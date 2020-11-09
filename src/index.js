@@ -26,7 +26,7 @@ async function initialise() {
 
     const emulator = new Emulator(document.getElementById('emulator'));
     await emulator.initialise();
-    await emulator.onStart('PRINT "Matt is cool"');
+    await emulator.onStart(editor.getModel().getValue());
 }
 
 initialise().then(() => {

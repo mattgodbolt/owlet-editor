@@ -9,7 +9,6 @@ var DdNoise = require('jsbeeb/ddnoise');
 var models = require('jsbeeb/models');
 var Cmos = require('jsbeeb/cmos');
 var utils = require('jsbeeb/utils');
-var fdc = require('jsbeeb/fdc');
 var Promise = require('promise');
 import tokenise from 'jsbeeb/basic-tokenise';
 
