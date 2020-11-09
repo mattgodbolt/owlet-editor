@@ -1,7 +1,8 @@
 import * as monaco from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
+import {Emulator} from './emulator';
 
-function initialise() {
+async function initialise() {
     registerBbcBasicLanguage();
 
     const editorPane = document.getElementById('editor');
@@ -22,6 +23,12 @@ function initialise() {
         wordWrap: 'on',
         lineDecorationsWidth: 0
     });
+
+    const emulator = new Emulator(document.getElementById('emulator'));
+    await emulator.initialise();
+    await emulator.onStart('PRINT "Matt is cool"');
 }
 
-initialise();
+initialise().then(() => {
+    console.log("Ready to go");
+});
