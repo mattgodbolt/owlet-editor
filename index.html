@@ -8,10 +8,24 @@
             font-family: ModeSeven;
             src: url(mode7gx3.ttf);
         }
+
+        .container {
+            display: flex;
+            height: 640px;
+            margin: 0 auto;
+        }
+
+        .code-editor {
+            position: relative;
+            width: 512px;
+            height: 80%;
+        }
     </style>
 </head>
 <body>
-<div id="editor" style="height: 1000px; width: 600px">
+<div class="container">
+    <div id="editor" class="code-editor">
+    </div>
 </div>
 <script src="main.js"></script>
 </body>

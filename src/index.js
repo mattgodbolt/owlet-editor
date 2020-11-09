@@ -16,7 +16,7 @@ function initialise() {
         lineNumbers: l => l * 10,
         language: 'BBCBASIC',
         theme: 'vs-dark',
-        // fontFamily: "ModeSeven", // selected text breaks
+        fontFamily: "ModeSeven",
         fontSize: 16,
         scrollBeyondLastLine: false,
         wordWrap: 'on',
