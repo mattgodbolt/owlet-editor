@@ -2,24 +2,33 @@ const path = require('path');
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
+const {CleanWebpackPlugin} = require('clean-webpack-plugin');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
 function getPlugins() {
     const plugins = [
+        new CleanWebpackPlugin(),
         new CopyPlugin({
             patterns: [
-                {from: path.resolve(__dirname, 'node_modules/jsbeeb/roms'), to: 'jsbeeb/roms'},
-                {from: path.resolve(__dirname, 'node_modules/jsbeeb/sounds'), to: 'jsbeeb/sounds'},
+                {
+                    context: path.resolve(__dirname, 'node_modules'), from: 'jsbeeb/roms/**/*',
+                    globOptions: {ignore: ['*.txt', 'README']}
+                },
+                {context: path.resolve(__dirname, 'node_modules'), from: 'jsbeeb/sounds/**/*.wav'},
             ],
         }),
         new MonacoWebpackPlugin({
             languages: [],
-            filename: isDev ? '[name].worker.js' : `[name].worker[contenthash].js`
+            filename: isDev ? '[name].worker.js' : `[name].worker.[contenthash].js`
         }),
         new MiniCssExtractPlugin({
             filename: isDev ? '[name].css' : '[name].[contenthash].css',
+        }),
+        new HtmlWebpackPlugin({
+            title: 'Screech',
         }),
     ];
     if (isDev) {
@@ -32,7 +41,7 @@ module.exports = {
     mode: isDev ? 'development' : 'production',
     entry: './src/index.js',
     output: {
-        filename: isDev ? '[name].js' : `[name][contenthash].js`,
+        filename: isDev ? '[name].js' : `[name].[contenthash].js`,
         path: path.resolve(__dirname, 'dist'),
     },
     resolve: {
@@ -70,6 +79,9 @@ module.exports = {
                     isDev ? 'style-loader' :
                         {
                             loader: MiniCssExtractPlugin.loader,
+                            options: {
+                                publicPath: './',
+                            },
                         },
                     'css-loader',
                     'less-loader'
@@ -81,6 +93,9 @@ module.exports = {
                     isDev ? 'style-loader' :
                         {
                             loader: MiniCssExtractPlugin.loader,
+                            options: {
+                                publicPath: './',
+                            },
                         },
                     'css-loader',
                 ],

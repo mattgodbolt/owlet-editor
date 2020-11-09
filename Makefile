@@ -54,7 +54,7 @@ HASH := $(shell git rev-parse HEAD)
 dist: export NODE_ENV=production
 dist: export WEBPACK_ARGS=-p
 dist: prereqs webpack  ## Creates a distribution
-	echo $(HASH) > out/dist/git_hash
+	echo $(HASH) > dist/git_hash
 
 install-git-hooks:  ## Install git hooks that will ensure code is linted and tests are run before allowing a check in
 	mkdir -p "$(shell git rev-parse --git-dir)/hooks"

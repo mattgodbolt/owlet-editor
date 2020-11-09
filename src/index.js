@@ -2,6 +2,7 @@ import $ from 'jquery';
 import {editor as monacoEditor, KeyMod, KeyCode} from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
+import rootHtml from './root.html';
 
 import './screech.less';
 
@@ -58,6 +59,7 @@ class Screech {
 }
 
 async function initialise() {
+    $('body').append(rootHtml);
     registerBbcBasicLanguage();
 
     screech = new Screech();
