@@ -28,7 +28,7 @@ function getPlugins() {
             filename: isDev ? '[name].css' : '[name].[contenthash].css',
         }),
         new HtmlWebpackPlugin({
-            title: 'Screech',
+            title: 'Owlet Editor',
         }),
     ];
     if (isDev) {

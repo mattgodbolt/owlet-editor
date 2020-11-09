@@ -1,12 +1,11 @@
-# Screech
+# Owlet Editor
 
 Future home of something cool. I hope.
 
 To develop:
 
 ```
-$ npm install
-$ npm start
+$ make run
 ```
 
 then visit http://localhost:8080

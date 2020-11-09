@@ -1,5 +1,5 @@
 {
-  "name": "screech",
+  "name": "owlet-editor",
   "description": "Web-based IDE for the BBC Micro",
   "authors": [
     {
@@ -10,7 +10,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mattgodbolt/screech.git"
+    "url": "git+https://github.com/mattgodbolt/owlet-editor.git"
   },
   "version": "0.0.1",
   "dependencies": {
@@ -49,9 +49,9 @@
   },
   "license": "BSD-2-Clause",
   "bugs": {
-    "url": "https://github.com/mattgodbolt/screech/issues"
+    "url": "https://github.com/mattgodbolt/owlet-editor/issues"
   },
-  "homepage": "https://github.com/mattgodbolt/screech#readme",
+  "homepage": "https://github.com/mattgodbolt/owlet-editor#readme",
   "private": true,
   "author": ""
 }

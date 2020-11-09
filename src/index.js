@@ -4,16 +4,16 @@ import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
 import rootHtml from './root.html';
 
-import './screech.less';
+import './owlet-editor.less';
 
-let screech = null;
+let owletEditor = null;
 
 const DefaultProgram = [
     'PRINT "HELLO WORLD"',
     'GOTO 10'
 ].join('\n');
 
-class Screech {
+class OwletEditor {
     constructor() {
         const editorPane = document.getElementById('editor');
         this.editor = monacoEditor.create(editorPane, {
@@ -62,8 +62,8 @@ async function initialise() {
     $('body').append(rootHtml);
     registerBbcBasicLanguage();
 
-    screech = new Screech();
-    await screech.initialise();
+    owletEditor = new OwletEditor();
+    await owletEditor.initialise();
 }
 
 initialise().then(() => {
