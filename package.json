@@ -14,7 +14,12 @@
   },
   "version": "0.0.1",
   "dependencies": {
-    "lodash": "^4.17.20"
+    "css-loader": "^5.0.1",
+    "file-loader": "^6.2.0",
+    "lodash": "^4.17.20",
+    "monaco-editor": "^0.21.2",
+    "monaco-editor-webpack-plugin": "^2.0.0",
+    "style-loader": "^2.0.0"
   },
   "devDependencies": {
     "@webpack-cli/serve": "^1.1.0",
