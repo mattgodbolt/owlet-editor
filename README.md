@@ -11,7 +11,7 @@ A simple, intuitive creative coding tool for BBC BASIC.
 
 * Integrated with JSbeeb emulator
 * Share your entire program as a URL
-* Export an disc image file to use on another emulator or physical machine
+* Export a disc image file to use on another emulator or physical machine
 
 ## Share your creations with the BBC Micro Bot Twitter community:
 
