@@ -1,0 +1,33 @@
+{
+  "name": "screech",
+  "description": "Web-based IDE for the BBC Micro",
+  "authors": [
+    {
+      "name": "Matt Godbolt",
+      "email": "matt@godbolt.org",
+      "url": "http://xania.org"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattgodbolt/screech.git"
+  },
+  "version": "0.0.1",
+  "dependencies": {
+    "lodash": "^4.17.20"
+  },
+  "devDependencies": {
+    "webpack": "^4.44.2",
+    "webpack-cli": "^3.3.12"
+  },
+  "scripts": {
+    "build": "webpack --mode development"
+  },
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/mattgodbolt/screech/issues"
+  },
+  "homepage": "https://github.com/mattgodbolt/screech#readme",
+  "private": true,
+  "author": ""
+}
