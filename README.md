@@ -5,6 +5,7 @@ Future home of something cool. I hope.
 To develop:
 
 ```
+$ npm install
 $ npm start
 ```
 
