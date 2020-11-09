@@ -1,30 +1,17 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8"/>
     <title>Screech</title>
-    <style>
-        @font-face {
-            font-family: ModeSeven;
-            src: url(mode7gx3.ttf);
-        }
-
-        .container {
-            display: flex;
-            height: 640px;
-            margin: 0 auto;
-        }
-
-        .code-editor {
-            position: relative;
-            width: 512px;
-            height: 80%;
-        }
-    </style>
 </head>
 <body>
 <div class="container">
-    <div id="editor" class="code-editor"></div>
+    <div>
+        <div class="toolbar">
+            <button class="run">run</button>
+        </div>
+        <div id="editor" class="code-editor"></div>
+    </div>
     <div id="emulator">
         <canvas class="screen" width="896" height="600"></canvas>
     </div>

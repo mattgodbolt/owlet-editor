@@ -1,12 +1,15 @@
-import * as monaco from 'monaco-editor';
+import $ from 'jquery';
+import {editor as monacoEditor} from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
+
+import './screech.less';
 
 async function initialise() {
     registerBbcBasicLanguage();
 
     const editorPane = document.getElementById('editor');
-    const editor = monaco.editor.create(editorPane, {
+    const editor = monacoEditor.create(editorPane, {
         value: [
             'PRINT "HELLO WORLD"',
             'GOTO 10'
@@ -24,9 +27,12 @@ async function initialise() {
         lineDecorationsWidth: 0
     });
 
-    const emulator = new Emulator(document.getElementById('emulator'));
+    const emulator = new Emulator($('#emulator'));
     await emulator.initialise();
-    await emulator.onStart(editor.getModel().getValue());
+    await emulator.runProgram(editor.getModel().getValue());
+    $(".toolbar .run").click(async () => {
+        await emulator.runProgram(editor.getModel().getValue());
+    });
 }
 
 initialise().then(() => {

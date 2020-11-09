@@ -1,8 +1,32 @@
 const path = require('path');
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const webpack = require('webpack');
 
-const isDev = true;
+const isDev = process.env.NODE_ENV !== 'production';
+
+function getPlugins() {
+    const plugins = [
+        new CopyPlugin({
+            patterns: [
+                {from: path.resolve(__dirname, 'node_modules/jsbeeb/roms'), to: 'jsbeeb/roms'},
+                {from: path.resolve(__dirname, 'node_modules/jsbeeb/sounds'), to: 'jsbeeb/sounds'},
+            ],
+        }),
+        new MonacoWebpackPlugin({
+            languages: [],
+            filename: isDev ? '[name].worker.js' : `[name].worker[contenthash].js`
+        }),
+        new MiniCssExtractPlugin({
+            filename: isDev ? '[name].css' : '[name].[contenthash].css',
+        }),
+    ];
+    if (isDev) {
+        plugins.push(new webpack.HotModuleReplacementPlugin);
+    }
+    return plugins;
+}
 
 module.exports = {
     mode: 'development',
@@ -19,18 +43,7 @@ module.exports = {
         preferRelative: true, // ugly, for jsbeeb and its love of non-relative imports
     },
     devtool: 'source-map',
-    plugins: [
-        new CopyPlugin({
-            patterns: [
-                {from: path.resolve(__dirname, 'node_modules/jsbeeb/roms'), to: 'jsbeeb/roms'},
-                {from: path.resolve(__dirname, 'node_modules/jsbeeb/sounds'), to: 'jsbeeb/sounds'},
-            ],
-        }),
-        new MonacoWebpackPlugin({
-            languages: [],
-            filename: isDev ? '[name].worker.js' : `[name].worker[contenthash].js`
-        })
-    ],
+    plugins: getPlugins(),
     devServer: {
         publicPath: '/',
         contentBase: './'
@@ -52,9 +65,23 @@ module.exports = {
     module: {
         rules: [
             {
+                test: /\.less$/,
+                use: [
+                    isDev ? 'style-loader' :
+                        {
+                            loader: MiniCssExtractPlugin.loader,
+                        },
+                    'css-loader',
+                    'less-loader'
+                ]
+            },
+            {
                 test: /\.css$/,
                 use: [
-                    'style-loader',
+                    isDev ? 'style-loader' :
+                        {
+                            loader: MiniCssExtractPlugin.loader,
+                        },
                     'css-loader',
                 ],
             }, {
