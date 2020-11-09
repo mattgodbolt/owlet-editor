@@ -27,8 +27,7 @@ export class Emulator {
         this.video = new Video.Video(model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
         const audioContext = typeof AudioContext !== 'undefined' ? new AudioContext()
-            : typeof webkitAudioContext !== 'undefined' ? new webkitAudioContext()
-                : null;
+            : null;
 
         if (audioContext) {
             this.soundChip = new SoundChip.SoundChip(audioContext.sampleRate);

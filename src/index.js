@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import {editor as monacoEditor} from 'monaco-editor';
+import {editor as monacoEditor, KeyMod, KeyCode} from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
 
@@ -33,7 +33,7 @@ class Screech {
         this.editor.addAction({
             id: 'execute-basic',
             label: 'Run',
-            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+            keybindings: [KeyMod.CtrlCmd | KeyCode.Enter],
             keybindingContext: null,
             contextMenuGroupId: 'navigation',
             contextMenuOrder: 1.5,

@@ -29,7 +29,7 @@ function getPlugins() {
 }
 
 module.exports = {
-    mode: 'development',
+    mode: isDev ? 'development' : 'production',
     entry: './src/index.js',
     output: {
         filename: isDev ? '[name].js' : `[name][contenthash].js`,

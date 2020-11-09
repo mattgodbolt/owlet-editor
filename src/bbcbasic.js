@@ -1,5 +1,6 @@
+import {languages} from 'monaco-editor';
 export function registerBbcBasicLanguage() {
-    monaco.languages.register({id: 'BBCBASIC'});
+    languages.register({id: 'BBCBASIC'});
 
     var keywords = ["AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
         "ELSE", "THEN", "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
@@ -15,7 +16,7 @@ export function registerBbcBasicLanguage() {
         "STOP", "COLOUR", "TRACE", "UNTIL", "WIDTH", "OSCLI"];
 
     // Register a tokens provider for the language
-    monaco.languages.setMonarchTokensProvider('BBCBASIC', {
+    languages.setMonarchTokensProvider('BBCBASIC', {
         defaultToken: 'invalid',
         brackets: [
             ['[', ']', 'delimiter.square'],
@@ -28,7 +29,7 @@ export function registerBbcBasicLanguage() {
             '+', '-', '*', '/', '<<', '>>', '^', '=', '==', '<>', '!=', '<', '>', '<=', '>=',
             '{', '}', ':'
         ],
-        symbols: /[-+#=><!*\/{}:]+/,
+        symbols: /[-+#=><!*/{}:]+/,
         tokenizer: {
             root: [
                 // identifiers and keywords
@@ -47,10 +48,10 @@ export function registerBbcBasicLanguage() {
                 // immediate
                 [/@symbols/, {cases: {'@operators': 'operator', '@default': ''}}],
                 // numbers
-                [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+                [/\d*\.\d+([eE][-+]?\d+)?/, 'number.float'],
                 [/&[0-9a-fA-F]+/, 'number.hex'],
                 [/\d+/, 'number'],
-                [/[{}()\[\]]/, '@brackets'],
+                [/[{}()[\]]/, '@brackets'],
                 // strings
                 [/["\u201c\u201d]/, {token: 'string.quote', next: '@string'}]
             ],
@@ -66,14 +67,14 @@ export function registerBbcBasicLanguage() {
     });
 
     // Register a completion item provider for the new language
-    monaco.languages.registerCompletionItemProvider('BBCBASIC', {
+    languages.registerCompletionItemProvider('BBCBASIC', {
         provideCompletionItems: () => {
             var suggestions = [];
 
             keywords.forEach(token =>
                 suggestions.push({
                     label: token,
-                    kind: monaco.languages.CompletionItemKind.Keyword,
+                    kind: languages.CompletionItemKind.Keyword,
                     insertText: token
                 })
             )
