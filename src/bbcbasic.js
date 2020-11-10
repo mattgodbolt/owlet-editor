@@ -58,7 +58,7 @@ export function registerBbcBasicLanguage() {
             ],
             whitespace: [
                 [/[ \t\r\n]+/, 'white'],
-                [/[;\\\\].*/, 'comment']
+                [/\b(REM\s*)\b.*/, 'comment']
             ],
             string: [
                 [/[^"\u201c\u201d]+/, 'string'],
