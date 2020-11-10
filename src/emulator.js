@@ -77,6 +77,10 @@ export class Emulator {
         requestAnimationFrame(this.onAnimFrame);
     }
 
+    pause() {
+        this.running = false;
+    }
+
     async runProgram(program) {
         if (!this.ready) return;
         this.cpu.reset(true);

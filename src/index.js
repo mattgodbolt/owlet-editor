@@ -16,6 +16,8 @@ const DefaultProgram = [
 class OwletEditor {
     constructor() {
         const editorPane = document.getElementById('editor');
+        this.observer = new ResizeObserver(() => this.editor.layout());
+        this.observer.observe(editorPane.parentElement)
         this.editor = monacoEditor.create(editorPane, {
             value: localStorage.getItem("program") || DefaultProgram,
             minimap: {
@@ -54,7 +56,12 @@ class OwletEditor {
     async initialise() {
         await this.emulator.initialise();
         await this.updateProgram();
-        $(".toolbar .run").click(async () => this.updateProgram());
+        const actions = {
+            run: async () => this.updateProgram(),
+            pause: async () => this.emulator.pause(),
+            resume: async () => this.emulator.start(),
+        };
+        $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }
 }
 

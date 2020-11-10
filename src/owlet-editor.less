@@ -3,6 +3,11 @@
   src: url(../assets/mode7gx3.ttf);
 }
 
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
 body {
   font-family: 'Roboto', sans-serif;
   color: #bbbbbb;
@@ -10,10 +15,38 @@ body {
   font-size: small;
 }
 
+.rows {
+  display: flex;
+  flex-flow: column;
+  height: 100%;
+
+  .row.header {
+    flex: 0 1 auto;
+  }
+
+  .row.content {
+    flex: 1 1 auto;
+  }
+
+  .row.footer {
+    flex: 0 1 2em;
+  }
+}
+
 .container {
   display: flex;
-  height: 640px;
+  justify-content: space-between;
+  height: 100%;
   margin: 0 auto;
+
+  .editor {
+    overflow: hidden;
+    flex: 1 1 0;
+  }
+
+  .emulator {
+    flex: 0 0 0;
+  }
 }
 
 button {
@@ -31,7 +64,10 @@ button:hover, button:active {
 }
 
 .code-editor {
-  position: relative;
-  width: 512px;
-  height: 80%;
+  height: 100%;
+}
+
+canvas.screen {
+  margin: 0 0.5em 0;
+  border: 1px solid #888888;
 }
