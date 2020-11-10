@@ -64,3 +64,4 @@ install-git-hooks:  ## Install git hooks that will ensure code is linted and tes
 .PHONY: deploy
 deploy: dist
 	aws s3 sync dist s3://owlet.godbolt.org
+	aws s3 cp dist/index.html s3://owlet.godbolt.org --cache-control max-age=30 --metadata-directive REPLACE
