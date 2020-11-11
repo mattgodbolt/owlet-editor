@@ -26,6 +26,7 @@ class OwletEditor {
             lineNumbers: l => l * 10,
             language: 'BBCBASIC',
             theme: 'vs-dark',
+            renderWhitespace: "none", // seems to fix odd space/font interaction
             fontFamily: "ModeSeven",
             fontSize: 16,
             scrollBeyondLastLine: false,
