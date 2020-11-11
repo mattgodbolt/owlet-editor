@@ -16,13 +16,42 @@ utils.setBaseUrl('jsbeeb/');
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
 
+class ScreenResizer {
+    constructor(screen) {
+        this.screen = screen;
+        const origHeight = screen.height();
+        const origWidth = screen.width();
+        this.desiredAspectRatio = origWidth / origHeight;
+        this.minHeight = origHeight / 4;
+        this.minWidth = origWidth / 4;
+        this.observer = new ResizeObserver(() => this.resizeScreen());
+        this.observer.observe(this.screen.parent()[0]);
+        this.resizeScreen();
+    }
+
+    resizeScreen() {
+        const InnerBorder = 16;
+        let width = Math.max(this.minWidth, this.screen.parent().innerWidth() - InnerBorder);
+        let height = Math.max(this.minHeight, this.screen.parent().innerHeight() - InnerBorder);
+        if (width / height <= this.desiredAspectRatio) {
+            height = width / this.desiredAspectRatio;
+        } else {
+            width = height * this.desiredAspectRatio;
+        }
+        console.log(width, height);
+        this.screen.height(height).width(width);
+    }
+}
+
 export class Emulator {
     constructor(root) {
         this.root = root;
-        this.canvas = canvasLib.bestCanvas(this.root.find('.screen')[0]);
+        const screen = this.root.find('.screen');
+        this.canvas = canvasLib.bestCanvas(screen[0]);
         this.frames = 0;
         this.frameSkip = 0;
         const model = models.findModel('B');
+        this.resizer = new ScreenResizer(screen);
 
         this.video = new Video.Video(model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
