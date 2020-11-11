@@ -83,4 +83,21 @@ export function registerBbcBasicLanguage() {
         }
     });
 
+    languages.setLanguageConfiguration('BBCBASIC', {
+        comments: {
+            blockComment: ['REM', ':'], lineComment: 'REM'
+        },
+        brackets: [
+            ['[', ']'],
+            ['(', ')']
+        ],
+        autoClosingPairs: [
+            {open: '(', close: ')'},
+            {open: '"', close: '"', notIn: ['string']}
+        ],
+        surroundingPairs: [
+            {open: '(', close: ')'},
+            {open: '"', close: '"'}
+        ]
+    });
 }
