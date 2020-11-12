@@ -64,9 +64,9 @@ class OwletEditor {
         await this.emulator.initialise();
         await this.updateProgram();
         const actions = {
-            run: async () => this.updateProgram(),
-            pause: async () => this.emulator.pause(),
-            resume: async () => this.emulator.start(),
+            run: async () => {this.updateProgram();this.selectView('screen')},
+            pause: async () => {this.emulator.pause();this.selectView('screen')},
+            resume: async () => {this.emulator.start();this.selectView('screen')},
             examples: async () => this.selectView('examples'),
             emulator: async () => this.selectView('screen'),
             about: async () => this.selectView('about')
