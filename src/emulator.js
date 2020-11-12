@@ -30,7 +30,7 @@ class ScreenResizer {
     }
 
     resizeScreen() {
-        const InnerBorder = 16;
+        const InnerBorder = 0;
         let width = Math.max(this.minWidth, this.screen.parent().innerWidth() - InnerBorder);
         let height = Math.max(this.minHeight, this.screen.parent().innerHeight() - InnerBorder);
         if (width / height <= this.desiredAspectRatio) {
