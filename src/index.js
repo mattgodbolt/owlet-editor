@@ -27,7 +27,6 @@ class OwletEditor {
             language: 'BBCBASIC',
             theme: 'vs-dark',
             renderWhitespace: "none", // seems to fix odd space/font interaction
-            fontFamily: "ModeSeven",
             fontSize: 16,
             scrollBeyondLastLine: false,
             wordWrap: 'on',
@@ -54,13 +53,23 @@ class OwletEditor {
         await this.emulator.runProgram(this.editor.getModel().getValue());
     }
 
+    selectView(selected) {
+              for ( var element of ['screen','about','examples']) {
+                document.getElementById(element).style.display = (element == selected) ? 'block' : 'none';
+              }
+    }
+
     async initialise() {
+
         await this.emulator.initialise();
         await this.updateProgram();
         const actions = {
-            run: async () => this.updateProgram(),
-            pause: async () => this.emulator.pause(),
-            resume: async () => this.emulator.start(),
+            run: async () => {this.updateProgram();this.selectView('screen')},
+            pause: async () => {this.emulator.pause();this.selectView('screen')},
+            resume: async () => {this.emulator.start();this.selectView('screen')},
+            examples: async () => this.selectView('examples'),
+            emulator: async () => this.selectView('screen'),
+            about: async () => this.selectView('about')
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }
@@ -72,6 +81,12 @@ async function initialise() {
 
     owletEditor = new OwletEditor();
     await owletEditor.initialise();
+
+    function setTheme(themeName) {
+      localStorage.setItem('theme', themeName);
+      document.documentElement.className = themeName;
+    }
+    setTheme("theme-beeb-dark");
 }
 
 initialise().then(() => {

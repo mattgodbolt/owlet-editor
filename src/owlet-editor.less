@@ -3,75 +3,95 @@
   src: url(../assets/mode7gx3.ttf);
 }
 
-html, body {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
+.theme-beeb-dark {
+  --color-background: #242321;
+  --color-toolbar: #434241;
+  --color-buttons: #595959;
+  --color-editor-bg: #171717;
+  --font-color: #B1A69A;
+  --color-highlight: #5E8040;
 }
 
-body {
-  font-family: 'Roboto', sans-serif;
-  color: #bbbbbb;
-  background: black;
+html, body {
+  font-family: Arial, Helvetica, sans-serif;
   font-size: small;
 }
 
-.rows {
+a:link, a:visited, a:hover, a:active {
+  color: var(--font-color);
+}
+
+*:focus {
+  outline: 0 !important;
+}
+
+body {
+  color: var(--font-color);
+  background: var(--color-background);
+  padding: 0;
+  margin: 0;
+}
+
+.wrapper {
+  height: 90vh;
+  display:grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px;
+}
+
+.header {
+  grid-column: 1/ span 2;
+  background-image: url('../assets/images/logo.png');
+  background-repeat: no-repeat;
+  background-position: left 10px top 10px;
+  background-size: auto 64px;
+}
+
+.toolbar {
+  grid-column: span 1;
+  background-color: var(--color-toolbar);
+  border: 1px solid  var(--color-background);
   display: flex;
-  flex-flow: column;
-  height: 100%;
-
-  .row.header {
-    flex: 0 1 auto;
-  }
-
-  .row.content {
-    flex: 1 1 auto;
-  }
-
-  .row.footer {
-    flex: 0 1 2em;
-  }
-}
-
-.container {
-  display: flex;
-  justify-content: space-between;
-  height: 100%;
-  margin: 0 auto;
-
-  .editor {
-    overflow: hidden;
-    flex: 3 1 0;
-    min-width: 60em;
-  }
-
-  .emulator {
-    overflow: hidden;
-    flex: 2 1 0;
-    min-width: 300px;
-  }
-}
-
-button {
-  font: bold 14px Arial;
-  text-decoration: none;
-  background-color: #000000;
-  color: #bbbbbb;
-  padding: 2px 6px 2px 6px;
-  border: 1px solid #888888;
-}
-
-button:hover, button:active {
-  background-color: #9c27b0;
-  color: #fff;
 }
 
 .code-editor {
+  background-color: var(--color-background);
+}
+
+.emulator{
+  background: var(--color-editor-bg);
+  justify-content: center;
+  align-content: center;
+}
+
+.footer {
+  grid-column: span 2;
+  background-color: var(--color-toolbar);
+  border: 1px solid  var(--color-background);
+}
+
+button {
+  width: 15%;
+  min-width: 64px;
   height: 100%;
+  text-decoration: none;
+  color: var(--font-color);
+  border: 1px solid  var(--color-background);
+  border-left: none;
+  background-color: var(--color-buttons);
+}
+
+button:hover, button:active, button:visited {
+  background-color: var(--color-highlight);
+  border: none;
 }
 
 canvas.screen {
-  margin: 0 0.5em 0;
-  border: 1px solid #888888;
+  border: none;
+}
+
+#examples, #about {
+  margin: 32px;
+  display: none;
+  height: 100%;
 }
