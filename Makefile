@@ -1,6 +1,7 @@
 .PHONY: default
 default: help
 
+NPM_UPDATED=node_modules/.npm-updated
 NPM?=$(shell which npm 2>/dev/null || echo .npm-not-found)
 .npm-not-found:
 	@echo "Could not find npm on the path. Please install"
@@ -11,11 +12,10 @@ help:  ## Shows this help
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: prereqs
-prereqs: node_modules
+prereqs: $(NPM_UPDATED)
 
-NODE_MODULES=.npm-updated
-$(NODE_MODULES): package.json
-	$(NPM) install
+$(NPM_UPDATED): package.json
+	$(NPM) install --production=false
 	@touch $@
 
 WEBPACK:=./node_modules/webpack-cli/bin/cli.js
@@ -24,11 +24,11 @@ webpack: prereqs  ## Runs webpack (useful only for debugging webpack)
 	$(NPM) run build
 
 .PHONY: lint
-lint: $(NODE_MODULES)  ## Checks if the source currently matches code conventions
+lint: prereqs  ## Checks if the source currently matches code conventions
 	$(NPM) run lint
 
 .PHONY: lint-fix
-lint-fix: $(NODE_MODULES)  ## Checks if everything matches code conventions & fixes those which are trivial to do so
+lint-fix: prereqs  ## Checks if everything matches code conventions & fixes those which are trivial to do so
 	$(NPM) run lint-fix
 
 .PHONY: test
@@ -37,9 +37,9 @@ test: $(NODE_MODULES)  ## Runs the tests
 	@echo Tests pass
 
 .PHONY: check
-check: $(NODE_MODULES) test lint-fix  ## Runs all checks required before committing (fixing trivial things automatically)
+check: test lint-fix  ## Runs all checks required before committing (fixing trivial things automatically)
 .PHONY: pre-commit
-pre-commit: $(NODE_MODULES) test lint
+pre-commit: test lint
 
 .PHONY: clean
 clean:  ## Cleans up everything
