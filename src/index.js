@@ -72,6 +72,12 @@ async function initialise() {
 
     owletEditor = new OwletEditor();
     await owletEditor.initialise();
+
+    function setTheme(themeName) {
+      localStorage.setItem('theme', themeName);
+      document.documentElement.className = themeName;
+    }
+    setTheme("theme-beeb-dark");
 }
 
 initialise().then(() => {
