@@ -13,8 +13,6 @@
 }
 
 html, body {
-  margin: 0;
-  padding: 0;
   font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -25,21 +23,27 @@ html, body {
 body {
   color: var(--font-color);
   background: var(--color-background);
+  padding: 0;
+  margin: 0;
 }
 
 .wrapper {
   height: 90vh;
   display:grid;
-  grid-template-columns: minmax(320px, auto) 640px;
-  grid-template-rows: 2fr 0.4fr 512px 0.4fr;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  grid-template-rows: 80px 24px auto 24px;
 }
 
 .header {
   grid-column: 1/ span 2;
+  background-image: url('../assets/images/logo.png');
+  background-repeat: no-repeat;
+  background-position: left 10px top 10px;
+  background-size: auto 64px;
 }
 
 .toolbar {
-  grid-column: 1/ span 2;
+  grid-column: span 1;
   background-color: var(--color-toolbar);
   border: 1px solid  var(--color-background);
   display: flex;
@@ -50,23 +54,25 @@ body {
 }
 
 .emulator {
-  background-color: var(--color-background);
-justify-content: center;
-align-content: center;
+  background-color: #080808;
+  justify-content: center;
+  align-content: center;
 }
 
 .footer {
-  grid-column: 1/ span 2;
+  grid-column: span 2;
   background-color: var(--color-toolbar);
   font-size: small;
 }
 
 button {
-  width: 8%;
+  width: 15%;
+  min-width: 64px;
   height: 100%;
   text-decoration: none;
   color: var(--font-color);
   border: 1px solid  var(--color-background);
+  border-left: none;
   background-color: var(--color-buttons);
 }
 
@@ -76,5 +82,10 @@ button:hover, button:active, button:visited {
 }
 
 canvas.screen {
-  border: 1px solid var(--color-toolbar);
+  border: none;
+}
+
+// There must be a better way
+.monaco-editor {
+  padding-top: 32px;
 }
