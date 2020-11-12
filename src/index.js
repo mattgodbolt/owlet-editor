@@ -53,13 +53,23 @@ class OwletEditor {
         await this.emulator.runProgram(this.editor.getModel().getValue());
     }
 
+    selectView(selected) {
+              for ( var element of ['screen','about','examples']) {
+                document.getElementById(element).style.display = (element == selected) ? 'block' : 'none';
+              }
+    }
+
     async initialise() {
+
         await this.emulator.initialise();
         await this.updateProgram();
         const actions = {
             run: async () => this.updateProgram(),
             pause: async () => this.emulator.pause(),
             resume: async () => this.emulator.start(),
+            examples: async () => this.selectView('examples'),
+            emulator: async () => this.selectView('screen'),
+            about: async () => this.selectView('about')
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }

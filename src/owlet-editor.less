@@ -31,7 +31,7 @@ body {
   height: 90vh;
   display:grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  grid-template-rows: 80px 24px auto 24px;
+  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px;
 }
 
 .header {
@@ -53,7 +53,7 @@ body {
   background-color: var(--color-background);
 }
 
-.emulator {
+.emulator{
   background-color: #080808;
   justify-content: center;
   align-content: center;
@@ -63,6 +63,7 @@ body {
   grid-column: span 2;
   background-color: var(--color-toolbar);
   font-size: small;
+  border: 1px solid  var(--color-background);
 }
 
 button {
@@ -83,4 +84,11 @@ button:hover, button:active, button:visited {
 
 canvas.screen {
   border: none;
+}
+
+#examples, #about {
+  background: var(--color-background);
+  padding: 16px;
+  display: none;
+  height: 100%;
 }
