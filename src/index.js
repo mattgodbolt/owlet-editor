@@ -13,6 +13,7 @@ const DefaultProgram = [
     'GOTO 10'
 ].join('\n');
 
+const GxrRomUrl = document.location.href + "jsbeeb/roms/gxr.rom";
 const StateVersion = 1;
 
 class OwletEditor {
@@ -48,14 +49,18 @@ class OwletEditor {
         });
 
         this.editor.getModel().onDidChangeContent(() => {
-            localStorage.setItem("program", this.editor.getModel().getValue());
+            localStorage.setItem("program", this.getBasicText());
             history.replaceState(null, '', `#${this.toStateString()}`)
         });
         this.emulator = new Emulator($('#emulator'));
     }
 
+    getBasicText() {
+        return this.editor.getModel().getValue();
+    }
+
     toStateString() {
-        const state = {v: StateVersion, program: this.editor.getModel().getValue()};
+        const state = {v: StateVersion, program: this.getBasicText()};
         return encodeURIComponent(JSON.stringify(state));
     }
 
@@ -81,7 +86,7 @@ class OwletEditor {
     }
 
     async updateProgram() {
-        await this.emulator.runProgram(this.editor.getModel().getValue());
+        await this.emulator.runProgram(this.getBasicText());
     }
 
     selectView(selected) {
@@ -105,6 +110,10 @@ class OwletEditor {
             resume: async () => {
                 this.emulator.start();
                 this.selectView('screen')
+            },
+            jsbeeb: async () => {
+                const url = `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&autorun&rom=gxr.rom`;
+                window.open(url, "_blank");
             },
             examples: async () => this.selectView('examples'),
             emulator: async () => this.selectView('screen'),
