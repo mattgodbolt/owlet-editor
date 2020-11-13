@@ -111,9 +111,13 @@ class OwletEditor {
                 this.emulator.start();
                 this.selectView('screen')
             },
-            jsbeeb: async () => {
+            jsbeeb: () => {
                 const url = `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&autorun&rom=gxr.rom`;
                 window.open(url, "_blank");
+            },
+            tweet: () => {
+                const url = `https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`;
+                window.open(url, '_new');
             },
             examples: async () => this.selectView('examples'),
             emulator: async () => this.selectView('screen'),
