@@ -13,13 +13,17 @@ const DefaultProgram = [
     'GOTO 10'
 ].join('\n');
 
+const StateVersion = 1;
+
 class OwletEditor {
     constructor() {
+        const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
+        const program = state ? state.program : localStorage.getItem("program") || DefaultProgram;
         const editorPane = document.getElementById('editor');
         this.observer = new ResizeObserver(() => this.editor.layout());
-        this.observer.observe(editorPane.parentElement)
+        this.observer.observe(editorPane.parentElement);
         this.editor = monacoEditor.create(editorPane, {
-            value: localStorage.getItem("program") || DefaultProgram,
+            value: program,
             minimap: {
                 enabled: false
             },
@@ -45,8 +49,35 @@ class OwletEditor {
 
         this.editor.getModel().onDidChangeContent(() => {
             localStorage.setItem("program", this.editor.getModel().getValue());
+            history.replaceState(null, '', `#${this.toStateString()}`)
         });
         this.emulator = new Emulator($('#emulator'));
+    }
+
+    toStateString() {
+        const state = {v: StateVersion, program: this.editor.getModel().getValue()};
+        return encodeURIComponent(JSON.stringify(state));
+    }
+
+    static decodeStateString(stateString) {
+        try {
+            const state = JSON.parse(decodeURIComponent(stateString));
+            if (state.v !== StateVersion)
+                return null;
+            return state;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async onHashChange() {
+        console.log("hash changed");
+        const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
+        if (state) {
+            this.editor.getModel().setValue(state.program);
+            await this.updateProgram();
+            this.selectView('screen')
+        }
     }
 
     async updateProgram() {
@@ -54,19 +85,27 @@ class OwletEditor {
     }
 
     selectView(selected) {
-              for ( var element of ['screen','about','examples']) {
-                document.getElementById(element).style.display = (element == selected) ? 'block' : 'none';
-              }
+        for (const element of ['screen', 'about', 'examples']) {
+            document.getElementById(element).style.display = element === selected ? 'block' : 'none';
+        }
     }
 
     async initialise() {
-
         await this.emulator.initialise();
         await this.updateProgram();
         const actions = {
-            run: async () => {this.updateProgram();this.selectView('screen')},
-            pause: async () => {this.emulator.pause();this.selectView('screen')},
-            resume: async () => {this.emulator.start();this.selectView('screen')},
+            run: async () => {
+                await this.updateProgram();
+                this.selectView('screen')
+            },
+            pause: async () => {
+                this.emulator.pause();
+                this.selectView('screen')
+            },
+            resume: async () => {
+                this.emulator.start();
+                this.selectView('screen')
+            },
             examples: async () => this.selectView('examples'),
             emulator: async () => this.selectView('screen'),
             about: async () => this.selectView('about')
@@ -82,10 +121,13 @@ async function initialise() {
     owletEditor = new OwletEditor();
     await owletEditor.initialise();
 
+    window.onhashchange = () => owletEditor.onHashChange();
+
     function setTheme(themeName) {
-      localStorage.setItem('theme', themeName);
-      document.documentElement.className = themeName;
+        localStorage.setItem('theme', themeName);
+        document.documentElement.className = themeName;
     }
+
     setTheme("theme-beeb-dark");
 }
 
