@@ -12,11 +12,18 @@ help:  ## Shows this help
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: prereqs
-prereqs: $(NPM_UPDATED)
+prereqs: $(NPM_UPDATED) roms
 
 $(NPM_UPDATED): package.json
 	$(NPM) install --production=false
 	@touch $@
+
+.PHONY: roms
+ROM_DIR:=./node_modules/jsbeeb/roms
+roms: $(ROM_DIR)/gxr.rom
+
+$(ROM_DIR)/gxr.rom: $(NPM_UPDATED)
+	curl -sL http://mdfs.net/System/ROMs/Graphics/GXR120 -o $@
 
 WEBPACK:=./node_modules/webpack-cli/bin/cli.js
 .PHONY: webpack

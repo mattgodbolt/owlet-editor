@@ -50,6 +50,7 @@ export class Emulator {
         this.frames = 0;
         this.frameSkip = 0;
         const model = models.findModel('B');
+        model.os.push('gxr.rom');
         this.resizer = new ScreenResizer(screen);
         this.leftMargin = 115;
         this.rightMargin = 130;
