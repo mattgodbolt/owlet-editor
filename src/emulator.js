@@ -38,7 +38,6 @@ class ScreenResizer {
         } else {
             width = height * this.desiredAspectRatio;
         }
-        console.log(width, height);
         this.screen.height(height).width(width);
     }
 }
@@ -52,6 +51,11 @@ export class Emulator {
         this.frameSkip = 0;
         const model = models.findModel('B');
         this.resizer = new ScreenResizer(screen);
+        this.leftMargin = 115;
+        this.rightMargin = 130;
+        this.topMargin = 45;
+        this.bottomMargin = 30;
+        window.theEmulator = this;
 
         this.video = new Video.Video(model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
@@ -208,6 +212,11 @@ export class Emulator {
         this.frames++;
         if (this.frames < this.frameSkip) return;
         this.frames = 0;
-        this.canvas.paint(minx, miny, maxx, maxy);
+        const teletextAdjustX = (this.video && this.video.teletextMode) ? 15 : 0;
+        this.canvas.paint(
+            minx + this.leftMargin + teletextAdjustX,
+            miny + this.topMargin,
+            maxx - this.rightMargin + teletextAdjustX,
+            maxy - this.bottomMargin);
     }
 }
