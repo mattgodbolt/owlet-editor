@@ -13,7 +13,6 @@ const DefaultProgram = [
     'GOTO 10'
 ].join('\n');
 
-const GxrRomUrl = document.location.href + "jsbeeb/roms/gxr.rom";
 const StateVersion = 1;
 
 class OwletEditor {
@@ -112,7 +111,7 @@ class OwletEditor {
                 this.selectView('screen')
             },
             jsbeeb: () => {
-                const url = `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&autorun&rom=gxr.rom`;
+                const url = `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`;
                 window.open(url, "_blank");
             },
             tweet: () => {
