@@ -71,19 +71,28 @@ body {
   grid-column: span 1;
   background-color: var(--color-toolbar);
   border: 1px solid  var(--color-background);
-  font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
+  //font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
   color: var(--color-highlight);
 }
 
 button {
-  width: 15%;
-  min-width: 64px;
+  min-width: contain;
   height: 100%;
+  padding-right: 16px;
+  padding-left: 16px;
+  margin-right: 2px;
   text-decoration: none;
   color: var(--font-color);
-  border: 1px solid var(--color-background);
-  border-left: none;
+  border: none;//1px solid var(--color-background);
   background-color: var(--color-buttons);
+}
+
+button.bottom {
+  background-color: var(--color-toolbar);
+}
+
+button.small {
+  min-width: 16px;
 }
 
 button.twitter {
@@ -92,8 +101,6 @@ button.twitter {
 
 button:hover, button:active, button:visited {
   background-color: var(--color-highlight);
-  border: 1px solid  var(--color-background);
-  border-left: none;
 }
 
 canvas.screen {

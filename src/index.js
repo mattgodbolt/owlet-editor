@@ -98,7 +98,7 @@ class OwletEditor {
     updateStatus(basicText){
         var status = (basicText.length >= tweetMaximum) ? '<span style="color:Tomato">'+basicText.length+"</span>" : basicText.length;
         edit_status.innerHTML = status+" characters";
-        emu_status.innerHTML = "JSbeeb | BBC Micro Model B | GXR ROM";
+        emu_status.innerHTML = " BBC Micro Model B | GXR ROM";
     }
 
     selectView(selected) {
