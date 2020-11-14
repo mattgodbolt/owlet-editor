@@ -6,9 +6,6 @@ import rootHtml from './root.html';
 
 import './owlet-editor.less';
 
-let owletEditor = null;
-
-
 const DefaultProgram = [
     'PRINT "HELLO WORLD"',
     'GOTO 10'
@@ -21,12 +18,12 @@ class OwletEditor {
     constructor() {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         const program = state ? state.program : localStorage.getItem("program") || DefaultProgram;
-        const editorPane = document.getElementById('editor');
-        const edit_status = document.getElementById('edit_status');
-        const emu_status = document.getElementById('emu_status');
+        const editorPane = $('#editor');
+        this.editStatus = $('#edit_status');
+        this.emuStatus = $('#emu_status');
         this.observer = new ResizeObserver(() => this.editor.layout());
-        this.observer.observe(editorPane.parentElement);
-        this.editor = monacoEditor.create(editorPane, {
+        this.observer.observe(editorPane.parent()[0]);
+        this.editor = monacoEditor.create(editorPane[0], {
             value: program,
             minimap: {
                 enabled: false
@@ -95,15 +92,17 @@ class OwletEditor {
         await this.emulator.runProgram(this.getBasicText());
     }
 
-    updateStatus(basicText){
-        var status = (basicText.length >= tweetMaximum) ? '<span style="color:Tomato">'+basicText.length+"</span>" : basicText.length;
-        edit_status.innerHTML = status+" characters";
-        emu_status.innerHTML = " BBC Micro Model B | GXR ROM";
+    updateStatus(basicText) {
+        this.editStatus
+            .find(".count")
+            .text(basicText.length)
+            .toggleClass("too_long", basicText.length >= tweetMaximum);
+        this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
 
     selectView(selected) {
         for (const element of ['screen', 'about', 'examples']) {
-            document.getElementById(element).style.display = element === selected ? 'block' : 'none';
+            $(`#${element}`).toggle(element === selected);
         }
     }
 
@@ -131,9 +130,18 @@ class OwletEditor {
                 const url = `https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`;
                 window.open(url, '_new');
             },
-            examples: async () => {this.selectView('examples');this.emulator.pause();},
-            emulator: async () => {this.selectView('screen');this.emulator.start();},
-            about: async () => {this.selectView('about');this.emulator.pause();}
+            examples: async () => {
+                this.selectView('examples');
+                this.emulator.pause();
+            },
+            emulator: async () => {
+                this.selectView('screen');
+                this.emulator.start();
+            },
+            about: async () => {
+                this.selectView('about');
+                this.emulator.pause();
+            }
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }
@@ -143,7 +151,7 @@ async function initialise() {
     $('body').append(rootHtml);
     registerBbcBasicLanguage();
 
-    owletEditor = new OwletEditor();
+    const owletEditor = new OwletEditor();
     await owletEditor.initialise();
 
     window.onhashchange = () => owletEditor.onHashChange();
