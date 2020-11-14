@@ -5,11 +5,12 @@
 
 .theme-beeb-dark {
   --color-background: #242321;
-  --color-toolbar: #434241;
+  --color-toolbar: #333231;
   --color-buttons: #595959;
   --color-editor-bg: #171717;
   --font-color: #B1A69A;
   --color-highlight: #5E8040;
+  --twitter-blue: #00536f;
 }
 
 html, body {
@@ -65,29 +66,41 @@ body {
 }
 
 .footer {
-  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  grid-column: span 1;
   background-color: var(--color-toolbar);
-  border: 1px solid var(--color-background);
+  border: 1px solid  var(--color-background);
+  //font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
+  color: var(--color-highlight);
 }
 
 button {
-  width: 15%;
-  min-width: 64px;
+  min-width: contain;
   height: 100%;
+  padding-right: 16px;
+  padding-left: 16px;
+  margin-right: 2px;
   text-decoration: none;
   color: var(--font-color);
-  border: 1px solid var(--color-background);
-  border-left: none;
+  border: none;//1px solid var(--color-background);
   background-color: var(--color-buttons);
 }
 
+button.bottom {
+  background-color: var(--color-toolbar);
+}
+
+button.small {
+  min-width: 16px;
+}
+
 button.twitter {
-  background-color: #00536f;
+  background-color: var(--twitter-blue);
 }
 
 button:hover, button:active, button:visited {
   background-color: var(--color-highlight);
-  border: none;
 }
 
 canvas.screen {
@@ -98,4 +111,14 @@ canvas.screen {
   margin: 32px;
   display: none;
   height: 100%;
+}
+
+#edit_status {
+  padding-left: 16px;
+  justify-content: left;
+}
+
+#emu_status {
+  padding-left: 16px;
+  justify-content: right;
 }

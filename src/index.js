@@ -8,18 +8,22 @@ import './owlet-editor.less';
 
 let owletEditor = null;
 
+
 const DefaultProgram = [
     'PRINT "HELLO WORLD"',
     'GOTO 10'
 ].join('\n');
 
 const StateVersion = 1;
+const tweetMaximum = 280;
 
 class OwletEditor {
     constructor() {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         const program = state ? state.program : localStorage.getItem("program") || DefaultProgram;
         const editorPane = document.getElementById('editor');
+        const edit_status = document.getElementById('edit_status');
+        const emu_status = document.getElementById('emu_status');
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parentElement);
         this.editor = monacoEditor.create(editorPane, {
@@ -48,10 +52,13 @@ class OwletEditor {
         });
 
         this.editor.getModel().onDidChangeContent(() => {
-            localStorage.setItem("program", this.getBasicText());
-            history.replaceState(null, '', `#${this.toStateString()}`)
+            var basicText = this.getBasicText();
+            localStorage.setItem("program", basicText);
+            history.replaceState(null, '', `#${this.toStateString()}`);
+            this.updateStatus(basicText);
         });
         this.emulator = new Emulator($('#emulator'));
+        this.updateStatus(program);
     }
 
     getBasicText() {
@@ -88,6 +95,12 @@ class OwletEditor {
         await this.emulator.runProgram(this.getBasicText());
     }
 
+    updateStatus(basicText){
+        var status = (basicText.length >= tweetMaximum) ? '<span style="color:Tomato">'+basicText.length+"</span>" : basicText.length;
+        edit_status.innerHTML = status+" characters";
+        emu_status.innerHTML = " BBC Micro Model B | GXR ROM";
+    }
+
     selectView(selected) {
         for (const element of ['screen', 'about', 'examples']) {
             document.getElementById(element).style.display = element === selected ? 'block' : 'none';
@@ -118,9 +131,9 @@ class OwletEditor {
                 const url = `https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`;
                 window.open(url, '_new');
             },
-            examples: async () => this.selectView('examples'),
-            emulator: async () => this.selectView('screen'),
-            about: async () => this.selectView('about')
+            examples: async () => {this.selectView('examples');this.emulator.pause();},
+            emulator: async () => {this.selectView('screen');this.emulator.start();},
+            about: async () => {this.selectView('about');this.emulator.pause();}
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }
