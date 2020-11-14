@@ -1,13 +1,11 @@
 import $ from 'jquery';
-import {editor as monacoEditor, KeyMod, KeyCode} from 'monaco-editor';
+import {editor as monacoEditor, KeyCode, KeyMod} from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
 import rootHtml from './root.html';
+import Examples from './examples.yaml';
 
 import './owlet-editor.less';
-
-let owletEditor = null;
-
 
 const DefaultProgram = [
     'PRINT "HELLO WORLD"',
@@ -21,12 +19,12 @@ class OwletEditor {
     constructor() {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         const program = state ? state.program : localStorage.getItem("program") || DefaultProgram;
-        const editorPane = document.getElementById('editor');
-        const edit_status = document.getElementById('edit_status');
-        const emu_status = document.getElementById('emu_status');
+        const editorPane = $('#editor');
+        this.editStatus = $('#edit_status');
+        this.emuStatus = $('#emu_status');
         this.observer = new ResizeObserver(() => this.editor.layout());
-        this.observer.observe(editorPane.parentElement);
-        this.editor = monacoEditor.create(editorPane, {
+        this.observer.observe(editorPane.parent()[0]);
+        this.editor = monacoEditor.create(editorPane[0], {
             value: program,
             minimap: {
                 enabled: false
@@ -52,13 +50,42 @@ class OwletEditor {
         });
 
         this.editor.getModel().onDidChangeContent(() => {
-            var basicText = this.getBasicText();
+            const basicText = this.getBasicText();
             localStorage.setItem("program", basicText);
             history.replaceState(null, '', `#${this.toStateString()}`);
             this.updateStatus(basicText);
         });
         this.emulator = new Emulator($('#emulator'));
         this.updateStatus(program);
+
+        this.examples = {};
+        for (const example of Examples.examples)
+            this.addExample(example);
+    }
+
+    async chooseExample(id) {
+        const example = this.examples[id];
+        if (example.basic) {
+            this.editor.getModel().setValue(example.basic);
+            await this.updateProgram();
+            this.selectView('screen')
+        }
+    }
+
+    addExample(example) {
+        this.examples[example.id] = example;
+        const $examples = $('#examples');
+        const newElem =
+            $examples.find("div.template")
+                .clone()
+                .removeClass("template")
+                .appendTo($examples);
+        newElem.find(".name")
+            .text(example.name)
+            .click(() => this.chooseExample(example.id));
+        newElem.find(".description").text(example.description);
+        if (example.basic)
+            newElem.find(".code").text(example.basic);
     }
 
     getBasicText() {
@@ -82,7 +109,6 @@ class OwletEditor {
     }
 
     async onHashChange() {
-        console.log("hash changed");
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         if (state) {
             this.editor.getModel().setValue(state.program);
@@ -95,16 +121,22 @@ class OwletEditor {
         await this.emulator.runProgram(this.getBasicText());
     }
 
-    updateStatus(basicText){
-        var status = (basicText.length >= tweetMaximum) ? '<span style="color:Tomato">'+basicText.length+"</span>" : basicText.length;
-        edit_status.innerHTML = status+" characters";
-        emu_status.innerHTML = " BBC Micro Model B | GXR ROM";
+    updateStatus(basicText) {
+        this.editStatus
+            .find(".count")
+            .text(basicText.length)
+            .toggleClass("too_long", basicText.length >= tweetMaximum);
+        this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
 
     selectView(selected) {
         for (const element of ['screen', 'about', 'examples']) {
-            document.getElementById(element).style.display = element === selected ? 'block' : 'none';
+            $(`#${element}`).toggle(element === selected);
         }
+        if (selected === 'screen')
+            this.emulator.start();
+        else
+            this.emulator.pause();
     }
 
     async initialise() {
@@ -115,25 +147,11 @@ class OwletEditor {
                 await this.updateProgram();
                 this.selectView('screen')
             },
-            pause: async () => {
-                this.emulator.pause();
-                this.selectView('screen')
-            },
-            resume: async () => {
-                this.emulator.start();
-                this.selectView('screen')
-            },
-            jsbeeb: () => {
-                const url = `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`;
-                window.open(url, "_blank");
-            },
-            tweet: () => {
-                const url = `https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`;
-                window.open(url, '_new');
-            },
-            examples: async () => {this.selectView('examples');this.emulator.pause();},
-            emulator: async () => {this.selectView('screen');this.emulator.start();},
-            about: async () => {this.selectView('about');this.emulator.pause();}
+            jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
+            tweet: () => window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`, '_new'),
+            examples: () => this.selectView('examples'),
+            emulator: () => this.selectView('screen'),
+            about: () => this.selectView('about')
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }
@@ -143,7 +161,7 @@ async function initialise() {
     $('body').append(rootHtml);
     registerBbcBasicLanguage();
 
-    owletEditor = new OwletEditor();
+    const owletEditor = new OwletEditor();
     await owletEditor.initialise();
 
     window.onhashchange = () => owletEditor.onHashChange();

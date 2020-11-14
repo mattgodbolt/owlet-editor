@@ -3,7 +3,7 @@ import {languages} from 'monaco-editor';
 export function registerBbcBasicLanguage() {
     languages.register({id: 'BBCBASIC'});
 
-    var keywords = ["AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
+    const keywords = ["AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
         "ELSE", "THEN", "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
         "ASC", "ASN", "ATN", "BGET", "COS", "COUNT", "DEG", "ERL", "ERR", "EVAL", "EXP", "EXT", "FALSE",
         "FN", "GET", "INKEY", "INSTR", "INT", "LEN", "LN", "LOG", "NOT", "OPENIN", "OPENOUT", "PI",
@@ -70,7 +70,7 @@ export function registerBbcBasicLanguage() {
     // Register a completion item provider for the new language
     languages.registerCompletionItemProvider('BBCBASIC', {
         provideCompletionItems: () => {
-            var suggestions = [];
+            const suggestions = [];
 
             keywords.forEach(token =>
                 suggestions.push({

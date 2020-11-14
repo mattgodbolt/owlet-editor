@@ -73,11 +73,11 @@ module.exports = {
     },
     module: {
         rules: [
-          {
-                 test: /\.(jpg|png)$/,
-                 use: {
+            {
+                test: /\.(jpg|png)$/,
+                use: {
                     loader: 'url-loader',
-                      },
+                },
             },
             {
                 test: /\.less$/,
@@ -113,6 +113,10 @@ module.exports = {
                 test: /\.(html)$/,
                 loader: 'html-loader',
             },
+            {
+                test: /\.ya?ml$/,
+                use: ['json-loader', 'yaml-loader']
+            }
         ],
     }
 };

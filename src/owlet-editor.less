@@ -59,6 +59,10 @@ body {
   background-color: var(--color-background);
 }
 
+.too_long {
+  color: Tomato;
+}
+
 .emulator {
   background: var(--color-editor-bg);
   justify-content: center;
@@ -70,20 +74,19 @@ body {
   align-items: center;
   grid-column: span 1;
   background-color: var(--color-toolbar);
-  border: 1px solid  var(--color-background);
+  border: 1px solid var(--color-background);
   //font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
   color: var(--color-highlight);
 }
 
 button {
-  min-width: contain;
   height: 100%;
   padding-right: 16px;
   padding-left: 16px;
   margin-right: 2px;
   text-decoration: none;
   color: var(--font-color);
-  border: none;//1px solid var(--color-background);
+  border: none; //1px solid var(--color-background);
   background-color: var(--color-buttons);
 }
 
@@ -121,4 +124,15 @@ canvas.screen {
 #emu_status {
   padding-left: 16px;
   justify-content: right;
+}
+
+.template {
+  display: none;
+}
+
+#examples {
+  overflow-x: hidden;
+  .code {
+    font-family: ModeSeven;
+  }
 }
