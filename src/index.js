@@ -56,8 +56,6 @@ class OwletEditor {
         });
         this.emulator = new Emulator($('#emulator'));
         this.updateStatus(program);
-
-        editorPane.on("")
     }
 
     getBasicText() {
