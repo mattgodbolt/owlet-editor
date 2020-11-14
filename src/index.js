@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import {editor as monacoEditor, KeyMod, KeyCode} from 'monaco-editor';
+import {editor as monacoEditor, KeyCode, KeyMod} from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
 import rootHtml from './root.html';
@@ -49,13 +49,15 @@ class OwletEditor {
         });
 
         this.editor.getModel().onDidChangeContent(() => {
-            var basicText = this.getBasicText();
+            const basicText = this.getBasicText();
             localStorage.setItem("program", basicText);
             history.replaceState(null, '', `#${this.toStateString()}`);
             this.updateStatus(basicText);
         });
         this.emulator = new Emulator($('#emulator'));
         this.updateStatus(program);
+
+        editorPane.on("")
     }
 
     getBasicText() {
@@ -79,7 +81,6 @@ class OwletEditor {
     }
 
     async onHashChange() {
-        console.log("hash changed");
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         if (state) {
             this.editor.getModel().setValue(state.program);
@@ -104,6 +105,10 @@ class OwletEditor {
         for (const element of ['screen', 'about', 'examples']) {
             $(`#${element}`).toggle(element === selected);
         }
+        if (selected === 'screen')
+            this.emulator.start();
+        else
+            this.emulator.pause();
     }
 
     async initialise() {
@@ -114,34 +119,11 @@ class OwletEditor {
                 await this.updateProgram();
                 this.selectView('screen')
             },
-            pause: async () => {
-                this.emulator.pause();
-                this.selectView('screen')
-            },
-            resume: async () => {
-                this.emulator.start();
-                this.selectView('screen')
-            },
-            jsbeeb: () => {
-                const url = `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`;
-                window.open(url, "_blank");
-            },
-            tweet: () => {
-                const url = `https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`;
-                window.open(url, '_new');
-            },
-            examples: async () => {
-                this.selectView('examples');
-                this.emulator.pause();
-            },
-            emulator: async () => {
-                this.selectView('screen');
-                this.emulator.start();
-            },
-            about: async () => {
-                this.selectView('about');
-                this.emulator.pause();
-            }
+            jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
+            tweet: () => window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`, '_new'),
+            examples: () => this.selectView('examples'),
+            emulator: () => this.selectView('screen'),
+            about: () => this.selectView('about')
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }
