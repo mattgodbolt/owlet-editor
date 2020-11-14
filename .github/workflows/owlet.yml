@@ -17,8 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: actions/setup-node@v1
-          with:
-            node-version: 12.x
+        with:
+          node-version: 12.x
       - run: make dist
       - name: upload to s3
         uses: jakejarvis/s3-sync-action@master
