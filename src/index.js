@@ -3,6 +3,7 @@ import {editor as monacoEditor, KeyCode, KeyMod} from 'monaco-editor';
 import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
 import rootHtml from './root.html';
+import Examples from './examples.yaml';
 
 import './owlet-editor.less';
 
@@ -56,6 +57,35 @@ class OwletEditor {
         });
         this.emulator = new Emulator($('#emulator'));
         this.updateStatus(program);
+
+        this.examples = {};
+        for (const example of Examples.examples)
+            this.addExample(example);
+    }
+
+    async chooseExample(id) {
+        const example = this.examples[id];
+        if (example.basic) {
+            this.editor.getModel().setValue(example.basic);
+            await this.updateProgram();
+            this.selectView('screen')
+        }
+    }
+
+    addExample(example) {
+        this.examples[example.id] = example;
+        const $examples = $('#examples');
+        const newElem =
+            $examples.find("div.template")
+                .clone()
+                .removeClass("template")
+                .appendTo($examples);
+        newElem.find(".name")
+            .text(example.name)
+            .click(() => this.chooseExample(example.id));
+        newElem.find(".description").text(example.description);
+        if (example.basic)
+            newElem.find(".code").text(example.basic);
     }
 
     getBasicText() {
