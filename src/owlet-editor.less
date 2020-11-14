@@ -34,7 +34,7 @@ body {
 
 .wrapper {
   height: 90vh;
-  display: grid;
+  display:grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
   grid-template-rows: 80px 24px minmax(320px, 90vh) 24px;
 }
@@ -50,7 +50,7 @@ body {
 .toolbar {
   grid-column: span 1;
   background-color: var(--color-toolbar);
-  border: 1px solid var(--color-background);
+  border: 1px solid  var(--color-background);
   display: flex;
 }
 
@@ -58,16 +58,21 @@ body {
   background-color: var(--color-background);
 }
 
-.emulator {
+.emulator{
   background: var(--color-editor-bg);
   justify-content: center;
   align-content: center;
 }
 
 .footer {
+  display: flex;
+  justify-content: left;
+  align-items: center;
   grid-column: span 2;
   background-color: var(--color-toolbar);
-  border: 1px solid var(--color-background);
+  border: 1px solid  var(--color-background);
+  font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
+  color: var(--color-highlight);
 }
 
 button {
@@ -76,18 +81,15 @@ button {
   height: 100%;
   text-decoration: none;
   color: var(--font-color);
-  border: 1px solid var(--color-background);
+  border: 1px solid  var(--color-background);
   border-left: none;
   background-color: var(--color-buttons);
 }
 
-button.twitter {
-  background-color: #00536f;
-}
-
 button:hover, button:active, button:visited {
   background-color: var(--color-highlight);
-  border: none;
+  border: 1px solid  var(--color-background);
+  border-left: none;
 }
 
 canvas.screen {
@@ -98,4 +100,8 @@ canvas.screen {
   margin: 32px;
   display: none;
   height: 100%;
+}
+
+#remaining {
+  padding-left: 16px;
 }
