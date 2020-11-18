@@ -21,21 +21,23 @@ jobs:
         with:
           node-version: 12.x
       - run: make dist
-      - name: upload to s3
+      - name: upload distribution to s3
         uses: jakejarvis/s3-sync-action@v0.5.1
         with:
-          args: --acl public-read --follow-symlinks
+          args: --acl public-read --follow-symlinks --exclude index.html
         env:
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
           AWS_REGION: 'us-east-1'
           SOURCE_DIR: 'dist'
-      - name: invalidate
-        uses: chetan/invalidate-cloudfront-action@v1.3
+      - name: upload new index.html to s3 (with cache control magic)
+        uses: jakejarvis/s3-sync-action@v0.5.1
+        with:
+          args: --acl public-read --exclude '*' --include index.html --cache-control max-age=0 --metadata-directive REPLACE
         env:
-          DISTRIBUTION: ${{ secrets.DISTRIBUTION }}
-          PATHS: '/ /index.html'
-          AWS_REGION: 'us-east-1'
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          AWS_REGION: 'us-east-1'
+          SOURCE_DIR: 'dist'
