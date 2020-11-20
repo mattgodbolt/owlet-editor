@@ -2,8 +2,9 @@
     <div class="header"></div>
     <div class="toolbar">
         <button data-action="run" title="Run the program (ctrl-enter)">run</button>
-        <button class="twitter" data-action="tweet" title="Tweet your amazing code to @bbcmicrobot">tweet</button>
-          <button data-action="detokenize" title="detokenize code">detokenize</button>
+        <button data-action="detokenize" title="detokenize code">detokenize</button>
+        <button class="share" data-action="tweet" title="Tweet your amazing code to @bbcmicrobot">share</button>
+
     </div>
     <div class="toolbar">
         <button data-action="emulator" title="View emulator (ctrl-enter)">emulator</button>
@@ -40,4 +41,13 @@
         <button class="bottom" data-action="jsbeeb" title="Load the current code into a full emulator">JSbeeb</button>
         <div id="emu_status"></div>
     </div>
+</div>
+
+<!-- Modal Share Pop-Up-->
+<div id="share" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <p><b>Share your BBC Micro program</b></p>
+    <p id="share-content">The hash URL will be here to copy. Also button to tweet to the bot.</p>
+  </div>
 </div>
