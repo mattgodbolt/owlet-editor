@@ -28,4 +28,4 @@ const tokens = ["AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP"
         "PLOT", "PRINT", "PROC", "READ", "REM", "REPEAT", "REPORT", "RESTORE", "RETURN", "RUN",
         "STOP", "COLOUR", "TRACE", "UNTIL", "WIDTH", "OSCLI"];
 
-exports.tokens = tokens;
+module.exports.tokens = tokens;
