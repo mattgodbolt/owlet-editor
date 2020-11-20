@@ -134,10 +134,10 @@ class OwletEditor {
     }
 
     detokenize(text) {
-      var output="";
-      var instr = false;
+      let output="";
+      let instr = false;
       for (let i = 0; i<text.length; i++){
-        var g = text.codePointAt(i) & 0xff;
+        let g = text.codePointAt(i) & 0xff;
         if (g==0x22) {instr = !instr;} // we're a string
         if (g==0x10 || g==0x3A) {instr = false}
         output += (g>=0x80 && !instr) ? Keywords[g-0x81] : text[i];
