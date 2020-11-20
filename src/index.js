@@ -186,6 +186,16 @@ class OwletEditor {
 async function initialise() {
     $('body').append(rootHtml);
     registerBbcBasicLanguage(Keywords);
+    
+    // Check if we reference a cached tweet on first load and convert it to URL hash
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const tweet = urlParams.get('tweet')
+    if (tweet !== null){
+      const response = await fetch("./programs/"+tweet);
+      const basicText = await response.text();
+      history.replaceState(null, '', `#${encodeURIComponent(JSON.stringify({v: StateVersion, program: basicText}))}`);
+    }
 
     const owletEditor = new OwletEditor();
     await owletEditor.initialise();
