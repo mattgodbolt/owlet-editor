@@ -2,7 +2,9 @@
     <div class="header"></div>
     <div class="toolbar">
         <button data-action="run" title="Run the program (ctrl-enter)">run</button>
-        <button class="twitter" data-action="tweet" title="Tweet your amazing code to @bbcmicrobot">tweet</button>
+        <button data-action="detokenize" title="detokenize code">detokenize</button>
+        <button class="share" data-action="tweet" title="Tweet your amazing code to @bbcmicrobot">share</button>
+
     </div>
     <div class="toolbar">
         <button data-action="emulator" title="View emulator (ctrl-enter)">emulator</button>
@@ -14,11 +16,11 @@
         <canvas id="screen" class="screen" width="640px" height="512px"></canvas>
         <div id="about">
             <img src="../assets/images/owlet.png" width="10%"/>
-            <h3>Owlet BBC BASIC Editor</h3>
-            <p>A modern editor for a classic language
-                by <a href="https://www.github.com/8bitkick">8bitkick</a> with help from
+            <h3>Owlet Editor - beta preview</h3>
+            <p>A simple, modern editor for a BBC BASIC inspired by the <a href="https://www.twitter.com/bbcmicrobot">BBC Micro bot</a> community</p>
+            <p></p><p>Created by <a href="https://www.github.com/8bitkick">8bitkick</a> and
                 <a href="https://twitter.com/mattgodbolt">mattgodbolt</a>.
-                Source on <a href="https://github.com/mattgodbolt/owlet-editor">GitHub</a></p>
+                Contribute source and submit issues on <a href="https://github.com/mattgodbolt/owlet-editor">GitHub</a></p>
         </div>
         <div id="examples">
             <div class="template">
@@ -33,9 +35,19 @@
     </div>
     <div class="footer">
         <div id="edit_status"><span class="count">0</span> characters</div>
+
     </div>
     <div class="footer">
         <button class="bottom" data-action="jsbeeb" title="Load the current code into a full emulator">JSbeeb</button>
         <div id="emu_status"></div>
     </div>
+</div>
+
+<!-- Modal Share Pop-Up-->
+<div id="share" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <p><b>Share your BBC Micro program</b></p>
+    <p id="share-content">The hash URL will be here to copy. Also button to tweet to the bot.</p>
+  </div>
 </div>
