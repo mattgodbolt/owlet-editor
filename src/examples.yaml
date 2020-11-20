@@ -14,3 +14,101 @@ examples:
     basic: |
       D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
       MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.
+
+  - id: print0
+    name: PRINT and GOTO
+    description: A simple example showing how cool Matt is
+    basic: |
+      PRINT "Matt is cool"
+      GOTO 10
+
+  - id: gfx0
+    name: Graphics
+    description: Showing how lovely graphics can be
+    basic: |
+      D.63,50,100,48,67,-56,20,71,51,48,47,-19,36,61,20,40,60,-19,31,77,19,40,76,-19,66,61,-19,65,117,51,97,86,-17,104,95,19,93,93,-19,86,132,51,85,69,-19,7,6,4
+      MO.1:REP.:REA.X,Y,R:C=1-SGN(R):MOV.X*10,Y*10:GC.8*C,C:PL.153,R*10,0:UN.X=85:F.I=0 TO 2:REA.C:V.19,I,C;0;:N.

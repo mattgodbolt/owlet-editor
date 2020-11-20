@@ -110,8 +110,8 @@ canvas.screen {
   border: none;
 }
 
-#examples, #about {
-  margin: 32px;
+#about {
+  padding: 32px;
   display: none;
   height: 100%;
 }
@@ -131,7 +131,12 @@ canvas.screen {
 }
 
 #examples {
-  overflow-x: hidden;
+  margin: 16px;
+  height: 90%;
+  display: none;
+  overflow-x: none;
+  overflow-y: scroll;
+  flex-wrap: wrap;
   .code {
     font-family: ModeSeven;
   }

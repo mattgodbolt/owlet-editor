@@ -4,6 +4,7 @@ import {registerBbcBasicLanguage} from './bbcbasic';
 import {Emulator} from './emulator';
 import rootHtml from './root.html';
 import Examples from './examples.yaml';
+import Tokens from './tokens';
 
 import './owlet-editor.less';
 
@@ -14,18 +15,6 @@ const DefaultProgram = [
 
 const StateVersion = 1;
 const TweetMaximum = 280;
-const Keywords = ["AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
-        "ELSE", "THEN", "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
-        "ASC", "ASN", "ATN", "BGET", "COS", "COUNT", "DEG", "ERL", "ERR", "EVAL", "EXP", "EXT", "FALSE",
-        "FN", "GET", "INKEY", "INSTR", "INT", "LEN", "LN", "LOG", "NOT", "OPENIN", "OPENOUT", "PI",
-        "POINT(", "POS", "RAD", "RND", "SGN", "SIN", "SQR", "TAN", "TO", "TRUE", "USR", "VAL", "VPOS",
-        "CHR$", "GET$", "INKEY$", "LEFT$(", "MID$(", "RIGHT$(", "STR$", "STRING$(", "EOF", "AUTO",
-        "DELETE", "LOAD", "LIST", "NEW", "OLD", "RENUMBER", "SAVE", "PUT", "PTR", "PAGE",
-        "TIME", "LOMEM", "HIMEM", "SOUND", "BPUT", "CALL", "CHAIN", "CLEAR", "CLOSE", "CLG",
-        "CLS", "DATA", "DEF", "DIM", "DRAW", "END", "ENDPROC", "ENVELOPE", "FOR", "GOSUB",
-        "GOTO", "GCOL", "IF", "INPUT", "LET", "LOCAL", "MODE", "MOVE", "NEXT", "ON", "VDU",
-        "PLOT", "PRINT", "PROC", "READ", "REM", "REPEAT", "REPORT", "RESTORE", "RETURN", "RUN",
-        "STOP", "COLOUR", "TRACE", "UNTIL", "WIDTH", "OSCLI"];
 
 class OwletEditor {
     constructor() {
@@ -64,7 +53,7 @@ class OwletEditor {
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             localStorage.setItem("program", basicText);
-            history.replaceState(null, '', `#${this.toStateString()}`);
+            //history.replaceState(null, '', `#${this.toStateString()}`);
             this.updateStatus(basicText);
         });
         this.emulator = new Emulator($('#emulator'));
@@ -80,7 +69,7 @@ class OwletEditor {
         if (example.basic) {
             this.editor.getModel().setValue(example.basic);
             await this.updateProgram();
-            this.selectView('screen')
+            //this.selectView('screen')
         }
     }
 
@@ -134,17 +123,16 @@ class OwletEditor {
     }
 
     detokenize(text) {
-      let output="";
-      let instr = false;
+      var output="";
+      var instr = false;
       for (let i = 0; i<text.length; i++){
-        const g = text.codePointAt(i) & 0xff;
-        if (g===0x22) {instr = !instr;} // we're a string
-        if (g===0x10 || g===0x3A) {instr = false}
-        output += (g>=0x80 && !instr) ? Keywords[g-0x81] : text[i];
+        var g = text.codePointAt(i) & 0xff;
+        if (g==0x22) {instr = !instr;} // we're a string
+        if (g==0x10 || g==0x3A) {instr = false}
+        output += (g>=0x80 && !instr) ? Tokens.tokens[g-0x81] : text[i];
       }
       return output;
     }
-
 
     updateStatus(basicText) {
         this.editStatus
@@ -185,21 +173,25 @@ class OwletEditor {
 
 async function initialise() {
     $('body').append(rootHtml);
-    registerBbcBasicLanguage(Keywords);
-    
+    registerBbcBasicLanguage();
+
     // Check if we reference a cached tweet on first load and convert it to URL hash
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const tweet = urlParams.get('tweet')
-    if (tweet !== null){
-      const response = await fetch("./programs/"+tweet);
+    const load = urlParams.get('load')
+    if (load !== null){
+      const response = await fetch("../assets/programs/"+load);
       const basicText = await response.text();
-      history.replaceState(null, '', `#${encodeURIComponent(JSON.stringify({v: StateVersion, program: basicText}))}`);
+      console.log(response.status,response)
+      let program = (response.status === 200) ? basicText : "REM BBC BASIC program "+load+" not found\n";
+      //history.replaceState(null, '', `#${encodeURIComponent(JSON.stringify({v: StateVersion, program: program}))}`);
+      localStorage.setItem("program", program);
     }
 
     const owletEditor = new OwletEditor();
     await owletEditor.initialise();
 
+owletEditor.LineNumbers = false;
     window.onhashchange = () => owletEditor.onHashChange();
 
     function setTheme(themeName) {

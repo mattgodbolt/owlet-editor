@@ -1,6 +1,7 @@
 import {languages} from 'monaco-editor';
+import Tokens from './tokens';
 
-export function registerBbcBasicLanguage(keywords) {
+export function registerBbcBasicLanguage() {
     languages.register({id: 'BBCBASIC'});
 
     // Register a tokens provider for the language
@@ -10,7 +11,7 @@ export function registerBbcBasicLanguage(keywords) {
             ['[', ']', 'delimiter.square'],
             ['(', ')', 'delimiter.parenthesis'],
         ],
-        keywords: keywords,
+        keywords: Tokens.tokens,
 
         operators: [
             '#', // immediate
@@ -59,7 +60,7 @@ export function registerBbcBasicLanguage(keywords) {
         provideCompletionItems: () => {
             const suggestions = [];
 
-            keywords.forEach(token =>
+            Tokens.tokens.forEach(token =>
                 suggestions.push({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,
