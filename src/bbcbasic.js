@@ -10,7 +10,7 @@ export function registerBbcBasicLanguage() {
             ['[', ']', 'delimiter.square'],
             ['(', ')', 'delimiter.parenthesis'],
         ],
-        keywords: Tokens.tokens,
+        keywords: Tokens,
 
         operators: [
             '#', // immediate
@@ -59,7 +59,7 @@ export function registerBbcBasicLanguage() {
         provideCompletionItems: () => {
             const suggestions = [];
 
-            Tokens.tokens.forEach(token =>
+            Tokens.forEach(token =>
                 suggestions.push({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,

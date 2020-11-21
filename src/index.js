@@ -134,7 +134,7 @@ class OwletEditor {
             if (g === 0x10 || g === 0x3A) {
                 instr = false
             }
-            output += (g >= 0x80 && !instr) ? Tokens.tokens[g - 0x81] : text[i];
+            output += (g >= 0x80 && !instr) ? Tokens[g - 0x81] : text[i];
         }
         return output;
     }

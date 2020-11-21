@@ -15,7 +15,7 @@
 
 */
 
-export const tokens = [
+const tokens = [
     "AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
     "ELSE", "THEN", "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
     "ASC", "ASN", "ATN", "BGET", "COS", "COUNT", "DEG", "ERL", "ERR", "EVAL", "EXP", "EXT", "FALSE",
@@ -29,3 +29,5 @@ export const tokens = [
     "PLOT", "PRINT", "PROC", "READ", "REM", "REPEAT", "REPORT", "RESTORE", "RETURN", "RUN",
     "STOP", "COLOUR", "TRACE", "UNTIL", "WIDTH", "OSCLI"
 ];
+
+export {tokens as default};
