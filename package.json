@@ -20,8 +20,10 @@
     "jsbeeb": "https://github.com/mattgodbolt/jsbeeb.git#78eeeb3299c4640ca709df189c76d7447977258f",
     "monaco-editor": "^0.21.2",
     "monaco-editor-webpack-plugin": "^2.0.0",
+    "optimize-css-assets-webpack-plugin": "^5.0.4",
     "promise": "^8.1.0",
     "style-loader": "^2.0.0",
+    "terser-webpack-plugin": "^5.0.3",
     "underscore": "^1.11.0",
     "webgl-debug": "^2.0.1"
   },

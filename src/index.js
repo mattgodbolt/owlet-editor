@@ -13,7 +13,6 @@ const DefaultProgram = [
     'GOTO 10'
 ].join('\n');
 
-const StateVersion = 1;
 const TweetMaximum = 280;
 
 function programUrl(id) {
@@ -22,10 +21,15 @@ function programUrl(id) {
     return `../assets/${id}`;
 }
 
+async function loadCachedProgram(id) {
+    const response = await fetch(programUrl(id));
+    const basicText = await response.text();
+    return response.status === 200 ? basicText : `REM BBC BASIC program ${id} not found\n`;
+}
+
 class OwletEditor {
-    constructor() {
-        const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
-        const program = state ? state.program : localStorage.getItem("program") || DefaultProgram;
+    constructor(optionalInitialProgram) {
+        const program = optionalInitialProgram ? optionalInitialProgram : localStorage.getItem("program") || DefaultProgram;
         const editorPane = $('#editor');
         this.editStatus = $('#edit_status');
         this.emuStatus = $('#emu_status');
@@ -59,7 +63,6 @@ class OwletEditor {
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             localStorage.setItem("program", basicText);
-            //history.replaceState(null, '', `#${this.toStateString()}`);
             this.updateStatus(basicText);
         });
         this.emulator = new Emulator($('#emulator'));
@@ -96,31 +99,6 @@ class OwletEditor {
 
     getBasicText() {
         return this.editor.getModel().getValue();
-    }
-
-    toStateString() {
-        const state = {v: StateVersion, program: this.getBasicText()};
-        return encodeURIComponent(JSON.stringify(state));
-    }
-
-    static decodeStateString(stateString) {
-        try {
-            const state = JSON.parse(decodeURIComponent(stateString));
-            if (state.v !== StateVersion)
-                return null;
-            return state;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    async onHashChange() {
-        const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
-        if (state) {
-            this.editor.getModel().setValue(state.program);
-            await this.updateProgram();
-            this.selectView('screen')
-        }
     }
 
     async updateProgram() {
@@ -200,19 +178,12 @@ async function initialise() {
     // Check if we reference a cached tweet on first load and convert it to URL hash
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const load = urlParams.get('load')
-    if (load !== null) {
-        const response = await fetch(programUrl(load));
-        const basicText = await response.text();
-        const program = (response.status === 200) ? basicText : "REM BBC BASIC program " + load + " not found\n";
-        localStorage.setItem("program", program);
-    }
-
-    const owletEditor = new OwletEditor();
+    const load = urlParams.get('load');
+    const initialProgram = load ? await loadCachedProgram(load) : null;
+    const owletEditor = new OwletEditor(initialProgram);
     await owletEditor.initialise();
 
     owletEditor.LineNumbers = false;
-    window.onhashchange = () => owletEditor.onHashChange();
 
     // 'Share' pop-up
     const modal = document.getElementById("share");

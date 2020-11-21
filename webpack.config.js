@@ -4,6 +4,8 @@ const CopyPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
+const OptimizeCssAssetsPlugin = require('optimize-css-assets-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
 const {CleanWebpackPlugin} = require('clean-webpack-plugin');
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -58,18 +60,27 @@ module.exports = {
         contentBase: './'
     },
     optimization: {
-        // Enabling any of this stuff from CE breaks things silently
-        // splitChunks: {
-        //     cacheGroups: {
-        //         vendors: {
-        //             test: /[/\\]node_modules[/\\]/,
-        //             name: 'vendor',
-        //             chunks: 'all',
-        //             priority: -10,
-        //         },
-        //     },
-        // },
+        minimize: !isDev,
+        runtimeChunk: 'single',
+        splitChunks: {
+            cacheGroups: {
+                vendors: {
+                    test: /[/\\]node_modules[/\\]/,
+                    name: 'vendor',
+                    chunks: 'all',
+                    priority: -10,
+                },
+            },
+        },
         moduleIds: 'deterministic',
+        minimizer: [
+            new OptimizeCssAssetsPlugin({
+                cssProcessorPluginOptions: {
+                    preset: ['default', {discardComments: {removeAll: true}}],
+                },
+            }),
+            new TerserPlugin(),
+        ],
     },
     module: {
         rules: [
