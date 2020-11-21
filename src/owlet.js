@@ -136,6 +136,6 @@ export class OwletEditor {
             about: () => this.selectView('about'),
             detokenise: () => this.editor.getModel().setValue(detokenise(this.getBasicText()))
         };
-        $(".toolbar button").click(e => actions[e.target.dataset.action]());
+        $("button[data-action]").click(e => actions[e.target.dataset.action]());
     }
 }
