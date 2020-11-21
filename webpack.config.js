@@ -7,6 +7,7 @@ const webpack = require('webpack');
 const OptimizeCssAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const {CleanWebpackPlugin} = require('clean-webpack-plugin');
+const FaviconsWebpackPlugin = require('favicons-webpack-plugin')
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -32,6 +33,16 @@ function getPlugins() {
         new HtmlWebpackPlugin({
             title: 'Owlet Editor',
         }),
+        new FaviconsWebpackPlugin({
+            logo: './assets/images/owlet.png',
+            prefix: 'assets/images',
+            favicons: {
+                icons: {
+                    appleIcon: false,
+                    appleStartup: false
+                }
+            }
+        })
     ];
     if (isDev) {
         plugins.push(new webpack.HotModuleReplacementPlugin);

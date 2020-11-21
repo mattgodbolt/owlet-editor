@@ -29,6 +29,7 @@
     "copy-webpack-plugin": "^6.3.0",
     "eslint": "^7.13.0",
     "esm": "^3.2.25",
+    "favicons-webpack-plugin": "https://github.com/benkostr/favicons-webpack-plugin.git#2247028b37cc14bf4a96aa2c0048b0b268a30534",
     "file-loader": "^6.2.0",
     "html-webpack-plugin": "^4.5.0",
     "json-loader": "^0.5.7",
