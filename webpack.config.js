@@ -17,7 +17,7 @@ function getPlugins() {
             patterns: [
                 {
                     context: path.resolve(__dirname, 'node_modules'), from: 'jsbeeb/roms/**/*',
-                    globOptions: {ignore: ['*.txt', 'README']}
+                    globOptions: {ignore: ['**/*.txt', '**/*README*']}
                 },
                 {context: path.resolve(__dirname, 'node_modules'), from: 'jsbeeb/sounds/**/*.wav'},
             ],
