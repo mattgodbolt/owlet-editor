@@ -5,7 +5,7 @@ import {OwletEditor} from "./owlet";
 
 function programUrl(id) {
     if (window.location.hostname === 'localhost')
-        return `https://bbcmic.ro/assets/${id}`
+        return `https://bbcmic.ro/assets/programs/${id}`
     return `../assets/${id}`;
 }
 
