@@ -39,7 +39,7 @@ lint-fix: prereqs  ## Checks if everything matches code conventions & fixes thos
 	$(NPM) run lint-fix
 
 .PHONY: test
-test: $(NODE_MODULES)  ## Runs the tests
+test: prereqs  ## Runs the tests
 	$(NPM) run test
 	@echo Tests pass
 
