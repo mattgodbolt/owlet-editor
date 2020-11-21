@@ -60,7 +60,7 @@ export function registerBbcBasicLanguage() {
         provideCompletionItems: () => {
             const suggestions = [];
 
-            Tokens.forEach(token =>
+            tokens.forEach(token =>
                 suggestions.push({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,
