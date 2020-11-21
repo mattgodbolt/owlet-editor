@@ -1,5 +1,6 @@
 import {languages} from 'monaco-editor';
 import Tokens from './tokens';
+
 export function registerBbcBasicLanguage() {
     languages.register({id: 'BBCBASIC'});
 

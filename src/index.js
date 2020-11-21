@@ -16,6 +16,12 @@ const DefaultProgram = [
 const StateVersion = 1;
 const TweetMaximum = 280;
 
+function programUrl(id) {
+    if (window.location.hostname === 'localhost')
+        return `https://bbcmic.ro/assets/${id}`
+    return `../assets/${id}`;
+}
+
 class OwletEditor {
     constructor() {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
@@ -69,7 +75,6 @@ class OwletEditor {
         if (example.basic) {
             this.editor.getModel().setValue(example.basic);
             await this.updateProgram();
-            //this.selectView('screen')
         }
     }
 
@@ -158,7 +163,6 @@ class OwletEditor {
     }
 
     share() {
-        //window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicroBot&text=${encodeURIComponent(this.getBasicText())}`, '_new'),
         const shareModal = document.getElementById("share");
         shareModal.style.display = "block";
     }
@@ -183,6 +187,13 @@ class OwletEditor {
 }
 
 async function initialise() {
+    function setTheme(themeName) {
+        localStorage.setItem('theme', themeName);
+        document.documentElement.className = themeName;
+    }
+
+    setTheme("theme-classic");
+
     $('body').append(rootHtml);
     registerBbcBasicLanguage();
 
@@ -191,11 +202,9 @@ async function initialise() {
     const urlParams = new URLSearchParams(queryString);
     const load = urlParams.get('load')
     if (load !== null) {
-        const response = await fetch("../assets/programs/" + load);
+        const response = await fetch(programUrl(load));
         const basicText = await response.text();
-        console.log(response.status, response)
-        let program = (response.status === 200) ? basicText : "REM BBC BASIC program " + load + " not found\n";
-        //history.replaceState(null, '', `#${encodeURIComponent(JSON.stringify({v: StateVersion, program: program}))}`);
+        const program = (response.status === 200) ? basicText : "REM BBC BASIC program " + load + " not found\n";
         localStorage.setItem("program", program);
     }
 
@@ -204,13 +213,6 @@ async function initialise() {
 
     owletEditor.LineNumbers = false;
     window.onhashchange = () => owletEditor.onHashChange();
-
-    function setTheme(themeName) {
-        localStorage.setItem('theme', themeName);
-        document.documentElement.className = themeName;
-    }
-
-    setTheme("theme-classic");
 
     // 'Share' pop-up
     const modal = document.getElementById("share");
@@ -223,9 +225,8 @@ async function initialise() {
             modal.style.display = "none";
         }
     }
-
 }
 
 initialise().then(() => {
-    console.log("Ready to go");
+    // And we're ready to go here.
 });
