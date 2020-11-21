@@ -43,7 +43,7 @@ export class OwletEditor {
             keybindingContext: null,
             contextMenuGroupId: 'navigation',
             contextMenuOrder: 1.5,
-            run: async () => await this.emulator.runProgram(this.editor.getModel().getValue()),
+            run: async () => await this.updateProgram()
         });
 
         this.editor.getModel().onDidChangeContent(() => {
@@ -88,7 +88,14 @@ export class OwletEditor {
     }
 
     async updateProgram() {
-        await this.emulator.runProgram(this.getBasicText());
+        try {
+            await this.emulator.runProgram(this.getBasicText());
+        } catch (e) {
+            // TODO a pop up or similar? See #14
+            // Reproducible if you paste a too-long line into the
+            // editor; we get "Unable to tokenize".
+            console.log(`Unable to run program: ${e}`);
+        }
     }
 
     updateStatus(basicText) {
