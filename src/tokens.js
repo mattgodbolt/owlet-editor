@@ -17,7 +17,7 @@
 
 export const tokens = [
     "AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
-    "ELSE", "THEN", "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
+    "ELSE", "THEN", null, "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
     "ASC", "ASN", "ATN", "BGET", "COS", "COUNT", "DEG", "ERL", "ERR", "EVAL", "EXP", "EXT", "FALSE",
     "FN", "GET", "INKEY", "INSTR", "INT", "LEN", "LN", "LOG", "NOT", "OPENIN", "OPENOUT", "PI",
     "POINT(", "POS", "RAD", "RND", "SGN", "SIN", "SQR", "TAN", "TO", "TRUE", "USR", "VAL", "VPOS",
@@ -31,19 +31,40 @@ export const tokens = [
 ];
 
 
+const Chars = {
+    Quote: '"'.charCodeAt(0),
+    FirstToken: 0x80,
+    LineNumberToken: 0x8d
+}
+
 export function detokenise(text) {
     let output = "";
-    let instr = false;
-    for (let i = 0; i < text.length; i++) {
-        const g = text.codePointAt(i) & 0xff;
-        if (g === 0x22) {
-            // we're a string
-            instr = !instr;
+    let withinString = false;
+    let lineNumberBuffer = null;
+    const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
+    for (const charCode of codePoints) {
+        if (charCode === Chars.Quote)
+            withinString = !withinString;
+        if (charCode === Chars.LineNumberToken) {
+            // If we see the magic line number token we need to accumulate the
+            // next three bytes.
+            lineNumberBuffer = [];
+            continue;
         }
-        if (g === 0x10 || g === 0x3A) {
-            instr = false
+        if (lineNumberBuffer !== null) {
+            lineNumberBuffer.push(charCode);
+            if (lineNumberBuffer.length === 3) {
+                // With reference to https://xania.org/200711/bbc-basic-line-number-format-part-2
+                const topBits = lineNumberBuffer[0] << 2;
+                const lowBits = lineNumberBuffer[1] ^ (topBits & 0xc0);
+                const highBits = lineNumberBuffer[2] ^ ((topBits << 2) & 0xc0);
+                output += `${(highBits << 8) | lowBits}`;
+            }
+            continue;
         }
-        output += (g >= 0x80 && !instr) ? tokens[g - 0x81] : text[i];
+        output += charCode >= Chars.FirstToken && !withinString
+            ? tokens[charCode - Chars.FirstToken]
+            : String.fromCodePoint(charCode);
     }
     return output;
 }
