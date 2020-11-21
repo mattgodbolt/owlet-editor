@@ -15,7 +15,7 @@
 
 */
 
-const tokens = [
+export const tokens = [
     "AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
     "ELSE", "THEN", "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
     "ASC", "ASN", "ATN", "BGET", "COS", "COUNT", "DEG", "ERL", "ERR", "EVAL", "EXP", "EXT", "FALSE",
@@ -30,4 +30,20 @@ const tokens = [
     "STOP", "COLOUR", "TRACE", "UNTIL", "WIDTH", "OSCLI"
 ];
 
-export {tokens as default};
+
+export function detokenise(text) {
+    let output = "";
+    let instr = false;
+    for (let i = 0; i < text.length; i++) {
+        const g = text.codePointAt(i) & 0xff;
+        if (g === 0x22) {
+            // we're a string
+            instr = !instr;
+        }
+        if (g === 0x10 || g === 0x3A) {
+            instr = false
+        }
+        output += (g >= 0x80 && !instr) ? tokens[g - 0x81] : text[i];
+    }
+    return output;
+}

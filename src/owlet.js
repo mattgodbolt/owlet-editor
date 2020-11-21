@@ -2,8 +2,8 @@ import $ from "jquery";
 import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor";
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
-import Tokens from "./tokens";
-
+import {detokenise} from "./tokens";
+import './owlet-editor.less';
 
 const DefaultProgram = [
     'PRINT "HELLO WORLD"',
@@ -90,23 +90,6 @@ export class OwletEditor {
         await this.emulator.runProgram(this.getBasicText());
     }
 
-    detokenize(text) {
-        let output = "";
-        let instr = false;
-        for (let i = 0; i < text.length; i++) {
-            const g = text.codePointAt(i) & 0xff;
-            if (g === 0x22) {
-                // we're a string
-                instr = !instr;
-            }
-            if (g === 0x10 || g === 0x3A) {
-                instr = false
-            }
-            output += (g >= 0x80 && !instr) ? Tokens[g - 0x81] : text[i];
-        }
-        return output;
-    }
-
     updateStatus(basicText) {
         this.editStatus
             .find(".count")
@@ -143,7 +126,7 @@ export class OwletEditor {
             tweet: () => this.share(),
             emulator: () => this.selectView('screen'),
             about: () => this.selectView('about'),
-            detokenize: () => this.editor.getModel().setValue(this.detokenize(this.getBasicText()))
+            detokenise: () => this.editor.getModel().setValue(detokenise(this.getBasicText()))
         };
         $(".toolbar button").click(e => actions[e.target.dataset.action]());
     }

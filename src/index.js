@@ -3,8 +3,6 @@ import {registerBbcBasicLanguage} from './bbcbasic';
 import rootHtml from './root.html';
 import {OwletEditor} from "./owlet";
 
-import './owlet-editor.less';
-
 function programUrl(id) {
     if (window.location.hostname === 'localhost')
         return `https://bbcmic.ro/assets/${id}`

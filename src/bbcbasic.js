@@ -1,5 +1,5 @@
 import {languages} from 'monaco-editor';
-import Tokens from './tokens';
+import {tokens} from './tokens';
 
 export function registerBbcBasicLanguage() {
     languages.register({id: 'BBCBASIC'});
@@ -11,7 +11,7 @@ export function registerBbcBasicLanguage() {
             ['[', ']', 'delimiter.square'],
             ['(', ')', 'delimiter.parenthesis'],
         ],
-        keywords: Tokens,
+        keywords: tokens,
 
         operators: [
             '#', // immediate
