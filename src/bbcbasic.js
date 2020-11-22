@@ -76,7 +76,7 @@ export function registerBbcBasicLanguage() {
     // Register a completion item provider for the new language
     languages.registerCompletionItemProvider('BBCBASIC', {
         provideCompletionItems: () => {
-            const suggestions = [];
+            let suggestions = [];
 
             tokens.forEach(token =>
                 suggestions.push({
