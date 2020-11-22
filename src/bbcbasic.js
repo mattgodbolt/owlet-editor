@@ -78,13 +78,15 @@ export function registerBbcBasicLanguage() {
         provideCompletionItems: () => {
             let suggestions = [];
 
-            tokens.forEach(token =>
+            tokens.forEach(token =>{
+              if (token !== null){
                 suggestions.push({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,
                     insertText: token
                 })
-            )
+              }
+            })
             return {suggestions: suggestions};
         }
     });
