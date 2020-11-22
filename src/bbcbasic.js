@@ -15,7 +15,6 @@ export function registerBbcBasicLanguage() {
         brackets: [
             ['(', ')', 'delimiter.parenthesis'],
         ],
-
         operators: [
             '#', // immediate
             '+', '-', '*', '/', '<<', '>>', '^', '=', '==', '<>', '!=', '<', '>', '<=', '>=',
@@ -32,6 +31,9 @@ export function registerBbcBasicLanguage() {
                     .sort((x, y) => y.length - x.length)
                     .join("|"),
                     'keyword'],
+                // Assume any abbreviation is "valid" - TODO can use 'keywords' to actually fix
+                // by building a list of keywords that include all possible prefixes.
+                [/[A-Z]+\./, 'keyword'],
                 [/[a-zA-Z_][\w]*[$%]?/, 'type.identifier'],
                 // whitespace
                 {include: '@whitespace'},
