@@ -1,5 +1,5 @@
 ## Owlet Editor🦉 ![Owlet CI and CD](https://github.com/mattgodbolt/owlet-editor/workflows/Owlet%20CI%20and%20CD/badge.svg)
-A simple, intuitive creative coding tool for BBC BASIC. 
+A simple, intuitive creative coding tool for BBC BASIC inspired by [BBC Micro Bot](https://www.twitter.com/bbcmicrobot)
 
 ## A modern editor for a classic language
 
