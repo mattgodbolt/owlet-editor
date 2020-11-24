@@ -1,4 +1,4 @@
-import { encode, decode } from 'base2048'
+import { decode } from 'base2048'
 
 /*
 
