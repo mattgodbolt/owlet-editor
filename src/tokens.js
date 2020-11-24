@@ -39,16 +39,16 @@ const Chars = {
     LineNumberToken: 0x8d
 }
 
-function decode2048(text){
-  let output = text;
+function decode2048(input){
     try{
-      const code = output.match(/🗜(\S*)/);
-      output=String.fromCharCode.apply(null, decode(code[1].trim()));
+      let code = input.match(/🗜(\S*)/);
+      code = (code===null) ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
+      return String.fromCharCode.apply(null, decode(code.trim()));
     }
     catch(error){
       console.log(error);
+      return input
     }
-  return output
 }
 
 export function detokenise(text) {
