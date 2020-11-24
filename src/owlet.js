@@ -26,7 +26,8 @@ export class OwletEditor {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'type.identifier', foreground: 'bb8844' } // variables
+        { token: 'variable', foreground: 'bb8844' },
+        { token: 'number', foreground: '22bb88' }
       ]
     });
 
@@ -45,6 +46,8 @@ export class OwletEditor {
       lineDecorationsWidth: 0
     });
 
+    this.lineNumberDetect(program);
+
     this.editor.addAction({
       id: 'execute-basic',
       label: 'Run',
@@ -58,16 +61,10 @@ export class OwletEditor {
     this.editor.getModel().onDidChangeContent(() => {
       const basicText = this.getBasicText();
       localStorage.setItem("program", basicText);
-      if (/^\s*\d+/.test(basicText)) {
-        this.editor.updateOptions({lineNumbers:"off"})
-      } else
-      {
-        this.editor.updateOptions({lineNumbers:l => l * 10})
-      }
-
+      this.lineNumberDetect(basicText);
       this.updateStatus(basicText);
     });
-    
+
     this.emulator = new Emulator($('#emulator'));
     this.updateStatus(program);
 
@@ -103,6 +100,15 @@ export class OwletEditor {
   toStateString() {
     const state = {v: 1, program: this.getBasicText()};
     return encodeURIComponent(JSON.stringify(state));
+  }
+
+  lineNumberDetect(text){
+    if (/^\s*\d+/.test(text)) {
+      this.editor.updateOptions({lineNumbers:"off"})
+    } else
+    {
+      this.editor.updateOptions({lineNumbers:l => l * 10})
+    }
   }
 
   getBasicText() {

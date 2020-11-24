@@ -34,7 +34,8 @@ export function registerBbcBasicLanguage() {
                 // Assume any abbreviation is "valid" - TODO can use 'keywords' to actually fix
                 // by building a list of keywords that include all possible prefixes.
                 [/[A-Z]+\./, 'keyword'],
-                [/[a-zA-Z_][\w]*[$%]?/, 'type.identifier'],
+                [/[a-zA-Z_][\w]*[$%]?/, 'variable'],
+                [/^\s*\d+/,'enum'], // line numbers
                 // whitespace
                 {include: '@whitespace'},
                 {include: '@common'},
