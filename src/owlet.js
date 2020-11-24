@@ -21,6 +21,13 @@ export class OwletEditor {
         this.emuStatus = $('#emu_status');
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parent()[0]);
+        monacoEditor.defineTheme('bbcbasicTheme', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'type.identifier', foreground: 'ee8844' } // variables
+            ]
+        });
         this.editor = monacoEditor.create(editorPane[0], {
             value: program,
             minimap: {
@@ -28,7 +35,7 @@ export class OwletEditor {
             },
             lineNumbers: l => l * 10,
             language: 'BBCBASIC',
-            theme: 'vs-dark',
+            theme: 'bbcbasicTheme',
             renderWhitespace: "none", // seems to fix odd space/font interaction
             fontSize: 16,
             scrollBeyondLastLine: false,
