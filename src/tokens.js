@@ -33,42 +33,47 @@ export const tokens = [
 ];
 
   // TODO - merge with byte token array, pay attention to flags wrt spacing
-  const abbreviationOrder = ["AND","ABS","ACS","ADVAL","ASC","ASN","ATN","AUTO","BGET","BPUT","COLOUR","CALL","CHAIN","CHR$","CLEAR","CLOSE","CLG","CLS","COS","COUNT","DATA","DEG","DEF","DELETE","DIV","DIM","DRAW","ENDPROC","END","ENVELOPE","ELSE","EVAL","ERL","ERROR","EOF","EOR","ERR","EXP","EXT","FOR","FALSE","FN","GOTO","GET$","GET","GOSUB","GCOL","HIMEM","INPUT","IF","INKEY$","INKEY","INT","INSTR(","LIST","LINE","LOAD","LOMEM","LOCAL","LEFT$(","LEN","LET","LOG","LN","MID$(","MODE","MOD","MOVE","NEXT","NEW","NOT","OLD","ON","OFF","OR","OPENIN","OPENOUT","OPENUP","OSCLI","PRINT","PAGE","PTR","PI","PLOT","POINT(","PROC","POS","RETURN","REPEAT","REPORT","READ","REM","RUN","RAD","RESTORE","RIGHT$(","RND","RENUMBER","STEP","SAVE","SGN","SIN","SQR","SPC","STR$","STRING$(","SOUND","STOP","TAN","THEN","TO","TAB(","TRACE","TIME","TRUE","UNTIL","USR","VDU","VAL","VPOS","WIDTH","PAGE","PTR","TIME","LOMEM","HIMEM"];
+const abbreviationOrder = ["AND","ABS","ACS","ADVAL","ASC","ASN","ATN","AUTO","BGET","BPUT","COLOUR","CALL","CHAIN","CHR$","CLEAR","CLOSE","CLG","CLS","COS","COUNT","DATA","DEG","DEF","DELETE","DIV","DIM","DRAW","ENDPROC","END","ENVELOPE","ELSE","EVAL","ERL","ERROR","EOF","EOR","ERR","EXP","EXT","FOR","FALSE","FN","GOTO","GET$","GET","GOSUB","GCOL","HIMEM","INPUT","IF","INKEY$","INKEY","INT","INSTR(","LIST","LINE","LOAD","LOMEM","LOCAL","LEFT$(","LEN","LET","LOG","LN","MID$(","MODE","MOD","MOVE","NEXT","NEW","NOT","OLD","ON","OFF","OR","OPENIN","OPENOUT","OPENUP","OSCLI","PRINT","PAGE","PTR","PI","PLOT","POINT(","PROC","POS","RETURN","REPEAT","REPORT","READ","REM","RUN","RAD","RESTORE","RIGHT$(","RND","RENUMBER","STEP","SAVE","SGN","SIN","SQR","SPC","STR$","STRING$(","SOUND","STOP","TAN","THEN","TO","TAB(","TRACE","TIME","TRUE","UNTIL","USR","VDU","VAL","VPOS","WIDTH","PAGE","PTR","TIME","LOMEM","HIMEM"];
 
-  const Chars = {
+const Chars = {
       Quote: '"'.charCodeAt(0),
       FirstToken: 0x80,
       LineNumberToken: 0x8d,
       Dot: '.'.charCodeAt(0)
     }
 
-  function findKeyword(abbreviation){
-    for (const keyword of abbreviationOrder) {
-      if (keyword.indexOf(abbreviation) === 0) {return keyword}
+function findKeyword(abbreviation){
+  for (const keyword of abbreviationOrder) {
+    if (keyword.indexOf(abbreviation) === 0 && (abbreviation !== keyword)) {
+      return keyword
     }
-    return abbreviation+"."
   }
+  return abbreviation+"."
+}
 
-  function isUpperCase(c){return (c > 64 && c<91)}
+function isUpperCase(c){
+  return (c > 64 && c<91)
+}
 
-  function debbreviate(text) {
-    let output = "";
-    let buffer = "";
-    let withinString = false;
-    const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
-    for (const charCode of codePoints) {
-      if (charCode === Chars.Quote)
-      withinString = !withinString;
-      if (isUpperCase(charCode) && !withinString) {
-        buffer += String.fromCodePoint(charCode)
-      }
-      else {
-        output += ((charCode === Chars.Dot) && !withinString) ? findKeyword(buffer) : buffer+String.fromCodePoint(charCode);
-        buffer = "";
-      }
+function debbreviate(text) {
+  let output = "";
+  let buffer = "";
+  let withinString = false;
+  const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
+  for (const charCode of codePoints) {
+    if (charCode === Chars.Quote)
+    withinString = !withinString;
+    if (isUpperCase(charCode) && !withinString) {
+      buffer += String.fromCodePoint(charCode)
     }
-    return output+buffer;
+    else {
+      output += ((charCode === Chars.Dot) && !withinString && buffer !== "") ? findKeyword(buffer) :
+      buffer+String.fromCodePoint(charCode);
+      buffer = "";
+    }
   }
+  return output+buffer;
+}
 
 function decode2048(input){
     try{
