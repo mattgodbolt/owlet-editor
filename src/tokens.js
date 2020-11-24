@@ -67,7 +67,7 @@ export const tokens = [
         buffer = "";
       }
     }
-    return output;
+    return output+buffer;
   }
 
 function decode2048(input){
