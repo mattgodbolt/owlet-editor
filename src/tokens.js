@@ -1,3 +1,5 @@
+import { encode, decode } from 'base2048'
+
 /*
 
  BBC BASIC Keyword Byte Tokens
@@ -37,7 +39,20 @@ const Chars = {
     LineNumberToken: 0x8d
 }
 
+function decode2048(text){
+  let output = text;
+    try{
+      const code = output.match(/🗜(\S*)/);
+      output=String.fromCharCode.apply(null, decode(code[1].trim()));
+    }
+    catch(error){
+      console.log(error);
+    }
+  return output
+}
+
 export function detokenise(text) {
+    text = decode2048(text);
     let output = "";
     let withinString = false;
     let lineNumberBuffer = null;
