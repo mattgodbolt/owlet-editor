@@ -1,5 +1,5 @@
 import $ from "jquery";
-import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor as monacoEditor, KeyCode, KeyMod, Selection} from "monaco-editor/esm/vs/editor/editor.api";
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
@@ -12,6 +12,10 @@ const DefaultProgram = [
 ].join('\n');
 
 const TweetMaximum = 280;
+
+function defaultLineNumber(line) {
+    return line * 10;
+}
 
 export class OwletEditor {
     constructor(optionalInitialProgram) {
@@ -36,7 +40,7 @@ export class OwletEditor {
             minimap: {
                 enabled: false
             },
-            lineNumbers: l => l * 10,
+            lineNumbers: defaultLineNumber,
             language: 'BBCBASIC',
             theme: 'bbcbasicTheme',
             renderWhitespace: "none", // seems to fix odd space/font interaction
@@ -58,6 +62,16 @@ export class OwletEditor {
             run: async () => await this.updateProgram()
         });
 
+        this.editor.addAction({
+            id: 'execute-basic',
+            label: 'Expand code',
+            keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
+            keybindingContext: null,
+            contextMenuGroupId: 'navigation',
+            contextMenuOrder: 1.5,
+            run: () => this.expandCode()
+        });
+
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             localStorage.setItem("program", basicText);
@@ -76,8 +90,25 @@ export class OwletEditor {
     async chooseExample(id) {
         const example = this.examples[id];
         if (example.basic) {
-            this.editor.getModel().setValue(example.basic);
+            this.updateEditorText(example.basic, "load example")
             await this.updateProgram();
+        }
+    }
+
+    updateEditorText(newText, updateType) {
+        if (updateType) {
+            this.editor.pushUndoStop();
+            const previousSelections = this.editor.getSelections();
+            this.editor.executeEdits(
+                updateType,
+                [{
+                    range: this.editor.getModel().getFullModelRange(),
+                    text: newText
+                }],
+                previousSelections);
+            this.editor.pushUndoStop();
+        } else {
+            this.editor.getModel().setValue(newText);
         }
     }
 
@@ -106,7 +137,7 @@ export class OwletEditor {
         if (/^\s*\d+/.test(text)) {
             this.editor.updateOptions({lineNumbers: "off"});
         } else {
-            this.editor.updateOptions({lineNumbers: l => l * 10});
+            this.editor.updateOptions({lineNumbers: defaultLineNumber});
         }
     }
 
@@ -148,6 +179,10 @@ export class OwletEditor {
         shareModal.style.display = "block";
     }
 
+    expandCode() {
+        this.updateEditorText(expandCode(this.getBasicText()), "expand code");
+    }
+
     async initialise() {
         await this.emulator.initialise();
         await this.updateProgram();
@@ -161,7 +196,7 @@ export class OwletEditor {
             tweet: () => this.share(),
             emulator: () => this.selectView('screen'),
             about: () => this.selectView('about'),
-            expand: () => this.editor.getModel().setValue(expandCode(this.getBasicText()))
+            expand: () => this.expandCode()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
     }
