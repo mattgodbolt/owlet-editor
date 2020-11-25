@@ -3,7 +3,7 @@ import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/edit
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
-import {detokenise} from "./tokens";
+import {expandCode} from "./tokens";
 import './owlet-editor.less';
 
 const DefaultProgram = [
@@ -162,7 +162,7 @@ export class OwletEditor {
         tweet: () => this.share(),
         emulator: () => this.selectView('screen'),
         about: () => this.selectView('about'),
-        detokenise: () => this.editor.getModel().setValue(detokenise(this.getBasicText()))
+        expand: () => this.editor.getModel().setValue(expandCode(this.getBasicText()))
       };
       $("button[data-action]").click(e => actions[e.target.dataset.action]());
     }
