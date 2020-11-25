@@ -91,7 +91,7 @@ function decode2048(input){
     }
 }
 
-function detokenise(text) {
+export function detokenise(text) {
     let output = "";
     let withinString = false;
     let lineNumberBuffer = null;
