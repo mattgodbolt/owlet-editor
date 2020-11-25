@@ -35,7 +35,7 @@ export function registerBbcBasicLanguage() {
                 // by building a list of keywords that include all possible prefixes.
                 [/[A-Z]+\./, 'keyword'],
                 [/[a-zA-Z_][\w]*[$%]?/, 'variable'],
-                [/^\s*\d+/,'enum'], // line numbers
+                [/^\s*\d+/, 'enum'], // line numbers
                 // whitespace
                 {include: '@whitespace'},
                 {include: '@common'},
@@ -79,17 +79,15 @@ export function registerBbcBasicLanguage() {
     // Register a completion item provider for the new language
     languages.registerCompletionItemProvider('BBCBASIC', {
         provideCompletionItems: () => {
-            let suggestions = [];
+            const suggestions = [];
 
-            tokens.forEach(token =>{
-              if (token !== null){
+            tokens.filter(x => x).forEach(token => {
                 suggestions.push({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,
                     insertText: token
-                })
-              }
-            })
+                });
+            });
             return {suggestions: suggestions};
         }
     });

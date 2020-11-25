@@ -5,7 +5,7 @@ import {OwletEditor} from "./owlet";
 
 function programUrl(id) {
     if (window.location.hostname === 'localhost')
-        return `https://bbcmic.ro/assets/programs/${id}`
+        return `https://bbcmic.ro/assets/programs/${id}`;
     return `../assets/programs/${id}`;
 }
 
@@ -39,14 +39,12 @@ async function initialise() {
     // 'Share' pop-up
     const modal = document.getElementById("share");
     const span = document.getElementsByClassName("close")[0];
-    span.onclick = function () {
-        modal.style.display = "none";
-    }
-    window.onclick = function (event) {
+    span.onclick = () => modal.style.display = "none";
+    window.onclick = event => {
         if (event.target === modal) {
             modal.style.display = "none";
         }
-    }
+    };
 }
 
 initialise().then(() => {

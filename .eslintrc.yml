@@ -8,6 +8,7 @@ parserOptions:
   sourceType: module
 rules:
   no-var: error
+  semi: error
 overrides:
   - files: "webpack.config.js"
     env:
