@@ -1,5 +1,5 @@
 import $ from "jquery";
-import {editor as monacoEditor, KeyCode, KeyMod, Selection} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/editor/editor.api";
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
