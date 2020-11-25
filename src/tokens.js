@@ -55,6 +55,10 @@ function isUpperCase(c){
   return (c > 64 && c<91)
 }
 
+function lineNumberSpace(text){
+    return text.replace(/(^|\n)\s*(\d+)\s*/g, '$1 $2 ');
+}
+
 function debbreviate(text) {
   let output = "";
   let buffer = "";
@@ -90,6 +94,7 @@ function decode2048(input){
 export function detokenise(text) {
     text = decode2048(text);
     text = debbreviate(text);
+    text = lineNumberSpace(text);
     let output = "";
     let withinString = false;
     let lineNumberBuffer = null;
