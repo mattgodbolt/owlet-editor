@@ -4,6 +4,7 @@ import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/edit
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode} from "./tokens";
+import {encode} from 'base2048';
 import './owlet-editor.less';
 
 const DefaultProgram = [
@@ -157,10 +158,16 @@ export class OwletEditor {
     }
 
     updateStatus(basicText) {
+
+      let base2048encoded = encode(basicText.split("").map(c => c.charCodeAt(0)));
+      let message = (basicText.length>280) ? basicText.length+' plaintext | '+base2048encoded.length+' base2048' : basicText.length;
+
+      console.log(base2048encoded,base2048encoded.length)
         this.editStatus
             .find(".count")
-            .text(basicText.length)
-            .toggleClass("too_long", basicText.length >= TweetMaximum);
+            .text(message)
+            .toggleClass("too_long", base2048encoded.length > TweetMaximum);
+
         this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
 
