@@ -11,13 +11,13 @@ function programUrl(id) {
 
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
-    if (response.status === 200){
-    const json = await response.json();
-    const author = document.getElementById('author');
-    author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0,16)}`;
-    return json
-  }
-    return {program:`REM BBC BASIC program ${id} not found\n`};
+    if (response.status === 200) {
+        const json = await response.json();
+        const author = document.getElementById('author');
+        author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`;
+        return json;
+    }
+    return {program: `REM BBC BASIC program ${id} not found\n`};
 }
 
 async function initialise() {
@@ -36,7 +36,7 @@ async function initialise() {
     const urlParams = new URLSearchParams(queryString);
     const load = urlParams.get('load');
     const cached = load ? await loadCachedProgram(load) : null;
-    const initialProgram = load ? cached.program  : null;
+    const initialProgram = load ? cached.program : null;
     const owletEditor = new OwletEditor(initialProgram);
     await owletEditor.initialise();
 

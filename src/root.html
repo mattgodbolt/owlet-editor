@@ -12,11 +12,11 @@
         <button data-action="examples" title="Load examples">examples</button>
         <button data-action="about" title="About OwletEditor">about</button>
     </div>
-    <div id="editor" class="code-editor"></div>
+    <div class="code-editor" id="editor"></div>
     <div class="emulator" id="emulator">
-        <canvas id="screen" class="screen" width="640px" height="512px"></canvas>
+        <canvas class="screen" height="512px" id="screen" width="640px"></canvas>
         <div id="about">
-            <img src="../assets/images/owlet.png" width="10%" alt="Owlet logo"/>
+            <img alt="Owlet logo" src="../assets/images/owlet.png" width="10%"/>
             <h3>Owlet Editor - beta preview</h3>
             <p>A simple, modern editor for a BBC BASIC inspired by the <a href="https://www.twitter.com/bbcmicrobot">BBC
                 Micro bot</a> community</p>
@@ -28,7 +28,7 @@
         </div>
         <div id="examples">
             <div class="template">
-                <h2><a href="javascript:void(0);" class="name"></a></h2>
+                <h2><a class="name" href="javascript:void(0);"></a></h2>
                 <div class="description"></div>
                 <div>
                     <pre><code class="code"></code></pre>
@@ -37,7 +37,8 @@
             </div>
         </div>
     </div>
-    <div class="kudos" id="author"></div><div class="kudos" id="like"></div>
+    <div class="kudos" id="author"></div>
+    <div class="kudos" id="like"></div>
     <div class="footer">
         <div id="edit_status"><span class="count">0</span> characters</div>
 
@@ -49,7 +50,7 @@
 </div>
 
 <!-- Modal Share Pop-Up-->
-<div id="share" class="modal">
+<div class="modal" id="share">
     <div class="modal-content">
         <span class="close">&times;</span>
         <p><b>Share your BBC Micro program</b></p>

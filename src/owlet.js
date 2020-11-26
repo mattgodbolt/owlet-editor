@@ -159,8 +159,8 @@ export class OwletEditor {
 
     updateStatus(basicText) {
 
-      let base2048encoded = encode(basicText.split("").map(c => c.charCodeAt(0)));
-      let message = (basicText.length>280) ? basicText.length+' plaintext | '+base2048encoded.length+' base2048' : basicText.length;
+        let base2048encoded = encode(basicText.split("").map(c => c.charCodeAt(0)));
+        let message = (basicText.length > 280) ? basicText.length + ' plaintext | ' + base2048encoded.length + ' base2048' : basicText.length;
 
         this.editStatus
             .find(".count")
