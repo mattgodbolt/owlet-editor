@@ -1,4 +1,5 @@
 import {decode} from 'base2048';
+import BasicRom from 'jsbeeb/roms/BASIC.ROM';
 
 /*
 
@@ -15,61 +16,29 @@ import {decode} from 'base2048';
 
  Array starts at byte token 0x80
 
-const fs = require('fs');
-
-// Extract tokens, keywords and flags from BASIC ROM. This will supercede the next two array definitions!
-async function extractTokensFromROM(){
-  const BASICROM = await fs.readFileSync('../node_modules/jsbeeb/roms/BASIC.ROM');
-  const bytes = new Uint8Array(BASICROM.buffer);//.slice(0x6e,0x2FA+0x6e).split('');
-  let word = "";
-  let keywords = [];
-  for (let b = 0x71; b<(0x71+0x2fb); b++) {
-    if (bytes[b] > 127){
-      keywords.push({
-        keyword: word,
-        token: "0x"+bytes[b],
-        flags: "0b"+bytes[b+1]
-      })
-      word = "";
-    } else {
-      if (bytes[b]>64) {word += String.fromCharCode(bytes[b])};
-    }
-  };
-  console.log(JSON.stringify(keywords))
-}
-extractTokensFromROM();
 */
 
-export const tokens = [
-    "AND", "DIV", "EOR", "MOD", "OR", "ERROR", "LINE", "OFF", "STEP", "SPC", "TAB(",
-    "ELSE", "THEN", null, "OPENIN", "PTR", "PAGE", "TIME", "LOMEM", "HIMEM", "ABS", "ACS", "ADVAL",
-    "ASC", "ASN", "ATN", "BGET", "COS", "COUNT", "DEG", "ERL", "ERR", "EVAL", "EXP", "EXT", "FALSE",
-    "FN", "GET", "INKEY", "INSTR", "INT", "LEN", "LN", "LOG", "NOT", "OPENIN", "OPENOUT", "PI",
-    "POINT(", "POS", "RAD", "RND", "SGN", "SIN", "SQR", "TAN", "TO", "TRUE", "USR", "VAL", "VPOS",
-    "CHR$", "GET$", "INKEY$", "LEFT$(", "MID$(", "RIGHT$(", "STR$", "STRING$(", "EOF", "AUTO",
-    "DELETE", "LOAD", "LIST", "NEW", "OLD", "RENUMBER", "SAVE", "PUT", "PTR", "PAGE",
-    "TIME", "LOMEM", "HIMEM", "SOUND", "BPUT", "CALL", "CHAIN", "CLEAR", "CLOSE", "CLG",
-    "CLS", "DATA", "DEF", "DIM", "DRAW", "END", "ENDPROC", "ENVELOPE", "FOR", "GOSUB",
-    "GOTO", "GCOL", "IF", "INPUT", "LET", "LOCAL", "MODE", "MOVE", "NEXT", "ON", "VDU",
-    "PLOT", "PRINT", "PROC", "READ", "REM", "REPEAT", "REPORT", "RESTORE", "RETURN", "RUN",
-    "STOP", "COLOUR", "TRACE", "UNTIL", "WIDTH", "OSCLI"
-];
+// Extract tokens, keywords and flags from BASIC ROM. This will supercede the next two array definitions!
+export const keywords = (() => {
+    const keywords = [];
+    for (const match of BasicRom.substr(0x71, 0x2fc).matchAll(/([A-Z$(]+)(..)/gs)) {
+        keywords.push({
+            keyword: match[1],
+            token: match[2].codePointAt(0) & 0xff,
+            flags: match[2].codePointAt(1) & 0xff
+        });
+    }
+    return keywords;
+})();
+
+export const tokens = (() => {
+    const result = new Array(0x80).fill(null);
+    for (const keyword of keywords)
+        result[keyword.token - 0x80] = keyword.keyword;
+    return result;
+})();
 
 // TODO - merge with byte token array, pay attention to flags wrt spacing
-const abbreviationOrder = [
-    "AND", "ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN", "AUTO", "BGET", "BPUT", "COLOUR", "CALL",
-    "CHAIN", "CHR$", "CLEAR", "CLOSE", "CLG", "CLS", "COS", "COUNT", "DATA", "DEG", "DEF",
-    "DELETE", "DIV", "DIM", "DRAW", "ENDPROC", "END", "ENVELOPE", "ELSE", "EVAL", "ERL", "ERROR",
-    "EOF", "EOR", "ERR", "EXP", "EXT", "FOR", "FALSE", "FN", "GOTO", "GET$", "GET", "GOSUB",
-    "GCOL", "HIMEM", "INPUT", "IF", "INKEY$", "INKEY", "INT", "INSTR(", "LIST", "LINE", "LOAD",
-    "LOMEM", "LOCAL", "LEFT$(", "LEN", "LET", "LOG", "LN", "MID$(", "MODE", "MOD", "MOVE", "NEXT",
-    "NEW", "NOT", "OLD", "ON", "OFF", "OR", "OPENIN", "OPENOUT", "OPENUP", "OSCLI", "PRINT",
-    "PAGE", "PTR", "PI", "PLOT", "POINT(", "PROC", "POS", "RETURN", "REPEAT", "REPORT", "READ",
-    "REM", "RUN", "RAD", "RESTORE", "RIGHT$(", "RND", "RENUMBER", "STEP", "SAVE", "SGN", "SIN",
-    "SQR", "SPC", "STR$", "STRING$(", "SOUND", "STOP", "TAN", "THEN", "TO", "TAB(", "TRACE",
-    "TIME", "TRUE", "UNTIL", "USR", "VDU", "VAL", "VPOS", "WIDTH", "PAGE", "PTR", "TIME",
-    "LOMEM", "HIMEM"
-];
 
 const Chars = {
     Quote: '"'.charCodeAt(0),
@@ -79,9 +48,9 @@ const Chars = {
 };
 
 function findKeyword(abbreviation) {
-    for (const keyword of abbreviationOrder) {
-        if (keyword.indexOf(abbreviation) === 0 && (abbreviation !== keyword)) {
-            return keyword;
+    for (const keyword of keywords) {
+        if (keyword.keyword.indexOf(abbreviation) === 0 && abbreviation !== keyword.keyword) {
+            return keyword.keyword;
         }
     }
     return abbreviation + ".";
@@ -95,7 +64,7 @@ function lineNumberSpace(text) {
     return text.replace(/(^|\n)\s*(\d+)\s*/g, '$1$2 ');
 }
 
-function debbreviate(text) {
+export function debbreviate(text) {
     let output = "";
     let buffer = "";
     let withinString = false;

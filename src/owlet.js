@@ -91,7 +91,7 @@ export class OwletEditor {
     async chooseExample(id) {
         const example = this.examples[id];
         if (example.basic) {
-            this.updateEditorText(example.basic, "load example")
+            this.updateEditorText(example.basic, "load example");
             await this.updateProgram();
         }
     }

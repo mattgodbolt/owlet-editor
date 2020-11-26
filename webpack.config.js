@@ -8,8 +8,42 @@ const OptimizeCssAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const {CleanWebpackPlugin} = require('clean-webpack-plugin');
 const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
+const glob = require('glob');
 
 const isDev = process.env.NODE_ENV !== 'production';
+const isTest = process.env.TESTBUILD !== undefined;
+
+const entry = isTest ? glob.sync(path.resolve(__dirname, 'test/**/*.js'))
+    : path.resolve(__dirname, './src/index.js');
+const outputPath = isTest ? path.resolve(__dirname, 'dist/test')
+    : path.resolve(__dirname, 'dist');
+
+function getOptimizationSettings() {
+    if (isTest) return undefined;
+    return {
+        minimize: !isDev,
+        runtimeChunk: 'single',
+        splitChunks: {
+            cacheGroups: {
+                vendors: {
+                    test: /[/\\]node_modules[/\\]/,
+                    name: 'vendor',
+                    chunks: 'all',
+                    priority: -10,
+                },
+            },
+        },
+        moduleIds: 'deterministic',
+        minimizer: [
+            new OptimizeCssAssetsPlugin({
+                cssProcessorPluginOptions: {
+                    preset: ['default', {discardComments: {removeAll: true}}],
+                },
+            }),
+            new TerserPlugin(),
+        ]
+    };
+}
 
 function getPlugins() {
     const plugins = [
@@ -52,10 +86,11 @@ function getPlugins() {
 
 module.exports = {
     mode: isDev ? 'development' : 'production',
-    entry: './src/index.js',
+    entry: entry,
+    target: isTest ? 'node': 'web',
     output: {
         filename: isDev ? '[name].js' : `[name].[contenthash].js`,
-        path: path.resolve(__dirname, 'dist'),
+        path: outputPath,
     },
     resolve: {
         alias: {
@@ -70,29 +105,7 @@ module.exports = {
         publicPath: '/',
         contentBase: './'
     },
-    optimization: {
-        minimize: !isDev,
-        runtimeChunk: 'single',
-        splitChunks: {
-            cacheGroups: {
-                vendors: {
-                    test: /[/\\]node_modules[/\\]/,
-                    name: 'vendor',
-                    chunks: 'all',
-                    priority: -10,
-                },
-            },
-        },
-        moduleIds: 'deterministic',
-        minimizer: [
-            new OptimizeCssAssetsPlugin({
-                cssProcessorPluginOptions: {
-                    preset: ['default', {discardComments: {removeAll: true}}],
-                },
-            }),
-            new TerserPlugin(),
-        ],
-    },
+    optimization: getOptimizationSettings(),
     module: {
         rules: [
             {
@@ -138,6 +151,10 @@ module.exports = {
             {
                 test: /\.ya?ml$/,
                 use: ['json-loader', 'yaml-loader']
+            },
+            {
+                test: /.rom$/i,
+                use: ['binary-loader']
             }
         ],
     }

@@ -1,7 +1,7 @@
-import {detokenise} from '../src/tokens';
-import * as assert from 'assert';
+import {debbreviate, detokenise} from '../src/tokens';
+import {assert} from 'chai';
 
-describe('Detokinisation', () => {
+describe('Detokenisation', () => {
     it('should detokenise the empty string', () => {
         assert.strictEqual(detokenise(""), "");
     });
@@ -44,5 +44,17 @@ Q=+5:ãJ=0¸16:X=?Q-19:L=Q?1-96:Q=Q+2:ãI=0¸L:æ0,P:ì10*X+64*I,60*Y:ð97,4
 Q=PAGE+5:FORJ=0TO16:X=?Q-19:L=Q?1-96:Q=Q+2:FORI=0TOL:GCOL0,ATNP:MOVE10*X+64*I,60*Y:PLOT97,48,48:PLOT0,-40,0:GCOL0,3:IFPPLOT0,-8,0:VDU102:PLOT0,-12,-16
 VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
 `);
+    });
+});
+
+describe('Debbreviation', () => {
+    it('should work with the empty string', () => {
+        assert.strictEqual(debbreviate(""), "");
+    });
+    it('should leave non-token things alone', () => {
+        assert.strictEqual(debbreviate("I am a mongoose."), "I am a mongoose.");
+    });
+    it('should handle simple cases', () => {
+        assert.strictEqual(debbreviate("P."), "PRINT");
     });
 });
