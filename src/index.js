@@ -11,6 +11,7 @@ function programUrl(id) {
 
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
+    console.log(decodeURI(await response.text()));
     const json = JSON.parse(decodeURI(await response.text()));
     const author = document.getElementById('author');
     author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0,16)}`;
