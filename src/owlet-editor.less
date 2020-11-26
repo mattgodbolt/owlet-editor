@@ -37,7 +37,7 @@ body {
   height: 90vh;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px;
+  grid-template-rows: 80px 24px  minmax(320px, 90vh) 32px 24px;
 }
 
 .header {
@@ -53,6 +53,16 @@ body {
   background-color: var(--color-toolbar);
   border: 1px solid var(--color-background);
   display: flex;
+}
+
+.kudos {
+  color: #eee;
+  padding: 4px;
+  padding-left: 16px;
+  padding-top: 8px;
+  grid-column: span 1;
+  background-color: #111;//var(--color-editor-bg);
+  border: 0px;
 }
 
 .code-editor {

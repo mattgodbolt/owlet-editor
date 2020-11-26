@@ -4,15 +4,18 @@ import rootHtml from './root.html';
 import {OwletEditor} from "./owlet";
 
 function programUrl(id) {
-    if (window.location.hostname === 'localhost')
+    if (window.location.hostname !== 'localhost')
         return `https://bbcmic.ro/assets/programs/${id}`;
     return `../assets/programs/${id}`;
 }
 
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
-    const basicText = await response.text();
-    return response.status === 200 ? basicText : `REM BBC BASIC program ${id} not found\n`;
+    const json = JSON.parse(decodeURI(await response.text()));
+    const author = document.getElementById('author');
+    author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0,16)}`;
+
+    return response.status === 200 ? json: `REM BBC BASIC program ${id} not found\n`;
 }
 
 async function initialise() {
@@ -30,7 +33,8 @@ async function initialise() {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const load = urlParams.get('load');
-    const initialProgram = load ? await loadCachedProgram(load) : null;
+    const cached = load ? await loadCachedProgram(load) : null;
+    const initialProgram = load ? cached.program  : null;
     const owletEditor = new OwletEditor(initialProgram);
     await owletEditor.initialise();
 
