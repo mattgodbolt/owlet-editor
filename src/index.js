@@ -11,12 +11,15 @@ function programUrl(id) {
 
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
-    console.log(decodeURI(await response.text()));
-    const json = JSON.parse(decodeURI(await response.text()));
+    if (response.status === 200){
+    const data = decodeURI(await response.text());
+    console.log(data);
+    const json = JSON.parse(decodeURI(data));
     const author = document.getElementById('author');
     author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0,16)}`;
-
-    return response.status === 200 ? json: `REM BBC BASIC program ${id} not found\n`;
+    return json
+  }
+    return {program:`REM BBC BASIC program ${id} not found\n`};
 }
 
 async function initialise() {
