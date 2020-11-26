@@ -15,6 +15,29 @@ import {decode} from 'base2048';
 
  Array starts at byte token 0x80
 
+const fs = require('fs');
+
+// Extract tokens, keywords and flags from BASIC ROM. This will supercede the next two array definitions!
+async function extractTokensFromROM(){
+  const BASICROM = await fs.readFileSync('../node_modules/jsbeeb/roms/BASIC.ROM');
+  const bytes = new Uint8Array(BASICROM.buffer);//.slice(0x6e,0x2FA+0x6e).split('');
+  let word = "";
+  let keywords = [];
+  for (let b = 0x71; b<(0x71+0x2fb); b++) {
+    if (bytes[b] > 127){
+      keywords.push({
+        keyword: word,
+        token: "0x"+bytes[b],
+        flags: "0b"+bytes[b+1]
+      })
+      word = "";
+    } else {
+      if (bytes[b]>64) {word += String.fromCharCode(bytes[b])};
+    }
+  };
+  console.log(JSON.stringify(keywords))
+}
+extractTokensFromROM();
 */
 
 export const tokens = [
