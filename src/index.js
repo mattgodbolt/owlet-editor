@@ -15,7 +15,7 @@ async function loadCachedProgram(id) {
         const json = await response.json();
         const author = document.getElementById('author');
         const like = document.getElementById('like');
-        author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0,16)}`;
+        author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`;
         like.href = `https://twitter.com/intent/like?tweet_id=${id}`;
         like.innerHTML = `<span id="heart"></span> like the original post on Twitter`;
         return json;
