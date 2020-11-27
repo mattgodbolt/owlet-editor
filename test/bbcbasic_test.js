@@ -44,7 +44,8 @@ describe('should tokenise', () => {
         checkTokens(["C."], [{offset: 0, type: "keyword"}]);
         checkTokens(["R."], [{offset: 0, type: "keyword"}]);
     });
-    // it('should not recognize bad abbreviations', () => {
-    //     checkTokens(["ZZ."], [{offset: 0, type: "keyword"}]);
-    // });
+    it('should not recognize bad abbreviations', () => {
+        checkTokens(["Z."], [{offset: 0, type: "invalid"}]);
+        checkTokens(["PRIT."], [{offset: 0, type: "invalid"}]);
+    });
 });

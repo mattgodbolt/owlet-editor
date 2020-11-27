@@ -5,6 +5,17 @@ function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(");
 }
 
+function findAllPrefixes() {
+    const prefixes = new Set();
+    for (const token of tokens.filter(x => x)) {
+        for (let i = 0; i < token.length; ++i)
+            prefixes.add(token.substr(0, i));
+    }
+    const result = [];
+    for (const prefix of prefixes)
+        result.push(prefix + '.');
+    return result;
+}
 
 export function registerBbcBasicLanguage() {
     languages.register({id: 'BBCBASIC'});
@@ -20,6 +31,7 @@ export function registerBbcBasicLanguage() {
             '+', '-', '*', '/', '<<', '>>', '^', '=', '==', '<>', '!=', '<', '>', '<=', '>=',
             '{', '}', ':', '$', '?', ';', ','
         ],
+        tokenPrefix: findAllPrefixes(),
         symbols: /[-+#=><!*/{}:?$;,]+/,
         tokenizer: {
             root: [
@@ -31,9 +43,7 @@ export function registerBbcBasicLanguage() {
                     .sort((x, y) => y.length - x.length)
                     .join("|"),
                     'keyword'],
-                // Assume any abbreviation is "valid" - TODO can use 'keywords' to actually fix
-                // by building a list of keywords that include all possible prefixes.
-                [/[A-Z]+\./, 'keyword'],
+                [/[A-Z]+\./, {cases: {'@tokenPrefix': 'keyword'}}],
                 [/[a-zA-Z_][\w]*[$%]?/, 'variable'],
                 [/^\s*\d+/, 'enum'], // line numbers
                 // whitespace
