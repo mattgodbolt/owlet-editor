@@ -48,4 +48,11 @@ describe('should tokenise', () => {
         checkTokens(["Z."], [{offset: 0, type: "invalid"}]);
         checkTokens(["PRIT."], [{offset: 0, type: "invalid"}]);
     });
+    it('should not recognize 6502 outside of []', () => {
+        checkTokens(["LDA"], [{offset: 0, type: "variable"}]);
+    });
+    it('should recognize 6502 inside []', () => {
+        checkTokens(["[", "LDA"], [{offset: 0, type: "delimiter.square"}], [{offset: 0, type: "keyword"}]);
+        checkTokens(["[LDA"], [{offset: 0, type: "delimiter.square"}, {offset: 1, type: "keyword"}]);
+    });
 });
