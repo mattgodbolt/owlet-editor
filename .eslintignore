@@ -1,2 +1,2 @@
-# Uninteresting folders (node_modules and dotfiles/dotfolders ignored by default)
 dist
+test/_polyfills.js

@@ -81,13 +81,20 @@ function getPlugins() {
     if (isDev) {
         plugins.push(new webpack.HotModuleReplacementPlugin);
     }
+    if (isTest) {
+        plugins.push(new CopyPlugin({
+            patterns: [
+                {context: path.resolve(__dirname, 'node_modules', 'canvas', 'build', 'Release'), from: '*.so*',},
+            ],
+        }));
+    }
     return plugins;
 }
 
 module.exports = {
     mode: isDev ? 'development' : 'production',
     entry: entry,
-    target: isTest ? 'node': 'web',
+    target: isTest ? 'node' : 'web',
     output: {
         filename: isDev ? '[name].js' : `[name].[contenthash].js`,
         path: outputPath,
@@ -155,6 +162,10 @@ module.exports = {
             {
                 test: /.rom$/i,
                 use: ['binary-loader']
+            },
+            {
+                test: /\.node$/,
+                loader: 'node-loader',
             }
         ],
     }
