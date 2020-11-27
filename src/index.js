@@ -14,7 +14,12 @@ async function loadCachedProgram(id) {
     if (response.status === 200) {
         const json = await response.json();
         const author = document.getElementById('author');
-        author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`;
+        const like = document.getElementById('like');
+        const icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 54 72"><path d="M38.723,12c-7.187,0-11.16,7.306-11.723,8.131C26.437,19.306,22.504,12,15.277,12C8.791,12,3.533,18.163,3.533,24.647 C3.533,39.964,21.891,55.907,27,56c5.109-0.093,23.467-16.036,23.467-31.353C50.467,18.163,45.209,12,38.723,12z"/></svg>'
+        author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0,16)}`;
+        like.href = `https://twitter.com/intent/like?tweet_id=${id}`;
+
+        like.innerHTML = `<span id=\"heart\"></span> like the original post on Twitter`;
         return json;
     }
     return {program: `REM BBC BASIC program ${id} not found\n`};
