@@ -4,7 +4,7 @@ import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/edit
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode} from "./tokens";
-import {encode} from 'base2048';
+import {encode, decode} from 'base2048';
 import tokenise from 'jsbeeb/basic-tokenise';
 import './owlet-editor.less';
 
@@ -76,9 +76,13 @@ export class OwletEditor {
 
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
-            localStorage.setItem("program", basicText);
-            this.lineNumberDetect(basicText);
-            this.updateStatus(basicText);
+            const decodedText = this.decode2048(basicText);
+            localStorage.setItem("program", decodedText);
+            this.updateStatus(decodedText);
+            if (basicText !== decodedText) {
+
+            this.updateEditorText(decodedText);
+          }
         });
 
         this.emulator = new Emulator($('#emulator'));
@@ -190,6 +194,16 @@ export class OwletEditor {
     share() {
         const shareModal = document.getElementById("share");
         shareModal.style.display = "block";
+    }
+
+    decode2048(input) {
+        try {
+            let code = input.match(/🗜(\S*)/);
+            code = (code === null) ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
+            return String.fromCharCode.apply(null, decode(code.trim()));
+        } catch (error) {
+            return input;
+        }
     }
 
     expandCode() {

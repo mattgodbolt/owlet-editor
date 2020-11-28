@@ -1,4 +1,3 @@
-import {decode} from 'base2048';
 import BasicRom from 'jsbeeb/roms/BASIC.ROM';
 
 /*
@@ -44,7 +43,9 @@ const Chars = {
     Quote: '"'.charCodeAt(0),
     FirstToken: 0x80,
     LineNumberToken: 0x8d,
-    Dot: '.'.charCodeAt(0)
+    Dot: '.'.charCodeAt(0),
+    REM: 0xf4,
+    NewLine: '\n'.charCodeAt(0)
 };
 
 function findKeyword(abbreviation) {
@@ -58,10 +59,6 @@ function findKeyword(abbreviation) {
 
 function isUpperCase(c) {
     return c > 64 && c < 91;
-}
-
-function lineNumberSpace(text) {
-    return text.replace(/(^|\n)\s*(\d+)\s*/g, '$1$2 ');
 }
 
 export function debbreviate(text) {
@@ -83,20 +80,10 @@ export function debbreviate(text) {
     return output + buffer;
 }
 
-function decode2048(input) {
-    try {
-        let code = input.match(/🗜(\S*)/);
-        code = (code === null) ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
-        return String.fromCharCode.apply(null, decode(code.trim()));
-    } catch (error) {
-        console.log(error);
-        return input;
-    }
-}
-
 export function detokenise(text) {
     let output = "";
     let withinString = false;
+    let withinREM = false;
     let lineNumberBuffer = null;
     const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
     for (const charCode of codePoints) {
@@ -106,6 +93,7 @@ export function detokenise(text) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];
+            withinREM = false;
             continue;
         }
         if (lineNumberBuffer !== null) {
@@ -119,17 +107,21 @@ export function detokenise(text) {
             }
             continue;
         }
-        output += charCode >= Chars.FirstToken && !withinString
+        output += charCode >= Chars.FirstToken && !withinString && !withinREM
             ? tokens[charCode - Chars.FirstToken]
             : String.fromCodePoint(charCode);
+
+        if (charCode === Chars.REM)
+                withinREM = true;
+        if (charCode === Chars.NewLine)
+                withinREM = false;
+
     }
     return output;
 }
 
 export function expandCode(text) {
-    text = decode2048(text);
     text = debbreviate(text);
     text = detokenise(text);
-    text = lineNumberSpace(text);
     return text;
 }
