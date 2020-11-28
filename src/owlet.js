@@ -5,6 +5,7 @@ import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode} from "./tokens";
 import {encode} from 'base2048';
+import tokenise from 'jsbeeb/basic-tokenise';
 import './owlet-editor.less';
 
 const DefaultProgram = [
@@ -158,14 +159,20 @@ export class OwletEditor {
     }
 
     updateStatus(basicText) {
+        let outputProgram = basicText;
+        let format = "text";
 
-        let base2048encoded = encode(basicText.split("").map(c => c.charCodeAt(0)));
-        let message = (basicText.length > 280) ? basicText.length + ' plaintext | ' + base2048encoded.length + ' base2048' : basicText.length;
+        if (outputProgram.length > 280) {
+          outputProgram = encode(outputProgram.split("").map(c => c.charCodeAt(0)));
+          format = "base2048";
+        }
+
+        let message = `${outputProgram.length} ${format}`;
 
         this.editStatus
             .find(".count")
             .text(message)
-            .toggleClass("too_long", base2048encoded.length > TweetMaximum);
+            .toggleClass("too_long", outputProgram.length > TweetMaximum);
 
         this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
@@ -189,9 +196,16 @@ export class OwletEditor {
         this.updateEditorText(expandCode(this.getBasicText()), "expand code");
     }
 
+    tokenise() {
+      let basicText = this.getBasicText().trim().replace(/\n/g,'\r');
+      console.log(this.tokeniser.tokenise(basicText))
+      this.updateEditorText(this.tokeniser.tokenise(basicText));
+    }
+
     async initialise() {
         await this.emulator.initialise();
         await this.updateProgram();
+        this.tokeniser = await tokenise.create();
         const actions = {
             run: async () => {
                 await this.updateProgram();
@@ -202,7 +216,8 @@ export class OwletEditor {
             tweet: () => this.share(),
             emulator: () => this.selectView('screen'),
             about: () => this.selectView('about'),
-            expand: () => this.expandCode()
+            expand: () => this.expandCode(),
+            tokenise: () => this.tokenise()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
     }
