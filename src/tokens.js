@@ -43,9 +43,7 @@ const Chars = {
     Quote: '"'.charCodeAt(0),
     FirstToken: 0x80,
     LineNumberToken: 0x8d,
-    Dot: '.'.charCodeAt(0),
-    REM: 0xf4,
-    NewLine: '\n'.charCodeAt(0)
+    Dot: '.'.charCodeAt(0)
 };
 
 function findKeyword(abbreviation) {
@@ -83,7 +81,6 @@ export function debbreviate(text) {
 export function detokenise(text) {
     let output = "";
     let withinString = false;
-    let withinREM = false;
     let lineNumberBuffer = null;
     const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
     for (const charCode of codePoints) {
@@ -93,7 +90,6 @@ export function detokenise(text) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];
-            withinREM = false;
             continue;
         }
         if (lineNumberBuffer !== null) {
@@ -110,12 +106,6 @@ export function detokenise(text) {
         output += charCode >= Chars.FirstToken && !withinString && !withinREM
             ? tokens[charCode - Chars.FirstToken]
             : String.fromCodePoint(charCode);
-
-        if (charCode === Chars.REM)
-                withinREM = true;
-        if (charCode === Chars.NewLine)
-                withinREM = false;
-
     }
     return output;
 }
