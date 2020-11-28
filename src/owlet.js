@@ -228,6 +228,11 @@ export class OwletEditor {
       document.execCommand("copy");
     }
 
+    closeModal(){
+      const modal = document.getElementById("share");
+      modal.style.display = "none";
+    }
+
     async initialise() {
         await this.emulator.initialise();
         await this.updateProgram();
@@ -244,7 +249,8 @@ export class OwletEditor {
             about: () => this.selectView('about'),
             expand: () => this.expandCode(),
             tokenise: () => this.tokenise(),
-            copy: () => this.copy()
+            copy: () => this.copy(),
+            closeModal: () => this.closeModal()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
     }
