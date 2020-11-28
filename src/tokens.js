@@ -103,7 +103,7 @@ export function detokenise(text) {
             }
             continue;
         }
-        output += charCode >= Chars.FirstToken && !withinString && !withinREM
+        output += charCode >= Chars.FirstToken && !withinString 
             ? tokens[charCode - Chars.FirstToken]
             : String.fromCodePoint(charCode);
     }

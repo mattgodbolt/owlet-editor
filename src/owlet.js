@@ -193,7 +193,11 @@ export class OwletEditor {
 
     share() {
         const shareModal = document.getElementById("share");
+        const copyText = document.getElementById("copyText");
         shareModal.style.display = "block";
+        copyText.value = (location.hostname === "localhost") ?
+                        `http://localhost:8080/#${this.toStateString()}` :
+                        `https://${location.hostname}/#${this.toStateString()}`
     }
 
     decode2048(input) {
@@ -211,9 +215,17 @@ export class OwletEditor {
     }
 
     tokenise() {
-      let basicText = this.getBasicText().trim().replace(/\n/g,'\r');
+      const basicText = this.getBasicText().trim().replace(/\n/g,'\r');
       console.log(this.tokeniser.tokenise(basicText))
       this.updateEditorText(this.tokeniser.tokenise(basicText));
+    }
+
+    copy() {
+      const shareModal = document.getElementById("share");
+      const copyText = document.getElementById("copyText");
+      copyText.select();
+      copyText.setSelectionRange(0, 99999); // For mobile devices
+      document.execCommand("copy");
     }
 
     async initialise() {
@@ -231,7 +243,8 @@ export class OwletEditor {
             emulator: () => this.selectView('screen'),
             about: () => this.selectView('about'),
             expand: () => this.expandCode(),
-            tokenise: () => this.tokenise()
+            tokenise: () => this.tokenise(),
+            copy: () => this.copy()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
     }

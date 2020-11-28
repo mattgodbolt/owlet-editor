@@ -54,6 +54,18 @@ async function initialise() {
             modal.style.display = "none";
         }
     };
+    document.onkeydown = function(evt) {
+    evt = evt || window.event;
+    let isEscape = false;
+    if ("key" in evt) {
+        isEscape = (evt.key === "Escape" || evt.key === "Esc");
+    } else {
+        isEscape = (evt.keyCode === 27);
+    }
+    if (isEscape) {
+        modal.style.display = "none";
+    }
+};
 }
 
 initialise().then(() => {
