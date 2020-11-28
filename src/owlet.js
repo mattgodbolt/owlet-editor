@@ -221,7 +221,6 @@ export class OwletEditor {
     }
 
     copy() {
-      const shareModal = document.getElementById("share");
       const copyText = document.getElementById("copyText");
       copyText.select();
       copyText.setSelectionRange(0, 99999); // For mobile devices
