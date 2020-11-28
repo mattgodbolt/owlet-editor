@@ -42,30 +42,7 @@ async function initialise() {
     const initialProgram = load ? cached.program : null;
     const owletEditor = new OwletEditor(initialProgram);
     await owletEditor.initialise();
-
     owletEditor.LineNumbers = false;
-
-    // 'Share' pop-up
-    const modal = document.getElementById("share");
-    const span = document.getElementsByClassName("close")[0];
-    span.onclick = () => modal.style.display = "none";
-    window.onclick = event => {
-        if (event.target === modal) {
-            modal.style.display = "none";
-        }
-    };
-    document.onkeydown = function(evt) {
-    evt = evt || window.event;
-    let isEscape = false;
-    if ("key" in evt) {
-        isEscape = (evt.key === "Escape" || evt.key === "Esc");
-    } else {
-        isEscape = (evt.keyCode === 27);
-    }
-    if (isEscape) {
-        modal.style.display = "none";
-    }
-};
 }
 
 initialise().then(() => {
