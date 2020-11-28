@@ -65,7 +65,7 @@ export class OwletEditor {
         });
 
         this.editor.addAction({
-            id: 'execute-basic',
+            id: 'expand-code',
             label: 'Expand code',
             keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
             keybindingContext: null,
