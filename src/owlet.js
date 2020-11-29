@@ -191,11 +191,8 @@ export class OwletEditor {
         const shareModal = document.getElementById("share");
         const copyText = document.getElementById("copyText");
         shareModal.style.display = "block";
-        copyText.value = (location.hostname === "localhost") ?
-            `http://localhost:8080/#${this.toStateString()}` :
-            `https://${location.hostname}/#${this.toStateString()}`;
+        copyText.value = `${location.origin}/#${this.toStateString()}`;
     }
-
 
     expandCode() {
         this.updateEditorText(expandCode(this.getBasicText()), "expand code");
