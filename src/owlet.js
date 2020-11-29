@@ -204,7 +204,7 @@ export class OwletEditor {
     tokenise() {
         const basicText = this.getBasicText().trim().replace(/\n/g, '\r');
         console.log(this.tokeniser.tokenise(basicText))
-        this.updateEditorText(this.tokeniser.tokenise(basicText));
+        this.updateEditorText(this.tokeniser.tokenise(basicText), "tokenise");
     }
 
     copy() {
