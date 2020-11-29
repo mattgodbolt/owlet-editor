@@ -55,4 +55,17 @@ describe('should tokenise', () => {
         checkTokens(["[", "LDA"], [{offset: 0, type: "delimiter.square"}], [{offset: 0, type: "keyword"}]);
         checkTokens(["[LDA"], [{offset: 0, type: "delimiter.square"}, {offset: 1, type: "keyword"}]);
     });
+    it('should notice REM statements', () => {
+        checkTokens(["REM this is a comment"], [{offset: 0, type: "keyword"}, {offset: 3, type: "comment"}]);
+        checkTokens(["REM this is a comment and has PRINT in it"], [
+            {offset: 0, type: "keyword"},
+            {offset: 3, type: "comment"}
+        ]);
+        checkTokens(["REM this is a comment that ends at a colon:PRINT"], [
+            {offset: 0, type: "keyword"},
+            {offset: 3, type: "comment"},
+            {offset: 42, type: "operator"},
+            {offset: 43, type: "keyword"}
+        ]);
+    });
 });
