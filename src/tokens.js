@@ -79,8 +79,25 @@ export function debbreviate(text) {
     return output + buffer;
 }
 
-export function detokenise(text) {
-    let output = "";
+class StringHandler {
+    constructor() {
+        this.output = "";
+    }
+
+    onLineNumber(lineNumber) {
+        this.output += `${lineNumber}`;
+    }
+
+    onCharacter(charCode) {
+        this.output += String.fromCodePoint(charCode);
+    }
+
+    onToken(token) {
+        this.output += tokens[token - Chars.FirstToken];
+    }
+}
+
+function detokeniseInternal(text, handler) {
     let withinString = false;
     let lineNumberBuffer = null;
     const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
@@ -100,15 +117,70 @@ export function detokenise(text) {
                 const topBits = lineNumberBuffer[0] << 2;
                 const lowBits = lineNumberBuffer[1] ^ (topBits & 0xc0);
                 const highBits = lineNumberBuffer[2] ^ ((topBits << 2) & 0xc0);
-                output += `${(highBits << 8) | lowBits}`;
+                handler.onLineNumber((highBits << 8) | lowBits);
             }
             continue;
         }
-        output += charCode >= Chars.FirstToken && !withinString
-            ? tokens[charCode - Chars.FirstToken]
-            : String.fromCodePoint(charCode);
+        if (charCode >= Chars.FirstToken && !withinString)
+            handler.onToken(charCode);
+        else
+            handler.onCharacter(charCode);
     }
-    return output;
+}
+
+export function detokenise(text) {
+    const handler = new StringHandler();
+    detokeniseInternal(text, handler);
+    return handler.output;
+}
+
+export function forEachBasicLine(tokenised, lineHandler) {
+    while (tokenised) {
+        if (tokenised.charCodeAt(0) !== 0x0d)
+            throw new Error("Bad program");
+        const lineNumHigh = tokenised.charCodeAt(1);
+        if (lineNumHigh === 0xff)
+            break;
+        const lineNumLow = tokenised.charCodeAt(2);
+        const lineLength = tokenised.charCodeAt(3);
+        const lineNumber = (lineNumHigh << 8) | lineNumLow;
+        const line = tokenised.substr(4, lineLength - 4);
+        tokenised = tokenised.substr(lineLength);
+        lineHandler(lineNumber, line);
+    }
+}
+
+function goesUpInTensOnly(sequence) {
+    let prev = 0;
+    for (const num of sequence) {
+        if (num !== prev + 10) return false;
+        prev = num;
+    }
+    return true;
+}
+
+class PartialHandler extends StringHandler {
+    constructor() {
+        super();
+    }
+
+    onToken(token) {
+        this.onCharacter(token);
+    }
+}
+
+export function partialDetokenise(rawText) {
+    const lines = [];
+    forEachBasicLine(rawText, (lineNum, line) => {
+        const handler = new PartialHandler();
+        detokeniseInternal(line, handler);
+        lines.push({num: lineNum, line: handler.output});
+    });
+    if (goesUpInTensOnly(lines.map(x => x.num))) {
+        return lines.map(x => x.line.trimStart()).join("\n");
+    } else {
+        return lines.map(x => `${x.num}${x.line}`).join("\n");
+    }
 }
 
 function decode2048(input) {

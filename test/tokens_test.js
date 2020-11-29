@@ -1,4 +1,4 @@
-import {debbreviate, detokenise} from '../src/tokens';
+import {debbreviate, detokenise, forEachBasicLine, partialDetokenise} from '../src/tokens';
 import {assert} from 'chai';
 
 describe('Detokenisation', () => {
@@ -56,5 +56,34 @@ describe('Debbreviation', () => {
     });
     it('should handle simple cases', () => {
         assert.strictEqual(debbreviate("P."), "PRINT");
+    });
+});
+
+describe('For each basic line', () => {
+    it('should handle an empty program', () => {
+        forEachBasicLine('\x0d\xff', () => assert.fail("Shouldn't call me"));
+    });
+    it('should handle a single line program', () => {
+        const result = [];
+        forEachBasicLine('\x0d\x00\x0a\x0d\xf1 "Hello"\x0d\xff',
+            (lineNum, line) => result.push({num: lineNum, line}));
+        assert.deepStrictEqual(result, [{num: 10, line: '\xf1 "Hello"'}]);
+    });
+    it('should handle a two line program', () => {
+        const result = [];
+        forEachBasicLine('\x0d\x00\x0a\x0d\xf1 "Hello"\x0d\x00\x14\x05\xf9\x0d\xff',
+            (lineNum, line) => result.push({num: lineNum, line}));
+        assert.deepStrictEqual(result, [{num: 10, line: '\xf1 "Hello"'}, {num: 20, line: '\xf9'}]);
+    });
+});
+
+describe('Partial detokenisation', () => {
+    it('should drop sequential 10, 20 etc', () => {
+        const rawProgram = '\x0d\x00\x0a\x14 \xf1 "Hello world"\x0d\x00\x14\x0b \xe5 \x8d\x54\x4a\x40\x0d\xff';
+        assert.strictEqual(partialDetokenise(rawProgram), '\xf1 "Hello world"\n\xe5 10');
+    });
+    it('should leave non-tens line numbers', () => {
+        const rawProgram = '\x0d\x00\x0a\x14 \xf1 "Hello world"\x0d\x00\x0b\x0b \xe5 \x8d\x54\x4a\x40\x0d\xff';
+        assert.strictEqual(partialDetokenise(rawProgram), '10 \xf1 "Hello world"\n11 \xe5 10');
     });
 });

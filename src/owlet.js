@@ -3,7 +3,7 @@ import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/edit
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
-import {expandCode} from "./tokens";
+import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from 'base2048';
 import tokenise from 'jsbeeb/basic-tokenise';
 import './owlet-editor.less';
@@ -153,7 +153,7 @@ export class OwletEditor {
         } catch (e) {
             // TODO a pop up or similar? See #14
             // Reproducible if you paste a too-long line into the
-            // editor; we get "Unable to tokenize".
+            // editor; we get "Unable to tokenise".
             console.log(`Unable to run program: ${e}`);
         }
     }
@@ -202,8 +202,8 @@ export class OwletEditor {
     }
 
     tokenise() {
-        const basicText = this.getBasicText().trim().replace(/\n/g, '\r');
-        this.updateEditorText(this.tokeniser.tokenise(basicText), "tokenise");
+        const rawTokenised = this.tokeniser.tokenise(this.getBasicText());
+        this.updateEditorText(partialDetokenise(rawTokenised), "tokenise");
     }
 
     copy() {
