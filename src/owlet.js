@@ -185,7 +185,6 @@ export class OwletEditor {
                 try {
                     this.tokeniser.tokenise(this.editor.getModel().getLineContent(lineNum));
                 } catch (e) {
-                    console.log(e);
                     markers.push(
                         {
                             severity: 3,// error
