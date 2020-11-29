@@ -17,7 +17,7 @@ async function loadCachedProgram(id) {
         const like = document.getElementById('like');
         author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`;
         like.href = `https://twitter.com/intent/like?tweet_id=${id}`;
-        like.innerHTML = `<span id="heart"></span> like the original post on Twitter`;
+        like.innerHTML = `<span id="heart">♥</span> like the original post on Twitter`;
         return json;
     }
     return {program: `REM BBC BASIC program ${id} not found\n`};
