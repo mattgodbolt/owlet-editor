@@ -23,6 +23,26 @@ async function loadCachedProgram(id) {
     return {program: `REM BBC BASIC program ${id} not found\n`};
 }
 
+function consumeHash() {
+    // "consume" the hash so as not to confuse users. If they need the hash
+    // they should click share.
+    window.location.hash = '';
+}
+
+async function getInitialState(id) {
+    if (!id) {
+        const maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
+        if (maybeState) {
+            consumeHash();
+            return maybeState;
+        }
+        // No state, let the editor pick its own default state.
+        return null;
+    }
+    const result = await loadCachedProgram(id);
+    return OwletEditor.stateForBasicProgram(result.program);
+}
+
 async function initialise() {
     function setTheme(themeName) {
         localStorage.setItem('theme', themeName);
@@ -37,12 +57,15 @@ async function initialise() {
     // Check if we reference a cached tweet on first load and convert it to URL hash
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const load = urlParams.get('load');
-    const cached = load ? await loadCachedProgram(load) : null;
-    const initialProgram = load ? cached.program : null;
-    const owletEditor = new OwletEditor(initialProgram);
-    await owletEditor.initialise();
-    owletEditor.LineNumbers = false;
+    const owletEditor = new OwletEditor();
+    await owletEditor.initialise(await getInitialState(urlParams.get('load')));
+    window.onhashchange = () => {
+        const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
+        if (state) {
+            owletEditor.setState(state);
+            consumeHash();
+        }
+    };
 }
 
 initialise().then(() => {

@@ -14,14 +14,14 @@ const DefaultProgram = [
 ].join('\n');
 
 const TweetMaximum = 280;
+const StateVersion = 1;
 
 function defaultLineNumber(line) {
     return line * 10;
 }
 
 export class OwletEditor {
-    constructor(optionalInitialProgram) {
-        const program = optionalInitialProgram ? optionalInitialProgram : localStorage.getItem("program") || DefaultProgram;
+    constructor() {
         const editorPane = $('#editor');
         this.editStatus = $('#edit_status');
         this.emuStatus = $('#emu_status');
@@ -39,7 +39,7 @@ export class OwletEditor {
         });
 
         this.editor = monacoEditor.create(editorPane[0], {
-            value: program,
+            value: '',
             minimap: {
                 enabled: false
             },
@@ -52,8 +52,6 @@ export class OwletEditor {
             wordWrap: 'on',
             lineDecorationsWidth: 0
         });
-
-        this.lineNumberDetect(program);
 
         this.editor.addAction({
             id: 'execute-basic',
@@ -83,7 +81,6 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($('#emulator'));
-        this.updateStatus(program);
 
         this.examples = {};
         for (const example of Examples.examples)
@@ -132,8 +129,28 @@ export class OwletEditor {
     }
 
     toStateString() {
-        const state = {v: 1, program: this.getBasicText()};
-        return encodeURIComponent(JSON.stringify(state));
+        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(this.getBasicText())));
+    }
+
+    static stateForBasicProgram(program) {
+        return {v: StateVersion, program: program};
+    }
+
+    static decodeStateString(stateString) {
+        try {
+            const state = JSON.parse(decodeURIComponent(stateString));
+            if (state.v !== StateVersion)
+                return null;
+            return state;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    setState(state) {
+        this.editor.getModel().setValue(state.program);
+        this.updateProgram();
+        this.selectView('screen');
     }
 
     lineNumberDetect(text) {
@@ -168,6 +185,7 @@ export class OwletEditor {
                 try {
                     this.tokeniser.tokenise(this.editor.getModel().getLineContent(lineNum));
                 } catch (e) {
+                    console.log(e);
                     markers.push(
                         {
                             severity: 3,// error
@@ -243,11 +261,10 @@ export class OwletEditor {
         modal.style.display = "none";
     }
 
-    async initialise() {
+    async initialise(initialState) {
         await this.emulator.initialise();
         this.tokeniser = await tokenise.create();
 
-        this.updateProgram();
         const actions = {
             run: () => {
                 this.updateProgram();
@@ -264,5 +281,8 @@ export class OwletEditor {
             closeModal: () => this.closeModal()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
+
+        this.setState(initialState
+            || OwletEditor.stateForBasicProgram(localStorage.getItem("program") || DefaultProgram));
     }
 }
