@@ -9,7 +9,6 @@ import models from 'jsbeeb/models';
 import Cmos from 'jsbeeb/cmos';
 import utils from 'jsbeeb/utils';
 import Promise from 'promise';
-import tokenise from 'jsbeeb/basic-tokenise';
 
 utils.setBaseUrl('jsbeeb/');
 
@@ -115,11 +114,9 @@ export class Emulator {
         this.running = false;
     }
 
-    async runProgram(program) {
+    runProgram(tokenised) {
         if (!this.ready) return;
         this.cpu.reset(true);
-        const tokeniser = await tokenise.create();
-        const tokenised = tokeniser.tokenise(program);
         const processor = this.cpu;
         const idleAddr = processor.model.isMaster ? 0xe7e6 : 0xe581;
         const hook = processor.debugInstruction.add(addr => {

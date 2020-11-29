@@ -27,6 +27,7 @@ export class OwletEditor {
         this.emuStatus = $('#emu_status');
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parent()[0]);
+        this.tokeniser = null;
 
         monacoEditor.defineTheme('bbcbasicTheme', {
             base: 'vs-dark',
@@ -61,7 +62,7 @@ export class OwletEditor {
             keybindingContext: null,
             contextMenuGroupId: 'navigation',
             contextMenuOrder: 1.5,
-            run: async () => await this.updateProgram()
+            run: () => this.updateProgram()
         });
 
         this.editor.addAction({
@@ -89,11 +90,11 @@ export class OwletEditor {
             this.addExample(example);
     }
 
-    async chooseExample(id) {
+    chooseExample(id) {
         const example = this.examples[id];
         if (example.basic) {
             this.updateEditorText(example.basic, "load example");
-            await this.updateProgram();
+            this.updateProgram();
         }
     }
 
@@ -147,15 +148,40 @@ export class OwletEditor {
         return this.editor.getModel().getValue();
     }
 
-    async updateProgram() {
+    tryGetTokenisedText() {
         try {
-            await this.emulator.runProgram(this.getBasicText());
+            return this.tokeniser.tokenise(this.getBasicText());
         } catch (e) {
-            // TODO a pop up or similar? See #14
-            // Reproducible if you paste a too-long line into the
-            // editor; we get "Unable to tokenise".
-            console.log(`Unable to run program: ${e}`);
+            return null;
         }
+    }
+
+    updateProgram() {
+        const tokenised = this.tryGetTokenisedText();
+        const markers = [];
+        if (tokenised) {
+            this.emulator.runProgram(tokenised);
+        } else {
+            // Try and find the lines that we couldn't tokenise.
+            const numLines = this.editor.getModel().getLineCount();
+            for (let lineNum = 1; lineNum <= numLines; ++lineNum) {
+                try {
+                    this.tokeniser.tokenise(this.editor.getModel().getLineContent(lineNum));
+                } catch (e) {
+                    markers.push(
+                        {
+                            severity: 3,// error
+                            message: "Unable to tokenise line - too many characters?",
+                            startLineNumber: lineNum,
+                            startColumn: 0,
+                            endLineNumber: lineNum,
+                            endColumn: Infinity,
+                        }
+                    );
+                }
+            }
+        }
+        monacoEditor.setModelMarkers(this.editor.getModel(), 'updateProgram', markers);
     }
 
     updateStatus(basicText) {
@@ -197,7 +223,11 @@ export class OwletEditor {
     }
 
     tokenise() {
-        const rawTokenised = this.tokeniser.tokenise(this.getBasicText());
+        const rawTokenised = this.tryGetTokenisedText();
+        if (!rawTokenised) {
+            // TODO, something went wrong.
+            return;
+        }
         this.updateEditorText(partialDetokenise(rawTokenised), "tokenise");
     }
 
@@ -215,11 +245,12 @@ export class OwletEditor {
 
     async initialise() {
         await this.emulator.initialise();
-        await this.updateProgram();
         this.tokeniser = await tokenise.create();
+
+        this.updateProgram();
         const actions = {
-            run: async () => {
-                await this.updateProgram();
+            run: () => {
+                this.updateProgram();
                 this.selectView('screen');
             },
             examples: () => this.selectView('examples'),
