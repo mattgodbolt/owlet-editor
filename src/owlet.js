@@ -162,7 +162,7 @@ export class OwletEditor {
         let outputProgram = basicText;
         let format = "text";
 
-        if (outputProgram.length > 280) {
+        if (outputProgram.length > TweetMaximum) {
             outputProgram = encode(outputProgram.split("").map(c => c.charCodeAt(0)));
             format = "base2048";
         }
