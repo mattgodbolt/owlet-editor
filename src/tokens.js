@@ -1,4 +1,5 @@
 import BasicRom from 'jsbeeb/roms/BASIC.ROM';
+import {decode} from 'base2048';
 
 /*
 
@@ -103,14 +104,25 @@ export function detokenise(text) {
             }
             continue;
         }
-        output += charCode >= Chars.FirstToken && !withinString 
+        output += charCode >= Chars.FirstToken && !withinString
             ? tokens[charCode - Chars.FirstToken]
             : String.fromCodePoint(charCode);
     }
     return output;
 }
 
+function decode2048(input) {
+    try {
+        let code = input.match(/🗜(\S*)/);
+        code = (code === null) ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
+        return String.fromCharCode.apply(null, decode(code.trim()));
+    } catch (error) {
+        return input;
+    }
+}
+
 export function expandCode(text) {
+    text = decode2048(text);
     text = debbreviate(text);
     text = detokenise(text);
     return text;
