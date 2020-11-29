@@ -193,7 +193,7 @@ export class OwletEditor {
         shareModal.style.display = "block";
         copyText.value = (location.hostname === "localhost") ?
             `http://localhost:8080/#${this.toStateString()}` :
-            `https://${location.hostname}/#${this.toStateString()}`
+            `https://${location.hostname}/#${this.toStateString()}`;
     }
 
 
@@ -203,7 +203,6 @@ export class OwletEditor {
 
     tokenise() {
         const basicText = this.getBasicText().trim().replace(/\n/g, '\r');
-        console.log(this.tokeniser.tokenise(basicText))
         this.updateEditorText(this.tokeniser.tokenise(basicText), "tokenise");
     }
 
