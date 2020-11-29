@@ -19,7 +19,6 @@ html, body {
 }
 
 a:link, a:visited, a:hover, a:active {
-  color: var(--font-color);
   color: white;
   text-decoration: none;
 }
@@ -59,12 +58,10 @@ body {
 
 .kudos {
   color: #eee;
-  padding: 4px;
-  padding-left: 16px;
-  padding-top: 8px;
+  padding: 8px 4px 4px 16px;
   grid-column: span 1;
   background-color: #111; //var(--color-editor-bg);
-  border: 0px;
+  border: 0;
 }
 
 .code-editor {
@@ -146,7 +143,7 @@ canvas.screen {
   margin: 16px;
   height: 90%;
   display: none;
-  overflow-x: none;
+  overflow-x: hidden;
   overflow-y: scroll;
   flex-wrap: wrap;
 
@@ -155,7 +152,7 @@ canvas.screen {
   }
 }
 
-#heart {
+span.heart {
   color: red;
   font-size: large;
   margin-right: 4px;

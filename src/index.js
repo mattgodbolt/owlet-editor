@@ -9,15 +9,18 @@ function programUrl(id) {
     return `../assets/programs/${id}`;
 }
 
+function updateUiForProgram(id, json) {
+    $('#author').text(`Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`);
+    $('#like')
+        .attr('href', `https://twitter.com/intent/like?tweet_id=${id}`)
+        .html(`<span class="heart">♥</span> like the original post on Twitter`);
+}
+window.u = updateUiForProgram;
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
     if (response.status === 200) {
         const json = await response.json();
-        const author = document.getElementById('author');
-        const like = document.getElementById('like');
-        author.innerHTML = `Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`;
-        like.href = `https://twitter.com/intent/like?tweet_id=${id}`;
-        like.innerHTML = `<span id="heart">♥</span> like the original post on Twitter`;
+        updateUiForProgram(id, json);
         return json;
     }
     return {program: `REM BBC BASIC program ${id} not found\n`};
