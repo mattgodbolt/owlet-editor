@@ -167,11 +167,9 @@ export class OwletEditor {
             format = "base2048";
         }
 
-        let message = `${outputProgram.length} ${format}`;
-
         this.editStatus
             .find(".count")
-            .text(message)
+            .text(`${outputProgram.length} ${format}`)
             .toggleClass("too_long", outputProgram.length > TweetMaximum);
 
         this.emuStatus.text("BBC Micro Model B | GXR ROM");
