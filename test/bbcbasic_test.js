@@ -61,12 +61,11 @@ describe('should tokenise', () => {
             {offset: 0, type: "keyword"},
             {offset: 3, type: "comment"}
         ]);
-        checkTokens(["REM this is a comment that ends at a colon:PRINT"], [
+        checkTokens(["REM this is a comment doesn't ends at a colon:PRINT"], [
             {offset: 0, type: "keyword"},
             {offset: 3, type: "comment"},
-            {offset: 42, type: "operator"},
-            {offset: 43, type: "keyword"}
         ]);
         checkTokens(["REMthis is also a comment"], [{offset: 0, type: "keyword"}, {offset: 3, type: "comment"}]);
+        checkTokens(["REM", "PRINT"], [{offset: 0, type: "keyword"}], [{offset: 0, type: "keyword"}]);
     });
 });

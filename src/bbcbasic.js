@@ -35,7 +35,8 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+#=><!*/{}:?$;,]+/,
         tokenizer: {
             root: [
-                [/\bREM/, {token: 'keyword', next: '@remStatement'}],
+                [/\bREM$/, {token: 'keyword'}], // A REM on its own line
+                [/\bREM/, {token: 'keyword', next: '@remStatement'}], // A REM consumes to EOL
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [tokens
@@ -72,7 +73,7 @@ export function registerBbcBasicLanguage() {
                 [/[^"\u201c\u201d]+/, 'string'],
                 [/["\u201c\u201d]C?/, {token: 'string.quote', next: '@pop'}]
             ],
-            remStatement: [[/[^:]+/, 'comment', '@pop'],],
+            remStatement: [[/.*/, 'comment', '@pop']],
             asm: [
                 // Not exactly working properly yet...but a start
                 [/[a-zA-Z]{3}/, 'keyword'],
