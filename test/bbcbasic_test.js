@@ -67,5 +67,6 @@ describe('should tokenise', () => {
             {offset: 42, type: "operator"},
             {offset: 43, type: "keyword"}
         ]);
+        checkTokens(["REMthis is also a comment"], [{offset: 0, type: "keyword"}, {offset: 3, type: "comment"}]);
     });
 });

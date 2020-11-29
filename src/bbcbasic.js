@@ -35,7 +35,7 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+#=><!*/{}:?$;,]+/,
         tokenizer: {
             root: [
-                [/\bREM\b/, {token: 'keyword', next: '@remStatement'}],
+                [/\bREM/, {token: 'keyword', next: '@remStatement'}],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [tokens
