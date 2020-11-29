@@ -163,8 +163,8 @@ export class OwletEditor {
         let format = "text";
 
         if (outputProgram.length > 280) {
-          outputProgram = encode(outputProgram.split("").map(c => c.charCodeAt(0)));
-          format = "base2048";
+            outputProgram = encode(outputProgram.split("").map(c => c.charCodeAt(0)));
+            format = "base2048";
         }
 
         let message = `${outputProgram.length} ${format}`;
@@ -192,8 +192,8 @@ export class OwletEditor {
         const copyText = document.getElementById("copyText");
         shareModal.style.display = "block";
         copyText.value = (location.hostname === "localhost") ?
-                        `http://localhost:8080/#${this.toStateString()}` :
-                        `https://${location.hostname}/#${this.toStateString()}`
+            `http://localhost:8080/#${this.toStateString()}` :
+            `https://${location.hostname}/#${this.toStateString()}`
     }
 
 
@@ -202,21 +202,21 @@ export class OwletEditor {
     }
 
     tokenise() {
-      const basicText = this.getBasicText().trim().replace(/\n/g,'\r');
-      console.log(this.tokeniser.tokenise(basicText))
-      this.updateEditorText(this.tokeniser.tokenise(basicText));
+        const basicText = this.getBasicText().trim().replace(/\n/g, '\r');
+        console.log(this.tokeniser.tokenise(basicText))
+        this.updateEditorText(this.tokeniser.tokenise(basicText));
     }
 
     copy() {
-      const copyText = document.getElementById("copyText");
-      copyText.select();
-      copyText.setSelectionRange(0, 99999); // For mobile devices
-      document.execCommand("copy");
+        const copyText = document.getElementById("copyText");
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); // For mobile devices
+        document.execCommand("copy");
     }
 
-    closeModal(){
-      const modal = document.getElementById("share");
-      modal.style.display = "none";
+    closeModal() {
+        const modal = document.getElementById("share");
+        modal.style.display = "none";
     }
 
     async initialise() {

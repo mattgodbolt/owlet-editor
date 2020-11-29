@@ -21,9 +21,11 @@
             <p>A simple, modern editor for a BBC BASIC inspired by the <a href="https://www.twitter.com/bbcmicrobot">BBC
                 Micro bot</a> creative retro coding community</p>
             <p>
-              <a href="https://twitter.com/BBCmicroBot?ref_src=twsrc%5Etfw" class="twitter-follow-button" data-show-count="false">Follow @BBCmicroBot</a><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-              </p>
-              &nbsp;
+                <a class="twitter-follow-button" data-show-count="false"
+                   href="https://twitter.com/BBCmicroBot?ref_src=twsrc%5Etfw">Follow @BBCmicroBot</a>
+                <script async charset="utf-8" src="https://platform.twitter.com/widgets.js"></script>
+            </p>
+            &nbsp;
             <p>Created by <a href="https://www.github.com/8bitkick">8bitkick</a> and
                 <a href="https://twitter.com/mattgodbolt">mattgodbolt</a>.
                 Contribute source and submit issues on <a href="https://github.com/mattgodbolt/owlet-editor">GitHub</a>
@@ -46,7 +48,8 @@
     </div>
     <div class="footer">
         <div id="edit_status"><span class="count">0</span> characters</div>
-        <button class="bottom"  data-action="tokenise" title="Minify by converting to BBC BASIC byte tokens">tokenise</button>
+        <button class="bottom" data-action="tokenise" title="Minify by converting to BBC BASIC byte tokens">tokenise
+        </button>
 
     </div>
     <div class="footer">
@@ -59,9 +62,10 @@
 <div class="modal" id="share">
     <div class="modal-content">
         <p><b>Share your BBC Micro program</b></p>
-        <p id="share-content">The web link below contains a copy of the current program. You can save it, share it or tweet it to bbcmicrobot.</p>
-        <input type="text" value="Hello World" id="copyText">
-        <button data-action="copy" class="share" >Copy link</button>
-        <button data-action="closeModal"  class="share">Close</button>
+        <p id="share-content">The web link below contains a copy of the current program. You can save it, share it or
+            tweet it to bbcmicrobot.</p>
+        <input id="copyText" type="text" value="Hello World">
+        <button class="share" data-action="copy">Copy link</button>
+        <button class="share" data-action="closeModal">Close</button>
     </div>
 </div>
