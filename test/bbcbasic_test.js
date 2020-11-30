@@ -58,6 +58,18 @@ describe('should tokenise', () => {
             checkNum("123.450E-1", "number.float");
             checkNum("2E4", "number.float");
         });
+        it('should handle floating numbers with no suffix', () => {
+            checkNum("1.", "number.float");
+        });
+        it('should handle floating numbers with no prefix', () => {
+            checkNum("1.", "number.float");
+        });
+        it('should handle floating numbers with no suffix', () => {
+            checkNum(".5", "number.float");
+        });
+        it('should handle a single decimal point being a number', () => {
+            checkNum(".", "number.float");
+        });
     });
     it('should handle awkward cases', () => {
         // See https://github.com/mattgodbolt/owlet-editor/issues/26
