@@ -91,16 +91,13 @@ export function registerBbcBasicLanguage() {
     // Register a completion item provider for the new language
     languages.registerCompletionItemProvider('BBCBASIC', {
         provideCompletionItems: () => {
-            const suggestions = [];
-
-            tokens.filter(x => x).forEach(token => {
-                suggestions.push({
+            return {
+                suggestions: tokens.filter(x => x).map(token => ({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,
                     insertText: token
-                });
-            });
-            return {suggestions: suggestions};
+                }))
+            };
         }
     });
 
