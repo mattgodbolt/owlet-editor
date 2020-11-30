@@ -252,10 +252,12 @@ export class OwletEditor {
 
         if (selected !== 'screen' || (selected === 'screen' && this.emulator.running && $("#screen-button").hasClass("selected"))) {
             this.emulator.pause();
-            $("#screen-button").html("▶");
+            $("#play-pause").addClass("play");
+            $("#play-pause").html("▼");
         } else {
             this.emulator.start();
-            $("#screen-button").html("&#10074;&#10074;");
+            $("#play-pause").removeClass("play");
+            $("#play-pause").html("&#10074;&#10074;");
         }
 
         for (const element of ['screen', 'about', 'examples']) {
