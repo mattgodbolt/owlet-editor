@@ -125,5 +125,6 @@ describe('should tokenise', () => {
         checkTokens(["!"], [{offset: 0, type: "operator"}]);
         checkTokens([":"], [{offset: 0, type: "symbol"}]);
         checkTokens(["="], [{offset: 0, type: "operator"}]);
+        checkTokens(["^"], [{offset: 0, type: "operator"}]);
     });
 });
