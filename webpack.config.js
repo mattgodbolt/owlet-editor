@@ -9,6 +9,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 const {CleanWebpackPlugin} = require('clean-webpack-plugin');
 const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 const glob = require('glob');
+const HtmlWebpackPartialsPlugin = require('html-webpack-partials-plugin');
 
 const isDev = process.env.NODE_ENV !== 'production';
 const isTest = process.env.TESTBUILD !== undefined;
@@ -67,6 +68,14 @@ function getPlugins() {
         new HtmlWebpackPlugin({
             title: 'Owlet Editor',
         }),
+        new HtmlWebpackPartialsPlugin(
+            [
+                {
+                    path: path.resolve(__dirname, 'src', 'analytics.html'),
+                    location: 'head',
+                    priority: 'high'
+                }
+            ]),
         new FaviconsWebpackPlugin({
             logo: './assets/images/owlet.png',
             prefix: 'assets/images',
