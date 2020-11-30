@@ -5,6 +5,12 @@ function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(");
 }
 
+const tokenRegex = tokens
+    .filter(x => x)
+    .map(escape)
+    .sort((x, y) => y.length - x.length)
+    .join("|");
+
 function findAllPrefixes() {
     const prefixes = new Set();
     for (const token of tokens.filter(x => x)) {
@@ -39,12 +45,7 @@ export function registerBbcBasicLanguage() {
                 [/\bREM/, {token: 'keyword', next: '@remStatement'}], // A REM consumes to EOL
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
-                [tokens
-                    .filter(x => x)
-                    .map(escape)
-                    .sort((x, y) => y.length - x.length)
-                    .join("|"),
-                    'keyword'],
+                [tokenRegex, 'keyword'],
                 [/[A-Z]+\./, {cases: {'@tokenPrefix': 'keyword'}}],
                 [/[a-zA-Z_][\w]*[$%]?/, 'variable'],
                 [/^\s*\d+/, 'enum'], // line numbers
@@ -116,6 +117,10 @@ export function registerBbcBasicLanguage() {
         surroundingPairs: [
             {open: '(', close: ')'},
             {open: '"', close: '"'}
-        ]
+        ],
+        // In order to separate 10PRINT into "10" "PRINT" and
+        // PRINTLN12 into "PRINT" "LN" "12", we override the default word pattern.
+        wordPattern: new RegExp(
+            tokenRegex + "|" + (/(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g).source)
     });
 }
