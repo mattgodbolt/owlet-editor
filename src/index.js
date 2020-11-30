@@ -13,7 +13,9 @@ function updateUiForProgram(id, json) {
     $('#like').html(`<span class="heart">♥</span>code originally posted by @${json.author} on Twitter`)
     .attr('href', `https://twitter.com/intent/like?tweet_id=${id}`);
 }
+
 window.u = updateUiForProgram;
+
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
     if (response.status === 200) {
