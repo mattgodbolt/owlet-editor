@@ -60,7 +60,7 @@ export function registerBbcBasicLanguage() {
                 [/\d*\.\d+(E[-+]?\d+)?/, 'number.float'],
                 [/\d+E[-+]?\d+/, 'number.float'],
                 [/\d+/, 'number'],
-                [/&[0-9a-fA-F]+/, 'number.hex'],
+                [/&[0-9A-F]+/, 'number.hex'],
                 [/[{}()]/, '@brackets'],
                 // strings
                 [/["\u201c\u201d]/, {token: 'string.quote', next: '@string'}],
