@@ -1,5 +1,5 @@
 import $ from "jquery";
-import {editor as monacoEditor, KeyCode, KeyMod} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor as monacoEditor, KeyCode, KeyMod, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
@@ -7,6 +7,7 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from 'base2048';
 import tokenise from 'jsbeeb/basic-tokenise';
 import './owlet-editor.less';
+import {allTokensRegex} from "./bbcbasic";
 
 const DefaultProgram = [
     'PRINT "HELLO WORLD"',
@@ -19,6 +20,8 @@ const StateVersion = 1;
 function defaultLineNumber(line) {
     return line * 10;
 }
+
+const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})`);
 
 export class OwletEditor {
     constructor() {
@@ -78,6 +81,7 @@ export class OwletEditor {
             localStorage.setItem("program", basicText);
             this.lineNumberDetect(basicText);
             this.updateStatus(basicText);
+            this.updateWarnings();
         });
 
         this.emulator = new Emulator($('#emulator'));
@@ -93,6 +97,31 @@ export class OwletEditor {
             this.updateEditorText(example.basic, "load example");
             this.updateProgram();
         }
+    }
+
+    updateWarnings() {
+        const warnings = [];
+        const model = this.editor.getModel();
+        const tokens = monacoEditor.tokenize(this.getBasicText(), 'BBCBASIC');
+        let lineNum = 0;
+        for (const lineTokens of tokens) {
+            lineNum++;
+            const line = model.getLineContent(lineNum);
+            for (const token of lineTokens.filter(token => token.type === 'variable.BBCBASIC')) {
+                const match = line.substr(token.offset).match(LowerCaseTokenRegex);
+                if (match) {
+                    warnings.push({
+                        severity: MarkerSeverity.Warning,
+                        message: `BASIC keywords should be upper case, did you mean ${match[0].toUpperCase()}`,
+                        startLineNumber: lineNum,
+                        startColumn: token.offset + 1,
+                        endLineNumber: lineNum,
+                        endColumn: token.offset + match[0].length + 1,
+                    });
+                }
+            }
+        }
+        monacoEditor.setModelMarkers(model, 'warnings', warnings);
     }
 
     updateEditorText(newText, updateType) {
@@ -187,7 +216,7 @@ export class OwletEditor {
                 } catch (e) {
                     markers.push(
                         {
-                            severity: 3,// error
+                            severity: MarkerSeverity.Error,
                             message: "Unable to tokenise line - too many characters?",
                             startLineNumber: lineNum,
                             startColumn: 0,

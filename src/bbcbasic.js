@@ -5,7 +5,7 @@ function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(");
 }
 
-const tokenRegex = tokens
+export const allTokensRegex = tokens
     .filter(x => x)
     .map(escape)
     .sort((x, y) => y.length - x.length)
@@ -44,7 +44,7 @@ export function registerBbcBasicLanguage() {
                 [/\bREM/, {token: 'keyword', next: '@remStatement'}], // A REM consumes to EOL
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
-                [tokenRegex, 'keyword'],
+                [allTokensRegex, 'keyword'],
                 [/[A-Z]+\./, {cases: {'@tokenPrefix': 'keyword'}}],
                 [/[a-zA-Z_][\w]*[$%]?/, 'variable'],
                 [/^\s*\d+/, 'enum'], // line numbers
@@ -120,6 +120,34 @@ export function registerBbcBasicLanguage() {
         // In order to separate 10PRINT into "10" "PRINT" and
         // PRINTLN12 into "PRINT" "LN" "12", we override the default word pattern.
         wordPattern: new RegExp(
-            tokenRegex + "|" + (/(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g).source)
+            allTokensRegex + "|" + (/(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g).source)
+    });
+
+    // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
+    languages.registerCodeActionProvider('BBCBASIC', {
+        provideCodeActions(model, range, context) {
+            const actions = context.markers.map(marker => {
+                const text = model.getValueInRange(marker);
+                return {
+                    title: `Replace with ${text.toUpperCase()}`,
+                    diagnostics: [marker],
+                    kind: 'quickfix',
+                    edit: {
+                        edits: [
+                            {
+                                resource: model.uri,
+                                edit: {range: marker, text: text.toUpperCase()}
+                            }
+                        ]
+                    },
+                    isPreferred: true
+                };
+            });
+            return {
+                actions: actions,
+                dispose: () => {
+                }
+            };
+        }
     });
 }
