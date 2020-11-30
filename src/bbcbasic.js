@@ -40,8 +40,8 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+#=><!*/{}:?$;,~]+/,
         tokenizer: {
             root: [
-                [/\bREM$/, {token: 'keyword'}], // A REM on its own line
-                [/\bREM/, {token: 'keyword', next: '@remStatement'}], // A REM consumes to EOL
+                [/(\bREM|\xf4)$/, {token: 'keyword'}], // A REM on its own line
+                [/(\bREM|\xf4)/, {token: 'keyword', next: '@remStatement'}], // A REM consumes to EOL
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, 'keyword'],
