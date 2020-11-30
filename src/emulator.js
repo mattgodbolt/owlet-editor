@@ -59,25 +59,8 @@ export class Emulator {
 
         this.video = new Video.Video(model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
-        const audioContext = typeof AudioContext !== 'undefined' ? new AudioContext()
-            : null;
-
-        if (audioContext) {
-            this.soundChip = new SoundChip.SoundChip(audioContext.sampleRate);
-            // NB must be assigned to some kind of object else it seems to get GC'd by
-            // Safari...
-            this.soundChip.jsAudioNode = audioContext.createScriptProcessor(2048, 0, 1);
-            this.soundChip.jsAudioNode.onaudioprocess = _.bind(function pumpAudio(event) {
-                const outBuffer = event.outputBuffer;
-                const chan = outBuffer.getChannelData(0);
-                this.soundChip.render(chan, 0, chan.length);
-            }, this);
-            this.soundChip.jsAudioNode.connect(audioContext.destination);
-            this.ddNoise = new DdNoise.DdNoise(audioContext);
-        } else {
-            this.soundChip = new SoundChip.FakeSoundChip();
-            this.ddNoise = new DdNoise.FakeDdNoise();
-        }
+        this.soundChip = new SoundChip.FakeSoundChip();
+        this.ddNoise = new DdNoise.FakeDdNoise();
 
         this.dbgr = new Debugger(this.video);
         const cmos = new Cmos({
