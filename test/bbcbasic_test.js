@@ -84,6 +84,12 @@ describe('should tokenise', () => {
             {offset: 20, type: "number"},      // 100
         ]);
     });
+    it('should recognise percent variables', () => {
+        checkTokens(["A%"], [{offset: 0, type: "variable"}]);
+        checkTokens(["X%"], [{offset: 0, type: "variable"}]);
+        checkTokens(["LONGVAR%"], [{offset: 0, type: "variable"}]);
+        checkTokens(["@%"], [{offset: 0, type: "variable"}]);
+    });
     it('should recognise abbreviations', () => {
         checkTokens(["P."], [{offset: 0, type: "keyword"}]);
         checkTokens(["C."], [{offset: 0, type: "keyword"}]);
