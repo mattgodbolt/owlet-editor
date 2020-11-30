@@ -68,4 +68,11 @@ describe('should tokenise', () => {
         checkTokens(["REMthis is also a comment"], [{offset: 0, type: "keyword"}, {offset: 3, type: "comment"}]);
         checkTokens(["REM", "PRINT"], [{offset: 0, type: "keyword"}], [{offset: 0, type: "keyword"}]);
     });
+    it('should handle symbols and operators', () => {
+        checkTokens(["~"], [{offset: 0, type: "operator"}]);
+        checkTokens(["#"], [{offset: 0, type: "symbol"}]);
+        checkTokens(["!"], [{offset: 0, type: "operator"}]);
+        checkTokens([":"], [{offset: 0, type: "symbol"}]);
+        checkTokens(["="], [{offset: 0, type: "operator"}]);
+    });
 });

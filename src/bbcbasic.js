@@ -33,12 +33,11 @@ export function registerBbcBasicLanguage() {
             ['(', ')', 'delimiter.parenthesis'],
         ],
         operators: [
-            '#', // immediate
             '+', '-', '*', '/', '<<', '>>', '^', '=', '==', '<>', '!=', '<', '>', '<=', '>=',
-            '{', '}', ':', '$', '?', ';', ','
+            '$', '?', ';', ',', '~', '!'
         ],
         tokenPrefix: findAllPrefixes(),
-        symbols: /[-+#=><!*/{}:?$;,]+/,
+        symbols: /[-+#=><!*/{}:?$;,~]+/,
         tokenizer: {
             root: [
                 [/\bREM$/, {token: 'keyword'}], // A REM on its own line
@@ -56,7 +55,7 @@ export function registerBbcBasicLanguage() {
             ],
             common: [
                 // immediate
-                [/@symbols/, {cases: {'@operators': 'operator', '@default': ''}}],
+                ['@symbols', {cases: {'@operators': 'operator', '@default': 'symbol'}}],
                 // numbers
                 [/\d*\.\d+([eE][-+]?\d+)?/, 'number.float'],
                 [/&[0-9a-fA-F]+/, 'number.hex'],
