@@ -10,10 +10,8 @@ function programUrl(id) {
 }
 
 function updateUiForProgram(id, json) {
-    $('#author').text(`Code tweeted by ${json.author} on ${new Date(json.date).toUTCString().substring(0, 16)}`);
-    $('#like')
-        .attr('href', `https://twitter.com/intent/like?tweet_id=${id}`)
-        .html(`<span class="heart">♥</span> like the original post on Twitter`);
+    $('#like').html(`<span class="heart">♥</span>code originally posted by @${json.author} on Twitter`)
+    .attr('href', `https://twitter.com/intent/like?tweet_id=${id}`);
 }
 window.u = updateUiForProgram;
 async function loadCachedProgram(id) {
