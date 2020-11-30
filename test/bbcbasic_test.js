@@ -39,6 +39,39 @@ describe('should tokenise', () => {
             {offset: 5, type: "number"},
         ]);
     });
+    describe('number checks', () => {
+        // These all need a variable assignment at first to prevent the number
+        // being interpreted as a line number.
+        const checkNum = (text, type) => {
+            checkTokens([`A=${text}`], [{offset: 0, type: "variable"}, {offset: 1, type: "operator"}, {
+                offset: 2,
+                type: type
+            }]);
+        };
+        it('should recognise integer numbers', () => {
+            checkNum("123450", "number");
+        });
+        it('should recognise floating point numbers', () => {
+            checkNum("123.450", "number.float");
+        });
+        it('should recognise floating point numbers in E format', () => {
+            checkNum("123.450E-1", "number.float");
+            checkNum("2E4", "number.float");
+        });
+    });
+    it('should handle awkward cases', () => {
+        // See https://github.com/mattgodbolt/owlet-editor/issues/26
+        checkTokens(["FORJ%=2E4TO22400STEP100"], [
+            {offset: 0, type: "keyword"},      // FOR
+            {offset: 3, type: "variable"},     // J%
+            {offset: 5, type: "operator"},     // =
+            {offset: 6, type: "number.float"}, // 2E4
+            {offset: 9, type: "keyword"},      // TO
+            {offset: 11, type: "number"},      // 22400
+            {offset: 16, type: "keyword"},     // STEP
+            {offset: 20, type: "number"},      // 100
+        ]);
+    });
     it('should recognise abbreviations', () => {
         checkTokens(["P."], [{offset: 0, type: "keyword"}]);
         checkTokens(["C."], [{offset: 0, type: "keyword"}]);

@@ -57,9 +57,10 @@ export function registerBbcBasicLanguage() {
                 // immediate
                 ['@symbols', {cases: {'@operators': 'operator', '@default': 'symbol'}}],
                 // numbers
-                [/\d*\.\d+([eE][-+]?\d+)?/, 'number.float'],
-                [/&[0-9a-fA-F]+/, 'number.hex'],
+                [/\d*\.\d+(E[-+]?\d+)?/, 'number.float'],
+                [/\d+E[-+]?\d+/, 'number.float'],
                 [/\d+/, 'number'],
+                [/&[0-9a-fA-F]+/, 'number.hex'],
                 [/[{}()]/, '@brackets'],
                 // strings
                 [/["\u201c\u201d]/, {token: 'string.quote', next: '@string'}],
