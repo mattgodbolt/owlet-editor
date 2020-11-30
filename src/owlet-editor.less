@@ -88,6 +88,7 @@ body {
   color: var(--color-highlight);
 }
 
+
 button {
   height: 100%;
   padding-right: 16px;
@@ -95,12 +96,21 @@ button {
   margin-right: 4px;
   text-decoration: none;
   color: var(--font-color);
-  border: none; //1px solid var(--color-toolbar);
+  border: 0px solid var(--color-toolbar);
   background-color: var(--color-buttons);
 }
 
+.selected {
+    background-color: var(--color-editor-bg);
+}
+
 button.bottom {
-  background-color: var(--color-toolbar);
+  background-color: var(--font-color);
+  color:var(--color-toolbar);
+}
+
+.bottom:hover {
+  color:var(--font-color);
 }
 
 button.small {

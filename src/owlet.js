@@ -221,6 +221,11 @@ export class OwletEditor {
     selectView(selected) {
         for (const element of ['screen', 'about', 'examples']) {
             $(`#${element}`).toggle(element === selected);
+            if (element === selected) {
+              $(`#${element+"-button"}`).addClass("selected");
+            } else {
+              {$(`#${element+"-button"}`).removeClass("selected");}
+            }
         }
         if (selected === 'screen')
             this.emulator.start();
@@ -269,13 +274,16 @@ export class OwletEditor {
                 this.updateProgram();
                 this.selectView('screen');
             },
-            examples: () => this.selectView('examples'),
-            jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
-            tweet: () => this.share(),
-            emulator: () => this.selectView('screen'),
-            about: () => this.selectView('about'),
-            expand: () => this.expandCode(),
             tokenise: () => this.tokenise(),
+            expand: () => this.expandCode(),
+            tweet: () => this.share(),
+
+            emulator: () => this.selectView('screen'),
+            examples: () => this.selectView('examples'),
+            about: () => this.selectView('about'),
+
+            jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
+
             copy: () => this.copy(),
             closeModal: () => this.closeModal()
         };

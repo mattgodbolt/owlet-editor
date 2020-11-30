@@ -3,14 +3,15 @@
 
     <div class="toolbar">
         <button data-action="run" title="Run the program (ctrl-enter)">run</button>
-        <button data-action="expand" title="expand code">expand code</button>
+        <button data-action="expand" title="Expand abbreviations, detokenise, and base2048 decode">expand</button>
+        <button data-action="tokenise" title="Convert to BBC BASIC byte tokens">shrink</button>
         <button class="share" data-action="tweet" title="Tweet your amazing code to @bbcmicrobot">share</button>
 
     </div>
     <div class="toolbar">
-        <button data-action="emulator" title="View emulator (ctrl-enter)">emulator</button>
-        <button data-action="examples" title="Load examples">examples</button>
-        <button data-action="about" title="About OwletEditor">about</button>
+        <button id="screen-button" data-action="emulator" title="View emulator (ctrl-enter)">emulator</button>
+        <button id="examples-button" data-action="examples" title="Load examples">examples</button>
+        <button id="about-button"data-action="about" title="About OwletEditor">about</button>
     </div>
     <div class="code-editor" id="editor"></div>
     <div class="emulator" id="emulator">
@@ -46,8 +47,6 @@
     <div class="kudos"><a href="#" id="like"></a></div>
     <div class="footer">
         <div id="edit_status"><span class="count">0</span> characters</div>
-        <button class="bottom" data-action="tokenise" title="Minify by converting to BBC BASIC byte tokens">tokenise
-        </button>
     </div>
     <div class="footer">
         <button class="bottom" data-action="jsbeeb" title="Load the current code into a full emulator">JSbeeb</button>
