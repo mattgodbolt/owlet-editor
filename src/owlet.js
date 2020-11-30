@@ -300,7 +300,7 @@ export class OwletEditor {
     codeToTweet() {
         let text = this.getBasicText();
         if (text.length > TweetMaximum) {
-            text = encode(text.split("").map(c => c.charCodeAt(0)))
+            text = encode(text.split("").map(c => c.charCodeAt(0)));
         }
         return encodeURIComponent(text);
     }
