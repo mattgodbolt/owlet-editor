@@ -90,10 +90,11 @@ export function registerBbcBasicLanguage() {
     });
 
     // Register a completion item provider for the new language
+    const uniqueTokens = [...new Set(tokens.filter(x => x))];
     languages.registerCompletionItemProvider('BBCBASIC', {
         provideCompletionItems: () => {
             return {
-                suggestions: tokens.filter(x => x).map(token => ({
+                suggestions: uniqueTokens.map(token => ({
                     label: token,
                     kind: languages.CompletionItemKind.Keyword,
                     insertText: token
