@@ -250,14 +250,13 @@ export class OwletEditor {
 
     selectView(selected) {
 
-      if ( selected !== 'screen' || (selected === 'screen' && this.emulator.running && $("#screen-button").hasClass("selected")))
-      {
-        this.emulator.pause();
-        $("#screen-button").html("▶");
-      } else {
-        this.emulator.start();
-        $("#screen-button").html("&#10074;&#10074;");
-      }
+        if (selected !== 'screen' || (selected === 'screen' && this.emulator.running && $("#screen-button").hasClass("selected"))) {
+            this.emulator.pause();
+            $("#screen-button").html("▶");
+        } else {
+            this.emulator.start();
+            $("#screen-button").html("&#10074;&#10074;");
+        }
 
         for (const element of ['screen', 'about', 'examples']) {
             $(`#${element}`).toggle(element === selected);
@@ -298,10 +297,12 @@ export class OwletEditor {
         modal.style.display = "none";
     }
 
-    codeToTweet(){
-      let text = this.getBasicText();
-      if (text.length>TweetMaximum) {text=encode(text.split("").map(c => c.charCodeAt(0)))}
-      return encodeURIComponent(text);
+    codeToTweet() {
+        let text = this.getBasicText();
+        if (text.length > TweetMaximum) {
+            text = encode(text.split("").map(c => c.charCodeAt(0)))
+        }
+        return encodeURIComponent(text);
     }
 
     async initialise(initialState) {
@@ -325,8 +326,14 @@ export class OwletEditor {
 
             jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
 
-            copy: () => {this.copy();this.closeModal();},
-            tweet: () => {window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`,"_new");this.closeModal();},
+            copy: () => {
+                this.copy();
+                this.closeModal();
+            },
+            tweet: () => {
+                window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`, "_new");
+                this.closeModal();
+            },
             closeModal: () => this.closeModal()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
