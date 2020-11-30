@@ -218,7 +218,18 @@ export class OwletEditor {
         this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
 
+
     selectView(selected) {
+
+      if ( selected !== 'screen' || (selected === 'screen' && this.emulator.running && $("#screen-button").hasClass("selected")))
+      {
+        this.emulator.pause();
+        $("#screen-button").html("▶");
+      } else {
+        this.emulator.start();
+        $("#screen-button").html("&#10074;&#10074;");
+      }
+
         for (const element of ['screen', 'about', 'examples']) {
             $(`#${element}`).toggle(element === selected);
             if (element === selected) {
@@ -227,10 +238,7 @@ export class OwletEditor {
               {$(`#${element+"-button"}`).removeClass("selected");}
             }
         }
-        if (selected === 'screen')
-            this.emulator.start();
-        else
-            this.emulator.pause();
+
     }
 
     share() {
@@ -272,6 +280,7 @@ export class OwletEditor {
         const actions = {
             run: () => {
                 this.updateProgram();
+                this.emulator.pause();
                 this.selectView('screen');
             },
             tokenise: () => this.tokenise(),
