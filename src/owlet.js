@@ -298,9 +298,16 @@ export class OwletEditor {
         modal.style.display = "none";
     }
 
+    codeToTweet(){
+      let text = this.getBasicText();
+      if (text.length>TweetMaximum) {text=encode(text.split("").map(c => c.charCodeAt(0)))}
+      return encodeURIComponent(text);
+    }
+
     async initialise(initialState) {
         await this.emulator.initialise();
         this.tokeniser = await tokenise.create();
+
 
         const actions = {
             run: () => {
@@ -310,7 +317,7 @@ export class OwletEditor {
             },
             tokenise: () => this.tokenise(),
             expand: () => this.expandCode(),
-            tweet: () => this.share(),
+            share: () => this.share(),
 
             emulator: () => this.selectView('screen'),
             examples: () => this.selectView('examples'),
@@ -318,7 +325,8 @@ export class OwletEditor {
 
             jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
 
-            copy: () => this.copy(),
+            copy: () => {this.copy();this.closeModal();},
+            tweet: () => {window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`,"_new");this.closeModal();},
             closeModal: () => this.closeModal()
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
