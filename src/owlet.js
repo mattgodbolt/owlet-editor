@@ -91,6 +91,21 @@ export class OwletEditor {
             this.addExample(example);
     }
 
+    static stateForBasicProgram(program) {
+        return {v: StateVersion, program: program};
+    }
+
+    static decodeStateString(stateString) {
+        try {
+            const state = JSON.parse(decodeURIComponent(stateString));
+            if (state.v !== StateVersion)
+                return null;
+            return state;
+        } catch (e) {
+            return null;
+        }
+    }
+
     chooseExample(id) {
         const example = this.examples[id];
         if (example.basic) {
@@ -159,21 +174,6 @@ export class OwletEditor {
 
     toStateString() {
         return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(this.getBasicText())));
-    }
-
-    static stateForBasicProgram(program) {
-        return {v: StateVersion, program: program};
-    }
-
-    static decodeStateString(stateString) {
-        try {
-            const state = JSON.parse(decodeURIComponent(stateString));
-            if (state.v !== StateVersion)
-                return null;
-            return state;
-        } catch (e) {
-            return null;
-        }
     }
 
     setState(state) {
@@ -250,11 +250,7 @@ export class OwletEditor {
     selectView(selected) {
         for (const element of ['screen', 'about', 'examples']) {
             $(`#${element}`).toggle(element === selected);
-            if (element === selected) {
-              $(`#${element+"-button"}`).addClass("selected");
-            } else {
-              {$(`#${element+"-button"}`).removeClass("selected");}
-            }
+            $(`#${element}-button`).toggleClass("selected", element === selected);
         }
         if (selected === 'screen')
             this.emulator.start();

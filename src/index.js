@@ -15,7 +15,9 @@ function updateUiForProgram(id, json) {
         .attr('href', `https://twitter.com/intent/like?tweet_id=${id}`)
         .html(`<span class="heart">♥</span> like the original post on Twitter`);
 }
+
 window.u = updateUiForProgram;
+
 async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
     if (response.status === 200) {
