@@ -34,10 +34,10 @@ export function registerBbcBasicLanguage() {
         ],
         operators: [
             '+', '-', '*', '/', '<<', '>>', '^', '=', '==', '<>', '!=', '<', '>', '<=', '>=',
-            '$', '?', ';', ',', '~', '!'
+            '$', '?', ';', ',', '~', '!', '\''
         ],
         tokenPrefix: findAllPrefixes(),
-        symbols: /[-+#=><!*/{}:?$;,~^]+/,
+        symbols: /[-+#=><!*/{}:?$;,~^']+/,
         tokenizer: {
             root: [
                 [/(\bREM|\xf4)$/, {token: 'keyword'}], // A REM on its own line
