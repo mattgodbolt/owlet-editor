@@ -3,6 +3,8 @@ import {registerBbcBasicLanguage} from './bbcbasic';
 import rootHtml from './root.html';
 import {OwletEditor} from "./owlet";
 
+const LastProgramKey = 'program';
+
 function programUrl(id) {
     if (window.location.hostname !== 'localhost')
         return `https://bbcmic.ro/assets/programs/${id}`;
@@ -23,7 +25,7 @@ async function loadCachedProgram(id) {
         updateUiForProgram(id, json);
         return json;
     }
-    return {program: `REM BBC BASIC program ${id} not found\n`};
+    return null;
 }
 
 function consumeHash() {
@@ -33,17 +35,40 @@ function consumeHash() {
 }
 
 async function getInitialState(id) {
-    if (!id) {
-        const maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
-        if (maybeState) {
-            consumeHash();
-            return maybeState;
-        }
-        // No state, let the editor pick its own default state.
-        return await loadCachedProgram('1228377194210189312'); // This is the only way I tweet now
+    if (id) {
+        // If we were given a direct id, load that. And put up an error if there was a problem.
+        const result = await loadCachedProgram(id);
+        if (!result)
+            return OwletEditor.stateForBasicProgram(`REM BBC BASIC program ${id} not found\n`);
+        return OwletEditor.stateForBasicProgram(result.program);
     }
-    const result = await loadCachedProgram(id);
-    return OwletEditor.stateForBasicProgram(result.program);
+
+    // Try decoding state from the localtion hash.
+    const maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
+    if (maybeState) {
+        consumeHash();
+        return maybeState;
+    }
+
+    // If there's no state in the URL, look at the last program the user had in their browser.
+    const lastProgram = localStorage.getItem(LastProgramKey);
+    if (lastProgram)
+        return OwletEditor.stateForBasicProgram(lastProgram);
+
+    // Try loading an example program.
+    const ExampleProgramId = '1228377194210189312';  // This is the only way I tweet now
+    const example = await loadCachedProgram(ExampleProgramId);
+    if (example)
+        return OwletEditor.stateForBasicProgram(example.program);
+
+    // Failing loading an example program (e.g. running a local server, or some other
+    // error), then use a boring built-in program.
+    const FallbackDefaultProgram = [
+        'PRINT "HELLO WORLD"',
+        'GOTO 10'
+    ].join('\n');
+
+    return OwletEditor.stateForBasicProgram(FallbackDefaultProgram);
 }
 
 async function initialise() {
@@ -60,7 +85,7 @@ async function initialise() {
     // Check if we reference a cached tweet on first load and convert it to URL hash
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const owletEditor = new OwletEditor();
+    const owletEditor = new OwletEditor(changedText => localStorage.setItem(LastProgramKey, changedText));
     await owletEditor.initialise(await getInitialState(urlParams.get('load')));
     window.onhashchange = () => {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));

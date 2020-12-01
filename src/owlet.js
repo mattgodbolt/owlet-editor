@@ -9,11 +9,6 @@ import tokenise from 'jsbeeb/basic-tokenise';
 import './owlet-editor.less';
 import {allTokensRegex} from "./bbcbasic";
 
-const DefaultProgram = [
-    'PRINT "HELLO WORLD"',
-    'GOTO 10'
-].join('\n');
-
 const TweetMaximum = 280;
 const StateVersion = 1;
 
@@ -24,13 +19,14 @@ function defaultLineNumber(line) {
 const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})`);
 
 export class OwletEditor {
-    constructor() {
+    constructor(onChangeHandler) {
         const editorPane = $('#editor');
         this.editStatus = $('#edit_status');
         this.emuStatus = $('#emu_status');
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parent()[0]);
         this.tokeniser = null;
+        this.onChangeHandler = onChangeHandler;
 
         monacoEditor.defineTheme('bbcbasicTheme', {
             base: 'vs-dark',
@@ -78,7 +74,7 @@ export class OwletEditor {
 
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
-            localStorage.setItem("program", basicText);
+            this.onChangeHandler(basicText);
             this.lineNumberDetect(basicText);
             this.updateStatus(basicText);
             this.updateWarnings();
@@ -249,22 +245,21 @@ export class OwletEditor {
 
 
     selectView(selected) {
-
+        const $play = $("#play-pause");
         if (selected !== 'screen' || (selected === 'screen' && this.emulator.running && $("#screen-button").hasClass("selected"))) {
             this.emulator.pause();
-            $("#play-pause").addClass("play");
-            $("#play-pause").html("▼");
+            $play.addClass("play");
+            $play.html("▼");
         } else {
             this.emulator.start();
-            $("#play-pause").removeClass("play");
-            $("#play-pause").html("&#10074;&#10074;");
+            $play.removeClass("play");
+            $play.html("&#10074;&#10074;");
         }
 
         for (const element of ['screen', 'about', 'examples']) {
             $(`#${element}`).toggle(element === selected);
             $(`#${element}-button`).toggleClass("selected", element === selected);
         }
-
     }
 
     share() {
@@ -340,7 +335,6 @@ export class OwletEditor {
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
 
-        this.setState(initialState
-            || OwletEditor.stateForBasicProgram(localStorage.getItem("program") || DefaultProgram));
+        this.setState(initialState);
     }
 }
