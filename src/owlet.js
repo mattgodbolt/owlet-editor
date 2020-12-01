@@ -187,7 +187,14 @@ export class OwletEditor {
     }
 
     getBasicText() {
-        return this.editor.getModel().getValue();
+        // We strip leading text here to avoid issues with any tokenisers that
+        // aren't expecting any. This does mean "getBasicText()" doesn't round-trip
+        // back; we lose the leading spaces. That's _probably_ a feature.
+        // Added for #31.
+        return this.editor.getModel()
+            .getLinesContent()
+            .map(line => line.trimStart())
+            .join("\n");
     }
 
     tryGetTokenisedText() {
