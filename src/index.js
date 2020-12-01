@@ -40,7 +40,7 @@ async function getInitialState(id) {
             return maybeState;
         }
         // No state, let the editor pick its own default state.
-        return null;
+        return await loadCachedProgram('1228377194210189312'); // This is the only way I tweet now
     }
     const result = await loadCachedProgram(id);
     return OwletEditor.stateForBasicProgram(result.program);
