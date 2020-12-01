@@ -92,7 +92,12 @@ export function registerBbcBasicLanguage() {
     // Register a completion item provider for the new language
     const uniqueTokens = [...new Set(tokens.filter(x => x))];
     languages.registerCompletionItemProvider('BBCBASIC', {
-        provideCompletionItems: () => {
+        provideCompletionItems: (model, position, context, token) => {
+            const linePrefix = model.getLineContent(position.lineNumber).substr(0, position.column);
+            // Does it look like a hex constant? If so, don't try to autocomplete
+            if (linePrefix.match(/&[0-9A-F]*$/)) {
+                return null;
+            }
             return {
                 suggestions: uniqueTokens.map(token => ({
                     label: token,

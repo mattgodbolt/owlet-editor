@@ -42,6 +42,9 @@ export class OwletEditor {
             minimap: {
                 enabled: false
             },
+            suggest: {
+                showValues: false // Prevents hex constants from trying to autocomplete
+            },
             lineNumbers: defaultLineNumber,
             language: 'BBCBASIC',
             theme: 'bbcbasicTheme',
