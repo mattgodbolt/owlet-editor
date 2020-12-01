@@ -35,7 +35,7 @@ body {
   margin: 0;
 }
 
-.wrapper {
+.top-level-wrapper {
   height: 90vh;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
@@ -67,6 +67,7 @@ body {
 
 .code-editor {
   background-color: var(--color-background);
+  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px  32px;
 }
 
 .too_long {
