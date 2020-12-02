@@ -101,6 +101,7 @@ export class Emulator {
         if (!this.ready) return;
         this.cpu.reset(true);
         const processor = this.cpu;
+        // TODO - get a precise cycle timestamp for breakpoint so beebjit can match it
         const idleAddr = processor.model.isMaster ? 0xe7e6 : 0xe581;
         const hook = processor.debugInstruction.add(addr => {
             if (addr !== idleAddr) return;
@@ -117,57 +118,22 @@ export class Emulator {
             processor.writemem(0x12, endLow);
             processor.writemem(0x13, endHigh);
             hook.remove();
-            const bbcKeys = utils.stringToBBCKeys('RUN\n');
-            this.sendRawKeyboardToBBC([200].concat(bbcKeys), false);
+            this.writeToKeyboardBuffer('RUN\r');
         });
         this.start();
     }
 
-    sendRawKeyboardToBBC(keysToSend) {
-        let lastChar;
-        let nextKeyMillis = 0;
-        const processor = this.cpu;
-        processor.sysvia.disableKeyboard();
-
-        const sendCharHook = processor.debugInstruction.add(function nextCharHook() {
-            const millis = processor.cycleSeconds * 1000 + processor.currentCycles / (ClocksPerSecond / 1000);
-            if (millis < nextKeyMillis) {
-                return;
-            }
-
-            if (lastChar && lastChar !== utils.BBC.SHIFT) {
-                processor.sysvia.keyToggleRaw(lastChar);
-            }
-
-            if (keysToSend.length === 0) {
-                // Finished
-                processor.sysvia.enableKeyboard();
-                sendCharHook.remove();
-                return;
-            }
-
-            const ch = keysToSend[0];
-            const debounce = lastChar === ch;
-            lastChar = ch;
-            if (debounce) {
-                lastChar = undefined;
-                nextKeyMillis = millis + 30;
-                return;
-            }
-
-            let time = 50;
-            if (typeof lastChar === "number") {
-                time = lastChar;
-                lastChar = undefined;
-            } else {
-                processor.sysvia.keyToggleRaw(lastChar);
-            }
-
-            // remove first character
-            keysToSend.shift();
-
-            nextKeyMillis = millis + time;
-        });
+    writeToKeyboardBuffer(text) {
+      const processor = this.cpu;
+      const keyboardBuffer = 0x0300;  // BBC Micro OS 1.20
+      const IBPaddress = 0x02E1;      // input buffer pointer
+      let inputBufferPointer = processor.readmem(IBPaddress);
+      for (let a = 0; a<text.length;a++){
+        processor.writemem(keyboardBuffer+inputBufferPointer, text.charCodeAt(a));
+        inputBufferPointer++;
+        if (inputBufferPointer>0xff) {inputBufferPointer=0xE0;}
+      }
+      processor.writemem(IBPaddress,inputBufferPointer);
     }
 
     frameFunc(now) {
