@@ -77,13 +77,13 @@ export function registerBbcBasicLanguage() {
             remStatement: [[/.*/, 'comment', '@pop']],
             asm: [
                 // Not exactly working properly yet...but a start
-                [/[a-zA-Z]{3}/, 'keyword'],
+                [/EQU[BDSW]|[A-Z]{3}/, 'keyword'],
                 [/[ \t\r\n]+/, 'white'],
-                [/[;\\].*/, 'comment'],
-                {include: '@common'},
+                [/[;\\][^:]*/, 'comment'],
                 [/,\s*[XY]/, 'keyword'],
                 // labels
-                [/\.[a-zA-Z_$][\w$]*/, 'type.identifier'],
+                [/\.([a-zA-Z_][\w]*%?|@%)/, 'type.identifier'],
+                {include: '@common'},
                 [']', {token: 'delimiter.square', next: '@pop'}]
             ]
         }
