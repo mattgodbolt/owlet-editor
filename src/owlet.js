@@ -157,15 +157,20 @@ export class OwletEditor {
 
     addExample(example) {
         this.examples[example.id] = example;
-        if (!example.link && example.basic) {example.link = `${window.location}#${this.toStateString(example.basic)}`;}
+
         const $examples = $('#examples');
         const newElem =
             $examples.find("div.template")
                 .clone()
                 .removeClass("template")
                 .addClass("example")
-                .attr("onClick", `window.location='${example.link}'`)
+                .click(() => this.chooseExample(example.id))
                 .appendTo($examples)
+
+       if (example.link)
+                newElem.click(() => window.location.href=example.link);
+
+
         newElem.find(".thumb")
                 .attr("src", example.thumb)
         newElem.find(".name")
