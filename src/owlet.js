@@ -164,7 +164,7 @@ export class OwletEditor {
                 .clone()
                 .removeClass("template")
                 .addClass("example")
-                .attr("onClick", `window.location="${example.link}"`)
+                .attr("onClick", `window.location='${example.link}'`)
                 .appendTo($examples)
         newElem.find(".thumb")
                 .attr("src", example.thumb)
