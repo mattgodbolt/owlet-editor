@@ -22,4 +22,6 @@ examples:
     name: Watch this space
     description: We'll be adding more examples.
     thumb: https://www.bbcmicrobot.com/screenshots/1255647509902495746.png
-    basic:
+    basic: |
+      10 PRINT "Watch this space"
+      

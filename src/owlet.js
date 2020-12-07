@@ -164,12 +164,12 @@ export class OwletEditor {
                 .clone()
                 .removeClass("template")
                 .addClass("example")
-                .appendTo($examples);
+                .attr("onClick", `window.location="${example.link}"`)
+                .appendTo($examples)
         newElem.find(".thumb")
                 .attr("src", example.thumb)
         newElem.find(".name")
             .text(example.name)
-            .attr("href", example.link)
         newElem.find(".description").text(example.description);
         if (example.basic)
             newElem.find(".code").text(example.basic.split('\n').slice(0,3).join('\n'));
