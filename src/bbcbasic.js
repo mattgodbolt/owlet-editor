@@ -72,7 +72,7 @@ export function registerBbcBasicLanguage() {
             ],
             string: [
                 [/[^"\u201c\u201d]+/, 'string'],
-                [/["\u201c\u201d]C?/, {token: 'string.quote', next: '@pop'}]
+                [/["\u201c\u201d]/, {token: 'string.quote', next: '@pop'}]
             ],
             remStatement: [[/.*/, 'comment', '@pop']],
             asm: [
