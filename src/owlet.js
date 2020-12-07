@@ -157,22 +157,26 @@ export class OwletEditor {
 
     addExample(example) {
         this.examples[example.id] = example;
+        if (!example.link && example.basic) {example.link = `${window.location}#${this.toStateString(example.basic)}`;}
         const $examples = $('#examples');
         const newElem =
             $examples.find("div.template")
                 .clone()
                 .removeClass("template")
+                .addClass("example")
                 .appendTo($examples);
+        newElem.find(".thumb")
+                .attr("src", example.thumb)
         newElem.find(".name")
             .text(example.name)
-            .click(() => this.chooseExample(example.id));
+            .attr("href", example.link)
         newElem.find(".description").text(example.description);
         if (example.basic)
-            newElem.find(".code").text(example.basic);
+            newElem.find(".code").text(example.basic.split('\n').slice(0,3).join('\n'));
     }
 
-    toStateString() {
-        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(this.getBasicText())));
+    toStateString(basicText) {
+        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(basicText)));
     }
 
     setState(state) {
@@ -276,7 +280,7 @@ export class OwletEditor {
         const shareModal = document.getElementById("share");
         const copyText = document.getElementById("copyText");
         shareModal.style.display = "block";
-        copyText.value = `${location.origin}/#${this.toStateString()}`;
+        copyText.value = `${location.origin}/#${this.toStateString(this.getBasicText())}`;
     }
 
     expandCode() {

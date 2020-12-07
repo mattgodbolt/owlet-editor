@@ -166,16 +166,49 @@ canvas.screen {
 }
 
 #examples {
-  margin: 16px;
+  margin: 8px;
   height: 90%;
   display: none;
   overflow-x: hidden;
   overflow-y: scroll;
   flex-wrap: wrap;
-
   .code {
     font-family: ModeSeven;
   }
+}
+
+.example {
+  background-color: var(--color-background);
+  padding: 4px;
+  margin-bottom: 8px;
+  height: 100px;
+  display: flex;
+}
+
+.template {
+  display:none;
+}
+
+.name{
+  margin-left: 16px;
+}
+
+.description {
+  margin-left: 16px;
+}
+
+.example:nth-of-type(2) {
+  background: var(--button-highlight);
+}
+
+h2 { padding: 0px;
+    margin: 0px;
+margin-bottom: 4px;
+  }
+
+pre {
+    margin-left: 16px;
+    color: grey;
 }
 
 span.heart {
