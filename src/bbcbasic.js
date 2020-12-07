@@ -45,7 +45,7 @@ export function registerBbcBasicLanguage() {
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, 'keyword'],
-                [/[A-Z]+\./, {cases: {'@tokenPrefix': 'keyword'}}],
+                [/[A-Z$]+\./, {cases: {'@tokenPrefix': 'keyword'}}],
                 [/[a-zA-Z_][\w]*[$%]?/, 'variable'],
                 [/^\s*\d+/, 'enum'], // line numbers
                 // whitespace
