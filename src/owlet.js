@@ -181,7 +181,7 @@ export class OwletEditor {
     }
 
     toStateString(basicText) {
-        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(basicText)));
+        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(basicText))).replace(/[)]/g, "%28").replace(/[(]/g, "%29");
     }
 
     setState(state) {
