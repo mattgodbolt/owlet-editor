@@ -321,6 +321,11 @@ export class OwletEditor {
         return encodeURIComponent(text);
     }
 
+    async rocket() {
+      const program = await this.tokeniser.tokenise(this.getBasicText());
+      this.emulator.beebjit(program);
+    }
+
     async initialise(initialState) {
         await this.emulator.initialise();
         this.tokeniser = await tokenise.create();
@@ -341,7 +346,7 @@ export class OwletEditor {
             about: () => this.selectView('about'),
 
             jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
-            rocket: () => this.emulator.beebjit(this.tokeniser.tokenise(this.getBasicText())),
+            rocket: () => this.rocket(),
             copy: () => {
                 this.copy();
                 this.closeModal();
