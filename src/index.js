@@ -94,6 +94,12 @@ async function initialise() {
             consumeHash();
         }
     };
+
+    if (urlParams.get('experimental')) {
+      console.log("experimental features enabled");
+      const rocket = document.getElementById("rocket");
+      rocket.style.display = "block";
+    }
 }
 
 initialise().then(() => {

@@ -341,7 +341,7 @@ export class OwletEditor {
             about: () => this.selectView('about'),
 
             jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
-
+            rocket: () => this.emulator.beebjit(this.tokeniser.tokenise(this.getBasicText())),
             copy: () => {
                 this.copy();
                 this.closeModal();

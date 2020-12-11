@@ -97,6 +97,19 @@ export class Emulator {
         this.running = false;
     }
 
+    async beebjit(tokenised){
+      const processor = this.cpu;
+      let myHeaders = new Headers();
+      myHeaders.set("x-api-key","pDSnG5aGyx8MRABCnx25h874O27FTNSu99j7D5iq");
+      const response = await fetch('https://api.bbcmic.ro/beta?basic='+btoa(tokenised));
+      let beebjitData = await response.json();
+      let data = window.atob(beebjitData.data);
+      let address = parseInt(beebjitData.address,16);
+       for (let i = 0; i < data.length; i++) {
+           processor.writemem(address+i, data.charCodeAt(i));
+       }
+    }
+
     runProgram(tokenised) {
         if (!this.ready) return;
         this.cpu.reset(true);
