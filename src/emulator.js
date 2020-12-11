@@ -100,7 +100,7 @@ export class Emulator {
     async beebjit(tokenised){
       const processor = this.cpu;
       let myHeaders = new Headers();
-      myHeaders.set("x-api-key","pDSnG5aGyx8MRABCnx25h874O27FTNSu99j7D5iq");
+      myHeaders.set("x-api-key","YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa");
       const response = await fetch('https://api.bbcmic.ro/beta?basic='+btoa(tokenised));
       let beebjitData = await response.json();
       let data = window.atob(beebjitData.data);
