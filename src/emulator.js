@@ -14,6 +14,7 @@ utils.setBaseUrl('jsbeeb/');
 
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
+const urlParams = new URLSearchParams(window.location.search);
 
 class ScreenResizer {
     constructor(screen) {
@@ -49,7 +50,11 @@ export class Emulator {
         this.frames = 0;
         this.frameSkip = 0;
         const model = models.findModel('B');
+
+        if (!urlParams.get('experimental')) {
         model.os.push('gxr.rom');
+        }
+
         this.resizer = new ScreenResizer(screen);
         this.leftMargin = 115;
         this.rightMargin = 130;
@@ -100,7 +105,7 @@ export class Emulator {
     async beebjit(tokenised){
       const basic = btoa(tokenised).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       const processor = this.cpu;
-      const response = await fetch('https://ur670des43.execute-api.us-east-1.amazonaws.com/beta?saveAddress=3000&saveLength=5000&basic='+basic,{
+      const response = await fetch('https://ur670des43.execute-api.us-east-1.amazonaws.com/beta?saveAddress=1900&saveLength=4800&basic='+basic,{
         headers:{"x-api-key":"YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa"}
       });
       let beebjitData = await response.json();
