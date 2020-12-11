@@ -99,14 +99,15 @@ export class Emulator {
 
     async beebjit(tokenised){
       const processor = this.cpu;
-      let myHeaders = new Headers();
-      myHeaders.set("x-api-key","YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa");
-      const response = await fetch('https://api.bbcmic.ro/beta?basic='+btoa(tokenised));
+      const response = await fetch('https://ur670des43.execute-api.us-east-1.amazonaws.com/beta?basic='+btoa(tokenised),{
+        headers:{"x-api-key":"YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa"}
+      });
       let beebjitData = await response.json();
       let data = window.atob(beebjitData.data);
       let address = parseInt(beebjitData.address,16);
        for (let i = 0; i < data.length; i++) {
            processor.writemem(address+i, data.charCodeAt(i));
+           console.log(i, data.charCodeAt(i))
        }
     }
 
