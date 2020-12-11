@@ -107,7 +107,6 @@ export class Emulator {
       let address = parseInt(beebjitData.address,16);
        for (let i = 0; i < data.length; i++) {
            processor.writemem(address+i, data.charCodeAt(i));
-           console.log(i, data.charCodeAt(i))
        }
     }
 
