@@ -179,6 +179,27 @@ canvas.screen {
 
 #rocket {
   display: none;
+  margin: 0px;
+  padding: 0px;
+  width: 32px;
+}
+
+@-o-keyframes fadeIt {
+  0%   { background-color: #FFFFFF; }
+  50%  { background-color: #AD301B; }
+  100% { background-color: #FFFFFF; }
+}
+@keyframes fadeIt {
+  0%   { background-color: #FFFFFF; }
+  50%  { background-color: #AD301B; }
+  100% { background-color: #FFFFFF; }
+}
+
+.backgroundAnimated{
+    background-image:none !important;
+         -o-animation: fadeIt 2s ease-in-out;
+            animation: fadeIt 2s ease-in-out;
+            animation-iteration-count: infinite;
 }
 
 .example {

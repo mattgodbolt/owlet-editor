@@ -322,8 +322,10 @@ export class OwletEditor {
     }
 
     async rocket() {
+      $('#rocket').addClass('backgroundAnimated');
       const program = await this.tokeniser.tokenise(this.getBasicText());
-      this.emulator.beebjit(program);
+      await this.emulator.beebjit(program);
+      $('#rocket').removeClass('backgroundAnimated');
     }
 
     async initialise(initialState) {
