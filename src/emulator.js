@@ -98,7 +98,7 @@ export class Emulator {
     }
 
     async beebjit(tokenised){
-      const basic = btoa(tokenised).replace(/\+/g, '-').replace(/\//g, '_').replace(/\=+$/, '');
+      const basic = btoa(tokenised).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       const processor = this.cpu;
       const response = await fetch('https://ur670des43.execute-api.us-east-1.amazonaws.com/beta?saveAddress=3000&saveLength=5000&basic='+basic,{
         headers:{"x-api-key":"YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa"}
