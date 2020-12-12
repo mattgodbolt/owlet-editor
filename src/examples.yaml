@@ -15,8 +15,6 @@ examples:
     basic: |
       REM Prints a message in random colours
       REM and repeats forever
-      REM
-      REM Press 'run' above to start program
 
       MODE 2
       REPEAT
