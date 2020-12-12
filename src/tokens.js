@@ -1,5 +1,5 @@
-import BasicRom from 'jsbeeb/roms/BASIC.ROM';
-import {decode} from 'base2048';
+import BasicRom from "jsbeeb/roms/BASIC.ROM";
+import {decode} from "base2048";
 
 /*
 
@@ -25,7 +25,7 @@ export const keywords = (() => {
         keywords.push({
             keyword: match[1],
             token: match[2].codePointAt(0) & 0xff,
-            flags: match[2].codePointAt(1) & 0xff
+            flags: match[2].codePointAt(1) & 0xff,
         });
     }
     return keywords;
@@ -33,8 +33,7 @@ export const keywords = (() => {
 
 export const tokens = (() => {
     const result = new Array(0x80).fill(null);
-    for (const keyword of keywords)
-        result[keyword.token - 0x80] = keyword.keyword;
+    for (const keyword of keywords) result[keyword.token - 0x80] = keyword.keyword;
     return result;
 })();
 
@@ -44,7 +43,7 @@ const Chars = {
     Quote: '"'.charCodeAt(0),
     FirstToken: 0x80,
     LineNumberToken: 0x8d,
-    Dot: '.'.charCodeAt(0)
+    Dot: ".".charCodeAt(0),
 };
 
 function findKeyword(abbreviation) {
@@ -66,13 +65,14 @@ export function debbreviate(text) {
     let withinString = false;
     const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
     for (const charCode of codePoints) {
-        if (charCode === Chars.Quote)
-            withinString = !withinString;
+        if (charCode === Chars.Quote) withinString = !withinString;
         if (isUpperCase(charCode) && !withinString) {
             buffer += String.fromCodePoint(charCode);
         } else {
-            output += ((charCode === Chars.Dot) && !withinString && buffer !== "") ? findKeyword(buffer) :
-                buffer + String.fromCodePoint(charCode);
+            output +=
+                charCode === Chars.Dot && !withinString && buffer !== ""
+                    ? findKeyword(buffer)
+                    : buffer + String.fromCodePoint(charCode);
             buffer = "";
         }
     }
@@ -102,8 +102,7 @@ function detokeniseInternal(text, handler) {
     let lineNumberBuffer = null;
     const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
     for (const charCode of codePoints) {
-        if (charCode === Chars.Quote)
-            withinString = !withinString;
+        if (charCode === Chars.Quote) withinString = !withinString;
         if (charCode === Chars.LineNumberToken) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
@@ -121,10 +120,8 @@ function detokeniseInternal(text, handler) {
             }
             continue;
         }
-        if (charCode >= Chars.FirstToken && !withinString)
-            handler.onToken(charCode);
-        else
-            handler.onCharacter(charCode);
+        if (charCode >= Chars.FirstToken && !withinString) handler.onToken(charCode);
+        else handler.onCharacter(charCode);
     }
 }
 
@@ -136,11 +133,9 @@ export function detokenise(text) {
 
 export function forEachBasicLine(tokenised, lineHandler) {
     while (tokenised) {
-        if (tokenised.charCodeAt(0) !== 0x0d)
-            throw new Error("Bad program");
+        if (tokenised.charCodeAt(0) !== 0x0d) throw new Error("Bad program");
         const lineNumHigh = tokenised.charCodeAt(1);
-        if (lineNumHigh === 0xff)
-            break;
+        if (lineNumHigh === 0xff) break;
         const lineNumLow = tokenised.charCodeAt(2);
         const lineLength = tokenised.charCodeAt(3);
         const lineNumber = (lineNumHigh << 8) | lineNumLow;
@@ -186,7 +181,7 @@ export function partialDetokenise(rawText) {
 function decode2048(input) {
     try {
         let code = input.match(/🗜(\S*)/);
-        code = (code === null) ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
+        code = code === null ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
         return String.fromCharCode.apply(null, decode(code.trim()));
     } catch (error) {
         return input;
@@ -195,7 +190,7 @@ function decode2048(input) {
 
 export function expandCode(text) {
     if (text !== decode2048(text)) {
-        return decode2048(text)
+        return decode2048(text);
     }
     text = debbreviate(text);
     text = detokenise(text);
