@@ -167,17 +167,17 @@ export class OwletEditor {
                 .click(() => this.chooseExample(example.id))
                 .appendTo($examples)
 
-       if (example.link)
-                newElem.click(() => window.location.href=example.link);
+        if (example.link)
+            newElem.click(() => window.location.href = example.link);
 
 
         newElem.find(".thumb")
-                .attr("src", example.thumb)
+            .attr("src", example.thumb)
         newElem.find(".name")
             .text(example.name)
         newElem.find(".description").text(example.description);
         if (example.basic)
-            newElem.find(".code").text(example.basic.split('\n').slice(0,3).join('\n'));
+            newElem.find(".code").text(example.basic.split('\n').slice(0, 3).join('\n'));
     }
 
     toStateString(basicText) {
@@ -322,10 +322,10 @@ export class OwletEditor {
     }
 
     async rocket() {
-      $('#rocket').addClass('backgroundAnimated');
-      const program = await this.tokeniser.tokenise(this.getBasicText());
-      await this.emulator.beebjit(program);
-      $('#rocket').removeClass('backgroundAnimated');
+        $('#rocket').addClass('backgroundAnimated');
+        const program = await this.tokeniser.tokenise(this.getBasicText());
+        await this.emulator.beebjit(program);
+        $('#rocket').removeClass('backgroundAnimated');
     }
 
     async initialise(initialState) {

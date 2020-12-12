@@ -52,7 +52,7 @@ export class Emulator {
         const model = models.findModel('B');
 
         if (!urlParams.get('experimental')) {
-        model.os.push('gxr.rom');
+            model.os.push('gxr.rom');
         }
 
         this.resizer = new ScreenResizer(screen);
@@ -102,18 +102,18 @@ export class Emulator {
         this.running = false;
     }
 
-    async beebjit(tokenised){
-      const basic = btoa(tokenised).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      const processor = this.cpu;
-      const response = await fetch('https://api.bbcmic.ro/beta?saveAddress=1900&saveLength=6700&basic='+basic,{
-        headers:{"x-api-key":"YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa"}
-      });
-      let beebjitData = await response.json();
-      let data = window.atob(beebjitData.data);
-      let address = parseInt(beebjitData.address,16);
-       for (let i = 0; i < data.length; i++) {
-           processor.writemem(address+i, data.charCodeAt(i));
-       }
+    async beebjit(tokenised) {
+        const basic = btoa(tokenised).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const processor = this.cpu;
+        const response = await fetch('https://api.bbcmic.ro/beta?saveAddress=1900&saveLength=6700&basic=' + basic, {
+            headers: {"x-api-key": "YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa"}
+        });
+        let beebjitData = await response.json();
+        let data = window.atob(beebjitData.data);
+        let address = parseInt(beebjitData.address, 16);
+        for (let i = 0; i < data.length; i++) {
+            processor.writemem(address + i, data.charCodeAt(i));
+        }
     }
 
     runProgram(tokenised) {
@@ -143,16 +143,18 @@ export class Emulator {
     }
 
     writeToKeyboardBuffer(text) {
-      const processor = this.cpu;
-      const keyboardBuffer = 0x0300;  // BBC Micro OS 1.20
-      const IBPaddress = 0x02E1;      // input buffer pointer
-      let inputBufferPointer = processor.readmem(IBPaddress);
-      for (let a = 0; a<text.length;a++){
-        processor.writemem(keyboardBuffer+inputBufferPointer, text.charCodeAt(a));
-        inputBufferPointer++;
-        if (inputBufferPointer>0xff) {inputBufferPointer=0xE0;}
-      }
-      processor.writemem(IBPaddress,inputBufferPointer);
+        const processor = this.cpu;
+        const keyboardBuffer = 0x0300;  // BBC Micro OS 1.20
+        const IBPaddress = 0x02E1;      // input buffer pointer
+        let inputBufferPointer = processor.readmem(IBPaddress);
+        for (let a = 0; a < text.length; a++) {
+            processor.writemem(keyboardBuffer + inputBufferPointer, text.charCodeAt(a));
+            inputBufferPointer++;
+            if (inputBufferPointer > 0xff) {
+                inputBufferPointer = 0xE0;
+            }
+        }
+        processor.writemem(IBPaddress, inputBufferPointer);
     }
 
     frameFunc(now) {

@@ -172,6 +172,7 @@ canvas.screen {
   overflow-x: hidden;
   overflow-y: scroll;
   flex-wrap: wrap;
+
   .code {
     font-family: ModeSeven;
   }
@@ -185,21 +186,34 @@ canvas.screen {
 }
 
 @-o-keyframes fadeIt {
-  0%   { background-color: #FFFFFF; }
-  50%  { background-color: #AD301B; }
-  100% { background-color: #FFFFFF; }
-}
-@keyframes fadeIt {
-  0%   { background-color: #FFFFFF; }
-  50%  { background-color: #AD301B; }
-  100% { background-color: #FFFFFF; }
+  0% {
+    background-color: #FFFFFF;
+  }
+  50% {
+    background-color: #AD301B;
+  }
+  100% {
+    background-color: #FFFFFF;
+  }
 }
 
-.backgroundAnimated{
-    background-image:none !important;
-         -o-animation: fadeIt 2s ease-in-out;
-            animation: fadeIt 2s ease-in-out;
-            animation-iteration-count: infinite;
+@keyframes fadeIt {
+  0% {
+    background-color: #FFFFFF;
+  }
+  50% {
+    background-color: #AD301B;
+  }
+  100% {
+    background-color: #FFFFFF;
+  }
+}
+
+.backgroundAnimated {
+  background-image: none !important;
+  -o-animation: fadeIt 2s ease-in-out;
+  animation: fadeIt 2s ease-in-out;
+  animation-iteration-count: infinite;
 }
 
 .example {
@@ -211,10 +225,10 @@ canvas.screen {
 }
 
 .template {
-  display:none;
+  display: none;
 }
 
-.name{
+.name {
   margin-left: 16px;
 }
 
@@ -226,14 +240,15 @@ canvas.screen {
   background: var(--button-highlight);
 }
 
-h2 { padding: 0px;
-    margin: 0px;
-margin-bottom: 4px;
-  }
+h2 {
+  padding: 0px;
+  margin: 0px;
+  margin-bottom: 4px;
+}
 
 pre {
-    margin-left: 16px;
-    color: grey;
+  margin-left: 16px;
+  color: grey;
 }
 
 span.heart {

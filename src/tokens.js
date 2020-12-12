@@ -194,7 +194,9 @@ function decode2048(input) {
 }
 
 export function expandCode(text) {
-    if (text !== decode2048(text)) {return decode2048(text)};
+    if (text !== decode2048(text)) {
+        return decode2048(text)
+    }
     text = debbreviate(text);
     text = detokenise(text);
     return text;
