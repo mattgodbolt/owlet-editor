@@ -2,8 +2,6 @@
     <div class="header"></div>
     <div class="toolbar">
         <button data-action="run" title="Run the program (ctrl-enter)">run</button>
-        <button data-action="expand" title="Expand abbreviations, detokenise, and base2048 decode">expand</button>
-        <button data-action="tokenise" title="Convert to BBC BASIC byte tokens">shrink</button>
         <button class="share" data-action="share" title="Tweet your amazing code to @bbcmicrobot">share</button>
 
     </div>
@@ -52,7 +50,10 @@
         </div>
     </div>
     <div class="footer">
+      <button data-action="expand" title="Expand abbreviations, detokenise, and base2048 decode">expand</button>
+      <button data-action="tokenise" title="Convert to BBC BASIC byte tokens">shrink</button>
         <div id="edit_status"><span class="count">0</span> characters</div>
+
     </div>
     <div class="footer">
         <button class="bottom" data-action="jsbeeb" title="Load the current code into a full emulator">JSbeeb</button>
