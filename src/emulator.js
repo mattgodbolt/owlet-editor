@@ -105,7 +105,7 @@ export class Emulator {
     async beebjit(tokenised){
       const basic = btoa(tokenised).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       const processor = this.cpu;
-      const response = await fetch('https://ur670des43.execute-api.us-east-1.amazonaws.com/beta?saveAddress=1900&saveLength=6700&basic='+basic,{
+      const response = await fetch('https://api.bbcmic.ro/beta?saveAddress=1900&saveLength=6700&basic='+basic,{
         headers:{"x-api-key":"YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa"}
       });
       let beebjitData = await response.json();
