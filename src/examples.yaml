@@ -8,20 +8,62 @@ examples:
     link: https://www.bbcmicrobot.com/owlet-test2.html
     basic:
 
-  - id: hello
-    name: Hello world
-    description: Print your name in random colors
+  - id: Welcome
+    name: Welcome to the BBC Micro
+    description: An 8-bit 32KB computer from 1981
     thumb: https://www.bbcmicrobot.com/screenshots/1228051826957746176.gif
     basic: |
-      10 MODE 2
-      20 COLOUR RND(7)
-      30 PRINT "YOUR NAME GOES HERE"
-      40 GOTO 20
+      REM Prints a message in random colours
+      REM and repeats forever
+      REM
+      REM Press 'run' above to start program
 
-  - id: next
-    name: Watch this space
-    description: We'll be adding more examples.
-    thumb: https://www.bbcmicrobot.com/screenshots/1255647509902495746.png
+      MODE 2
+      REPEAT
+      COLOUR RND(7)
+      PRINT "YOUR NAME GOES HERE"
+      UNTIL FALSE
+  - id: Lines
+    name: Drawing lines
+    description: Each mode has a different colour palette and resolution.
+    thumb: ./assets/images/lines.png
     basic: |
-      10 PRINT "Watch this space"
-      
+      REM Graphics are on a 1280 x 1024 grid
+      REM so 640,512 is always the center
+
+      MODE 2
+      REPEAT
+      REM use GCOL for graphic colours
+      GCOL 0,RND(7)
+      MOVE 640,512
+      DRAW RND(1280),RND(1024)
+      UNTIL FALSE
+  - id: Shapes
+    name: Drawing shapes
+    description: Rectangles, Circles and Dots
+    thumb: ./assets/images/shapes1.png
+    basic: |
+      REM Drawing shapes with PLOT part 1
+
+      MODE2
+      GCOL 0,4 : REM blue fg
+
+      REM  Rectangle Fill in fg colour
+      MOVE 0,0           : REM bottom left
+      PLOT 101,1280,1024 : REM top right
+
+      GCOL 0,7 : REM white fg
+
+      REM Single pixel
+      FOR A = 0 TO 100
+      PLOT 69,RND(1280),RND(1024)
+      NEXT A
+
+      REM Circle fill
+      MOVE 240,720   : REM centre
+      PLOT 153,100,0 : REM radius,0
+
+      GCOL 0,4
+
+      MOVE 320,720
+      PLOT 153,100,0
