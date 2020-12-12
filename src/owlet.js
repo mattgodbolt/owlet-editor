@@ -39,6 +39,8 @@ export class OwletEditor {
 
         this.editor = monacoEditor.create(editorPane[0], {
             value: '',
+            fontFamily: 'Unprintable, "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
+            renderControlCharacters: true,
             minimap: {
                 enabled: false
             },
@@ -138,7 +140,27 @@ export class OwletEditor {
         monacoEditor.setModelMarkers(model, 'warnings', warnings);
     }
 
+    fix(text) {
+        let result = "";
+        for (let i = 0; i < text.length; ++i) {
+            let cp = text.codePointAt(i);
+            if (cp >= 0x80) cp = (cp & 0x7f) | 0xe000;
+            result += String.fromCodePoint(cp);
+        }
+        console.log("yo", result);
+        return result;
+    }
+    unfix(text) {return text;
+        let result = "";
+        for (let i = 0; i < text.length; ++i) {
+            result += String.fromCodePoint(text.codePointAt(i) & 0xff);
+        }
+        console.log("bo", result);
+        return result;
+    }
+
     updateEditorText(newText, updateType) {
+        newText = this.fix(newText);
         if (updateType) {
             this.editor.pushUndoStop();
             const previousSelections = this.editor.getSelections();
@@ -176,7 +198,7 @@ export class OwletEditor {
     }
 
     setState(state) {
-        this.editor.getModel().setValue(state.program);
+        this.editor.getModel().setValue(this.fix(state.program));
         this.updateProgram();
         this.selectView('screen');
     }
@@ -194,10 +216,10 @@ export class OwletEditor {
         // aren't expecting any. This does mean "getBasicText()" doesn't round-trip
         // back; we lose the leading spaces. That's _probably_ a feature.
         // Added for #31.
-        return this.editor.getModel()
+        return this.unfix(this.editor.getModel()
             .getLinesContent()
             .map(line => line.trimStart())
-            .join("\n");
+            .join("\n"));
     }
 
     tryGetTokenisedText() {

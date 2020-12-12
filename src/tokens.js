@@ -13,9 +13,6 @@ import {decode} from 'base2048';
  U+2000-U+200D # various spaces
  U+2010-U+201F # various punctuation
  U+2032-U+2037 # various prime marks
-
- Array starts at byte token 0x80
-
 */
 
 // Extract tokens, keywords and flags from BASIC ROM. This will supercede the next two array definitions!

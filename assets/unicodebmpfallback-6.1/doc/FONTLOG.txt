@@ -1,0 +1,54 @@
+FONTLOG 
+Unicode BMP Fallback SIL font
+=================
+
+This file provides detailed information on the Unicode BMP Fallback SIL font software. 
+This information should be distributed along with the Unicode BMP Fallback SIL font 
+and any derivative works.
+
+Basic Font Information
+----------------------
+
+Intended for debugging, this font contains a glyph for every character in the 
+Basic Multilingual plane (including Private Use Area) of Unicode, each glyph 
+consisting of a box enclosing the four hex digits identifying the Unicode scalar value.
+
+Current version supports BMP characters from Unicode 6.1.
+
+One font from this typeface family is included in this release:
+
+     * Unicode BMP Fallback SIL Regular
+
+
+ChangeLog
+---------
+2012-03-20 (SIL NRSI team) Unicode BMP Fallback SIL, 6.1
+- Support BMP from Unicode 6.1
+
+2008-03-21 (SIL NRSI team) Unicode BMP Fallback SIL, 5.1
+- Support BMP from Unicode 5.1
+- First released under OFL
+
+2005-05-20 (SIL NRSI team) Unicode BMP Fallback SIL, 4.1
+- Support BMP from Unicode 4.1
+- Released under the SIL Freeware License
+
+2004-05-14 (SIL NRSI team) Unicode BMP Fallback SIL, 4.01
+- Support BMP from Unicode 4.01
+- Released under the SIL Freeware License
+
+Acknowledgements
+----------------
+(Here is where contributors can be acknowledged. If you make modifications
+be sure to add your name (N), email (E), web-address (W) and description
+(D). This list is sorted by last name in alphabetical order.)
+
+N: Bob Hallissy, Peter Martin, Victor Gaultney
+E: fonts@sil.org
+W: http://scripts.sil.org/
+D: SIL designers and font engineers
+
+The Unicode BMP Fallback font project is maintained by SIL International.
+
+For more information please visit the SIL International's 
+Computers and Writing Systems website: http://scripts.sil.org/UnicodeBMPFallbackFont
