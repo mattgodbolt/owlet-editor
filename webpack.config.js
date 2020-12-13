@@ -1,48 +1,48 @@
-const path = require('path');
-const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
-const CopyPlugin = require('copy-webpack-plugin');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const webpack = require('webpack');
-const OptimizeCssAssetsPlugin = require('optimize-css-assets-webpack-plugin');
-const TerserPlugin = require('terser-webpack-plugin');
-const {CleanWebpackPlugin} = require('clean-webpack-plugin');
-const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
-const glob = require('glob');
-const HtmlWebpackPartialsPlugin = require('html-webpack-partials-plugin');
+const path = require("path");
+const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin");
+const CopyPlugin = require("copy-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const webpack = require("webpack");
+const OptimizeCssAssetsPlugin = require("optimize-css-assets-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
+const {CleanWebpackPlugin} = require("clean-webpack-plugin");
+const FaviconsWebpackPlugin = require("favicons-webpack-plugin");
+const glob = require("glob");
+const HtmlWebpackPartialsPlugin = require("html-webpack-partials-plugin");
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = process.env.NODE_ENV !== "production";
 const isTest = process.env.TESTBUILD !== undefined;
 
-const entry = isTest ? glob.sync(path.resolve(__dirname, 'test/**/*.js'))
-    : path.resolve(__dirname, './src/index.js');
-const outputPath = isTest ? path.resolve(__dirname, 'dist/test')
-    : path.resolve(__dirname, 'dist');
+const entry = isTest
+    ? glob.sync(path.resolve(__dirname, "test/**/*.js"))
+    : path.resolve(__dirname, "./src/index.js");
+const outputPath = isTest ? path.resolve(__dirname, "dist/test") : path.resolve(__dirname, "dist");
 
 function getOptimizationSettings() {
     if (isTest) return undefined;
     return {
         minimize: !isDev,
-        runtimeChunk: 'single',
+        runtimeChunk: "single",
         splitChunks: {
             cacheGroups: {
                 vendors: {
                     test: /[/\\]node_modules[/\\]/,
-                    name: 'vendor',
-                    chunks: 'all',
+                    name: "vendor",
+                    chunks: "all",
                     priority: -10,
                 },
             },
         },
-        moduleIds: 'deterministic',
+        moduleIds: "deterministic",
         minimizer: [
             new OptimizeCssAssetsPlugin({
                 cssProcessorPluginOptions: {
-                    preset: ['default', {discardComments: {removeAll: true}}],
+                    preset: ["default", {discardComments: {removeAll: true}}],
                 },
             }),
             new TerserPlugin(),
-        ]
+        ],
     };
 }
 
@@ -52,74 +52,88 @@ function getPlugins() {
         new CopyPlugin({
             patterns: [
                 {
-                    context: path.resolve(__dirname, 'node_modules'), from: 'jsbeeb/roms/**/*',
-                    globOptions: {ignore: ['**/*.txt', '**/*README*']}
+                    context: path.resolve(__dirname, "node_modules"),
+                    from: "jsbeeb/roms/**/*",
+                    globOptions: {ignore: ["**/*.txt", "**/*README*"]},
                 },
-                {context: path.resolve(__dirname, 'node_modules'), from: 'jsbeeb/sounds/**/*.wav'},
+                {
+                    context: path.resolve(__dirname, "node_modules"),
+                    from: "jsbeeb/sounds/**/*.wav",
+                },
             ],
         }),
         new MonacoWebpackPlugin({
             languages: [],
-            filename: isDev ? '[name].worker.js' : `[name].worker.[contenthash].js`
+            filename: isDev ? "[name].worker.js" : `[name].worker.[contenthash].js`,
         }),
         new MiniCssExtractPlugin({
-            filename: isDev ? '[name].css' : '[name].[contenthash].css',
+            filename: isDev ? "[name].css" : "[name].[contenthash].css",
         }),
         new HtmlWebpackPlugin({
-            title: 'Owlet Editor',
+            title: "Owlet Editor",
         }),
-        new HtmlWebpackPartialsPlugin(
-            [
-                {
-                    path: path.resolve(__dirname, 'src', 'analytics.html'),
-                    location: 'head',
-                    priority: 'high'
-                }
-            ]),
+        new HtmlWebpackPartialsPlugin([
+            {
+                path: path.resolve(__dirname, "src", "analytics.html"),
+                location: "head",
+                priority: "high",
+            },
+        ]),
         new FaviconsWebpackPlugin({
-            logo: './assets/images/owlet.png',
-            prefix: 'assets/images',
+            logo: "./assets/images/owlet.png",
+            prefix: "assets/images",
             favicons: {
                 icons: {
                     appleIcon: false,
-                    appleStartup: false
-                }
-            }
-        })
+                    appleStartup: false,
+                },
+            },
+        }),
     ];
     if (isDev) {
-        plugins.push(new webpack.HotModuleReplacementPlugin);
+        plugins.push(new webpack.HotModuleReplacementPlugin());
     }
     if (isTest) {
-        plugins.push(new CopyPlugin({
-            patterns: [
-                {context: path.resolve(__dirname, 'node_modules', 'canvas', 'build', 'Release'), from: '*.so*',},
-            ],
-        }));
+        plugins.push(
+            new CopyPlugin({
+                patterns: [
+                    {
+                        context: path.resolve(
+                            __dirname,
+                            "node_modules",
+                            "canvas",
+                            "build",
+                            "Release"
+                        ),
+                        from: "*.so*",
+                    },
+                ],
+            })
+        );
     }
     return plugins;
 }
 
 module.exports = {
-    mode: isDev ? 'development' : 'production',
+    mode: isDev ? "development" : "production",
     entry: entry,
-    target: isTest ? 'node' : 'web',
+    target: isTest ? "node" : "web",
     output: {
-        filename: isDev ? '[name].js' : `[name].[contenthash].js`,
+        filename: isDev ? "[name].js" : `[name].[contenthash].js`,
         path: outputPath,
     },
     resolve: {
         alias: {
-            'jsunzip': path.resolve(__dirname, 'node_modules/jsbeeb/lib/jsunzip.js'),
-            'fs': path.resolve(__dirname, 'src/fake-fs.js')
+            jsunzip: path.resolve(__dirname, "node_modules/jsbeeb/lib/jsunzip.js"),
+            fs: path.resolve(__dirname, "src/fake-fs.js"),
         },
         preferRelative: true, // ugly, for jsbeeb and its love of non-relative imports
     },
-    devtool: 'source-map',
+    devtool: "source-map",
     plugins: getPlugins(),
     devServer: {
-        publicPath: '/',
-        contentBase: './'
+        publicPath: "/",
+        contentBase: "./",
     },
     optimization: getOptimizationSettings(),
     module: {
@@ -127,55 +141,58 @@ module.exports = {
             {
                 test: /\.(jpg|png)$/,
                 use: {
-                    loader: 'url-loader',
+                    loader: "url-loader",
                 },
             },
             {
                 test: /\.less$/,
                 use: [
-                    isDev ? 'style-loader' :
-                        {
-                            loader: MiniCssExtractPlugin.loader,
-                            options: {
-                                publicPath: './',
-                            },
-                        },
-                    'css-loader',
-                    'less-loader'
-                ]
+                    isDev
+                        ? "style-loader"
+                        : {
+                              loader: MiniCssExtractPlugin.loader,
+                              options: {
+                                  publicPath: "./",
+                              },
+                          },
+                    "css-loader",
+                    "less-loader",
+                ],
             },
             {
                 test: /\.css$/,
                 use: [
-                    isDev ? 'style-loader' :
-                        {
-                            loader: MiniCssExtractPlugin.loader,
-                            options: {
-                                publicPath: './',
-                            },
-                        },
-                    'css-loader',
+                    isDev
+                        ? "style-loader"
+                        : {
+                              loader: MiniCssExtractPlugin.loader,
+                              options: {
+                                  publicPath: "./",
+                              },
+                          },
+                    "css-loader",
                 ],
-            }, {
+            },
+            {
                 test: /\.ttf$/,
-                use: ['file-loader']
+                use: ["file-loader"],
             },
             {
                 test: /\.(html)$/,
-                loader: 'html-loader',
+                loader: "html-loader",
             },
             {
                 test: /\.ya?ml$/,
-                use: ['json-loader', 'yaml-loader']
+                use: ["json-loader", "yaml-loader"],
             },
             {
                 test: /.rom$/i,
-                use: ['binary-loader']
+                use: ["binary-loader"],
             },
             {
                 test: /\.node$/,
-                loader: 'node-loader',
-            }
+                loader: "node-loader",
+            },
         ],
-    }
+    },
 };

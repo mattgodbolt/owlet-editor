@@ -8,18 +8,22 @@
   --color-toolbar: #333231;
   --color-buttons: #595959;
   --color-editor-bg: #171717;
-  --font-color: #B1A69A;
-  --color-highlight: #5E8040;
+  --font-color: #b1a69a;
+  --color-highlight: #5e8040;
   --button-highlight: #6f2020;
   --button-blue: #00536f;
 }
 
-html, body {
+html,
+body {
   font-family: Arial, Helvetica, sans-serif;
   font-size: small;
 }
 
-a:link, a:visited, a:hover, a:active {
+a:link,
+a:visited,
+a:hover,
+a:active {
   color: white;
   text-decoration: none;
 }
@@ -39,12 +43,12 @@ body {
   height: 90vh;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px  32px;
+  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px 32px;
 }
 
 .header {
-  grid-column: 1/ span 2;
-  background-image: url('../assets/images/logo.png');
+  grid-column: 1 / span 2;
+  background-image: url("../assets/images/logo.png");
   background-repeat: no-repeat;
   background-position: left 10px top 10px;
   background-size: auto 64px;
@@ -67,7 +71,7 @@ body {
 
 .code-editor {
   background-color: var(--color-background);
-  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px  32px;
+  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px 32px;
 }
 
 .too_long {
@@ -89,7 +93,6 @@ body {
   //font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
   color: var(--color-highlight);
 }
-
 
 button {
   height: 100%;
@@ -127,7 +130,9 @@ button.tweet {
   background-color: var(--button-blue);
 }
 
-button:hover, button:active, button:visited {
+button:hover,
+button:active,
+button:visited {
   background-color: var(--color-background);
   background-size: 20px 20px;
 }
@@ -172,9 +177,48 @@ canvas.screen {
   overflow-x: hidden;
   overflow-y: scroll;
   flex-wrap: wrap;
+
   .code {
     font-family: ModeSeven;
   }
+}
+
+#rocket {
+  display: none;
+  margin: 0px;
+  padding: 0px;
+  width: 32px;
+}
+
+@-o-keyframes fadeIt {
+  0% {
+    background-color: #ffffff;
+  }
+  50% {
+    background-color: #ad301b;
+  }
+  100% {
+    background-color: #ffffff;
+  }
+}
+
+@keyframes fadeIt {
+  0% {
+    background-color: #ffffff;
+  }
+  50% {
+    background-color: #ad301b;
+  }
+  100% {
+    background-color: #ffffff;
+  }
+}
+
+.backgroundAnimated {
+  background-image: none !important;
+  -o-animation: fadeIt 2s ease-in-out;
+  animation: fadeIt 2s ease-in-out;
+  animation-iteration-count: infinite;
 }
 
 .example {
@@ -186,10 +230,10 @@ canvas.screen {
 }
 
 .template {
-  display:none;
+  display: none;
 }
 
-.name{
+.name {
   margin-left: 16px;
 }
 
@@ -201,14 +245,15 @@ canvas.screen {
   background: var(--button-highlight);
 }
 
-h2 { padding: 0px;
-    margin: 0px;
-margin-bottom: 4px;
-  }
+h2 {
+  padding: 0px;
+  margin: 0px;
+  margin-bottom: 4px;
+}
 
 pre {
-    margin-left: 16px;
-    color: grey;
+  margin-left: 16px;
+  color: grey;
 }
 
 span.heart {
@@ -221,7 +266,6 @@ input {
   width: 100%;
   margin-bottom: 16px;
 }
-
 
 // Modal pop-up
 /* The Modal (background) */

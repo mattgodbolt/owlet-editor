@@ -1,19 +1,20 @@
-import _ from 'underscore';
-import Cpu6502 from 'jsbeeb/6502';
-import canvasLib from 'jsbeeb/canvas';
-import Video from 'jsbeeb/video';
-import Debugger from 'jsbeeb/debug';
-import SoundChip from 'jsbeeb/soundchip';
-import DdNoise from 'jsbeeb/ddnoise';
-import models from 'jsbeeb/models';
-import Cmos from 'jsbeeb/cmos';
-import utils from 'jsbeeb/utils';
-import Promise from 'promise';
+import _ from "underscore";
+import Cpu6502 from "jsbeeb/6502";
+import canvasLib from "jsbeeb/canvas";
+import Video from "jsbeeb/video";
+import Debugger from "jsbeeb/debug";
+import SoundChip from "jsbeeb/soundchip";
+import DdNoise from "jsbeeb/ddnoise";
+import models from "jsbeeb/models";
+import Cmos from "jsbeeb/cmos";
+import utils from "jsbeeb/utils";
+import Promise from "promise";
 
-utils.setBaseUrl('jsbeeb/');
+utils.setBaseUrl("jsbeeb/");
 
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
+const urlParams = new URLSearchParams(window.location.search);
 
 class ScreenResizer {
     constructor(screen) {
@@ -44,12 +45,16 @@ class ScreenResizer {
 export class Emulator {
     constructor(root) {
         this.root = root;
-        const screen = this.root.find('.screen');
+        const screen = this.root.find(".screen");
         this.canvas = canvasLib.bestCanvas(screen[0]);
         this.frames = 0;
         this.frameSkip = 0;
-        const model = models.findModel('B');
-        model.os.push('gxr.rom');
+        const model = models.findModel("B");
+
+        if (!urlParams.get("experimental")) {
+            model.os.push("gxr.rom");
+        }
+
         this.resizer = new ScreenResizer(screen);
         this.leftMargin = 115;
         this.rightMargin = 130;
@@ -64,18 +69,26 @@ export class Emulator {
 
         this.dbgr = new Debugger(this.video);
         const cmos = new Cmos({
-            'load': function () {
+            load: function () {
                 if (window.localStorage.cmosRam) {
                     return JSON.parse(window.localStorage.cmosRam);
                 }
                 return null;
             },
-            'save': function (data) {
+            save: function (data) {
                 window.localStorage.cmosRam = JSON.stringify(data);
-            }
+            },
         });
         const config = {};
-        this.cpu = new Cpu6502(model, this.dbgr, this.video, this.soundChip, this.ddNoise, cmos, config);
+        this.cpu = new Cpu6502(
+            model,
+            this.dbgr,
+            this.video,
+            this.soundChip,
+            this.ddNoise,
+            cmos,
+            config
+        );
 
         this.lastFrameTime = 0;
         this.onAnimFrame = _.bind(this.frameFunc, this);
@@ -95,6 +108,25 @@ export class Emulator {
 
     pause() {
         this.running = false;
+    }
+
+    async beebjit(tokenised) {
+        const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const processor = this.cpu;
+        const response = await fetch(
+            "https://api.bbcmic.ro/beta?saveAddress=1900&saveLength=6700&basic=" + basic,
+            {
+                headers: {
+                    "x-api-key": "YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa",
+                },
+            }
+        );
+        let beebjitData = await response.json();
+        let data = window.atob(beebjitData.data);
+        let address = parseInt(beebjitData.address, 16);
+        for (let i = 0; i < data.length; i++) {
+            processor.writemem(address + i, data.charCodeAt(i));
+        }
     }
 
     runProgram(tokenised) {
@@ -118,29 +150,31 @@ export class Emulator {
             processor.writemem(0x12, endLow);
             processor.writemem(0x13, endHigh);
             hook.remove();
-            this.writeToKeyboardBuffer('RUN\r');
+            this.writeToKeyboardBuffer("RUN\r");
         });
         this.start();
     }
 
     writeToKeyboardBuffer(text) {
-      const processor = this.cpu;
-      const keyboardBuffer = 0x0300;  // BBC Micro OS 1.20
-      const IBPaddress = 0x02E1;      // input buffer pointer
-      let inputBufferPointer = processor.readmem(IBPaddress);
-      for (let a = 0; a<text.length;a++){
-        processor.writemem(keyboardBuffer+inputBufferPointer, text.charCodeAt(a));
-        inputBufferPointer++;
-        if (inputBufferPointer>0xff) {inputBufferPointer=0xE0;}
-      }
-      processor.writemem(IBPaddress,inputBufferPointer);
+        const processor = this.cpu;
+        const keyboardBuffer = 0x0300; // BBC Micro OS 1.20
+        const IBPaddress = 0x02e1; // input buffer pointer
+        let inputBufferPointer = processor.readmem(IBPaddress);
+        for (let a = 0; a < text.length; a++) {
+            processor.writemem(keyboardBuffer + inputBufferPointer, text.charCodeAt(a));
+            inputBufferPointer++;
+            if (inputBufferPointer > 0xff) {
+                inputBufferPointer = 0xe0;
+            }
+        }
+        processor.writemem(IBPaddress, inputBufferPointer);
     }
 
     frameFunc(now) {
         requestAnimationFrame(this.onAnimFrame);
         if (this.running && this.lastFrameTime !== 0) {
             const sinceLast = now - this.lastFrameTime;
-            let cycles = (sinceLast * ClocksPerSecond / 1000) | 0;
+            let cycles = ((sinceLast * ClocksPerSecond) / 1000) | 0;
             cycles = Math.min(cycles, MaxCyclesPerFrame);
             try {
                 if (!this.cpu.execute(cycles)) {
@@ -159,11 +193,12 @@ export class Emulator {
         this.frames++;
         if (this.frames < this.frameSkip) return;
         this.frames = 0;
-        const teletextAdjustX = (this.video && this.video.teletextMode) ? 15 : 0;
+        const teletextAdjustX = this.video && this.video.teletextMode ? 15 : 0;
         this.canvas.paint(
             minx + this.leftMargin + teletextAdjustX,
             miny + this.topMargin,
             maxx - this.rightMargin + teletextAdjustX,
-            maxy - this.bottomMargin);
+            maxy - this.bottomMargin
+        );
     }
 }
