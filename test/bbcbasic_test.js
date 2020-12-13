@@ -169,7 +169,7 @@ describe("should tokenise", () => {
             [{offset: 0, type: "delimiter.square"}],
             [
                 {offset: 0, type: "keyword.directive"},
-                {offset: 3, type: "space"},
+                {offset: 4, type: "white"},
                 {offset: 5, type: "keyword"},
                 {offset: 8, type: "variable"},
             ]
