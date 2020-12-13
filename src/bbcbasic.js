@@ -32,7 +32,7 @@ export const allTokensForAsmRegex = keywords
 function findAllPrefixes() {
     const prefixes = new Set();
     for (const token of keywords.map(kw => kw.keyword)) {
-        for (let i = 0; i < token.length; ++i) prefixes.add(token.substr(0, i));
+        for (let i = 1; i < token.length; ++i) prefixes.add(token.substr(0, i));
     }
     const result = [];
     for (const prefix of prefixes) result.push(prefix + ".");
