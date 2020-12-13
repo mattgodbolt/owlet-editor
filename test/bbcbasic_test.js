@@ -219,12 +219,16 @@ describe("should tokenise", () => {
         checkTokens(["^"], [{offset: 0, type: "operator"}]);
         checkTokens(["'"], [{offset: 0, type: "operator"}]);
     });
-    it('should not treat C specially after a string', () => {
-        checkTokens(["P.\"\"C1"], [
-            {offset: 0, type: "keyword"},
-            {offset: 2, type: "string.quote"},
-            {offset: 4, type: "variable"}
-        ]);
+    it("should not treat C specially after a string", () => {
+        checkTokens(
+            ['P.""C1'],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "string.quote"},
+                {offset: 4, type: "variable"},
+            ]
+        );
+    });
     it("should tokenise continuation tokens when appropriate", () => {
         checkTokens(["TIME"], [{offset: 0, type: "keyword"}]);
         checkTokens(
