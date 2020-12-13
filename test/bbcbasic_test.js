@@ -1,6 +1,6 @@
-import {registerBbcBasicLanguage} from "../src/bbcbasic";
+import {getWarnings, registerBbcBasicLanguage} from "../src/bbcbasic";
 import {assert} from "chai";
-import {editor} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 
 function checkTokens(text, ...expected) {
     const tokenized = editor.tokenize(text.join("\n"), "BBCBASIC").map(line =>
@@ -12,7 +12,7 @@ function checkTokens(text, ...expected) {
     assert.deepStrictEqual(tokenized, [...expected]);
 }
 
-describe("should tokenise", () => {
+describe("Tokenisation", () => {
     registerBbcBasicLanguage();
     it("should recognise simple tokens", () => {
         checkTokens(["PRINT"], [{offset: 0, type: "keyword"}]);
@@ -258,5 +258,34 @@ describe("should tokenise", () => {
         checkTokens(["TIMER"], [{offset: 0, type: "variable"}]);
         // Surprisingly even abbreviations are affected by the continuation. See #36.
         checkTokens(["H.TO"], [{offset: 0, type: "invalid"}]);
+    });
+});
+
+function checkWarnings(text, ...expected) {
+    const warnings = getWarnings(1, text, editor.tokenize(text, "BBCBASIC")[0]);
+    assert.deepStrictEqual(
+        warnings,
+        expected.map(x =>
+            Object.assign({}, x, {
+                startLineNumber: 1,
+                endLineNumber: 1,
+                severity: MarkerSeverity.Warning,
+            })
+        )
+    );
+}
+
+describe("Line warnings", () => {
+    it("should not generate warnings on lines that are fine", () => {
+        checkWarnings("COLOUR 123");
+        checkWarnings('P."I am a mongoose"');
+        checkWarnings("colour%=123");
+    });
+    it("should warn on suspicious variable names", () => {
+        checkWarnings("colour", {
+            message: "BASIC keywords should be upper case, did you mean COLOUR?",
+            startColumn: 1,
+            endColumn: 7,
+        });
     });
 });

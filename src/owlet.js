@@ -12,7 +12,7 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import tokenise from "jsbeeb/basic-tokenise";
 import "./owlet-editor.less";
-import {allTokensRegex} from "./bbcbasic";
+import {getWarnings} from "./bbcbasic";
 
 const TweetMaximum = 280;
 const StateVersion = 1;
@@ -20,8 +20,6 @@ const StateVersion = 1;
 function defaultLineNumber(line) {
     return line * 10;
 }
-
-const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})`);
 
 export class OwletEditor {
     constructor(onChangeHandler) {
@@ -122,21 +120,7 @@ export class OwletEditor {
         const tokens = monacoEditor.tokenize(this.getBasicText(), "BBCBASIC");
         let lineNum = 0;
         for (const lineTokens of tokens) {
-            lineNum++;
-            const line = model.getLineContent(lineNum);
-            for (const token of lineTokens.filter(token => token.type === "variable.BBCBASIC")) {
-                const match = line.substr(token.offset).match(LowerCaseTokenRegex);
-                if (match) {
-                    warnings.push({
-                        severity: MarkerSeverity.Warning,
-                        message: `BASIC keywords should be upper case, did you mean ${match[0].toUpperCase()}`,
-                        startLineNumber: lineNum,
-                        startColumn: token.offset + 1,
-                        endLineNumber: lineNum,
-                        endColumn: token.offset + match[0].length + 1,
-                    });
-                }
-            }
+            warnings.push(...getWarnings(++lineNum, model.getLineContent(lineNum), lineTokens));
         }
         monacoEditor.setModelMarkers(model, "warnings", warnings);
     }

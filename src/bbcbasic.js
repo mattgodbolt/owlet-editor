@@ -1,4 +1,4 @@
-import {languages} from "monaco-editor/esm/vs/editor/editor.api";
+import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 import {Flags, keywords} from "./tokens";
 
 function escape(token) {
@@ -15,14 +15,14 @@ const conditionalTokens = new Set(
     keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword)
 );
 
-export const allTokensRegex = keywords
+const allTokensRegex = keywords
     .map(kw => kw.keyword)
     .sort((x, y) => y.length - x.length)
     .map(escape)
     .map(kw => (conditionalTokens.has(kw) ? kw + "\\b" : kw))
     .join("|");
 
-export const allTokensForAsmRegex = keywords
+const allTokensForAsmRegex = keywords
     .filter(isExpressionToken)
     .map(kw => kw.keyword)
     .sort((x, y) => y.length - x.length)
@@ -224,4 +224,25 @@ export function registerBbcBasicLanguage() {
             };
         },
     });
+}
+
+const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?!%)`);
+
+export function getWarnings(lineNum, line, lineTokens) {
+    const warnings = [];
+
+    for (const token of lineTokens.filter(token => token.type === "variable.BBCBASIC")) {
+        const match = line.substr(token.offset).match(LowerCaseTokenRegex);
+        if (match) {
+            warnings.push({
+                severity: MarkerSeverity.Warning,
+                message: `BASIC keywords should be upper case, did you mean ${match[0].toUpperCase()}?`,
+                startLineNumber: lineNum,
+                startColumn: token.offset + 1,
+                endLineNumber: lineNum,
+                endColumn: token.offset + match[0].length + 1,
+            });
+        }
+    }
+    return warnings;
 }
