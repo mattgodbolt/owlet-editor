@@ -45,8 +45,6 @@ test: prereqs  ## Runs the tests
 
 .PHONY: check
 check: test lint-fix  ## Runs all checks required before committing (fixing trivial things automatically)
-.PHONY: pre-commit
-pre-commit: test lint
 
 .PHONY: clean
 clean:  ## Cleans up everything

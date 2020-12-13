@@ -1,12 +1,17 @@
 import $ from "jquery";
-import {editor as monacoEditor, KeyCode, KeyMod, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {
+    editor as monacoEditor,
+    KeyCode,
+    KeyMod,
+    MarkerSeverity,
+} from "monaco-editor/esm/vs/editor/editor.api";
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode, partialDetokenise} from "./tokens";
-import {encode} from 'base2048';
-import tokenise from 'jsbeeb/basic-tokenise';
-import './owlet-editor.less';
+import {encode} from "base2048";
+import tokenise from "jsbeeb/basic-tokenise";
+import "./owlet-editor.less";
 import {allTokensRegex} from "./bbcbasic";
 
 const TweetMaximum = 280;
@@ -20,59 +25,59 @@ const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})`);
 
 export class OwletEditor {
     constructor(onChangeHandler) {
-        const editorPane = $('#editor');
-        this.editStatus = $('#edit_status');
-        this.emuStatus = $('#emu_status');
+        const editorPane = $("#editor");
+        this.editStatus = $("#edit_status");
+        this.emuStatus = $("#emu_status");
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parent()[0]);
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
 
-        monacoEditor.defineTheme('bbcbasicTheme', {
-            base: 'vs-dark',
+        monacoEditor.defineTheme("bbcbasicTheme", {
+            base: "vs-dark",
             inherit: true,
             rules: [
-                {token: 'variable', foreground: 'bb8844'},
-                {token: 'number', foreground: '22bb88'}
-            ]
+                {token: "variable", foreground: "bb8844"},
+                {token: "number", foreground: "22bb88"},
+            ],
         });
 
         this.editor = monacoEditor.create(editorPane[0], {
-            value: '',
+            value: "",
             minimap: {
-                enabled: false
+                enabled: false,
             },
             suggest: {
-                showValues: false // Prevents hex constants from trying to autocomplete
+                showValues: false, // Prevents hex constants from trying to autocomplete
             },
             lineNumbers: defaultLineNumber,
-            language: 'BBCBASIC',
-            theme: 'bbcbasicTheme',
+            language: "BBCBASIC",
+            theme: "bbcbasicTheme",
             renderWhitespace: "none", // seems to fix odd space/font interaction
             fontSize: 16,
             scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            lineDecorationsWidth: 0
+            wordWrap: "on",
+            lineDecorationsWidth: 0,
         });
 
         this.editor.addAction({
-            id: 'execute-basic',
-            label: 'Run',
+            id: "execute-basic",
+            label: "Run",
             keybindings: [KeyMod.CtrlCmd | KeyCode.Enter],
             keybindingContext: null,
-            contextMenuGroupId: 'navigation',
+            contextMenuGroupId: "navigation",
             contextMenuOrder: 1.5,
-            run: () => this.updateProgram()
+            run: () => this.updateProgram(),
         });
 
         this.editor.addAction({
-            id: 'expand-code',
-            label: 'Expand code',
+            id: "expand-code",
+            label: "Expand code",
             keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
             keybindingContext: null,
-            contextMenuGroupId: 'navigation',
+            contextMenuGroupId: "navigation",
             contextMenuOrder: 1.5,
-            run: () => this.expandCode()
+            run: () => this.expandCode(),
         });
 
         this.editor.getModel().onDidChangeContent(() => {
@@ -83,11 +88,10 @@ export class OwletEditor {
             this.updateWarnings();
         });
 
-        this.emulator = new Emulator($('#emulator'));
+        this.emulator = new Emulator($("#emulator"));
 
         this.examples = {};
-        for (const example of Examples.examples)
-            this.addExample(example);
+        for (const example of Examples.examples) this.addExample(example);
     }
 
     static stateForBasicProgram(program) {
@@ -97,8 +101,7 @@ export class OwletEditor {
     static decodeStateString(stateString) {
         try {
             const state = JSON.parse(decodeURIComponent(stateString));
-            if (state.v !== StateVersion)
-                return null;
+            if (state.v !== StateVersion) return null;
             return state;
         } catch (e) {
             return null;
@@ -116,12 +119,12 @@ export class OwletEditor {
     updateWarnings() {
         const warnings = [];
         const model = this.editor.getModel();
-        const tokens = monacoEditor.tokenize(this.getBasicText(), 'BBCBASIC');
+        const tokens = monacoEditor.tokenize(this.getBasicText(), "BBCBASIC");
         let lineNum = 0;
         for (const lineTokens of tokens) {
             lineNum++;
             const line = model.getLineContent(lineNum);
-            for (const token of lineTokens.filter(token => token.type === 'variable.BBCBASIC')) {
+            for (const token of lineTokens.filter(token => token.type === "variable.BBCBASIC")) {
                 const match = line.substr(token.offset).match(LowerCaseTokenRegex);
                 if (match) {
                     warnings.push({
@@ -135,7 +138,7 @@ export class OwletEditor {
                 }
             }
         }
-        monacoEditor.setModelMarkers(model, 'warnings', warnings);
+        monacoEditor.setModelMarkers(model, "warnings", warnings);
     }
 
     updateEditorText(newText, updateType) {
@@ -144,11 +147,14 @@ export class OwletEditor {
             const previousSelections = this.editor.getSelections();
             this.editor.executeEdits(
                 updateType,
-                [{
-                    range: this.editor.getModel().getFullModelRange(),
-                    text: newText
-                }],
-                previousSelections);
+                [
+                    {
+                        range: this.editor.getModel().getFullModelRange(),
+                        text: newText,
+                    },
+                ],
+                previousSelections
+            );
             this.editor.pushUndoStop();
         } else {
             this.editor.getModel().setValue(newText);
@@ -157,32 +163,35 @@ export class OwletEditor {
 
     addExample(example) {
         this.examples[example.id] = example;
-        if (!example.link && example.basic) {example.link = `${window.location}#${this.toStateString(example.basic)}`;}
-        const $examples = $('#examples');
-        const newElem =
-            $examples.find("div.template")
-                .clone()
-                .removeClass("template")
-                .addClass("example")
-                .appendTo($examples);
-        newElem.find(".thumb")
-                .attr("src", example.thumb)
-        newElem.find(".name")
-            .text(example.name)
-            .attr("href", example.link)
+
+        const $examples = $("#examples");
+        const newElem = $examples
+            .find("div.template")
+            .clone()
+            .removeClass("template")
+            .addClass("example")
+            .click(() => this.chooseExample(example.id))
+            .appendTo($examples);
+
+        if (example.link) newElem.click(() => (window.location.href = example.link));
+
+        newElem.find(".thumb").attr("src", example.thumb);
+        newElem.find(".name").text(example.name);
         newElem.find(".description").text(example.description);
         if (example.basic)
-            newElem.find(".code").text(example.basic.split('\n').slice(0,3).join('\n'));
+            newElem.find(".code").text(example.basic.split("\n").slice(0, 3).join("\n"));
     }
 
     toStateString(basicText) {
-        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(basicText)));
+        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(basicText)))
+            .replace(/[(]/g, "%28")
+            .replace(/[)]/g, "%29");
     }
 
     setState(state) {
         this.editor.getModel().setValue(state.program);
         this.updateProgram();
-        this.selectView('screen');
+        this.selectView("screen");
     }
 
     lineNumberDetect(text) {
@@ -198,7 +207,8 @@ export class OwletEditor {
         // aren't expecting any. This does mean "getBasicText()" doesn't round-trip
         // back; we lose the leading spaces. That's _probably_ a feature.
         // Added for #31.
-        return this.editor.getModel()
+        return this.editor
+            .getModel()
             .getLinesContent()
             .map(line => line.trimStart())
             .join("\n");
@@ -224,20 +234,18 @@ export class OwletEditor {
                 try {
                     this.tokeniser.tokenise(this.editor.getModel().getLineContent(lineNum));
                 } catch (e) {
-                    markers.push(
-                        {
-                            severity: MarkerSeverity.Error,
-                            message: "Unable to tokenise line - too many characters?",
-                            startLineNumber: lineNum,
-                            startColumn: 0,
-                            endLineNumber: lineNum,
-                            endColumn: Infinity,
-                        }
-                    );
+                    markers.push({
+                        severity: MarkerSeverity.Error,
+                        message: "Unable to tokenise line - too many characters?",
+                        startLineNumber: lineNum,
+                        startColumn: 0,
+                        endLineNumber: lineNum,
+                        endColumn: Infinity,
+                    });
                 }
             }
         }
-        monacoEditor.setModelMarkers(this.editor.getModel(), 'updateProgram', markers);
+        monacoEditor.setModelMarkers(this.editor.getModel(), "updateProgram", markers);
     }
 
     updateStatus(basicText) {
@@ -257,10 +265,14 @@ export class OwletEditor {
         this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
 
-
     selectView(selected) {
         const $play = $("#play-pause");
-        if (selected !== 'screen' || (selected === 'screen' && this.emulator.running && $("#screen-button").hasClass("selected"))) {
+        if (
+            selected !== "screen" ||
+            (selected === "screen" &&
+                this.emulator.running &&
+                $("#screen-button").hasClass("selected"))
+        ) {
             this.emulator.pause();
             $play.addClass("play");
             $play.html("▼");
@@ -270,7 +282,7 @@ export class OwletEditor {
             $play.html("&#10074;&#10074;");
         }
 
-        for (const element of ['screen', 'about', 'examples']) {
+        for (const element of ["screen", "about", "examples"]) {
             $(`#${element}`).toggle(element === selected);
             $(`#${element}-button`).toggleClass("selected", element === selected);
         }
@@ -316,36 +328,51 @@ export class OwletEditor {
         return encodeURIComponent(text);
     }
 
+    async rocket() {
+        $("#rocket").addClass("backgroundAnimated");
+        const program = await this.tokeniser.tokenise(this.getBasicText());
+        await this.emulator.beebjit(program);
+        $("#rocket").removeClass("backgroundAnimated");
+    }
+
     async initialise(initialState) {
         await this.emulator.initialise();
         this.tokeniser = await tokenise.create();
-
 
         const actions = {
             run: () => {
                 this.updateProgram();
                 this.emulator.pause();
-                this.selectView('screen');
+                this.selectView("screen");
             },
             tokenise: () => this.tokenise(),
             expand: () => this.expandCode(),
             share: () => this.share(),
 
-            emulator: () => this.selectView('screen'),
-            examples: () => this.selectView('examples'),
-            about: () => this.selectView('about'),
+            emulator: () => this.selectView("screen"),
+            examples: () => this.selectView("examples"),
+            about: () => this.selectView("about"),
 
-            jsbeeb: () => window.open(`https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(this.getBasicText())}&rom=gxr.rom`, "_blank"),
-
+            jsbeeb: () =>
+                window.open(
+                    `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(
+                        this.getBasicText()
+                    )}&rom=gxr.rom`,
+                    "_blank"
+                ),
+            rocket: () => this.rocket(),
             copy: () => {
                 this.copy();
                 this.closeModal();
             },
             tweet: () => {
-                window.open(`https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`, "_new");
+                window.open(
+                    `https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`,
+                    "_new"
+                );
                 this.closeModal();
             },
-            closeModal: () => this.closeModal()
+            closeModal: () => this.closeModal(),
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
 
