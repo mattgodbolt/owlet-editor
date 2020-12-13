@@ -19,6 +19,21 @@ describe("should tokenise", () => {
         checkTokens(["CALL"], [{offset: 0, type: "keyword"}]);
         checkTokens(["RESTORE"], [{offset: 0, type: "keyword"}]);
     });
+    it("should recognise abutting tokens", () => {
+        // we recognise this as two separate tokens, though the editor coalesces them into one.
+        checkTokens(["PRINTLEN"], [{offset: 0, type: "keyword"}]);
+        checkTokens(["P.LEN"], [{offset: 0, type: "keyword"}]);
+    });
+    it("should recognise tokens abutting variables", () => {
+        // we recognise this as two separate tokens, though the editor coalesces them into one.
+        checkTokens(
+            ["PRINTA$"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "variable"},
+            ]
+        );
+    });
     it("should work with assignments", () => {
         checkTokens(
             ["N=1"],
