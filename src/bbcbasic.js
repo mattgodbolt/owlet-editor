@@ -94,6 +94,12 @@ export function registerBbcBasicLanguage() {
             root: [
                 [/(\bREM|\xf4)$/, {token: "keyword"}], // A REM on its own line
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
+                [/\*.*/, {token: "keyword.oscli"}],
+                [/./, {token: "@rematch", next: "notFirst"}],
+            ],
+            notFirst: [
+                [/:/, {token: "symbol", next: "@pop"}],
+                // ARGH need to "pop" at end of line somehow!!!
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],

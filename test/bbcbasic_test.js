@@ -259,6 +259,31 @@ describe("Tokenisation", () => {
         // Surprisingly even abbreviations are affected by the continuation. See #36.
         checkTokens(["H.TO"], [{offset: 0, type: "invalid"}]);
     });
+    it("should handle star", () => {
+        checkTokens(["*FX200,3"], [{offset: 0, type: "keyword.oscli"}]);
+        checkTokens(
+            ["P.2*3:*FX200,3"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "number"},
+                {offset: 5, type: "symbol"},
+                {offset: 6, type: "keyword.oscli"},
+            ]
+        );
+        checkTokens(
+            ["P.2*3", "*FX200,3"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "number"},
+                {offset: 5, type: "symbol"},
+            ],
+            [{offset: 0, type: "keyword.oscli"}]
+        );
+    });
 });
 
 function checkWarnings(text, ...expected) {
