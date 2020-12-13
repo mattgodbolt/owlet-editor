@@ -1,25 +1,37 @@
 import {languages} from "monaco-editor/esm/vs/editor/editor.api";
-import {tokens, tokensForAsm} from "./tokens";
+import {Flags, keywords} from "./tokens";
 
 function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(");
 }
 
-export const allTokensRegex = tokens
-    .filter(x => x)
-    .map(escape)
+function isExpressionToken(keyword) {
+    // Does this token look like it'd be useful as a token. Used to find sensible things to tokenise
+    // in assembly statements (like LEN).
+    return (keyword.flags & ~Flags.Conditional) === 0;
+}
+
+const conditionalTokens = new Set(
+    keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword)
+);
+
+export const allTokensRegex = keywords
+    .map(kw => kw.keyword)
     .sort((x, y) => y.length - x.length)
+    .map(escape)
+    .map(kw => (conditionalTokens.has(kw) ? kw + "\\b" : kw))
     .join("|");
 
-export const allTokensForAsmRegex = tokensForAsm
-    .filter(x => x)
-    .map(escape)
+export const allTokensForAsmRegex = keywords
+    .filter(isExpressionToken)
+    .map(kw => kw.keyword)
     .sort((x, y) => y.length - x.length)
+    .map(escape)
     .join("|");
 
 function findAllPrefixes() {
     const prefixes = new Set();
-    for (const token of tokens.filter(x => x)) {
+    for (const token of keywords.map(kw => kw.keyword)) {
         for (let i = 0; i < token.length; ++i) prefixes.add(token.substr(0, i));
     }
     const result = [];
@@ -120,7 +132,7 @@ export function registerBbcBasicLanguage() {
     });
 
     // Register a completion item provider for the new language
-    const uniqueTokens = [...new Set(tokens.filter(x => x))];
+    const uniqueTokens = [...new Set(keywords.map(kw => kw.keyword))];
     languages.registerCompletionItemProvider("BBCBASIC", {
         provideCompletionItems: (model, position) => {
             const linePrefix = model.getLineContent(position.lineNumber).substr(0, position.column);

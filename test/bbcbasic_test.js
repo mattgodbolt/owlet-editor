@@ -219,4 +219,18 @@ describe("should tokenise", () => {
         checkTokens(["^"], [{offset: 0, type: "operator"}]);
         checkTokens(["'"], [{offset: 0, type: "operator"}]);
     });
+    it("should tokenise continuation tokens when appropriate", () => {
+        checkTokens(["TIME"], [{offset: 0, type: "keyword"}]);
+        checkTokens(
+            ["TIME r"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 4, type: "white"},
+                {offset: 5, type: "variable"},
+            ]
+        );
+    });
+    it("should not tokenise continuation tokens followed by alphanum", () => {
+        checkTokens(["TIMER"], [{offset: 0, type: "variable"}]);
+    });
 });

@@ -37,7 +37,7 @@ export const tokens = (() => {
     return result;
 })();
 
-const Flags = {
+export const Flags = {
     Conditional: 0x01,
     Middle: 0x02,
     Start: 0x04,
@@ -46,16 +46,6 @@ const Flags = {
     REM: 0x20,
     PseudoVariable: 0x40,
 };
-
-function isExpressionToken(keyword) {
-    // Does this token look like it'd be useful as a token. Used to find sensible things to tokenise
-    // in assembly statements (like LEN).
-    return (keyword.flags & ~Flags.Conditional) === 0;
-}
-
-export const tokensForAsm = (() => {
-    return keywords.filter(isExpressionToken).map(kw => kw.keyword);
-})();
 
 const Chars = {
     Quote: '"'.charCodeAt(0),
