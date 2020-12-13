@@ -136,16 +136,19 @@ describe("should tokenise", () => {
         checkTokens(["C."], [{offset: 0, type: "keyword"}]);
         checkTokens(["R."], [{offset: 0, type: "keyword"}]);
     });
-    it('should allow $ in abbreviated tokens', () => {
-        checkTokens(["P.STRING$.2,\"HO\")"], [
-            {offset: 0, type: "keyword"},
-            {offset: 10, type: "number"},
-            {offset: 11, type: "operator"},
-            {offset: 12, type: "string.quote"},
-            {offset: 13, type: "string"},
-            {offset: 15, type: "string.quote"},
-            {offset: 16, type: "delimiter.parenthesis"}
-        ]);
+    it("should allow $ in abbreviated tokens", () => {
+        checkTokens(
+            ['P.STRING$.2,"HO")'],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 10, type: "number"},
+                {offset: 11, type: "operator"},
+                {offset: 12, type: "string.quote"},
+                {offset: 13, type: "string"},
+                {offset: 15, type: "string.quote"},
+                {offset: 16, type: "delimiter.parenthesis"},
+            ]
+        );
     });
     it("should not recognize bad abbreviations", () => {
         checkTokens(["Z."], [{offset: 0, type: "invalid"}]);
@@ -253,5 +256,7 @@ describe("should tokenise", () => {
     });
     it("should not tokenise continuation tokens followed by alphanum", () => {
         checkTokens(["TIMER"], [{offset: 0, type: "variable"}]);
+        // Surprisingly even abbreviations are affected by the continuation. See #36.
+        checkTokens(["H.TO"], [{offset: 0, type: "invalid"}]);
     });
 });

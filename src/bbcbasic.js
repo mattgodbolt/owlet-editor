@@ -2,7 +2,7 @@ import {languages} from "monaco-editor/esm/vs/editor/editor.api";
 import {Flags, keywords} from "./tokens";
 
 function escape(token) {
-    return token.replace("$", "\\$").replace("(", "\\(");
+    return token.replace("$", "\\$").replace("(", "\\(").replace(".", "\\.");
 }
 
 function isExpressionToken(keyword) {
@@ -29,15 +29,33 @@ export const allTokensForAsmRegex = keywords
     .map(escape)
     .join("|");
 
-function findAllPrefixes() {
+function allAbbreviations(tokens) {
     const prefixes = new Set();
-    for (const token of keywords.map(kw => kw.keyword)) {
+    for (const token of tokens) {
         for (let i = 1; i < token.length; ++i) prefixes.add(token.substr(0, i));
     }
-    const result = [];
-    for (const prefix of prefixes) result.push(prefix + ".");
-    return result;
+    return [...prefixes].map(prefix => prefix + ".");
 }
+
+const invalidAbbreviatedTokensRegex = (() => {
+    // The "Conditional" bit applies even to abbreviations, though the variable name is junk and
+    // broken, so "F.A=H.TO8^5" is parsed as a variable named "H.TO" (No such variable).
+    const allNonConditional = new Set(
+        allAbbreviations(
+            keywords.filter(kw => !conditionalTokens.has(kw.keyword)).map(kw => kw.keyword)
+        )
+    );
+    const allConditional = new Set(
+        allAbbreviations(
+            keywords.filter(kw => (kw.flags & Flags.Conditional) !== 0).map(kw => kw.keyword)
+        )
+    );
+    return [...allConditional]
+        .filter(x => !allNonConditional.has(x))
+        .map(escape)
+        .map(kw => kw + "[a-zA-Z0-9]+")
+        .join("|");
+})();
 
 export function registerBbcBasicLanguage() {
     languages.register({id: "BBCBASIC"});
@@ -70,7 +88,7 @@ export function registerBbcBasicLanguage() {
             "!",
             "'",
         ],
-        tokenPrefix: findAllPrefixes(),
+        tokenPrefix: allAbbreviations(keywords.map(kw => kw.keyword)),
         symbols: /[-+#=><!*/{}:?$;,~^']+/,
         tokenizer: {
             root: [
@@ -79,6 +97,7 @@ export function registerBbcBasicLanguage() {
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
+                [invalidAbbreviatedTokensRegex, "invalid"],
                 [/[A-Z$]+\./, {cases: {"@tokenPrefix": "keyword"}}],
                 [/^\s*\d+/, "enum"], // line numbers
                 {include: "@common"},
