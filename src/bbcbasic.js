@@ -1,11 +1,17 @@
 import {languages} from "monaco-editor/esm/vs/editor/editor.api";
-import {tokens} from "./tokens";
+import {tokens, tokensForAsm} from "./tokens";
 
 function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(");
 }
 
 export const allTokensRegex = tokens
+    .filter(x => x)
+    .map(escape)
+    .sort((x, y) => y.length - x.length)
+    .join("|");
+
+export const allTokensForAsmRegex = tokensForAsm
     .filter(x => x)
     .map(escape)
     .sort((x, y) => y.length - x.length)
@@ -62,14 +68,12 @@ export function registerBbcBasicLanguage() {
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
                 [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword"}}],
-                [/[a-zA-Z_][\w]*[$%]?/, "variable"],
                 [/^\s*\d+/, "enum"], // line numbers
-                // whitespace
-                {include: "@whitespace"},
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
             common: [
+                {include: "@whitespace"},
                 // immediate
                 [
                     "@symbols",
@@ -86,6 +90,7 @@ export function registerBbcBasicLanguage() {
                 [/\d+/, "number"],
                 [/&[0-9A-F]+/, "number.hex"],
                 [/[{}()]/, "@brackets"],
+                [/[a-zA-Z_][\w]*[$%]?/, "variable"],
                 // strings
                 [/["\u201c\u201d]/, {token: "string.quote", next: "@string"}],
                 // Unusual cases. We treat @% as a regular variable (see #28).
@@ -98,13 +103,16 @@ export function registerBbcBasicLanguage() {
             ],
             remStatement: [[/.*/, "comment", "@pop"]],
             asm: [
-                // Not exactly working properly yet...but a start
-                [/EQU[BDSW]|[A-Z]{3}/, "keyword"],
-                [/[ \t\r\n]+/, "white"],
+                [
+                    /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/,
+                    "keyword",
+                ],
+                [/OPT|EQU[BDSW]/, "keyword.directive"],
                 [/[;\\][^:]*/, "comment"],
                 [/,\s*[XY]/, "keyword"],
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
+                [allTokensForAsmRegex, "keyword"],
                 {include: "@common"},
                 ["]", {token: "delimiter.square", next: "@pop"}],
             ],

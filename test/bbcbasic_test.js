@@ -156,6 +156,24 @@ describe("should tokenise", () => {
                 {offset: 1, type: "keyword"},
             ]
         );
+        checkTokens(
+            ["[", "OPTN%"],
+            [{offset: 0, type: "delimiter.square"}],
+            [
+                {offset: 0, type: "keyword.directive"},
+                {offset: 3, type: "variable"},
+            ]
+        );
+        checkTokens(
+            ["[", "EQUB LENA$"],
+            [{offset: 0, type: "delimiter.square"}],
+            [
+                {offset: 0, type: "keyword.directive"},
+                {offset: 3, type: "space"},
+                {offset: 5, type: "keyword"},
+                {offset: 8, type: "variable"},
+            ]
+        );
     });
     it("should notice REM statements", () => {
         checkTokens(
