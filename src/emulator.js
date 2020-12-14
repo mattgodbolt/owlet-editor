@@ -12,6 +12,7 @@ import Promise from "promise";
 
 utils.setBaseUrl("jsbeeb/");
 
+const BotStartCycles = 725000; // bbcmicrobot start time
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
 const urlParams = new URLSearchParams(window.location.search);
@@ -129,29 +130,24 @@ export class Emulator {
         }
     }
 
-    runProgram(tokenised) {
+    async runProgram(tokenised) {
         if (!this.ready) return;
         this.cpu.reset(true);
         const processor = this.cpu;
-        // TODO - get a precise cycle timestamp for breakpoint so beebjit can match it
-        const idleAddr = processor.model.isMaster ? 0xe7e6 : 0xe581;
-        const hook = processor.debugInstruction.add(addr => {
-            if (addr !== idleAddr) return;
-            const page = processor.readmem(0x18) << 8;
-            for (let i = 0; i < tokenised.length; ++i) {
-                processor.writemem(page + i, tokenised.charCodeAt(i));
-            }
-            // Set VARTOP (0x12/3) and TOP(0x02/3)
-            const end = page + tokenised.length;
-            const endLow = end & 0xff;
-            const endHigh = (end >>> 8) & 0xff;
-            processor.writemem(0x02, endLow);
-            processor.writemem(0x03, endHigh);
-            processor.writemem(0x12, endLow);
-            processor.writemem(0x13, endHigh);
-            hook.remove();
-            this.writeToKeyboardBuffer("RUN\r");
-        });
+        await processor.execute(BotStartCycles); // match bbcmicrobot
+        const page = processor.readmem(0x18) << 8;
+        for (let i = 0; i < tokenised.length; ++i) {
+            processor.writemem(page + i, tokenised.charCodeAt(i));
+        }
+        // Set VARTOP (0x12/3) and TOP(0x02/3)
+        const end = page + tokenised.length;
+        const endLow = end & 0xff;
+        const endHigh = (end >>> 8) & 0xff;
+        processor.writemem(0x02, endLow);
+        processor.writemem(0x03, endHigh);
+        processor.writemem(0x12, endLow);
+        processor.writemem(0x13, endHigh);
+        this.writeToKeyboardBuffer("RUN\r");
         this.start();
     }
 
