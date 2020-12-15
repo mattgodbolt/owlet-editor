@@ -188,6 +188,15 @@ describe("Tokenisation", () => {
                 {offset: 8, type: "variable"},
             ]
         );
+        checkTokens(
+            ["[", "EQUSFNx"],
+            [{offset: 0, type: "delimiter.square"}],
+            [
+                {offset: 0, type: "keyword.directive"},
+                {offset: 4, type: "keyword"},
+                {offset: 6, type: "variable"},
+            ]
+        );
     });
     it("should notice REM statements", () => {
         checkTokens(
