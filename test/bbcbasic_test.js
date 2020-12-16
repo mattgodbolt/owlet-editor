@@ -289,12 +289,24 @@ describe("Line warnings", () => {
         checkWarnings("COLOUR 123");
         checkWarnings('P."I am a mongoose"');
         checkWarnings("colour%=123");
+        checkWarnings("colour$=a$");
     });
     it("should warn on suspicious variable names", () => {
         checkWarnings("colour", {
             message: "BASIC keywords should be upper case, did you mean COLOUR?",
             startColumn: 1,
             endColumn: 7,
+        });
+        checkWarnings("chr$", {
+            message: "BASIC keywords should be upper case, did you mean CHR$?",
+            startColumn: 1,
+            endColumn: 5,
+        });
+	// Both GET and GET$ are tokens - check that doesn't trip us up.
+        checkWarnings("A$=get$", {
+            message: "BASIC keywords should be upper case, did you mean GET$?",
+            startColumn: 4,
+            endColumn: 8,
         });
     });
 });

@@ -226,7 +226,7 @@ export function registerBbcBasicLanguage() {
     });
 }
 
-const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?!%)`);
+const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?![%$])`);
 
 export function getWarnings(lineNum, line, lineTokens) {
     const warnings = [];
