@@ -37,6 +37,12 @@ export const tokens = (() => {
     return result;
 })();
 
+export const flags = (() => {
+    const result = new Array(0x80).fill(0);
+    for (const keyword of keywords) result[keyword.token - 0x80] = keyword.flags;
+    return result;
+})();
+
 export const Flags = {
     Conditional: 0x01,
     Middle: 0x02,
@@ -96,8 +102,19 @@ class StringHandler {
         this.output += `${lineNumber}`;
     }
 
-    onCharacter(charCode) {
+    onCharCode(charCode) {
+        if ((charCode >= 127 && charCode < 160) || (charCode < 32 && charCode !== 10)) {
+            charCode += 0x100;
+        }
         this.output += String.fromCodePoint(charCode);
+    }
+
+    onCharacter(ch) {
+        this.output += ch;
+    }
+
+    onSpace() {
+        this.output += ' ';
     }
 
     onToken(token) {
@@ -107,14 +124,39 @@ class StringHandler {
 
 function detokeniseInternal(text, handler) {
     let withinString = false;
+    let inIdentifier = false;
+    let leaveRestOfLine = false;
+    let afterConditionalToken = false;
     let lineNumberBuffer = null;
     const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
     for (const charCode of codePoints) {
+        let ch = String.fromCodePoint(charCode);
+        if (charCode === 10) {
+            // Newline.
+            withinString = false;
+            inIdentifier = false;
+            leaveRestOfLine = false;
+        }
+        if (afterConditionalToken) {
+            if ((charCode >= Chars.FirstToken) ||
+                (ch >= 'A' && ch <= 'Z') ||
+                (ch >= 'a' && ch <= 'z') ||
+                (ch >= '0' && ch <= '9') ||
+                (ch === '_')) {
+                handler.onSpace();
+            }
+            afterConditionalToken = false;
+        }
+        if (leaveRestOfLine) {
+            handler.onCharCode(charCode);
+            continue;
+        }
         if (charCode === Chars.Quote) withinString = !withinString;
         if (charCode === Chars.LineNumberToken) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];
+            inIdentifier = false;
             continue;
         }
         if (lineNumberBuffer !== null) {
@@ -128,8 +170,36 @@ function detokeniseInternal(text, handler) {
             }
             continue;
         }
-        if (charCode >= Chars.FirstToken && !withinString) handler.onToken(charCode);
-        else handler.onCharacter(charCode);
+        if (charCode >= Chars.FirstToken) {
+            if (withinString) {
+                handler.onCharCode(charCode);
+                continue;
+            }
+            if (inIdentifier) {
+                handler.onSpace();
+                inIdentifier = false;
+            }
+            handler.onToken(charCode);
+            let tokenFlags = flags[charCode - Chars.FirstToken];
+            if (tokenFlags & Flags.Conditional) {
+                afterConditionalToken = true;
+            }
+            if (tokenFlags & Flags.REM) {
+                // Note: "REM" flag is also set for DATA token!
+                // FIXME: What about untokenised REM or DATA?
+                // FIXME: Probably also turn on for * commands.
+                leaveRestOfLine = true;
+            }
+        } else if ((charCode < 32 && charCode !== 10) || charCode === 127) {
+            inIdentifier = false;
+            handler.onCharCode(charCode);
+        } else {
+            handler.onCharacter(ch);
+            inIdentifier = (ch >= 'A' && ch <= 'Z') ||
+                (ch >= 'a' && ch <= 'z') ||
+                (ch == '_') ||
+                (inIdentifier && ch >= '0' && ch <= '9');
+        }
     }
 }
 
@@ -167,8 +237,11 @@ class PartialHandler extends StringHandler {
         super();
     }
 
+    onSpace() {
+    }
+
     onToken(token) {
-        this.onCharacter(token);
+        this.onCharCode(token);
     }
 }
 
