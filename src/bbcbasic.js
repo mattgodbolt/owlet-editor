@@ -38,8 +38,9 @@ function allAbbreviations(tokens) {
 }
 
 const invalidAbbreviatedTokensRegex = (() => {
-    // The "Conditional" bit applies even to abbreviations, though the variable name is junk and
-    // broken, so "F.A=H.TO8^5" is parsed as a variable named "H.TO" (No such variable).
+    // The "Conditional" bit applies even to abbreviations, so "F.A=H.TO8^5" is
+    // parsed as a variable named "H" followed by ".", and BASIC reports error
+    // "No such variable" if "H" isn't a variable or "No TO" if it is.
     const allNonConditional = new Set(
         allAbbreviations(
             keywords.filter(kw => !conditionalTokens.has(kw.keyword)).map(kw => kw.keyword)

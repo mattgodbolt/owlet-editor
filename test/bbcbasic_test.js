@@ -302,7 +302,7 @@ describe("Line warnings", () => {
             startColumn: 1,
             endColumn: 5,
         });
-	// Both GET and GET$ are tokens - check that doesn't trip us up.
+        // Both GET and GET$ are tokens - check that doesn't trip us up.
         checkWarnings("A$=get$", {
             message: "BASIC keywords should be upper case, did you mean GET$?",
             startColumn: 4,
