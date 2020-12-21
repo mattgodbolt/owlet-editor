@@ -114,7 +114,7 @@ class StringHandler {
     }
 
     onSpace() {
-        this.output += ' ';
+        this.output += " ";
     }
 
     onToken(token) {
@@ -138,11 +138,13 @@ function detokeniseInternal(text, handler) {
             leaveRestOfLine = false;
         }
         if (afterConditionalToken) {
-            if ((charCode >= Chars.FirstToken) ||
-                (ch >= 'A' && ch <= 'Z') ||
-                (ch >= 'a' && ch <= 'z') ||
-                (ch >= '0' && ch <= '9') ||
-                (ch === '_')) {
+            if (
+                charCode >= Chars.FirstToken ||
+                (ch >= "A" && ch <= "Z") ||
+                (ch >= "a" && ch <= "z") ||
+                (ch >= "0" && ch <= "9") ||
+                ch === "_"
+            ) {
                 handler.onSpace();
             }
             afterConditionalToken = false;
@@ -195,10 +197,11 @@ function detokeniseInternal(text, handler) {
             handler.onCharCode(charCode);
         } else {
             handler.onCharacter(ch);
-            inIdentifier = (ch >= 'A' && ch <= 'Z') ||
-                (ch >= 'a' && ch <= 'z') ||
-                (ch == '_') ||
-                (inIdentifier && ch >= '0' && ch <= '9');
+            inIdentifier =
+                (ch >= "A" && ch <= "Z") ||
+                (ch >= "a" && ch <= "z") ||
+                ch == "_" ||
+                (inIdentifier && ch >= "0" && ch <= "9");
         }
     }
 }
@@ -237,8 +240,7 @@ class PartialHandler extends StringHandler {
         super();
     }
 
-    onSpace() {
-    }
+    onSpace() {}
 
     onToken(token) {
         this.onCharCode(token);

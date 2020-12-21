@@ -49,13 +49,13 @@ VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
         );
     });
     it("should add spaces after tokens with the Conditional flag", () => {
-        assert.strictEqual(detokenise('\xf1\x9f\x841'), 'PRINTERR OR1');
+        assert.strictEqual(detokenise("\xf1\x9f\x841"), "PRINTERR OR1");
     });
     it("should add spaces before tokens which follow an identifier", () => {
-        assert.strictEqual(detokenise('\xf1X\x84Y'), 'PRINTX ORY');
+        assert.strictEqual(detokenise("\xf1X\x84Y"), "PRINTX ORY");
     });
     it("shouldn't expand tokens after DATA", () => {
-        assert.strictEqual(detokenise('\xDCX\x84Y'), 'DATAX\u0184Y');
+        assert.strictEqual(detokenise("\xDCX\x84Y"), "DATAX\u0184Y");
     });
 });
 
@@ -107,8 +107,7 @@ describe("Partial detokenisation", () => {
         assert.strictEqual(partialDetokenise(rawProgram), '10 \xf1 "Hello world"\n11 \xe5 10');
     });
     it("should not result in invisible Unicode characters", () => {
-        const rawProgram =
-            '\x0d\x00\x0a\x08\xf1\x9f\x841\x0d\xff';
-        assert.strictEqual(partialDetokenise(rawProgram), '\xf1\u019f\u01841');
+        const rawProgram = "\x0d\x00\x0a\x08\xf1\x9f\x841\x0d\xff";
+        assert.strictEqual(partialDetokenise(rawProgram), "\xf1\u019f\u01841");
     });
 });
