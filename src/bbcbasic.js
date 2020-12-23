@@ -8,7 +8,7 @@ function escape(token) {
 function isExpressionToken(keyword) {
     // Does this token look like it'd be useful in an expression. Used to find sensible things to tokenise
     // in assembly statements (like LEN).
-    return (keyword.flags & ~Flags.Conditional) === 0 || keyword.keyword === 'FN';
+    return (keyword.flags & ~Flags.Conditional) === 0 || keyword.keyword === "FN";
 }
 
 const conditionalTokens = new Set(
