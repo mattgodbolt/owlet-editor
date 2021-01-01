@@ -30,8 +30,10 @@ class ScreenResizer {
         this.desiredAspectRatio = origWidth / origHeight;
         this.minHeight = origHeight / 4;
         this.minWidth = origWidth / 4;
+        try{
         this.observer = new ResizeObserver(() => this.resizeScreen());
-        this.observer.observe(this.screen.parent()[0]);
+        this.observer.observe(this.screen.parent()[0]);} catch(e){console.log(e);};
+
         this.resizeScreen();
     }
 
