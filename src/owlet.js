@@ -26,8 +26,10 @@ export class OwletEditor {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
         this.emuStatus = $("#emu_status");
+        try{
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parent()[0]);
+            } catch(e){console.log(e);};
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
 
