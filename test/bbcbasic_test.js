@@ -159,9 +159,15 @@ describe("Tokenisation", () => {
     });
     it("should recognize 6502 inside []", () => {
         checkTokens(
-            ["[", "LDA"],
-            [{offset: 0, type: "delimiter.square"}],
-            [{offset: 0, type: "keyword"}]
+            ["0[", "1LDA"],
+            [
+                {offset: 0, type: "enum"},
+                {offset: 1, type: "delimiter.square"},
+            ],
+            [
+                {offset: 0, type: "enum"},
+                {offset: 1, type: "keyword"},
+            ]
         );
         checkTokens(
             ["[LDA"],

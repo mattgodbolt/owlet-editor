@@ -111,11 +111,11 @@ export function registerBbcBasicLanguage() {
                 [abbreviatedDollarTokensRegex, "keyword"],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword"}}],
-                [/^\s*\d+/, "enum"], // line numbers
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
             common: [
+                [/^\s*\d+/, "enum"], // line numbers
                 {include: "@whitespace"},
                 // immediate
                 [
