@@ -274,6 +274,28 @@ describe("Tokenisation", () => {
         // Surprisingly even abbreviations are affected by the continuation. See #36.
         checkTokens(["H.TO"], [{offset: 0, type: "invalid"}]);
     });
+    it("should not include $ mid token/identifier", () => {
+        checkTokens(
+            ["IFVALA$PRINTA$.1"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "variable"},
+                {offset: 7, type: "keyword"},
+                {offset: 12, type: "variable"},
+                {offset: 14, type: "number.float"},
+            ]
+        );
+    });
+    it("should parse floating point number after $", () => {
+        checkTokens(
+            ["P.$.114338E6"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "operator"},
+                {offset: 3, type: "number.float"},
+            ]
+        );
+    });
 });
 
 function checkWarnings(text, ...expected) {

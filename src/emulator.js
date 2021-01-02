@@ -17,6 +17,11 @@ const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
 const urlParams = new URLSearchParams(window.location.search);
 
+const Model = models.findModel("B");
+if (!urlParams.get("experimental")) {
+    Model.os.push("gxr.rom");
+}
+
 class ScreenResizer {
     constructor(screen) {
         this.screen = screen;
@@ -25,8 +30,10 @@ class ScreenResizer {
         this.desiredAspectRatio = origWidth / origHeight;
         this.minHeight = origHeight / 4;
         this.minWidth = origWidth / 4;
+        try{
         this.observer = new ResizeObserver(() => this.resizeScreen());
-        this.observer.observe(this.screen.parent()[0]);
+        this.observer.observe(this.screen.parent()[0]);} catch(e){console.log(e);};
+
         this.resizeScreen();
     }
 
@@ -50,11 +57,6 @@ export class Emulator {
         this.canvas = canvasLib.bestCanvas(screen[0]);
         this.frames = 0;
         this.frameSkip = 0;
-        const model = models.findModel("B");
-
-        if (!urlParams.get("experimental")) {
-            model.os.push("gxr.rom");
-        }
 
         this.resizer = new ScreenResizer(screen);
         this.leftMargin = 115;
@@ -63,7 +65,7 @@ export class Emulator {
         this.bottomMargin = 30;
         window.theEmulator = this;
 
-        this.video = new Video.Video(model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
+        this.video = new Video.Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
         this.soundChip = new SoundChip.FakeSoundChip();
         this.ddNoise = new DdNoise.FakeDdNoise();
@@ -82,7 +84,7 @@ export class Emulator {
         });
         const config = {};
         this.cpu = new Cpu6502(
-            model,
+            Model,
             this.dbgr,
             this.video,
             this.soundChip,
