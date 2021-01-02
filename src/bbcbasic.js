@@ -8,7 +8,7 @@ function escape(token) {
 function isExpressionToken(keyword) {
     // Does this token look like it'd be useful in an expression. Used to find sensible things to tokenise
     // in assembly statements (like LEN).
-    return (keyword.flags & ~Flags.Conditional) === 0 || keyword.keyword === 'FN';
+    return (keyword.flags & ~Flags.Conditional) === 0 || keyword.keyword === "FN";
 }
 
 const conditionalTokens = new Set(
@@ -57,6 +57,17 @@ const invalidAbbreviatedTokensRegex = (() => {
         .join("|");
 })();
 
+const abbreviatedDollarTokensRegex = (() => {
+    // Find all abbreviated forms containing a "$".  It'll always be right before the "."
+    // because tokens with a "$" always end with either the "$" (and have no abbreviated
+    // form with it) or end with "$(".
+    const orRegex = keywords
+        .filter(kw => kw.keyword.endsWith("$("))
+        .map(kw => kw.keyword.slice(0, -2))
+        .join("|");
+    return "(" + orRegex + ")\\$.";
+})();
+
 export function registerBbcBasicLanguage() {
     languages.register({id: "BBCBASIC"});
 
@@ -97,8 +108,9 @@ export function registerBbcBasicLanguage() {
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
+                [abbreviatedDollarTokensRegex, "keyword"],
                 [invalidAbbreviatedTokensRegex, "invalid"],
-                [/[A-Z$]+\./, {cases: {"@tokenPrefix": "keyword"}}],
+                [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword"}}],
                 [/^\s*\d+/, "enum"], // line numbers
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
