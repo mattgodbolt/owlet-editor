@@ -17,9 +17,12 @@ const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
 const urlParams = new URLSearchParams(window.location.search);
 
+let   modelName = "BBC Micro Model B";
 const Model = models.findModel("B");
+
 if (!urlParams.get("experimental")) {
     Model.os.push("gxr.rom");
+    modelName += " | GXR ROM"
 }
 
 class ScreenResizer {
@@ -55,9 +58,9 @@ export class Emulator {
         this.root = root;
         const screen = this.root.find(".screen");
         this.canvas = canvasLib.bestCanvas(screen[0]);
+        this.emuStatus = document.getElementById("emu_status");
         this.frames = 0;
         this.frameSkip = 0;
-
         this.resizer = new ScreenResizer(screen);
         this.leftMargin = 115;
         this.rightMargin = 130;
@@ -93,6 +96,7 @@ export class Emulator {
             config
         );
 
+        setInterval(this.timer.bind(this),1000)
         this.lastFrameTime = 0;
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
@@ -101,6 +105,10 @@ export class Emulator {
     async initialise() {
         await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
         this.ready = true;
+    }
+
+    timer() {
+      this.emuStatus.innerHTML = modelName+" | "+this.cpu.cycleSeconds+" s";
     }
 
     start() {
@@ -130,6 +138,7 @@ export class Emulator {
         for (let i = 0; i < data.length; i++) {
             processor.writemem(address + i, data.charCodeAt(i));
         }
+        this.cpu.cycleSeconds = 60*60*3;
     }
 
     async runProgram(tokenised) {
