@@ -41,12 +41,21 @@ Q=+5:ãJ=0¸16:X=?Q-19:L=Q?1-96:Q=Q+2:ãI=0¸L:æ0,P:ì10*X+64*I,60*Y:ð97,4
 `;
         assert.strictEqual(
             detokenise(original),
-            `0REM1i0123456789!oOSCLI1234567890=^\\<>$o QWERTYUIOP@[_^v oOSCLIOSCLIASDFGHJKL:;]OSCLI )kOSCLIZXCVBNM,./OSCLI6g        q\`OSCLI!\`OSCLI!\`OSCLI~\`OSCLI aOSCLIOSCLI8f       q\`OSCLI!\`OSCLI!\`OSCLI~\`OSCLIsbOSCLIOSCLIOSCLI
+            `0REM1i0123456789!oÿ1234567890=^\\<>$o QWERTYUIOP@[_^v oÿÿASDFGHJKL:;]ÿ )kÿZXCVBNM,./ÿ6g        q\`ÿ!\`ÿ!\`ÿ~\`ÿ aÿÿ8f       q\`ÿ!\`ÿ!\`ÿ~\`ÿsbÿÿÿ
 1MODE1:Y=6:P=4420:!3320=RND:GCOL64,0:PLOT97,P,P:VDU535;P;P;P;P;5:GCOL16,0:MOVE80,50:PLOT97,1120,386:GCOL0,0:PLOT&65,80,500
-Q=PAGE+5:FORJ=0TO16:X=?Q-19:L=Q?1-96:Q=Q+2:FORI=0TOL:GCOL0,ATNP:MOVE10*X+64*I,60*Y:PLOT97,48,48:PLOT0,-40,0:GCOL0,3:IFPPLOT0,-8,0:VDU102:PLOT0,-12,-16
+Q=PAGE+5:FORJ=0TO16:X=?Q-19:L=Q?1-96:Q=Q+2:FORI=0TOL:GCOL0,ATNP:MOVE10*X+64*I,60*Y:PLOT97,48,48:PLOT0,-40,0:GCOL0,3:IFP PLOT0,-8,0:VDU102:PLOT0,-12,-16
 VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
 `
         );
+    });
+    it("should add spaces after tokens with the Conditional flag", () => {
+        assert.strictEqual(detokenise("\xf1\x9f\x841"), "PRINTERR OR1");
+    });
+    it("should add spaces before tokens which follow an identifier", () => {
+        assert.strictEqual(detokenise("\xf1X\x84Y"), "PRINTX ORY");
+    });
+    it("shouldn't expand tokens after DATA", () => {
+        assert.strictEqual(detokenise("\xDCX\x84Y"), "DATAX\u0184Y");
     });
 });
 
@@ -96,5 +105,9 @@ describe("Partial detokenisation", () => {
         const rawProgram =
             '\x0d\x00\x0a\x14 \xf1 "Hello world"\x0d\x00\x0b\x0b \xe5 \x8d\x54\x4a\x40\x0d\xff';
         assert.strictEqual(partialDetokenise(rawProgram), '10 \xf1 "Hello world"\n11 \xe5 10');
+    });
+    it("should not result in invisible Unicode characters", () => {
+        const rawProgram = "\x0d\x00\x0a\x08\xf1\x9f\x841\x0d\xff";
+        assert.strictEqual(partialDetokenise(rawProgram), "\xf1\u019f\u01841");
     });
 });
