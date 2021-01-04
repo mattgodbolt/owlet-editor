@@ -25,7 +25,6 @@ export class OwletEditor {
     constructor(onChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
-        this.emuStatus = $("#emu_status");
         try{
         this.observer = new ResizeObserver(() => this.editor.layout());
         this.observer.observe(editorPane.parent()[0]);
@@ -247,8 +246,6 @@ export class OwletEditor {
             .find(".count")
             .text(`${outputProgram.length} ${format}`)
             .toggleClass("too_long", outputProgram.length > TweetMaximum);
-
-        this.emuStatus.text("BBC Micro Model B | GXR ROM");
     }
 
     selectView(selected) {
