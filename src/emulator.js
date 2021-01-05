@@ -122,10 +122,16 @@ export class Emulator {
     }
 
     async beebjit(tokenised) {
+        function copyRegion(data, startAddr, endAddr){
+          for (let i = startAddr; i <= endAddr; i++) {
+              processor.writemem(i, data.charCodeAt(i));
+          }
+        }
+        
         const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
         const processor = this.cpu;
         const response = await fetch(
-            "https://api.bbcmic.ro/beta?saveAddress=1900&saveLength=6700&basic=" + basic,
+            "https://api.bbcmic.ro/beta?saveAddress=0&saveLength=8000&basic=" + basic,
             {
                 headers: {
                     "x-api-key": "YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa",
@@ -134,10 +140,9 @@ export class Emulator {
         );
         let beebjitData = await response.json();
         let data = window.atob(beebjitData.data);
-        let address = parseInt(beebjitData.address, 16);
-        for (let i = 0; i < data.length; i++) {
-            processor.writemem(address + i, data.charCodeAt(i));
-        }
+        copyRegion(data, 0,      0x8f);
+        copyRegion(data, 0x400,  0x7ff);
+        copyRegion(data, 0x1900, 0x8000);
         this.cpu.cycleSeconds = 60*60*3;
     }
 
