@@ -142,7 +142,7 @@ export class Emulator {
         let data = window.atob(beebjitData.data);
         copyRegion(data, 0,      0x8f);
         copyRegion(data, 0x400,  0x7ff);
-        copyRegion(data, 0x1900, 0x8000);
+        copyRegion(data, 0x1900, 0x7fff);
         this.cpu.cycleSeconds = 60*60*3;
     }
 
