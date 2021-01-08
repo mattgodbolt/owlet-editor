@@ -115,7 +115,7 @@ export class Emulator {
     }
 
     timer() {
-        this.emuStatus.innerHTML = modelName + " | " + this.cpu.cycleSeconds + " s";
+        this.emuStatus.innerHTML = `${modelName} | ${this.cpu.cycleSeconds} s`;
     }
 
     start() {
