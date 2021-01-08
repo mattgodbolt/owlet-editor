@@ -20,7 +20,7 @@
     "html-loader": "^1.3.2",
     "html-webpack-partials-plugin": "^0.7.1",
     "jquery": "^3.5.1",
-    "jsbeeb": "https://github.com/mattgodbolt/jsbeeb.git#78eeeb3299c4640ca709df189c76d7447977258f",
+    "jsbeeb": "https://github.com/mattgodbolt/jsbeeb.git#8935c9a3a095e846f63c0e4a08070f76ad01473e",
     "monaco-editor": "^0.21.2",
     "promise": "^8.1.0",
     "underscore": "^1.11.0",
