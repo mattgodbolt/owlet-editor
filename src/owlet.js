@@ -177,11 +177,9 @@ export class OwletEditor {
 
     setState(state) {
         // Turn invisible characters into equivalent visible ones.
-        /* eslint-disable no-control-regex */
-        let basic = state.program.replace(/[\0-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
+        const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
             return String.fromCharCode(c.charCodeAt(0) | 0x100);
         });
-        /* eslint-enable no-control-regex */
         this.editor.getModel().setValue(basic);
         this.updateProgram();
         this.selectView("screen");

@@ -9,6 +9,7 @@ parserOptions:
 rules:
   no-var: error
   semi: error
+  no-control-regex: off
 overrides:
   - files: "webpack.config.js"
     env:
