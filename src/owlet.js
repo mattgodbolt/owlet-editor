@@ -13,6 +13,7 @@ import {encode} from "base2048";
 import tokenise from "jsbeeb/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
+import ResizeObserver from "resize-observer-polyfill";
 
 const TweetMaximum = 280;
 const StateVersion = 1;
@@ -25,12 +26,8 @@ export class OwletEditor {
     constructor(onChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
-        try {
-            this.observer = new ResizeObserver(() => this.editor.layout());
-            this.observer.observe(editorPane.parent()[0]);
-        } catch (e) {
-            console.log(e);
-        }
+        this.observer = new ResizeObserver(() => this.editor.layout());
+        this.observer.observe(editorPane.parent()[0]);
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
 
