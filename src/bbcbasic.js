@@ -136,6 +136,10 @@ export function registerBbcBasicLanguage() {
                 [/[{}()]/, "@brackets"],
                 [/[a-zA-Z_][\w]*[$%]?/, "variable"],
                 // strings
+                [
+                    /["\u201c\u201d]([^"\u201c\u201d]|["\u201c\u201d]["\u201c\u201d])*$/,
+                    "invalid.string",
+                ],
                 [/["\u201c\u201d]/, {token: "string.quote", next: "@string"}],
                 // Unusual cases. We treat @% as a regular variable (see #28).
                 ["@%", "variable"],

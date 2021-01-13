@@ -258,6 +258,29 @@ describe("Tokenisation", () => {
             ]
         );
     });
+    it("should handle an unterminated string gracefully", () => {
+        checkTokens(
+            ['P."', 'P."TEST', 'P."ESC""APE', 'P."OK"'],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "invalid.string"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "invalid.string"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "invalid.string"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "string.quote"},
+                {offset: 3, type: "string"},
+                {offset: 5, type: "string.quote"},
+            ]
+        );
+    });
     it("should tokenise continuation tokens when appropriate", () => {
         checkTokens(["TIME"], [{offset: 0, type: "keyword"}]);
         checkTokens(
