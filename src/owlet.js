@@ -14,6 +14,7 @@ import tokenise from "jsbeeb/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
 import ResizeObserver from "resize-observer-polyfill";
+import {makeUEF} from "./UEF";
 
 const TweetMaximum = 280;
 const StateVersion = 1;
@@ -321,6 +322,18 @@ export class OwletEditor {
         $("#rocket").removeClass("backgroundAnimated");
     }
 
+    async openCassette() {
+        let tokenized = await this.tokeniser.tokenise(this.getBasicText());
+
+        let uef = btoa(
+            String.fromCharCode.apply(null, makeUEF("TWEET", 0x1900, 0x1900, tokenized))
+        );
+        console.log(uef);
+        uef = uef.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // make URL safe base64
+
+        window.open(`https://bbcmic.ro/tape/index.html?DATA=${uef}`, "_new");
+    }
+
     async initialise(initialState) {
         await this.emulator.initialise();
         this.tokeniser = await tokenise.create();
@@ -349,6 +362,10 @@ export class OwletEditor {
             rocket: () => this.rocket(),
             copy: () => {
                 this.copy();
+                this.closeModal();
+            },
+            cassette: () => {
+                this.openCassette();
                 this.closeModal();
             },
             tweet: () => {
