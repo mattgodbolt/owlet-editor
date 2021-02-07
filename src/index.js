@@ -43,7 +43,7 @@ async function getInitialState(id) {
         return OwletEditor.stateForBasicProgram(result.program);
     }
 
-    // Try decoding state from the localtion hash.
+    // Try decoding state from the location hash.
     const maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
     if (maybeState) {
         consumeHash();
