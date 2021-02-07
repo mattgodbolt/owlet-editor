@@ -296,6 +296,21 @@ describe("Tokenisation", () => {
             ]
         );
     });
+    it("should allow FN and PROC names starting with a digit", () => {
+        checkTokens(
+            ["DEFFN3D PROC1to1:=FN42"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "variable"},
+                {offset: 7, type: "white"},
+                {offset: 8, type: "keyword"},
+                {offset: 12, type: "variable"},
+                {offset: 16, type: "symbol"},
+                {offset: 18, type: "keyword"},
+                {offset: 20, type: "variable"},
+            ]
+        );
+    });
 });
 
 function checkWarnings(text, ...expected) {
