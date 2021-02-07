@@ -106,6 +106,7 @@ export function registerBbcBasicLanguage() {
             root: [
                 [/(\bREM|\xf4)$/, {token: "keyword"}], // A REM on its own line
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
+                [/(FN|PROC|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
@@ -144,6 +145,8 @@ export function registerBbcBasicLanguage() {
                 // Unusual cases. We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
             ],
+            // FN and PROC names can start with a digit.
+            fnProcName: [[/[a-zA-Z0-9_]+/, "variable", "@pop"]],
             whitespace: [[/[ \t\r\n]+/, "white"]],
             string: [
                 [/[^"\u201c\u201d]+/, "string"],
