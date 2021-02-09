@@ -24,7 +24,8 @@ export class AcornDFSdisc {
         this.image.write(0x0100, "BOT\0");
         this.image.write(0x0104, 0, 1); // BCD catalog cycle number
         this.image.write(0x0105, 0, 1); // Number of files << 3
-        this.image.write(0x0106, 0x2003, 2); // Number of sectors in volume 0x0320
+        this.image.write(0x0106, 0b00110000, 1); // *EXEC boot
+        this.image.write(0x0107, 0x2003, 2); // Number of sectors in volume 0x0320
     }
 
     // Save a file to the disc image
