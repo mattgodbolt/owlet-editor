@@ -70,7 +70,7 @@ function getPlugins() {
             filename: isDev ? "[name].css" : "[name].[contenthash].css",
         }),
         new HtmlWebpackPlugin({
-            title: "Owlet Editor",
+            title: "Owlet BBC BASIC Editor",
         }),
         new HtmlWebpackPartialsPlugin([
             {
