@@ -15,6 +15,7 @@ import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
 import ResizeObserver from "resize-observer-polyfill";
 import {makeUEF} from "./UEF";
+import {AcornDFSdisc} from "./DFS";
 
 const TweetMaximum = 280;
 const StateVersion = 1;
@@ -322,6 +323,32 @@ export class OwletEditor {
         $("#rocket").removeClass("backgroundAnimated");
     }
 
+    async downloadDisc() {
+        const program = await this.tokeniser.tokenise(this.getBasicText());
+        let disc = new AcornDFSdisc();
+        disc.save("README", "Created by Owlet https://bbcmic.ro\r", 0x1900, 0x1900);
+        disc.save("TWEET", program, 0x1900, 0x1900);
+
+        downloadBlob(new Blob([disc.image]), "file.ssd");
+
+        function downloadBlob(blob, name) {
+            const blobUrl = window.URL.createObjectURL(blob);
+            // Create a link element and click it
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = name;
+            document.body.appendChild(link);
+            link.dispatchEvent(
+                new MouseEvent("click", {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                })
+            );
+            link.remove();
+        }
+    }
+
     async openCassette() {
         let tokenized = await this.tokeniser.tokenise(this.getBasicText());
 
@@ -366,6 +393,10 @@ export class OwletEditor {
             },
             cassette: () => {
                 this.openCassette();
+                this.closeModal();
+            },
+            disc: () => {
+                this.downloadDisc();
                 this.closeModal();
             },
             tweet: () => {
