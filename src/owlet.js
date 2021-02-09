@@ -324,12 +324,19 @@ export class OwletEditor {
     }
 
     async downloadDisc() {
-        const program = await this.tokeniser.tokenise(this.getBasicText());
         let disc = new AcornDFSdisc();
-        disc.save("README", "Created by Owlet https://bbcmic.ro\r", 0x1900, 0x1900);
-        disc.save("TWEET", program, 0x1900, 0x1900);
+        const program = await this.tokeniser.tokenise(this.getBasicText());
+        const screenDump = [];
 
-        downloadBlob(new Blob([disc.image]), "file.ssd");
+        for (let i = 0x3000; i <= 0x7fff; i++) {
+            screenDump.push(this.emulator.cpu.readmem(i));
+        }
+
+        disc.save("README", "Created by Owlet https://bbcmic.ro\r", 0x0000, 0x0000);
+        disc.save("PROGRAM", program, 0x1900, 0x1900);
+        disc.save("SCREEN", screenDump, 0x3000, 0x0000);
+
+        downloadBlob(new Blob([disc.image]), "owletExport.ssd");
 
         function downloadBlob(blob, name) {
             const blobUrl = window.URL.createObjectURL(blob);
