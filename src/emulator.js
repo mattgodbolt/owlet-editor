@@ -144,8 +144,27 @@ export class Emulator {
         );
         const beebjitData = await response.json();
         const data = window.atob(beebjitData.data);
-        copyRegion(data, 0x1900, 0x7fff);
+        const registers = beebjitData.registers;
+        const flags = registers.F;
+
+        copyRegion(data, 0x0000, 0x7fff);
+
+        this.cpu.pc = registers.PC;
+        this.cpu.a = registers.A;
+        this.cpu.s = registers.S;
+        this.cpu.x = registers.X;
+        this.cpu.y = registers.Y;
+
+        this.cpu.p.n = flags.indexOf("N") !== -1;
+        this.cpu.p.v = flags.indexOf("V") !== -1;
+        this.cpu.p.d = flags.indexOf("D") !== -1;
+        this.cpu.p.i = flags.indexOf("I") !== -1;
+        this.cpu.p.z = flags.indexOf("Z") !== -1;
+        this.cpu.p.c = flags.indexOf("C") !== -1;
+
         this.cpu.cycleSeconds = 60 * 60 * 3;
+
+        console.log(registers);
     }
 
     async runProgram(tokenised) {

@@ -317,6 +317,7 @@ export class OwletEditor {
     }
 
     async rocket() {
+        this.updateProgram();
         $("#rocket").addClass("backgroundAnimated");
         const program = await this.tokeniser.tokenise(this.getBasicText());
         await this.emulator.beebjit(program);
