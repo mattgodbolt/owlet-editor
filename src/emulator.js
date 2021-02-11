@@ -162,8 +162,11 @@ export class Emulator {
         this.cpu.p.z = flags.indexOf("Z") !== -1;
         this.cpu.p.c = flags.indexOf("C") !== -1;
 
+        this.video.crtc.write(15, beebjitData.crtc[15]); // Cursor
+
         this.cpu.cycleSeconds = 60 * 60 * 3;
 
+        console.log(beebjitData.crtc);
         console.log(registers);
     }
 
