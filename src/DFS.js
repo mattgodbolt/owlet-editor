@@ -30,16 +30,20 @@ export class AcornDFSdisc {
 
     // Save a file to the disc image
     save(name, fileData, loadAdd, execAdd) {
-        let offset = 8 + this.files * 8;
+        // Shift existing catalog up 8 bytes to make room for new entry
+        let catalogS0 = this.image.slice(0x008, 0x008 + 8 * 30);
+        let catalogS1 = this.image.slice(0x108, 0x108 + 8 * 30);
+        this.image.write(0x010, catalogS0);
+        this.image.write(0x110, catalogS1);
 
-        // Add catalog entry
-        this.image.write(offset + 0x0000, "       $");
-        this.image.write(offset + 0x0000, name);
-        this.image.write(offset + 0x0100, loadAdd, 2); // Load address
-        this.image.write(offset + 0x0102, execAdd, 2); // Exec address
-        this.image.write(offset + 0x0104, fileData.length, 2); // Length
-        this.image.write(offset + 0x0106, 0, 1); // Top bits TODO
-        this.image.write(offset + 0x0107, this.nextSector, 1); // Start sector
+        // Insert latest catalog entry at the beginning
+        this.image.write(0x0008, "       $");
+        this.image.write(0x0008, name);
+        this.image.write(0x0108, loadAdd, 2); // Load address
+        this.image.write(0x010a, execAdd, 2); // Exec address
+        this.image.write(0x010c, fileData.length, 2); // Length
+        this.image.write(0x010e, 0, 1); // Top bits TODO
+        this.image.write(0x010f, this.nextSector, 1); // Start sector
 
         // Write data
         this.image.write(this.nextSector * 0x100, fileData); // Write file data
