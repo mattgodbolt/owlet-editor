@@ -12,7 +12,7 @@ function programUrl(id) {
 
 function updateUiForProgram(id, json) {
     $("#like")
-        .html(`<span class="heart">♥</span>code originally posted by @${json.author} on Twitter`)
+        .html(`<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`)
         .attr("href", `https://twitter.com/intent/like?tweet_id=${id}`);
 }
 
@@ -47,6 +47,7 @@ async function getInitialState(id) {
     const maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
     if (maybeState) {
         consumeHash();
+        if (maybeState.id) updateUiForProgram(maybeState.id, maybeState);
         return maybeState;
     }
 
@@ -88,7 +89,6 @@ async function initialise() {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         if (state) {
             owletEditor.setState(state);
-            if (state.id) updateUiForProgram(state.id, state);
             consumeHash();
         }
     };
