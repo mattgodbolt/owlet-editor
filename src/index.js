@@ -88,6 +88,7 @@ async function initialise() {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         if (state) {
             owletEditor.setState(state);
+            if (state.id) updateUiForProgram(state.id, state);
             consumeHash();
         }
     };
