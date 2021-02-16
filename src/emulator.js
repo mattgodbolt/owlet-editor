@@ -132,6 +132,12 @@ export class Emulator {
             }
         }
 
+        function myCounter() {
+            this.cpu.cycleSeconds = this.cpu.cycleSeconds + 21;
+            this.timer();
+        }
+
+        const counterInterval = setInterval(myCounter.bind(this), 10);
         const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
         const processor = this.cpu;
         const response = await fetch(
@@ -164,7 +170,9 @@ export class Emulator {
 
         this.video.crtc.write(15, beebjitData.crtc[15]); // Cursor
 
+        clearInterval(counterInterval);
         this.cpu.cycleSeconds = 60 * 60 * 3;
+        this.timer();
 
         console.log(beebjitData.crtc);
         console.log(registers);
