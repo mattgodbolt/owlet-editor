@@ -288,6 +288,7 @@ function detokeniseInternal(text, handler) {
                 const lowBits = lineNumberBuffer[1] ^ (topBits & 0xc0);
                 const highBits = lineNumberBuffer[2] ^ ((topBits << 2) & 0xc0);
                 handler.onLineNumber((highBits << 8) | lowBits);
+                lineNumberBuffer = null;
             }
             continue;
         }
