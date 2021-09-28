@@ -273,7 +273,7 @@ function detokeniseInternal(text, handler) {
             continue;
         }
         if (charCode === Chars.Quote) withinString = !withinString;
-        if (charCode === Chars.LineNumberToken) {
+        if (!withinString && charCode === Chars.LineNumberToken) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];
