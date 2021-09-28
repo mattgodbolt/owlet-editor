@@ -141,9 +141,7 @@ module.exports = {
         rules: [
             {
                 test: /\.(jpg|png)$/,
-                use: {
-                    loader: "url-loader",
-                },
+                type: 'asset/inline'
             },
             {
                 test: /\.less$/,
@@ -176,7 +174,7 @@ module.exports = {
             },
             {
                 test: /\.ttf$/,
-                use: ["file-loader"],
+                type: 'asset/resource'
             },
             {
                 test: /\.(html)$/,
