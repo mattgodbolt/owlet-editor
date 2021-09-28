@@ -3,7 +3,6 @@ const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-const webpack = require("webpack");
 const OptimizeCssAssetsPlugin = require("optimize-css-assets-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const {CleanWebpackPlugin} = require("clean-webpack-plugin");
@@ -81,7 +80,7 @@ function getPlugins() {
         ]),
         new FaviconsWebpackPlugin({
             logo: "./assets/images/owlet.png",
-            prefix: "assets/images",
+            prefix: "assets/images/",
             favicons: {
                 icons: {
                     appleIcon: false,
@@ -90,9 +89,6 @@ function getPlugins() {
             },
         }),
     ];
-    if (isDev) {
-        plugins.push(new webpack.HotModuleReplacementPlugin());
-    }
     if (isTest) {
         plugins.push(
             new CopyPlugin({
@@ -132,8 +128,11 @@ module.exports = {
     devtool: "source-map",
     plugins: getPlugins(),
     devServer: {
-        publicPath: "/",
-        contentBase: "./",
+        hot: isDev,
+        static: {
+            publicPath: "/",
+            directory: "./",
+        },
     },
     optimization: getOptimizationSettings(),
     module: {
