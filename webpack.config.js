@@ -9,6 +9,7 @@ const {CleanWebpackPlugin} = require("clean-webpack-plugin");
 const FaviconsWebpackPlugin = require("favicons-webpack-plugin");
 const glob = require("glob");
 const HtmlWebpackPartialsPlugin = require("html-webpack-partials-plugin");
+const nodeExternals = require("webpack-node-externals");
 
 const isDev = process.env.NODE_ENV !== "production";
 const isTest = process.env.TESTBUILD !== undefined;
@@ -114,6 +115,7 @@ module.exports = {
     mode: isDev ? "development" : "production",
     entry: entry,
     target: isTest ? "node" : "web",
+    externals: isTest ? [nodeExternals()] : [],
     output: {
         filename: isDev ? "[name].js" : `[name].[contenthash].js`,
         path: outputPath,
