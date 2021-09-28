@@ -110,4 +110,13 @@ describe("Partial detokenisation", () => {
         const rawProgram = "\x0d\x00\x0a\x08\xf1\x9f\x841\x0d\xff";
         assert.strictEqual(partialDetokenise(rawProgram), "\xf1\u019f\u01841");
     });
+    it("should reset state after a line number token", () => {
+        const rawProgram =
+            "\x0d\x00\x0a\x13\xe4\x8d\x54\x4a\x40:\xe5\x8d\x54\x54\x40:\xf4OK\x0d\xff";
+        assert.strictEqual(partialDetokenise(rawProgram), "\xe410:\xe520:\xf4OK");
+    });
+    it("should not expand line number token in literal string", () => {
+        const rawProgram = '\x0d\x00\x0a\x13\xf1"\x8dHello":\xe5\x8d\x54\x4a\x40\x0d\xff';
+        assert.strictEqual(partialDetokenise(rawProgram), '\xf1"\u018dHello":\xe510');
+    });
 });
