@@ -114,6 +114,8 @@ module.exports = {
     mode: isDev ? "development" : "production",
     entry: entry,
     target: isTest ? "node" : "web",
+    // In test, work around the fact bufferutil and utf-8-validate don't really exist
+    externals: isTest ? ["bufferutil", "utf-8-validate"] : [],
     output: {
         filename: isDev ? "[name].js" : `[name].[contenthash].js`,
         path: outputPath,
@@ -139,9 +141,7 @@ module.exports = {
         rules: [
             {
                 test: /\.(jpg|png)$/,
-                use: {
-                    loader: "url-loader",
-                },
+                type: 'asset/inline'
             },
             {
                 test: /\.less$/,
@@ -174,7 +174,7 @@ module.exports = {
             },
             {
                 test: /\.ttf$/,
-                use: ["file-loader"],
+                type: 'asset/resource'
             },
             {
                 test: /\.(html)$/,
