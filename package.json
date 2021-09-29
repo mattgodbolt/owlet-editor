@@ -14,7 +14,7 @@
   },
   "version": "0.0.1",
   "dependencies": {
-    "base2048": "^1.0.4",
+    "base2048": "^2.0.1",
     "glob": "^7.2.0",
     "html-webpack-partials-plugin": "^0.8.0",
     "jquery": "^3.6.0",
