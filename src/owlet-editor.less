@@ -318,7 +318,7 @@ input {
     height: 90vh;
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: 80px 32px 80vw 32px 32px 16px minmax(320px, 90vh) 24px 50vh;
+    grid-template-rows: 80px 32px 80vw 32px 32px minmax(320px, 90vh) 32px 50vh;
   }
 
   .header {
@@ -342,14 +342,14 @@ input {
     color: #eee;
     padding: 8px 4px 4px 16px;
     grid-column: 1;
-    grid-row: 4;
+    grid-row: 5;
     background-color: #111; //var(--color-editor-bg);
     border: 0;
   }
 
   .code-editor {
     grid-column: 1;
-    grid-row: 7;
+    grid-row: 6;
   }
 
   .too_long {
@@ -367,21 +367,25 @@ input {
   #emu_footer {
 
     grid-column: 1;
-    grid-row:5;
+    grid-row:4;
 }
 
 #editor_footer {
   grid-column: 1;
-  grid-row:8;
+  grid-row:7;
 }
 
 #mobile {
   grid-column: 1;
-  grid-row:9;
+  grid-row:8;
   padding: 24px 4px 4px 16px;
   display: block;
   justify-content: center;
   align-content: center;
+}
+
+#jsbeeb_button{
+  display:none;
 }
 
 
