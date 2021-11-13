@@ -84,7 +84,7 @@ body {
   align-content: center;
 }
 
-.footer {
+#emu_footer,#editor_footer {
   display: flex;
   align-items: center;
   grid-column: span 1;
@@ -316,7 +316,7 @@ input {
     height: 90vh;
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: 80px 24px 80vw 32px  32px minmax(320px, 90vh) 24px 32px;
+    grid-template-rows: 80px 32px 80vw 32px 32px 16px minmax(320px, 90vh) 24px 32px;
   }
 
   .header {
@@ -333,8 +333,7 @@ input {
   }
 
   #editor_toolbar {
-    grid-column: 1;
-      grid-row: 3;
+    display:none
   }
 
   .kudos {
@@ -348,7 +347,7 @@ input {
 
   .code-editor {
     grid-column: 1;
-    grid-row: 6;
+    grid-row: 7;
   }
 
   .too_long {
@@ -372,6 +371,6 @@ input {
 #editor_footer {
 
   grid-column: 1;
-  grid-row:7;
+  grid-row:8;
 }
 }
