@@ -306,3 +306,72 @@ input {
   text-decoration: none;
   cursor: pointer;
 }
+
+
+
+
+
+@media (orientation: portrait) {
+  .top-level-wrapper {
+    height: 90vh;
+    display: grid;
+    grid-template-columns: 100%;
+    grid-template-rows: 80px 24px 80vw 32px  32px minmax(320px, 90vh) 24px 32px;
+  }
+
+  .header {
+    grid-column: 1 / span 1;
+    background-image: url("../assets/images/logo.png");
+    background-repeat: no-repeat;
+    background-position: left 10px top 10px;
+    background-size: auto 64px;
+  }
+
+  #emu_toolbar {
+    grid-column: 1;
+      grid-row: 2;
+  }
+
+  #editor_toolbar {
+    grid-column: 1;
+      grid-row: 3;
+  }
+
+  .kudos {
+    color: #eee;
+    padding: 8px 4px 4px 16px;
+    grid-column: 1;
+    grid-row: 4;
+    background-color: #111; //var(--color-editor-bg);
+    border: 0;
+  }
+
+  .code-editor {
+    grid-column: 1;
+    grid-row: 6;
+  }
+
+  .too_long {
+    color: Tomato;
+  }
+
+  .emulator {
+    background: var(--color-editor-bg);
+    justify-content: center;
+    align-content: center;
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  #emu_footer {
+
+    grid-column: 1;
+    grid-row:5;
+}
+
+#editor_footer {
+
+  grid-column: 1;
+  grid-row:7;
+}
+}
