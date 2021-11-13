@@ -307,7 +307,9 @@ input {
   cursor: pointer;
 }
 
-
+#mobile {
+  display:none
+}
 
 
 
@@ -316,7 +318,7 @@ input {
     height: 90vh;
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: 80px 32px 80vw 32px 32px 16px minmax(320px, 90vh) 24px 32px;
+    grid-template-rows: 80px 32px 80vw 32px 32px 16px minmax(320px, 90vh) 24px 50vh;
   }
 
   .header {
@@ -369,8 +371,18 @@ input {
 }
 
 #editor_footer {
-
   grid-column: 1;
   grid-row:8;
 }
+
+#mobile {
+  grid-column: 1;
+  grid-row:9;
+  padding: 24px 4px 4px 16px;
+  display: block;
+  justify-content: center;
+  align-content: center;
+}
+
+
 }
