@@ -19,6 +19,7 @@ const MaxCyclesPerFrame = ClocksPerSecond / 10;
 const urlParams = new URLSearchParams(window.location.search);
 
 let modelName = "BBC Micro Model B";
+let beebjit_incoming = false;
 const Model = models.findModel("B");
 
 if (!urlParams.get("experimental")) {
@@ -112,7 +113,10 @@ export class Emulator {
     }
 
     timer() {
+
+        if (!beebjit_incoming) {
         this.emuStatus.innerHTML = `${modelName} | ${this.cpu.cycleSeconds} s`;
+      }
     }
 
     start() {
@@ -126,6 +130,7 @@ export class Emulator {
     }
 
     async beebjit(tokenised) {
+      beebjit_incoming = true
         function copyRegion(data, startAddr, endAddr) {
             for (let i = startAddr; i <= endAddr; i++) {
                 processor.writemem(i, data.charCodeAt(i));
@@ -133,11 +138,11 @@ export class Emulator {
         }
 
         function myCounter() {
-            this.cpu.cycleSeconds = this.cpu.cycleSeconds + 21;
-            this.timer();
+          this.emuStatus.innerHTML +="."
+          if (this.emuStatus.innerHTML.length>18) this.emuStatus.innerHTML = "Calling beebjit"
         }
-
-        const counterInterval = setInterval(myCounter.bind(this), 10);
+        this.emuStatus.innerHTML = "Calling beebjit"
+        const counterInterval = setInterval(myCounter.bind(this), 200);
         const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
         const processor = this.cpu;
         const response = await fetch(
@@ -148,6 +153,7 @@ export class Emulator {
                 },
             }
         );
+        beebjit_incoming = false
         const beebjitData = await response.json();
         const data = window.atob(beebjitData.data);
         const registers = beebjitData.registers;
