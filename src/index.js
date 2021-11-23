@@ -2,6 +2,7 @@ import $ from "jquery";
 import {registerBbcBasicLanguage} from "./bbcbasic";
 import rootHtml from "./root.html";
 import {OwletEditor} from "./owlet";
+import {backwardCompat} from "./tokens";
 
 const LastProgramKey = "program";
 
@@ -44,9 +45,10 @@ async function getInitialState(id) {
     }
 
     // Try decoding state from the location hash.
-    const maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
+    let maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
     if (maybeState) {
-        consumeHash();
+        consumeHash();     
+        if (maybeState.date<1637645735) {maybeState.program = backwardCompat(maybeState.program)}
         if (maybeState.id) updateUiForProgram(maybeState.id, maybeState);
         return maybeState;
     }
