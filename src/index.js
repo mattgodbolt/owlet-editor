@@ -47,8 +47,8 @@ async function getInitialState(id) {
     // Try decoding state from the location hash.
     let maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
     if (maybeState) {
-        consumeHash();     
-        if (maybeState.date<1637645735) {maybeState.program = backwardCompat(maybeState.program)}
+        consumeHash();
+        if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program)}
         if (maybeState.id) updateUiForProgram(maybeState.id, maybeState);
         return maybeState;
     }
