@@ -159,7 +159,7 @@ export function registerBbcBasicLanguage() {
                     "keyword",
                 ],
                 [/OPT|EQU[BDSW]/, "keyword.directive"],
-                [/[;\\][^:]*/, "comment"],
+                [/\\[^:]*/, "comment"],
                 [/,\s*[XY]/, "keyword"],
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
