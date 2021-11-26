@@ -57,6 +57,24 @@ VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
     it("shouldn't expand tokens after DATA", () => {
         assert.strictEqual(detokenise("\xDCX\x84Y"), "DATAX\u0184Y");
     });
+    it("shouldn't expand tokens after untokenised DATA", () => {
+        assert.strictEqual(detokenise("DATAX\x84Y"), "DATAX\u0184Y");
+    });
+    it("shouldn't expand tokens after DAT.", () => {
+        assert.strictEqual(detokenise("DAT.X\x84Y"), "DAT.X\u0184Y");
+    });
+    it("shouldn't expand tokens after DA.", () => {
+        assert.strictEqual(detokenise("DA.X\x84Y"), "DA.X\u0184Y");
+    });
+    it("shouldn't expand tokens after D.", () => {
+        assert.strictEqual(detokenise("D.X\x84Y"), "D.X\u0184Y");
+    });
+    it("shouldn't expand tokens after REM", () => {
+        assert.strictEqual(detokenise("\xf4X\x84Y"), "REMX\u0184Y");
+    });
+    it("shouldn't expand tokens after untokenised REM", () => {
+        assert.strictEqual(detokenise("REMX\x84Y"), "REMX\u0184Y");
+    });
 });
 
 describe("Debbreviation", () => {

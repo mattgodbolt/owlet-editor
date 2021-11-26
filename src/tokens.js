@@ -243,7 +243,7 @@ class StringHandler {
 
 function detokeniseInternal(text, handler) {
     let withinString = false;
-    let inIdentifier = false;
+    let identifier = undefined;
     let leaveRestOfLine = false;
     let afterConditionalToken = false;
     let lineNumberBuffer = null;
@@ -253,7 +253,7 @@ function detokeniseInternal(text, handler) {
         if (charCode === 10) {
             // Newline.
             withinString = false;
-            inIdentifier = false;
+            identifier = undefined;
             leaveRestOfLine = false;
         }
         if (afterConditionalToken) {
@@ -277,7 +277,7 @@ function detokeniseInternal(text, handler) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];
-            inIdentifier = false;
+            identifier = undefined;
             continue;
         }
         if (lineNumberBuffer !== null) {
@@ -297,9 +297,9 @@ function detokeniseInternal(text, handler) {
                 handler.onCharCode(charCode);
                 continue;
             }
-            if (inIdentifier) {
+            if (identifier !== undefined) {
                 handler.onSpace();
-                inIdentifier = false;
+                identifier = undefined;
             }
             handler.onToken(charCode);
             let tokenFlags = flags[charCode - Chars.FirstToken];
@@ -313,15 +313,28 @@ function detokeniseInternal(text, handler) {
                 leaveRestOfLine = true;
             }
         } else if ((charCode < 32 && charCode !== 10) || charCode === 127) {
-            inIdentifier = false;
+            identifier = undefined;
             handler.onCharCode(charCode);
         } else {
+            if (identifier === 'REM' ||
+                identifier === 'DATA' ||
+                (ch == '.' && 'DAT'.startsWith(identifier))) {
+                // Untokenised REM or DATA or abbreviated DATA.
+                leaveRestOfLine = true;
+            }
             handler.onCharacter(ch);
-            inIdentifier =
-                (ch >= "A" && ch <= "Z") ||
+            if ((ch >= "A" && ch <= "Z") ||
                 (ch >= "a" && ch <= "z") ||
                 ch == "_" ||
-                (inIdentifier && ch >= "0" && ch <= "9");
+                (identifier !== undefined && ch >= "0" && ch <= "9")) {
+                if (identifier === undefined) {
+                    identifier = ch;
+                } else {
+                    identifier += ch;
+                }
+            } else {
+                identifier = undefined;
+            }
         }
     }
 }
