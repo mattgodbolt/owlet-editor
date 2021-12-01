@@ -390,7 +390,7 @@ export class OwletEditor {
 
             jsbeeb: () =>
                 window.open(
-                    `https://bbc.godbolt.org/?embedBasic=${encodeURIComponent(
+                    `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
                         this.getBasicText()
                     )}&rom=gxr.rom`,
                     "_blank"
