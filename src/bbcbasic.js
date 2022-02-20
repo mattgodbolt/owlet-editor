@@ -1,5 +1,5 @@
 import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
-import {Flags, keywords} from "./tokens";
+import {Flags, keywords, immediateCommands} from "./tokens";
 
 function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(").replace(".", "\\.");
@@ -254,9 +254,12 @@ export function getWarnings(lineNum, line, lineTokens) {
     for (const token of lineTokens.filter(token => token.type === "variable.BBCBASIC")) {
         const match = line.substr(token.offset).match(LowerCaseTokenRegex);
         if (match) {
+            const upper = match[0].toUpperCase();
+            // Don't warn about lower case versions of immediate commands, e.g. `new`.
+            if (immediateCommands.indexOf(upper) !== -1) continue;
             warnings.push({
                 severity: MarkerSeverity.Warning,
-                message: `BASIC keywords should be upper case, did you mean ${match[0].toUpperCase()}?`,
+                message: `BASIC keywords should be upper case, did you mean ${upper}?`,
                 startLineNumber: lineNum,
                 startColumn: token.offset + 1,
                 endLineNumber: lineNum,

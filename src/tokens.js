@@ -162,6 +162,16 @@ export const flags = (() => {
     return result;
 })();
 
+export const immediateCommands = (() => {
+    const result = new Array(0xcd - 0xc6 + 1).fill(null);
+    for (const keyword of keywords) {
+        if (keyword.token >= 0xc6 && keyword.token <= 0xcd) {
+            result[keyword.token - 0xc6] = keyword.keyword;
+        }
+    }
+    return result;
+})();
+
 export const Flags = {
     Conditional: 0x01,
     Middle: 0x02,
