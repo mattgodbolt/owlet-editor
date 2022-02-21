@@ -401,4 +401,8 @@ describe("Line warnings", () => {
             endColumn: 8,
         });
     });
+    it("should not generate case warnings for variables matching immediate commands", () => {
+        checkWarnings("old=new");
+        checkWarnings("auto=delete+load/list+renumber*save");
+    });
 });
