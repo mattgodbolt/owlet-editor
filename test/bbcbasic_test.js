@@ -203,6 +203,32 @@ describe("Tokenisation", () => {
                 {offset: 6, type: "variable"},
             ]
         );
+        checkTokens(
+            ["[ROR 80\\comment:ROR80\\comment:]P."],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "keyword"},
+                {offset: 4, type: "white"},
+                {offset: 5, type: "number"},
+                {offset: 7, type: "comment"},
+                {offset: 15, type: "symbol"},
+                {offset: 16, type: "keyword"},
+                {offset: 19, type: "number"},
+                {offset: 21, type: "comment"},
+                {offset: 29, type: "symbol"},
+                {offset: 30, type: "delimiter.square"},
+                {offset: 31, type: "keyword"},
+            ]
+        );
+        // Regression test - `;` was incorrectly treated as a comment.
+        checkTokens(
+            ["[;notacomment"],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "variable"},
+            ]
+        );
     });
     it("should notice REM statements", () => {
         checkTokens(
