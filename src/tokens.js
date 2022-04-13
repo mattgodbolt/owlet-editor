@@ -211,6 +211,16 @@ export function debbreviate(text) {
         if (charCode === Chars.Quote) withinString = !withinString;
         if (isUpperCase(charCode) && !withinString) {
             buffer += String.fromCodePoint(charCode);
+            // Scan for complete unabbreviated keyword so we handle an
+            // abbreviated keyword after a non-abbreviated keyword correctly
+            // e.g. IFCOU.
+            for (const keyword of keywords) {
+                if (keyword.keyword === buffer && !(keyword.flags & Flags.Conditional)) {
+                    output += buffer;
+                    buffer = "";
+                    break;
+                }
+            }
         } else {
             output +=
                 charCode === Chars.Dot && !withinString && buffer !== ""

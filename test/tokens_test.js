@@ -87,6 +87,12 @@ describe("Debbreviation", () => {
     it("should handle simple cases", () => {
         assert.strictEqual(debbreviate("P."), "PRINT");
     });
+    it("should expand abbreviation after full token", () => {
+        assert.strictEqual(debbreviate("IFCOU."), "IFCOUNT");
+    });
+    it("should not expand abbreviation after conditional token", () => {
+        assert.strictEqual(debbreviate("PIP=1:P.PIP."), "PIP=1:PRINTPIP.");
+    });
 });
 
 describe("For each basic line", () => {
