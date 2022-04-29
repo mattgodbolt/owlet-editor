@@ -380,6 +380,7 @@ export class OwletEditor {
                 this.emulator.pause();
                 this.selectView("screen");
             },
+            new: () => this.updateEditorText("", "new"),
             tokenise: () => this.tokenise(),
             expand: () => this.expandCode(),
             share: () => this.share(),
