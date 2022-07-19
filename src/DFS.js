@@ -42,7 +42,15 @@ export class AcornDFSdisc {
         this.image.write(0x0108, loadAdd, 2); // Load address
         this.image.write(0x010a, execAdd, 2); // Exec address
         this.image.write(0x010c, fileData.length, 2); // Length
-        this.image.write(0x010e, 0, 1); // Top bits TODO
+
+        console.log(`execAdd=`);
+        let extra = 0;
+        extra |= (((execAdd & 0xffff0000) == (0xffff0000 | 0)) ? 3 : 0) << 6;
+        extra |= ((fileData.length >> 16) & 3) << 4;
+        extra |= (((loadAdd & 0xffff0000) == (0xffff0000 | 0)) ? 3 : 0) << 2;
+        extra |= ((this.nextSector >> 8) & 3) << 0;
+        this.image.write(0x010e, extra, 1);
+
         this.image.write(0x010f, this.nextSector, 1); // Start sector
 
         // Write data
