@@ -130,6 +130,9 @@ export class Emulator {
     }
 
     async beebjit(tokenised) {
+      //this.pause();
+
+
       beebjit_incoming = true
         function copyRegion(data, startAddr, endAddr) {
             for (let i = startAddr; i <= endAddr; i++) {
@@ -174,14 +177,18 @@ export class Emulator {
         this.cpu.p.z = flags.indexOf("Z") !== -1;
         this.cpu.p.c = flags.indexOf("C") !== -1;
 
-        this.video.crtc.write(15, beebjitData.crtc[15]); // Cursor
+        for (let r=0;r<17;r++){
+            processor.writemem(0xfe00, r);
+            processor.writemem(0xfe01, beebjitData.crtc[r]);
+        }
 
+
+        this.start();
         clearInterval(counterInterval);
         this.cpu.cycleSeconds = 60 * 60 * 3;
         this.timer();
 
-        console.log(beebjitData.crtc);
-        console.log(registers);
+        console.log(beebjitData.ula,beebjitData.crtc,beebjitData.registers);
     }
 
     async runProgram(tokenised) {
