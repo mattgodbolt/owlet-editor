@@ -130,7 +130,7 @@ export class Emulator {
     }
 
     async beebjit(tokenised) {
-      //this.pause();
+      this.pause();
 
 
       beebjit_incoming = true
@@ -177,9 +177,19 @@ export class Emulator {
         this.cpu.p.z = flags.indexOf("Z") !== -1;
         this.cpu.p.c = flags.indexOf("C") !== -1;
 
+        // write CRTC registers
         for (let r=0;r<17;r++){
             processor.writemem(0xfe00, r);
             processor.writemem(0xfe01, beebjitData.crtc[r]);
+        }
+
+        // write ULA control reg
+        processor.writemem(0xfe20, beebjitData.ulaControl);
+        console.log(beebjitData.ulaPalette)
+
+        // write ULA Palette - see https://beebwiki.mdfs.net/Video_ULA
+        for (let p=0;p<16;p++){
+            processor.writemem(0xfe21, p<<4 | (~beebjitData.ulaPalette[p] & 0b00000111) | (beebjitData.ulaPalette[p] & 0b00001000));
         }
 
 
@@ -188,7 +198,7 @@ export class Emulator {
         this.cpu.cycleSeconds = 60 * 60 * 3;
         this.timer();
 
-        console.log(beebjitData.ula,beebjitData.crtc,beebjitData.registers);
+        console.log(beebjitData.ulaControl,beebjitData.crtc,beebjitData.registers);
     }
 
     async runProgram(tokenised) {
@@ -209,7 +219,7 @@ export class Emulator {
         processor.writemem(0x12, endLow);
         processor.writemem(0x13, endHigh);
         this.writeToKeyboardBuffer("RUN\r");
-        this.start();
+        //this.start();
     }
 
     writeToKeyboardBuffer(text) {
