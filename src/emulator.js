@@ -157,8 +157,8 @@ export class Emulator {
         );
         beebjit_incoming = false
         const beebjitData = await response.json();
-        const data = window.atob(beebjitData.data);
-        const registers = beebjitData.registers;
+        const data = window.atob(beebjitData.RAM);
+        const registers = beebjitData.CPU6502;
         const flags = registers.F;
 
         copyRegion(data, 0x0000, 0x7fff);
@@ -179,25 +179,22 @@ export class Emulator {
         // write CRTC registers
         for (let r=0;r<17;r++){
             processor.writemem(0xfe00, r);
-            processor.writemem(0xfe01, beebjitData.crtc[r]);
+            processor.writemem(0xfe01, beebjitData.CRTC[r]);
         }
 
         // write ULA control reg
-        processor.writemem(0xfe20, beebjitData.ulaControl);
-        console.log(beebjitData.ulaPalette)
+        processor.writemem(0xfe20, beebjitData.ULAcontrol);
 
         // write ULA Palette - see https://beebwiki.mdfs.net/Video_ULA
         for (let p=0;p<16;p++){
-            processor.writemem(0xfe21, p<<4 | (~beebjitData.ulaPalette[p] & 0b00000111) | (beebjitData.ulaPalette[p] & 0b00001000));
+            processor.writemem(0xfe21, p<<4 | (~beebjitData.ULApalette[p] & 0b00000111) | (beebjitData.ULApalette[p] & 0b00001000));
         }
 
-
+        console.log(beebjitData)
         this.start();
         clearInterval(counterInterval);
         this.cpu.cycleSeconds = 60 * 60 * 3;
         this.timer();
-
-        console.log(beebjitData.ulaControl,beebjitData.crtc,beebjitData.registers);
     }
 
     async runProgram(tokenised) {
