@@ -132,7 +132,6 @@ export class Emulator {
     async beebjit(tokenised) {
       this.pause();
 
-
       beebjit_incoming = true
         function copyRegion(data, startAddr, endAddr) {
             for (let i = startAddr; i <= endAddr; i++) {
@@ -219,7 +218,7 @@ export class Emulator {
         processor.writemem(0x12, endLow);
         processor.writemem(0x13, endHigh);
         this.writeToKeyboardBuffer("RUN\r");
-        //this.start();
+        this.start();
     }
 
     writeToKeyboardBuffer(text) {
