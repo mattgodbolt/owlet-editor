@@ -211,6 +211,16 @@ export function debbreviate(text) {
         if (charCode === Chars.Quote) withinString = !withinString;
         if (isUpperCase(charCode) && !withinString) {
             buffer += String.fromCodePoint(charCode);
+            // Scan for complete unabbreviated keyword so we handle an
+            // abbreviated keyword after a non-abbreviated keyword correctly
+            // e.g. IFCOU.
+            for (const keyword of keywords) {
+                if (keyword.keyword === buffer && !(keyword.flags & Flags.Conditional)) {
+                    output += buffer;
+                    buffer = "";
+                    break;
+                }
+            }
         } else {
             output +=
                 charCode === Chars.Dot && !withinString && buffer !== ""
@@ -415,7 +425,7 @@ function decode2048(input) {
 }
 
 
-// Compatibilty with pre-tokenizer keyboard buffer method
+// Compatibility with pre-tokenizer keyboard buffer method
 // See https://twitter.com/bbcmicrobot/status/1329217276860538881?s=20
 export function backwardCompat(text) {
     let output = "";
