@@ -58,6 +58,7 @@
     </div>
     <div class="footer" id="emu_footer">
         <button class="bottom" data-action="jsbeeb" id="jsbeeb_button" title="Load the current code into a full emulator">VirtualBeeb</button>
+        <button class="save" data-action="save" title="Save memory from the emulator">save</button>
         <button data-action="rocket" id="rocket" title="send to beebjit">🚀</button>
         <div id="emu_status"></div>
     </div>
@@ -94,6 +95,19 @@
         <button data-action="cassette">Tape</button>
         <button data-action="disc">Disc</button>
         <button class="tweet" data-action="tweet">Tweet code</button>
+        <button data-action="closeModal">Cancel</button>
+    </div>
+
+</div>
+
+<!-- Modal Save Pop-Up-->
+<div class="modal" id="save">
+    <div class="modal-content">
+        <p><b>Save memory from the emulator (to clipboard)</b></p>
+        <p id="save-content">Start address and length (default is BASIC program).</p>
+        <input id="saveStartAddr" type="text" value="">
+        <input id="saveLen" type="text" value="">
+        <button data-action="copyMem">Copy</button>
         <button data-action="closeModal">Cancel</button>
     </div>
 

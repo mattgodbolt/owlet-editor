@@ -283,6 +283,17 @@ export class OwletEditor {
         copyText.value = `${location.origin}/#${this.toStateString(this.getBasicText())}`;
     }
 
+    save() {
+        const saveModal = document.getElementById("save");
+        const saveStartAddr = document.getElementById("saveStartAddr");
+        const saveLen = document.getElementById("saveLen");
+        saveModal.style.display = "block";
+        const PAGE = this.emulator.readmem(0x18) << 8;
+        const TOP = this.emulator.readmem(0x13) << 8 | this.emulator.readmem(0x12);
+        saveStartAddr.value = PAGE;
+        saveLen.value = TOP - PAGE;
+    }
+
     expandCode() {
         this.updateEditorText(expandCode(this.getBasicText()), "expand code");
     }
@@ -305,7 +316,9 @@ export class OwletEditor {
 
     closeModal() {
         const modal = document.getElementById("share");
+        const modal2 = document.getElementById("save");
         modal.style.display = "none";
+        modal2.style.display = "none";
     }
 
     codeToTweet() {
@@ -384,6 +397,7 @@ export class OwletEditor {
             tokenise: () => this.tokenise(),
             expand: () => this.expandCode(),
             share: () => this.share(),
+            save: () => this.save(),
 
             emulator: () => this.selectView("screen"),
             examples: () => this.selectView("examples"),
@@ -414,6 +428,26 @@ export class OwletEditor {
                     `https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`,
                     "_new"
                 );
+                this.closeModal();
+            },
+            copyMem: () => {
+                let data = '';
+                const saveStartAddr = document.getElementById("saveStartAddr");
+                const saveLen = document.getElementById("saveLen");
+                let addr = saveStartAddr.value;
+                let len = saveLen.value;
+                while (len--) {
+                    var b = this.emulator.readmem(addr++);
+                    if (b < 32 || (b >= 127 && b < 161)) {
+                        if (b == 10 || b == 13) alert("problematic byte value " + b);
+                        b += 0x100;
+                    }
+                    data += String.fromCodePoint(b);
+                }
+                saveLen.value = data;
+                saveLen.select();
+                saveLen.setSelectionRange(0, 99999); // For mobile devices
+                document.execCommand("copy");
                 this.closeModal();
             },
             closeModal: () => this.closeModal(),

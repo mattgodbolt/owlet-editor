@@ -233,6 +233,11 @@ export class Emulator {
         processor.writemem(IBPaddress, inputBufferPointer);
     }
 
+    readmem(addr) {
+        const processor = this.cpu;
+        return processor.readmem(addr);
+    }
+
     frameFunc(now) {
         requestAnimationFrame(this.onAnimFrame);
         if (this.running && this.lastFrameTime !== 0) {
