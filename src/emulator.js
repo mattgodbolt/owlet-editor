@@ -307,19 +307,21 @@ export class Emulator {
       var x = event.offsetX;
       var y = event.offsetY;
       switch (screenMode) {
-      case 3:
-      w = 80; h = 25.6; break;
-      case 6:
-      w = 40; h = 25.6; break;
-      case 7:
-      w = 40; h = 25.6; break;
-      default:
-      // Graphics Y increases up the screen.
-      y = screen.height() - y;
-      w = 1280; h = 1024; break;
+        case 3:
+          w = 80; h = 25.6; break;
+        case 6:
+          w = 40; h = 25.6; break;
+        case 7:
+          w = 40; h = 25.6; break;
+        default:
+          // Graphics Y increases up the screen.
+          y = screen.height() - y;
+          w = 1280; h = 1024; break;
       }
-      x = Math.floor(x * w / screen.width());
-      y = Math.floor(y * h / screen.height());
+      // 8 and 16 here are fudges to allow for a margin around the screen
+      // canvas - not sure where that comes from...
+      x = Math.floor((x - 8) * w / (screen.width() - 16));
+      y = Math.floor((y - 8) * h / (screen.height() - 16));
       coords.innerHTML = `&nbsp;| (${x},${y})`;
     }
 
