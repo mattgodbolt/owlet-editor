@@ -113,6 +113,8 @@ export class Emulator {
                     return this.executeInternalFast();
                   }
 
+    screen.mousemove(event => this.mouseMove(event));
+    screen.mouseleave(() => this.mouseLeave());
     screen.keyup(event => this.keyUp(event));
     screen.keydown(event => this.keyDown(event));
     screen.blur(() => this.clearKeys());
@@ -288,6 +290,37 @@ export class Emulator {
     clearKeys() {
       const processor = this.cpu;
       if (processor && processor.sysvia) processor.sysvia.clearKeys();
+    }
+
+    mouseLeave() {
+      const coords = document.getElementById("coords");
+      coords.innerHTML = '';
+    }
+
+    mouseMove(event) {
+      const processor = this.cpu;
+      const screen = this.root.find(".screen");
+      const coords = document.getElementById("coords");
+      var screenMode = processor.readmem(0x0355);
+      var w;
+      var h;
+      var x = event.offsetX;
+      var y = event.offsetY;
+      switch (screenMode) {
+      case 3:
+      w = 80; h = 25.6; break;
+      case 6:
+      w = 40; h = 25.6; break;
+      case 7:
+      w = 40; h = 25.6; break;
+      default:
+      // Graphics Y increases up the screen.
+      y = screen.height() - y;
+      w = 1280; h = 1024; break;
+      }
+      x = Math.floor(x * w / screen.width());
+      y = Math.floor(y * h / screen.height());
+      coords.innerHTML = `&nbsp;| (${x},${y})`;
     }
 
     keyUp(event) {
