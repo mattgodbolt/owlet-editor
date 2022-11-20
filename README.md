@@ -1,5 +1,5 @@
 ## Owlet Editor🦉 ![Owlet CI and CD](https://github.com/mattgodbolt/owlet-editor/workflows/Owlet%20CI%20and%20CD/badge.svg)
-A simple, intuitive creative coding tool for BBC BASIC inspired by [BBC Micro Bot](https://www.twitter.com/bbcmicrobot)
+A simple, intuitive creative coding tool for BBC BASIC inspired by [BBC Micro Bot](https://mastodon.me.uk/@bbcmicrobot)
 
 
 Try the beta now at [bbcmic.ro](https://bbcmic.ro) and get coding!
@@ -16,10 +16,10 @@ Try the beta now at [bbcmic.ro](https://bbcmic.ro) and get coding!
 * Share your entire program as a URL
 * Export to external emulator for interactive use
 
-## Share your creations with the BBC Micro Bot Twitter community
+## Share your creations with the BBC Micro Bot Mastodon community
 
-* One button tweet to share code
-* Automatic code golfing tools - byte token and base2048 encode/decode
+* One button tweet to share code (not yet updated for Mastodon)
+* Automatic code golfing tools - byte token encode/decode
 
 
 

@@ -17,7 +17,7 @@ import ResizeObserver from "resize-observer-polyfill";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 
-const TweetMaximum = 280;
+const TweetMaximum = 500;
 const StateVersion = 1;
 
 function defaultLineNumber(line) {
@@ -241,12 +241,6 @@ export class OwletEditor {
     updateStatus(basicText) {
         let outputProgram = basicText;
         let format = "text";
-
-        if (outputProgram.length > TweetMaximum) {
-            outputProgram = encode(outputProgram.split("").map(c => c.charCodeAt(0)));
-            format = "base2048";
-        }
-
         this.editStatus
             .find(".count")
             .text(`${outputProgram.length} ${format}`)
@@ -424,10 +418,12 @@ export class OwletEditor {
                 this.closeModal();
             },
             tweet: () => {
+                /* FIXME Automate posting to Mastodon?
                 window.open(
                     `https://twitter.com/intent/tweet?screen_name=BBCmicrobot&text=${this.codeToTweet()}`,
                     "_new"
                 );
+                */
                 this.closeModal();
             },
             copyMem: () => {
