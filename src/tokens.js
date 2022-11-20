@@ -4,14 +4,8 @@ import {decode} from "base2048";
 
  BBC BASIC Keyword Byte Tokens
 
- Derived from twitter.com/rheolism
+ Derived from rheolism's
  https://github.com/8bitkick/BBCMicroBot/blob/master/tools/bbcbasictokenise
-
- To twitter these inclusive ranges count as 1 character (everything else as 2):
- U+0000-U+10FF
- U+2000-U+200D # various spaces
- U+2010-U+201F # various punctuation
- U+2032-U+2037 # various prime marks
 
  Array starts at byte token 0x80
 
@@ -426,7 +420,14 @@ function decode2048(input) {
 
 
 // Compatibility with pre-tokenizer keyboard buffer method
-// See https://twitter.com/bbcmicrobot/status/1329217276860538881?s=20
+//
+// Only some token values make it through.
+//
+// It seems that U+00D0-U+00DA, U+00E0-U+00EA, U+00F0-U+00FA work;
+// U+0090-U+009A. U+00A0-U+00AA map to a byte value 16 lower (so U+0090 -> AND
+// which has byte token &80).
+//
+// The bot discards higher bits, so e.g. U+0190 -> AND too. All ranges incl.
 export function backwardCompat(text) {
     let output = "";
     const codePoints = [...text].map(char => char.charCodeAt(0));
