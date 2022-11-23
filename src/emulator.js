@@ -172,10 +172,10 @@ export class Emulator {
       this.state = await response.json();
       const t0 = performance.now();
       this.snapshot.load(this.state,this.cpu);
-      this.cpu.currentCycles = 40000+2000000*60*60*3; // 3 hours
-      this.cpu.targetCycles = 40000+2000000*60*60*3;
-      this.loopStart =  40000+2000000*60*60*3;
-      this.loopLength= 6000000-40000; // 3 seconds
+      this.cpu.currentCycles = 2000000*60*60*3; // 3 hours
+      this.cpu.targetCycles = 2000000*60*60*3;
+      this.loopStart =  2000000*60*60*3;
+      this.loopLength= 6000000; // 3 seconds
 
       const t1 = performance.now();
       const t2 = Math.round((t1 - t0)*1000)/1000
@@ -226,12 +226,19 @@ export class Emulator {
 
     frameFunc(now) {
       requestAnimationFrame(this.onAnimFrame);
-
-      // Loop start
-      if (this.loop == true && this.state == null & this.cpu.currentCycles > this.loopStart) {
+      // Take snapshot
+      if (this.loop == true && this.state == null & this.cpu.currentCycles >= this.loopStart) {
         this.state = this.snapshot.save(this.cpu).state;
-        frames = 0;
         console.log("snapshot taken at "+this.cpu.currentCycles+" cycles")
+      }
+
+      // Loop back
+      if (this.loop == true && this.state !== null & this.cpu.currentCycles >= this.loopStart+this.loopLength) {
+        this.pause();
+        this.snapshot.load(this.state,this.cpu);
+        this.cpu.currentCycles = this.loopStart;
+        this.cpu.targetCycles = this.loopStart;
+        this.start();
       }
 
       if (this.running && this.lastFrameTime !== 0) {
@@ -253,17 +260,8 @@ export class Emulator {
 
     paint(minx, miny, maxx, maxy) {
       this.frames++;
-
-      // Loop back
-      if (this.loop == true && this.state !== null & this.frame > 150) {
-        this.pause();
-        this.snapshot.load(this.state,this.cpu);
-        this.cpu.currentCycles = this.loopStart;
-        this.cpu.targetCycles = this.loopStart;
-        this.start();
-      }
-
-
+      if (this.frames < this.frameSkip) return;
+      this.frames = 0;
       const teletextAdjustX = this.video && this.video.teletextMode ? 15 : 0;
       this.canvas.paint(
         minx + this.leftMargin + teletextAdjustX,
