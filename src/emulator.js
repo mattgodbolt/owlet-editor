@@ -159,7 +159,6 @@ export class Emulator {
     const counterInterval = setInterval(myCounter.bind(this), 200);
     const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-      const processor = this.cpu;
       const response = await fetch(
         "https://api.bbcmic.ro/beta?saveAddress=0&saveLength=8000&basic=" + basic,
         {
