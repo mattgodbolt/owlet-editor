@@ -10,6 +10,7 @@ import Cmos from "jsbeeb/cmos";
 import utils from "jsbeeb/utils";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
+import Snapshot from "snapshot";
 
 utils.setBaseUrl("jsbeeb/");
 
@@ -22,346 +23,345 @@ let modelName = "BBC Micro Model B";
 let beebjit_incoming = false;
 const Model = models.findModel("B");
 
+
 if (!urlParams.get("experimental")) {
-    Model.os.push("gxr.rom");
-    modelName += " | GXR ROM";
+  Model.os.push("gxr.rom");
+  modelName += " | GXR ROM";
 }
 
 class ScreenResizer {
-    constructor(screen) {
-        this.screen = screen;
-        const origHeight = screen.height();
-        const origWidth = screen.width();
-        this.desiredAspectRatio = origWidth / origHeight;
-        this.minHeight = origHeight / 4;
-        this.minWidth = origWidth / 4;
-        this.observer = new ResizeObserver(() => this.resizeScreen());
-        this.observer.observe(this.screen.parent()[0]);
-        this.resizeScreen();
-    }
+  constructor(screen) {
+    this.screen = screen;
+    const origHeight = screen.height();
+    const origWidth = screen.width();
+    this.desiredAspectRatio = origWidth / origHeight;
+    this.minHeight = origHeight / 4;
+    this.minWidth = origWidth / 4;
+    this.observer = new ResizeObserver(() => this.resizeScreen());
+    this.observer.observe(this.screen.parent()[0]);
+    this.resizeScreen();
+  }
 
-    resizeScreen() {
-        const InnerBorder = 0;
-        let width = Math.max(this.minWidth, this.screen.parent().innerWidth() - InnerBorder);
-        let height = Math.max(this.minHeight, this.screen.parent().innerHeight() - InnerBorder);
-        if (width / height <= this.desiredAspectRatio) {
-            height = width / this.desiredAspectRatio;
-        } else {
-            width = height * this.desiredAspectRatio;
-        }
-        this.screen.height(height).width(width);
+  resizeScreen() {
+    const InnerBorder = 0;
+    let width = Math.max(this.minWidth, this.screen.parent().innerWidth() - InnerBorder);
+    let height = Math.max(this.minHeight, this.screen.parent().innerHeight() - InnerBorder);
+    if (width / height <= this.desiredAspectRatio) {
+      height = width / this.desiredAspectRatio;
+    } else {
+      width = height * this.desiredAspectRatio;
     }
+    this.screen.height(height).width(width);
+  }
 }
 
 export class Emulator {
-    constructor(root) {
-        this.root = root;
-        const screen = this.root.find(".screen");
-        this.canvas = canvasLib.bestCanvas(screen[0]);
-        this.emuStatus = document.getElementById("emu_status");
-        this.frames = 0;
-        this.frameSkip = 0;
-        this.resizer = new ScreenResizer(screen);
-        this.leftMargin = 115;
-        this.rightMargin = 130;
-        this.topMargin = 45;
-        this.bottomMargin = 30;
-        window.theEmulator = this;
+  constructor(root) {
+    this.root = root;
+    const screen = this.root.find(".screen");
+    this.canvas = canvasLib.bestCanvas(screen[0]);
+    this.emuStatus = document.getElementById("emu_status");
+    this.frames = 0;
+    this.frameSkip = 0;
+    this.resizer = new ScreenResizer(screen);
+    this.leftMargin = 115;
+    this.rightMargin = 130;
+    this.topMargin = 45;
+    this.bottomMargin = 30;
+    this.loopEnabled = true;
+    this.loopStart =  60680000;
+    this.loopLength = 6000000 - 40000;
+    this.state = null;
+    this.snapshot = new Snapshot();
+    this.loop = (urlParams.get("loop")) ? true : false;
 
-        this.video = new Video.Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
+    window.theEmulator = this;
 
-        this.soundChip = new SoundChip.FakeSoundChip();
-        this.ddNoise = new DdNoise.FakeDdNoise();
+    this.video = new Video.Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
-        this.dbgr = new Debugger(this.video);
-        const cmos = new Cmos({
-            load: function () {
-                if (window.localStorage.cmosRam) {
-                    return JSON.parse(window.localStorage.cmosRam);
-                }
-                return null;
-            },
-            save: function (data) {
-                window.localStorage.cmosRam = JSON.stringify(data);
-            },
-        });
-        const config = {};
-        this.cpu = new Cpu6502(
-            Model,
-            this.dbgr,
-            this.video,
-            this.soundChip,
-            this.ddNoise,
-            cmos,
-            config
-        );
+    this.soundChip = new SoundChip.FakeSoundChip();
+    this.ddNoise = new DdNoise.FakeDdNoise();
 
-        screen.keyup(event => this.keyUp(event));
-        screen.keydown(event => this.keyDown(event));
-        screen.blur(() => this.clearKeys());
-        setInterval(this.timer.bind(this), 1000);
-        this.lastFrameTime = 0;
-        this.onAnimFrame = _.bind(this.frameFunc, this);
-        this.ready = false;
-
-        this.lastShiftLocation = this.lastAltLocation = this.lastCtrlLocation = 0;
-    }
-
-    async initialise() {
-        await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
-        this.ready = true;
-    }
-
-    timer() {
-
-        if (!beebjit_incoming) {
-        this.emuStatus.innerHTML = `${modelName} | ${this.cpu.cycleSeconds} s`;
-      }
-    }
-
-    start() {
-        if (this.running) return;
-        this.running = true;
-        requestAnimationFrame(this.onAnimFrame);
-    }
-
-    pause() {
-        this.running = false;
-    }
-
-    async beebjit(tokenised) {
-      this.pause();
-
-      beebjit_incoming = true
-        function copyRegion(data, startAddr, endAddr) {
-            for (let i = startAddr; i <= endAddr; i++) {
-                processor.writemem(i, data.charCodeAt(i));
-            }
+    this.dbgr = new Debugger(this.video);
+    const cmos = new Cmos({
+      load: function () {
+        if (window.localStorage.cmosRam) {
+          return JSON.parse(window.localStorage.cmosRam);
         }
+        return null;
+      },
+      save: function (data) {
+        window.localStorage.cmosRam = JSON.stringify(data);
+      },
+    });
+    const config = {};
+    this.cpu = new Cpu6502(
+      Model,
+      this.dbgr,
+      this.video,
+      this.soundChip,
+      this.ddNoise,
+      cmos,
+      config
+    );
 
-        function myCounter() {
-          this.emuStatus.innerHTML +="."
-          if (this.emuStatus.innerHTML.length>18) this.emuStatus.innerHTML = "Calling beebjit"
+    // Patch this version of JSbeeb to stop it reseting cycle count.
+    // Number.MAX_SAFE_INTEGER should gives us plenty of headroom
+    this.cpu.execute = function (numCyclesToRun) {
+                    this.halted = false;
+                    this.targetCycles += numCyclesToRun;
+                    return this.executeInternalFast();
+                  }
+
+    screen.keyup(event => this.keyUp(event));
+    screen.keydown(event => this.keyDown(event));
+    screen.blur(() => this.clearKeys());
+    setInterval(this.timer.bind(this), 1000);
+    this.lastFrameTime = 0;
+    this.onAnimFrame = _.bind(this.frameFunc, this);
+    this.ready = false;
+
+    this.lastShiftLocation = this.lastAltLocation = this.lastCtrlLocation = 0;
+  }
+
+  async initialise() {
+    await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
+    this.ready = true;
+  }
+
+  timer() {
+
+    if (!beebjit_incoming) {
+      this.emuStatus.innerHTML = `${modelName} | ${Math.floor(this.cpu.currentCycles/2000000)} s`;
+    }
+  }
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+    requestAnimationFrame(this.onAnimFrame);
+  }
+
+  pause() {
+    this.running = false;
+  }
+
+  async beebjit(tokenised) {
+    this.pause();
+
+    beebjit_incoming = true
+
+    function myCounter() {
+      this.emuStatus.innerHTML +="."
+      if (this.emuStatus.innerHTML.length>18) this.emuStatus.innerHTML = "Calling beebjit"
+    }
+    this.emuStatus.innerHTML = "Calling beebjit"
+    const counterInterval = setInterval(myCounter.bind(this), 200);
+    const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+      const response = await fetch(
+        "https://api.bbcmic.ro/beta?saveAddress=0&saveLength=8000&basic=" + basic,
+        {
+          headers: {
+            "x-api-key": "YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa",
+          },
         }
-        this.emuStatus.innerHTML = "Calling beebjit"
-        const counterInterval = setInterval(myCounter.bind(this), 200);
-        const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        const processor = this.cpu;
-        const response = await fetch(
-            "https://api.bbcmic.ro/beta?saveAddress=0&saveLength=8000&basic=" + basic,
-            {
-                headers: {
-                    "x-api-key": "YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa",
-                },
-            }
-        );
-        beebjit_incoming = false
-        const beebjitData = await response.json();
-        const data = window.atob(beebjitData.RAM);
-        const registers = beebjitData.CPU6502;
-        const flags = registers.F;
+      );
+      beebjit_incoming = false
+      this.state = await response.json();
+      const t0 = performance.now();
+      this.snapshot.load(this.state,this.cpu);
+      this.cpu.currentCycles = 2000000*60*60*3; // 3 hours
+      this.cpu.targetCycles = 2000000*60*60*3;
+      this.loopStart =  2000000*60*60*3;
+      this.loopLength= 6000000 + 320000;
 
-        copyRegion(data, 0x0000, 0x7fff);
+      const t1 = performance.now();
+      const t2 = Math.round((t1 - t0)*1000)/1000
+      console.log(`State snapshot loaded in ${t2}ms.`);
 
-        this.cpu.pc = registers.PC;
-        this.cpu.a = registers.A;
-        this.cpu.s = registers.S;
-        this.cpu.x = registers.X;
-        this.cpu.y = registers.Y;
+      this.start();
 
-        this.cpu.p.n = flags.indexOf("N") !== -1;
-        this.cpu.p.v = flags.indexOf("V") !== -1;
-        this.cpu.p.d = flags.indexOf("D") !== -1;
-        this.cpu.p.i = flags.indexOf("I") !== -1;
-        this.cpu.p.z = flags.indexOf("Z") !== -1;
-        this.cpu.p.c = flags.indexOf("C") !== -1;
-
-        // write CRTC registers
-        for (let r=0;r<17;r++){
-            processor.writemem(0xfe00, r);
-            processor.writemem(0xfe01, beebjitData.CRTC[r]);
-        }
-
-        // write ULA control reg
-        processor.writemem(0xfe20, beebjitData.ULAcontrol);
-
-        // write ULA Palette - see https://beebwiki.mdfs.net/Video_ULA
-        for (let p=0;p<16;p++){
-            processor.writemem(0xfe21, p<<4 | (~beebjitData.ULApalette[p] & 0b00000111) | (beebjitData.ULApalette[p] & 0b00001000));
-        }
-
-        console.log(beebjitData)
-        this.start();
-        clearInterval(counterInterval);
-        this.cpu.cycleSeconds = 60 * 60 * 3;
-        this.timer();
+      clearInterval(counterInterval);
+      this.timer();
     }
 
     async runProgram(tokenised) {
-        if (!this.ready) return;
-        this.cpu.reset(true);
-        const processor = this.cpu;
-        await processor.execute(BotStartCycles); // match bbcmicrobot
-        const page = processor.readmem(0x18) << 8;
-        for (let i = 0; i < tokenised.length; ++i) {
-            processor.writemem(page + i, tokenised.charCodeAt(i));
-        }
-        // Set VARTOP (0x12/3) and TOP(0x02/3)
-        const end = page + tokenised.length;
-        const endLow = end & 0xff;
-        const endHigh = (end >>> 8) & 0xff;
-        processor.writemem(0x02, endLow);
-        processor.writemem(0x03, endHigh);
-        processor.writemem(0x12, endLow);
-        processor.writemem(0x13, endHigh);
-        this.writeToKeyboardBuffer("RUN\r");
-        this.start();
+      if (!this.ready) return;
+      console.log(this.cpu.currentCycles)
+      this.cpu.reset(true);
+      const processor = this.cpu;
+      await processor.execute(BotStartCycles); // match bbcmicrobot
+      const page = processor.readmem(0x18) << 8;
+      for (let i = 0; i < tokenised.length; ++i) {
+        processor.writemem(page + i, tokenised.charCodeAt(i));
+      }
+      // Set VARTOP (0x12/3) and TOP(0x02/3)
+      const end = page + tokenised.length;
+      const endLow = end & 0xff;
+      const endHigh = (end >>> 8) & 0xff;
+      processor.writemem(0x02, endLow);
+      processor.writemem(0x03, endHigh);
+      processor.writemem(0x12, endLow);
+      processor.writemem(0x13, endHigh);
+      this.writeToKeyboardBuffer("RUN\r");
+      this.start();
     }
 
     writeToKeyboardBuffer(text) {
-        const processor = this.cpu;
-        const keyboardBuffer = 0x0300; // BBC Micro OS 1.20
-        const IBPaddress = 0x02e1; // input buffer pointer
-        let inputBufferPointer = processor.readmem(IBPaddress);
-        for (let a = 0; a < text.length; a++) {
-            processor.writemem(keyboardBuffer + inputBufferPointer, text.charCodeAt(a));
-            inputBufferPointer++;
-            if (inputBufferPointer > 0xff) {
-                inputBufferPointer = 0xe0;
-            }
+      const processor = this.cpu;
+      const keyboardBuffer = 0x0300; // BBC Micro OS 1.20
+      const IBPaddress = 0x02e1; // input buffer pointer
+      let inputBufferPointer = processor.readmem(IBPaddress);
+      for (let a = 0; a < text.length; a++) {
+        processor.writemem(keyboardBuffer + inputBufferPointer, text.charCodeAt(a));
+        inputBufferPointer++;
+        if (inputBufferPointer > 0xff) {
+          inputBufferPointer = 0xe0;
         }
-        processor.writemem(IBPaddress, inputBufferPointer);
-    }
-
-    readmem(addr) {
-        const processor = this.cpu;
-        return processor.readmem(addr);
+      }
+      processor.writemem(IBPaddress, inputBufferPointer);
     }
 
     frameFunc(now) {
-        requestAnimationFrame(this.onAnimFrame);
-        if (this.running && this.lastFrameTime !== 0) {
-            const sinceLast = now - this.lastFrameTime;
-            let cycles = ((sinceLast * ClocksPerSecond) / 1000) | 0;
-            cycles = Math.min(cycles, MaxCyclesPerFrame);
-            try {
-                if (!this.cpu.execute(cycles)) {
-                    this.running = false; // TODO: breakpoint
-                }
-            } catch (e) {
-                this.running = false;
-                this.dbgr.debug(this.cpu.pc);
-                throw e;
-            }
+      requestAnimationFrame(this.onAnimFrame);
+      // Take snapshot
+      if (this.loop == true && this.state == null & this.cpu.currentCycles >= this.loopStart) {
+        this.state = this.snapshot.save(this.cpu).state;
+        console.log("snapshot taken at "+this.cpu.currentCycles+" cycles")
+      }
+
+      // Loop back
+      if (this.loop == true && this.state !== null & this.cpu.currentCycles >= this.loopStart+this.loopLength) {
+        this.pause();
+        this.snapshot.load(this.state,this.cpu);
+        this.cpu.currentCycles = this.loopStart;
+        this.cpu.targetCycles = this.loopStart;
+        this.start();
+      }
+
+      if (this.running && this.lastFrameTime !== 0) {
+        const sinceLast = now - this.lastFrameTime;
+        let cycles = ((sinceLast * ClocksPerSecond) / 1000) | 0;
+        cycles = Math.min(cycles, MaxCyclesPerFrame);
+        try {
+          if (!this.cpu.execute(cycles)) {
+            this.running = false; // TODO: breakpoint
+          }
+        } catch (e) {
+          this.running = false;
+          this.dbgr.debug(this.cpu.pc);
+          throw e;
         }
-        this.lastFrameTime = now;
+      }
+      this.lastFrameTime = now;
     }
 
     paint(minx, miny, maxx, maxy) {
-        this.frames++;
-        if (this.frames < this.frameSkip) return;
-        this.frames = 0;
-        const teletextAdjustX = this.video && this.video.teletextMode ? 15 : 0;
-        this.canvas.paint(
-            minx + this.leftMargin + teletextAdjustX,
-            miny + this.topMargin,
-            maxx - this.rightMargin + teletextAdjustX,
-            maxy - this.bottomMargin
-        );
+      this.frames++;
+      if (this.frames < this.frameSkip) return;
+      this.frames = 0;
+      const teletextAdjustX = this.video && this.video.teletextMode ? 15 : 0;
+      this.canvas.paint(
+        minx + this.leftMargin + teletextAdjustX,
+        miny + this.topMargin,
+        maxx - this.rightMargin + teletextAdjustX,
+        maxy - this.bottomMargin
+      );
     }
 
     keyDown(event) {
-        if (!this.running) return;
+      if (!this.running) return;
 
-        const code = this.keyCode(event);
-        const processor = this.cpu;
-        if (code === utils.keyCodes.HOME && event.ctrlKey) {
-            this.pause();
-        } else if (code === utils.keyCodes.F12 || code === utils.keyCodes.BREAK) {
-            processor.setReset(true);
-        } else {
-            processor.sysvia.keyDown(code, event.shiftKey);
-        }
-        event.preventDefault();
+      const code = this.keyCode(event);
+      const processor = this.cpu;
+      if (code === utils.keyCodes.HOME && event.ctrlKey) {
+        this.pause();
+      } else if (code === utils.keyCodes.F12 || code === utils.keyCodes.BREAK) {
+        processor.setReset(true);
+      } else {
+        processor.sysvia.keyDown(code, event.shiftKey);
+      }
+      event.preventDefault();
     }
 
     clearKeys() {
-        const processor = this.cpu;
-        if (processor && processor.sysvia) processor.sysvia.clearKeys();
+      const processor = this.cpu;
+      if (processor && processor.sysvia) processor.sysvia.clearKeys();
     }
 
     keyUp(event) {
-        // Always let the key ups come through.
-        const code = this.keyCode(event);
-        const processor = this.cpu;
-        if (processor && processor.sysvia) processor.sysvia.keyUp(code);
-        if (!this.running) return;
-        if (code === utils.keyCodes.F12 || code === utils.keyCodes.BREAK) {
-            processor.setReset(false);
-        }
-        event.preventDefault();
+      // Always let the key ups come through.
+      const code = this.keyCode(event);
+      const processor = this.cpu;
+      if (processor && processor.sysvia) processor.sysvia.keyUp(code);
+      if (!this.running) return;
+      if (code === utils.keyCodes.F12 || code === utils.keyCodes.BREAK) {
+        processor.setReset(false);
+      }
+      event.preventDefault();
     }
 
     keyCode(event) {
-        const ret = event.which || event.charCode || event.keyCode;
-        const keyCodes = utils.keyCodes;
-        switch (event.location) {
-            default:
-                // keyUp events seem to pass location = 0 (Chrome)
-                switch (ret) {
-                    case keyCodes.SHIFT:
-                        return this.lastShiftLocation === 1
-                            ? keyCodes.SHIFT_LEFT
-                            : keyCodes.SHIFT_RIGHT;
-                    case keyCodes.ALT:
-                        return this.lastAltLocation === 1 ? keyCodes.ALT_LEFT : keyCodes.ALT_RIGHT;
-                    case keyCodes.CTRL:
-                        return this.lastCtrlLocation === 1
-                            ? keyCodes.CTRL_LEFT
-                            : keyCodes.CTRL_RIGHT;
-                }
-                break;
-            case 1:
-                switch (ret) {
-                    case keyCodes.SHIFT:
-                        this.lastShiftLocation = 1;
-                        return keyCodes.SHIFT_LEFT;
-
-                    case keyCodes.ALT:
-                        this.lastAltLocation = 1;
-                        return keyCodes.ALT_LEFT;
-
-                    case keyCodes.CTRL:
-                        this.lastCtrlLocation = 1;
-                        return keyCodes.CTRL_LEFT;
-                }
-                break;
-            case 2:
-                switch (ret) {
-                    case keyCodes.SHIFT:
-                        this.lastShiftLocation = 2;
-                        return keyCodes.SHIFT_RIGHT;
-
-                    case keyCodes.ALT:
-                        this.lastAltLocation = 2;
-                        return keyCodes.ALT_RIGHT;
-
-                    case keyCodes.CTRL:
-                        this.lastCtrlLocation = 2;
-                        return keyCodes.CTRL_RIGHT;
-                }
-                break;
-            case 3: // numpad
-                switch (ret) {
-                    case keyCodes.ENTER:
-                        return utils.keyCodes.NUMPADENTER;
-
-                    case keyCodes.DELETE:
-                        return utils.keyCodes.NUMPAD_DECIMAL_POINT;
-                }
-                break;
+      const ret = event.which || event.charCode || event.keyCode;
+      const keyCodes = utils.keyCodes;
+      switch (event.location) {
+        default:
+        // keyUp events seem to pass location = 0 (Chrome)
+        switch (ret) {
+          case keyCodes.SHIFT:
+          return this.lastShiftLocation === 1
+          ? keyCodes.SHIFT_LEFT
+          : keyCodes.SHIFT_RIGHT;
+          case keyCodes.ALT:
+          return this.lastAltLocation === 1 ? keyCodes.ALT_LEFT : keyCodes.ALT_RIGHT;
+          case keyCodes.CTRL:
+          return this.lastCtrlLocation === 1
+          ? keyCodes.CTRL_LEFT
+          : keyCodes.CTRL_RIGHT;
         }
+        break;
+        case 1:
+        switch (ret) {
+          case keyCodes.SHIFT:
+          this.lastShiftLocation = 1;
+          return keyCodes.SHIFT_LEFT;
 
-        return ret;
+          case keyCodes.ALT:
+          this.lastAltLocation = 1;
+          return keyCodes.ALT_LEFT;
+
+          case keyCodes.CTRL:
+          this.lastCtrlLocation = 1;
+          return keyCodes.CTRL_LEFT;
+        }
+        break;
+        case 2:
+        switch (ret) {
+          case keyCodes.SHIFT:
+          this.lastShiftLocation = 2;
+          return keyCodes.SHIFT_RIGHT;
+
+          case keyCodes.ALT:
+          this.lastAltLocation = 2;
+          return keyCodes.ALT_RIGHT;
+
+          case keyCodes.CTRL:
+          this.lastCtrlLocation = 2;
+          return keyCodes.CTRL_RIGHT;
+        }
+        break;
+        case 3: // numpad
+        switch (ret) {
+          case keyCodes.ENTER:
+          return utils.keyCodes.NUMPADENTER;
+
+          case keyCodes.DELETE:
+          return utils.keyCodes.NUMPAD_DECIMAL_POINT;
+        }
+        break;
+      }
+
+      return ret;
     }
-}
+  }
