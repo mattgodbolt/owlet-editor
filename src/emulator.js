@@ -73,7 +73,7 @@ export class Emulator {
     this.loopLength = 6000000 - 40000;
     this.state = null;
     this.snapshot = new Snapshot();
-    this.loop = true;
+    this.loop = (urlParams.get("loop")) ? true : false;
 
     window.theEmulator = this;
 
