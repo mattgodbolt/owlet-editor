@@ -175,7 +175,7 @@ export class Emulator {
       this.cpu.currentCycles = 2000000*60*60*3; // 3 hours
       this.cpu.targetCycles = 2000000*60*60*3;
       this.loopStart =  2000000*60*60*3;
-      this.loopLength= 6000000; // 3 seconds
+      this.loopLength= 6000000 + 320000;
 
       const t1 = performance.now();
       const t2 = Math.round((t1 - t0)*1000)/1000
