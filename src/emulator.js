@@ -227,7 +227,9 @@ export class Emulator {
       requestAnimationFrame(this.onAnimFrame);
       // Take snapshot
       if (this.loop == true && this.state == null & this.cpu.currentCycles >= this.loopStart) {
+        this.pause();
         this.state = this.snapshot.save(this.cpu).state;
+        this.start();
         console.log("snapshot taken at "+this.cpu.currentCycles+" cycles")
       }
 
