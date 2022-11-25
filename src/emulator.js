@@ -302,27 +302,46 @@ export class Emulator {
       const screen = this.root.find(".screen");
       const coords = document.getElementById("coords");
       var screenMode = processor.readmem(0x0355);
-      var w;
-      var h;
-      var x = event.offsetX;
-      var y = event.offsetY;
+      var W;
+      var H;
+      var graphicsMode = true;
       switch (screenMode) {
+        case 0:
+          W = 80; H = 32; break;
+        case 1:
+        case 4:
+          W = 40; H = 32; break;
+        case 2:
+        case 5:
+          W = 20; H = 32; break;
         case 3:
-          w = 80; h = 25.6; break;
+          W = 80; H = 25.6; graphicsMode = false; break;
         case 6:
-          w = 40; h = 25.6; break;
+          W = 40; H = 25.6; graphicsMode = false; break;
         case 7:
-          w = 40; h = 25.6; break;
+          W = 40; H = 25.6; graphicsMode = false; break;
         default:
-          // Graphics Y increases up the screen.
-          y = screen.height() - y;
-          w = 1280; h = 1024; break;
+          // Unknown screen mode!
+          coords.innerHTML = '';
+          return;
       }
       // 8 and 16 here are fudges to allow for a margin around the screen
-      // canvas - not sure where that comes from...
-      x = Math.floor((x - 8) * w / (screen.width() - 16));
-      y = Math.floor((y - 8) * h / (screen.height() - 16));
-      coords.innerHTML = `&nbsp;| (${x},${y})`;
+      // canvas - not sure exactly where that comes from...
+      var x = event.offsetX - 8;
+      var y = event.offsetY - 8;
+      const sw = screen.width() - 16;
+      const sh = screen.height() - 16;
+      var X = Math.floor(x * W / sw);
+      var Y = Math.floor(y * H / sh);
+      var html = `&nbsp;| text: (${X},${Y})`;
+      if (graphicsMode) {
+         // Graphics Y increases up the screen.
+         y = sh - y;
+         x = Math.floor(x * 1280 / sw);
+         y = Math.floor(y * 1024 / sh);
+         html += ` graphics: (${x},${y})`;
+      }
+      coords.innerHTML = html;
     }
 
     keyUp(event) {
