@@ -11,11 +11,21 @@ function programUrl(id) {
     return `../assets/programs/${id}`;
 }
 
-function updateUiForProgram(id, json) {
+function updateUiForProgram(id, json, v) {
+
+  // Twitter
+   if (v==1) {
     $("#like")
         .html(`<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`);
-    // FIXME Update for Mastodon
-    // .attr("href", `https://twitter.com/intent/like?tweet_id=${id}`);
+      }
+
+  // Mastodon
+   if (v==3) {
+     let author = /@\w+/g.exec(json.src);
+    $("#like")
+        .html(`<a href='${json.src}'><span class="heart">♥</span>code originally posted by ${author} on Mastodon<a>`);
+      }
+
 }
 
 window.u = updateUiForProgram;
@@ -47,10 +57,16 @@ async function getInitialState(id) {
 
     // Try decoding state from the location hash.
     let maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
-    if (maybeState) {
+    if (maybeState.v == 1) {
         consumeHash();
         if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program)}
-        if (maybeState.id) updateUiForProgram(maybeState.id, maybeState);
+        if (maybeState.id) updateUiForProgram(maybeState.id, maybeState,1);
+        return maybeState;
+    }
+
+    if (maybeState.v == 3) {
+        consumeHash();
+        if (maybeState.src) updateUiForProgram(maybeState.src, maybeState,3);
         return maybeState;
     }
 
