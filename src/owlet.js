@@ -101,7 +101,7 @@ export class OwletEditor {
     static decodeStateString(stateString) {
         try {
             const state = JSON.parse(decodeURIComponent(stateString));
-            if (state.v !== StateVersion) return null;
+            if (state.v !== 3 && state.v !== 1 ) return null;
             return state;
         } catch (e) {
             return null;
