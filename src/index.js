@@ -57,18 +57,23 @@ async function getInitialState(id) {
 
     // Try decoding state from the location hash.
     let maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
-    if (maybeState.v == 1) {
-        consumeHash();
-        if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program)}
-        if (maybeState.id) updateUiForProgram(maybeState.id, maybeState,1);
-        return maybeState;
-    }
 
-    if (maybeState.v == 3) {
-        consumeHash();
-        if (maybeState.src) updateUiForProgram(maybeState.src, maybeState,3);
-        return maybeState;
-    }
+    if (maybeState !== null){
+
+      if (maybeState.v == 1) {
+          consumeHash();
+          if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program)}
+          if (maybeState.id) updateUiForProgram(maybeState.id, maybeState,1);
+          return maybeState;
+      }
+
+      if (maybeState.v == 3) {
+          consumeHash();
+          if (maybeState.src) updateUiForProgram(maybeState.src, maybeState,3);
+          return maybeState;
+      }
+
+  }
 
     // If there's no state in the URL, look at the last program the user had in their browser.
     const lastProgram = localStorage.getItem(LastProgramKey);
