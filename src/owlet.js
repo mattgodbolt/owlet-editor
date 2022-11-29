@@ -240,10 +240,9 @@ export class OwletEditor {
 
     updateStatus(basicText) {
         let outputProgram = basicText;
-        let format = "text";
         this.editStatus
             .find(".count")
-            .text(`${outputProgram.length} ${format}`)
+            .text(`${outputProgram.length}`)
             .toggleClass("too_long", outputProgram.length > TweetMaximum);
     }
 
@@ -257,7 +256,7 @@ export class OwletEditor {
         ) {
             this.emulator.pause();
             $play.addClass("play");
-            $play.html("▼");
+            $play.html('<i class="fa-solid fa-play" style="pointer-events: none;"></i>');
         } else {
             this.emulator.start();
             $play.removeClass("play");

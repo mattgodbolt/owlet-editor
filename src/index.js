@@ -3,6 +3,8 @@ import {registerBbcBasicLanguage} from "./bbcbasic";
 import rootHtml from "./root.html";
 import {OwletEditor} from "./owlet";
 import {backwardCompat} from "./tokens";
+import "@fortawesome/fontawesome-free/js/all.js";
+import "@fortawesome/fontawesome-free/css/all.css";
 
 const LastProgramKey = "program";
 
@@ -122,6 +124,7 @@ async function initialise() {
         const rocket = document.getElementById("rocket");
         rocket.style.display = "block";
     }
+
 }
 
 initialise().then(() => {

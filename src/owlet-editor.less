@@ -103,47 +103,11 @@ button {
   color: var(--font-color);
   border: 0px solid var(--color-toolbar);
   background-color: var(--color-buttons);
+//    background-color: #8064A2 !important;
 }
 
-.selected {
-  background-color: var(--color-editor-bg);
-}
-
-button.bottom {
-  background-color: var(--font-color);
-  color: var(--color-toolbar);
-}
-
-.bottom:hover {
-  color: var(--font-color);
-}
-
-button.small {
-  min-width: 16px;
-}
-
-button.share {
-  background-color: var(--button-highlight);
-}
-
-button.tweet {
-  background-color: var(--button-blue);
-}
-
-button:hover,
-button:active,
-button:visited {
-  background-color: var(--color-background);
-  background-size: 20px 20px;
-}
-
-#play-pause {
-  width: 16px;
-}
-
-.play {
-  background-color: transparent;
-  transform: rotate(-90deg);
+button:hover{
+    background-color: var(--color-highlight);
 }
 
 canvas.screen {
@@ -183,12 +147,7 @@ canvas.screen {
   }
 }
 
-#rocket {
-  display: none;
-  margin: 0px;
-  padding: 0px;
-  width: 32px;
-}
+
 
 @-o-keyframes fadeIt {
   0% {
@@ -384,8 +343,4 @@ input {
   align-content: center;
 }
 
-}
-
-#jsbeeb_button{
-  background-color: #88cccc;
 }
