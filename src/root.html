@@ -3,7 +3,8 @@
     <div class="toolbar" id="emu_toolbar">
         <button data-action="run" title="Run the program (ctrl-enter)"><i class="fa-solid fa-play" style="pointer-events: none;"></i></button>
         <button data-action="new" title="Start a new program"><i class="fa-solid fa-file" style="pointer-events: none;"></i></button>
-        <button data-action="share" title="Tweet your amazing code to @bbcmicrobot"><i class="fa-solid fa-share-square" style="pointer-events: none;"></i></button>
+                <button class="save" data-action="save" title="Save memory from the emulator" data-toggle="tooltip" data-placement="top" title="Save memory from the emulator"><i class="fa-solid fa-memory" style="pointer-events: none;"></i></button>
+        <button data-action="share" title="Share your code as a URL, disc or tape image"><i class="fa-solid fa-share-square" style="pointer-events: none;"></i></button>
 
     </div>
     <div class="toolbar" id="editor_toolbar">
@@ -53,9 +54,8 @@
         </div>
     </div>
     <div class="footer" id="editor_footer">
-        <button data-action="expand" title="Expand abbreviations, detokenise, and base2048 decode">expand</button>
-        <button data-action="tokenise" title="Convert to BBC BASIC byte tokens">shrink</button>
-        <button class="save" data-action="save" title="Save memory from the emulator" data-toggle="tooltip" data-placement="top" title="Save memory from the emulator"><i class="fa-solid fa-memory" style="pointer-events: none;"></i></button>
+        <button data-action="expand" title="Expand abbreviations, detokenise">Decode</button>
+        <button data-action="tokenise" title="Convert to BBC BASIC byte tokens">Shrink</button>
         <div id="edit_status"><span class="count">0</span> characters</div>
 
     </div>

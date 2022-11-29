@@ -26,7 +26,7 @@ const Model = models.findModel("B");
 
 if (!urlParams.get("experimental")) {
   Model.os.push("gxr.rom");
-  modelName += " | GXR ROM";
+  modelName += " | GXR";
 }
 
 class ScreenResizer {
