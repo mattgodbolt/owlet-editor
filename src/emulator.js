@@ -74,6 +74,7 @@ export class Emulator {
     this.state = null;
     this.snapshot = new Snapshot();
     this.loop = (urlParams.get("loop")) ? true : false;
+    this.showCoords = false; // coordinate display mode
 
     window.theEmulator = this;
 
@@ -133,7 +134,7 @@ export class Emulator {
 
   timer() {
 
-    if (!beebjit_incoming) {
+    if (!beebjit_incoming && !this.showCoords) {
       this.emuStatus.innerHTML = `${modelName} | ${Math.floor(this.cpu.currentCycles/2000000)} s`;
     }
   }
@@ -293,14 +294,14 @@ export class Emulator {
     }
 
     mouseLeave() {
-      const coords = document.getElementById("coords");
-      coords.innerHTML = '';
+      this.showCoords = false;
+      this.timer();
     }
 
     mouseMove(event) {
+      this.showCoords = true;
       const processor = this.cpu;
       const screen = this.root.find(".screen");
-      const coords = document.getElementById("coords");
       var screenMode = processor.readmem(0x0355);
       var W;
       var H;
@@ -322,7 +323,6 @@ export class Emulator {
           W = 40; H = 25.6; graphicsMode = false; break;
         default:
           // Unknown screen mode!
-          coords.innerHTML = '';
           return;
       }
       // 8 and 16 here are fudges to allow for a margin around the screen
@@ -333,15 +333,15 @@ export class Emulator {
       const sh = screen.height() - 16;
       var X = Math.floor(x * W / sw);
       var Y = Math.floor(y * H / sh);
-      var html = `&nbsp;| text: (${X},${Y})`;
+      var html = `Text: (${X},${Y})`;
       if (graphicsMode) {
          // Graphics Y increases up the screen.
          y = sh - y;
          x = Math.floor(x * 1280 / sw);
          y = Math.floor(y * 1024 / sh);
-         html += ` graphics: (${x},${y})`;
+         html += ` &nbsp; Graphics: (${x},${y})`;
       }
-      coords.innerHTML = html;
+      this.emuStatus.innerHTML = html;
     }
 
     keyUp(event) {
