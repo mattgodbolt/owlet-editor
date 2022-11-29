@@ -9,8 +9,8 @@ import "@fortawesome/fontawesome-free/css/all.css";
 const LastProgramKey = "program";
 
 function programUrl(id) {
-    if (window.location.hostname !== "localhost") return `https://bbcmic.ro/assets/programs/${id}`;
-    return `../assets/programs/${id}`;
+    if (window.location.hostname !== "localhost") return `https://bbcmic.ro/assets/${id}`;
+    return `../assets/${id}`;
 }
 
 function updateUiForProgram(id, json, v) {
@@ -82,7 +82,7 @@ async function getInitialState(id) {
     if (lastProgram) return OwletEditor.stateForBasicProgram(lastProgram);
 
     // Try loading an example program.
-    const ExampleProgramId = "1228377194210189312"; // This is the only way I tweet now
+    const ExampleProgramId = "toot.bas"; // This is the only way I toot now
     const example = await loadCachedProgram(ExampleProgramId);
     if (example) return OwletEditor.stateForBasicProgram(example.program);
 
