@@ -74,6 +74,7 @@ export class Emulator {
     this.state = null;
     this.snapshot = new Snapshot();
     this.loop = (urlParams.get("loop")) ? true : false;
+    this.showCoords = false; // coordinate display mode
 
     window.theEmulator = this;
 
@@ -113,6 +114,8 @@ export class Emulator {
                     return this.executeInternalFast();
                   }
 
+    screen.mousemove(event => this.mouseMove(event));
+    screen.mouseleave(() => this.mouseLeave());
     screen.keyup(event => this.keyUp(event));
     screen.keydown(event => this.keyDown(event));
     screen.blur(() => this.clearKeys());
@@ -131,7 +134,7 @@ export class Emulator {
 
   timer() {
 
-    if (!beebjit_incoming) {
+    if (!beebjit_incoming && !this.showCoords) {
       this.emuStatus.innerHTML = `${modelName} | ${Math.floor(this.cpu.currentCycles/2000000)} s`;
     }
   }
@@ -290,6 +293,57 @@ export class Emulator {
     clearKeys() {
       const processor = this.cpu;
       if (processor && processor.sysvia) processor.sysvia.clearKeys();
+    }
+
+    mouseLeave() {
+      this.showCoords = false;
+      this.timer();
+    }
+
+    mouseMove(event) {
+      this.showCoords = true;
+      const processor = this.cpu;
+      const screen = this.root.find(".screen");
+      var screenMode = processor.readmem(0x0355);
+      var W;
+      var H;
+      var graphicsMode = true;
+      switch (screenMode) {
+        case 0:
+          W = 80; H = 32; break;
+        case 1:
+        case 4:
+          W = 40; H = 32; break;
+        case 2:
+        case 5:
+          W = 20; H = 32; break;
+        case 3:
+          W = 80; H = 25.6; graphicsMode = false; break;
+        case 6:
+          W = 40; H = 25.6; graphicsMode = false; break;
+        case 7:
+          W = 40; H = 25.6; graphicsMode = false; break;
+        default:
+          // Unknown screen mode!
+          return;
+      }
+      // 8 and 16 here are fudges to allow for a margin around the screen
+      // canvas - not sure exactly where that comes from...
+      var x = event.offsetX - 8;
+      var y = event.offsetY - 8;
+      const sw = screen.width() - 16;
+      const sh = screen.height() - 16;
+      var X = Math.floor(x * W / sw);
+      var Y = Math.floor(y * H / sh);
+      var html = `Text: (${X},${Y})`;
+      if (graphicsMode) {
+         // Graphics Y increases up the screen.
+         y = sh - y;
+         x = Math.floor(x * 1280 / sw);
+         y = Math.floor(y * 1024 / sh);
+         html += ` &nbsp; Graphics: (${x},${y})`;
+      }
+      this.emuStatus.innerHTML = html;
     }
 
     keyUp(event) {
