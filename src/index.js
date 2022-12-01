@@ -10,7 +10,7 @@ const LastProgramKey = "program";
 
 function programUrl(id) {
     //if (window.location.hostname !== "localhost")
-    return `http://link.bbcmic.ro/state/${id}`;
+    return `https://bbcmic.ro/state/${id}`;
     //return `../assets/${id}`;
 }
 
