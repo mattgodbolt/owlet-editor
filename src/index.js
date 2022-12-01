@@ -83,14 +83,14 @@ async function getInitialState(id) {
     const lastProgram = localStorage.getItem(LastProgramKey);
     if (lastProgram) return OwletEditor.stateForBasicProgram(lastProgram);
 
-    // Try loading an example program.
-    const ExampleProgramId = "toot.bas"; // This is the only way I toot now
-    const example = await state(ExampleProgramId);
-    if (example) return OwletEditor.stateForBasicProgram(example.program);
+    // // Try loading an example program - TODO we will cache in s3
+    // const ExampleProgramId = "toot.bas"; // This is the only way I toot now
+    // const example = await state(ExampleProgramId);
+    // if (example) return OwletEditor.stateForBasicProgram(example.program);
 
     // Failing loading an example program (e.g. running a local server, or some other
     // error), then use a boring built-in program.
-    const FallbackDefaultProgram = ['PRINT "HELLO WORLD"', "GOTO 10"].join("\n");
+    const FallbackDefaultProgram = ["MODE 2","COLOUR RND(7)",'PRINT "HELLO WORLD"', "GOTO 20"].join("\n");
 
     return OwletEditor.stateForBasicProgram(FallbackDefaultProgram);
 }
