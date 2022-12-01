@@ -7,7 +7,7 @@ Try the beta now at [bbcmic.ro](https://bbcmic.ro) and get coding!
 ## A modern editor for a classic language
 
 * Fast, intuitive web-based editor (autocomplete, highlighting)
-* Linked to 1000 BBC BASIC code examples from the [bbcmicrobot community](https://www.bbcmicrobot.com/owlet-test2.html)
+* Linked to 1000 BBC BASIC code examples from the [bbcmicrobot community](https://www.bbcmicrobot.com/)
 * Based on Monaco editor
 
 ## BBC Micro emulator for instant feedback
