@@ -9,8 +9,9 @@ import "@fortawesome/fontawesome-free/css/all.css";
 const LastProgramKey = "program";
 
 function programUrl(id) {
-    if (window.location.hostname !== "localhost") return `https://bbcmic.ro/assets/${id}`;
-    return `../assets/${id}`;
+    //if (window.location.hostname !== "localhost")
+    return `http://link.bbcmic.ro/state/${id}`;
+    //return `../assets/${id}`;
 }
 
 function updateUiForProgram(id, json, v) {
@@ -36,7 +37,8 @@ async function loadCachedProgram(id) {
     const response = await fetch(programUrl(id));
     if (response.status === 200) {
         const json = await response.json();
-        updateUiForProgram(id, json);
+        json.program = json.toot;
+        updateUiForProgram(id, json, 3);
         return json;
     }
     return null;
@@ -83,7 +85,7 @@ async function getInitialState(id) {
 
     // Try loading an example program.
     const ExampleProgramId = "toot.bas"; // This is the only way I toot now
-    const example = await loadCachedProgram(ExampleProgramId);
+    const example = await state(ExampleProgramId);
     if (example) return OwletEditor.stateForBasicProgram(example.program);
 
     // Failing loading an example program (e.g. running a local server, or some other
@@ -110,7 +112,7 @@ async function initialise() {
     const owletEditor = new OwletEditor(changedText =>
         localStorage.setItem(LastProgramKey, changedText)
     );
-    await owletEditor.initialise(await getInitialState(urlParams.get("load")));
+    await owletEditor.initialise(await getInitialState(urlParams.get("t")));
     window.onhashchange = () => {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
         if (state) {
