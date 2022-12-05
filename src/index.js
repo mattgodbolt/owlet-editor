@@ -8,6 +8,8 @@ import "@fortawesome/fontawesome-free/css/all.css";
 
 const LastProgramKey = "program";
 
+let   StateSnapshot  = null;
+
 function programUrl(id) {
     //if (window.location.hostname !== "localhost")
     return `https://bbcmic.ro/state/${id}`;
@@ -38,6 +40,7 @@ async function loadCachedProgram(id) {
     if (response.status === 200) {
         const json = await response.json();
         json.program = json.toot;
+        json.mode = json.program.mode;
         updateUiForProgram(id, json, 3);
         return json;
     }
@@ -56,7 +59,7 @@ async function getInitialState(id) {
         const result = await loadCachedProgram(id);
         if (!result)
             return OwletEditor.stateForBasicProgram(`REM BBC BASIC program ${id} not found\n`);
-        return OwletEditor.stateForBasicProgram(result.program);
+        return result;
     }
 
     // Try decoding state from the location hash.
@@ -112,6 +115,8 @@ async function initialise() {
     const owletEditor = new OwletEditor(changedText =>
         localStorage.setItem(LastProgramKey, changedText)
     );
+
+    let state =
     await owletEditor.initialise(await getInitialState(urlParams.get("t")));
     window.onhashchange = () => {
         const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
@@ -121,7 +126,7 @@ async function initialise() {
         }
     };
 
-    if (urlParams.get("experimental")) {
+    if (urlParams.get("experimental") || state.mode > 1) {
         console.log("experimental features enabled");
         const rocket = document.getElementById("rocket");
         rocket.style.display = "block";
