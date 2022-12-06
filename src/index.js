@@ -40,7 +40,11 @@ async function loadCachedProgram(id) {
     if (response.status === 200) {
         const json = await response.json();
         json.program = json.toot;
-        json.mode = json.program.mode;
+        if (json.mode > 1) {
+            console.log("experimental features enabled");
+            const rocket = document.getElementById("rocket");
+            rocket.style.display = "block";
+        }
         updateUiForProgram(id, json, 3);
         return json;
     }
@@ -77,6 +81,7 @@ async function getInitialState(id) {
       if (maybeState.v == 3) {
           consumeHash();
           if (maybeState.src) updateUiForProgram(maybeState.src, maybeState,3);
+
           return maybeState;
       }
 
@@ -126,7 +131,7 @@ async function initialise() {
         }
     };
 
-    if (urlParams.get("experimental") || state.mode > 1) {
+    if (urlParams.get("experimental")) {
         console.log("experimental features enabled");
         const rocket = document.getElementById("rocket");
         rocket.style.display = "block";
