@@ -174,14 +174,30 @@ export class OwletEditor {
             .replace(/[)]/g, "%29");
     }
 
-    setState(state) {
-        // Turn invisible characters into equivalent visible ones.
+    async setState(state) {
+
         const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
             return String.fromCharCode(c.charCodeAt(0) | 0x100);
         });
         this.editor.getModel().setValue(basic);
-        this.updateProgram();
         this.selectView("screen");
+
+        if (state.mode > 1){
+        //  Load BBC Micro state snapshot
+          this.updateProgram();
+          this.emulator.start();
+          this.emulator.snapshot.load(state.state,this.emulator.cpu);
+          console.log(state.state)
+          this.emulator.cpu.currentCycles = 2000000*60*60*3;
+          this.emulator.cpu.targetCycles = 2000000*60*60*3;
+          this.emulator.pause();
+          return;
+        } else {
+            this.emulator.gxr();
+            await this.emulator.initialise();
+            this.updateProgram();
+        }
+
     }
 
     lineNumberDetect(text) {
@@ -377,7 +393,10 @@ export class OwletEditor {
     }
 
     async initialise(initialState) {
+
         await this.emulator.initialise();
+
+
         this.tokeniser = await tokenise.create();
 
         const actions = {

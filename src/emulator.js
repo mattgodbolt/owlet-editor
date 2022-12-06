@@ -23,12 +23,6 @@ let modelName = "BBC Micro Model B";
 let beebjit_incoming = false;
 const Model = models.findModel("B");
 
-
-if (!urlParams.get("experimental")) {
-  Model.os.push("gxr.rom");
-  modelName += " | GXR";
-}
-
 class ScreenResizer {
   constructor(screen) {
     this.screen = screen;
@@ -130,6 +124,11 @@ export class Emulator {
   async initialise() {
     await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
     this.ready = true;
+  }
+
+  gxr(){
+      Model.os.push("gxr.rom");
+      modelName += " | GXR";
   }
 
   timer() {
