@@ -174,7 +174,7 @@ export class OwletEditor {
             .replace(/[)]/g, "%29");
     }
 
-    setState(state) {
+    async setState(state) {
 
         const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
             return String.fromCharCode(c.charCodeAt(0) | 0x100);
@@ -194,6 +194,7 @@ export class OwletEditor {
           return;
         } else {
             this.emulator.gxr();
+            await this.emulator.initialise();
             this.updateProgram();
         }
 
