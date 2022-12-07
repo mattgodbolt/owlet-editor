@@ -176,6 +176,8 @@ export class OwletEditor {
 
     async setState(state) {
 
+
+
         const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
             return String.fromCharCode(c.charCodeAt(0) | 0x100);
         });
@@ -183,14 +185,14 @@ export class OwletEditor {
         this.selectView("screen");
 
         if (state.mode > 1){
-        //  Load BBC Micro state snapshot
-          this.updateProgram();
-          this.emulator.start();
+          //  Load BBC Micro state snapshot
+          await this.updateProgram();
+          this.emulator.pause();
           this.emulator.snapshot.load(state.state,this.emulator.cpu);
           console.log(state.state)
           this.emulator.cpu.currentCycles = 2000000*60*60*3;
           this.emulator.cpu.targetCycles = 2000000*60*60*3;
-          this.emulator.pause();
+          this.emulator.start();
           return;
         } else {
             this.emulator.gxr();
