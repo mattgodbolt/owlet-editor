@@ -27,7 +27,7 @@ function updateUiForProgram(id, json, v) {
    if (v==3) {
      let author = /@\w+/g.exec(json.src);
     $("#like")
-        .html(`<a href='${json.src}'><span class="heart">♥</span>code originally posted by ${author} on Mastodon<a>`);
+        .html(`<a href='${json.src}'><span class="heart">♥</span> code posted by ${author} on Mastodon<a>`);
       }
 
 }
