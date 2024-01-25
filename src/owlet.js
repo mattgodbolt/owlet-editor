@@ -189,7 +189,7 @@ export class OwletEditor {
           await this.updateProgram();
           this.emulator.pause();
           this.emulator.snapshot.load(state.state,this.emulator.cpu);
-          console.log(state.state)
+          console.log(state.state);
           this.emulator.cpu.currentCycles = 2000000*60*60*3;
           this.emulator.cpu.targetCycles = 2000000*60*60*3;
           this.emulator.start();
@@ -453,7 +453,7 @@ export class OwletEditor {
                 let addr = saveStartAddr.value;
                 let len = saveLen.value;
                 while (len--) {
-                    var b = this.emulator.readmem(addr++);
+                    let b = this.emulator.readmem(addr++);
                     if (b < 32 || (b >= 127 && b < 161)) {
                         if (b == 10 || b == 13) alert("problematic byte value " + b);
                         b += 0x100;

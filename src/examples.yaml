@@ -1,7 +1,7 @@
 ---
 examples:
   - id: gallery
-    name: Gallery of awesome
+    name: BBC Micro Bot Gallery
     description: Get inspired by 1000 examples of BBC BASIC
     thumb: https://www.bbcmicrobot.com/screenshots/1234923162808119297.gif
     link: https://www.bbcmicrobot.com/index.html

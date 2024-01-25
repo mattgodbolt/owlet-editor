@@ -53,7 +53,7 @@ export default class Snapshot {
       return out;
     }
 
-    let state = {}
+    let state = {};
 
     const mem = copyRegion(0x0000, 0x7fff);
     state.RAM = btoa(mem);
@@ -86,10 +86,10 @@ export default class Snapshot {
     state.ULApalette = [];
     for (let p=0;p<16;p++){
       let pal = (~processor.video.actualPal[p] & 0b00000111) | (processor.video.actualPal[p] & 0b00001000);
-      state.ULApalette.push(pal)
+      state.ULApalette.push(pal);
     }
 
-    var sampleBytes = new Int8Array(1024*32);
+    let sampleBytes = new Int8Array(1024*32);
     for (let i = 0; i <= 0x7fff; i++) {
       sampleBytes[i] = mem.charCodeAt(i);
     }
@@ -112,6 +112,6 @@ export default class Snapshot {
 
     return {
       state
-    }
+    };
   }
 }

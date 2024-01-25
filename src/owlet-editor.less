@@ -4,11 +4,11 @@
 }
 
 .theme-classic {
-  --color-background: #242321;
-  --color-toolbar: #333231;
+  --color-background: #212121;
+  --color-toolbar: #333;
   --color-buttons: #595959;
   --color-editor-bg: #171717;
-  --font-color: #b1a69a;
+  --font-color: #bbb;
   --color-highlight: #5e8040;
   --button-highlight: #6f2020;
   --button-blue: #00536f;
@@ -16,7 +16,7 @@
 
 html,
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Roboto Mono', monospace;
   font-size: small;
 }
 
@@ -47,11 +47,31 @@ body {
 }
 
 .header {
-  grid-column: 1 / span 2;
-  background-image: url("../assets/images/logo.png");
-  background-repeat: no-repeat;
-  background-position: left 10px top 10px;
-  background-size: auto 64px;
+
+  align-items: center;
+
+  display: flex;  
+  direction: row;
+  
+}
+
+.logo{
+  height: 64px;
+  padding: 8px;
+  margin: 8px;
+  align-items: center;
+  vertical-align: middle;
+
+  cursor: pointer;
+}
+
+h1{
+display: inline;
+  color: #eee;
+  font-size: 24px;
+  padding: 8px;
+  vertical-align: top;
+  text-align: center;
 }
 
 .toolbar {
@@ -272,6 +292,8 @@ input {
 
 
 
+
+
 @media (orientation: portrait) {
   .top-level-wrapper {
     height: 90vh;
@@ -281,11 +303,7 @@ input {
   }
 
   .header {
-    grid-column: 1 / span 1;
-    background-image: url("../assets/images/logo.png");
-    background-repeat: no-repeat;
-    background-position: left 10px top 10px;
-    background-size: auto 64px;
+    display: inline;
   }
 
   #emu_toolbar {

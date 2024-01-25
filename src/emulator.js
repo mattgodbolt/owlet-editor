@@ -106,7 +106,7 @@ export class Emulator {
                     this.halted = false;
                     this.targetCycles += numCyclesToRun;
                     return this.executeInternalFast();
-                  }
+                  };
 
     screen.mousemove(event => this.mouseMove(event));
     screen.mouseleave(() => this.mouseLeave());
@@ -151,13 +151,13 @@ export class Emulator {
   async beebjit(tokenised) {
     this.pause();
 
-    beebjit_incoming = true
+    beebjit_incoming = true;
 
     function myCounter() {
-      this.emuStatus.innerHTML +="."
-      if (this.emuStatus.innerHTML.length>18) this.emuStatus.innerHTML = "Calling beebjit"
+      this.emuStatus.innerHTML +=".";
+      if (this.emuStatus.innerHTML.length>18) this.emuStatus.innerHTML = "Calling beebjit";
     }
-    this.emuStatus.innerHTML = "Calling beebjit"
+    this.emuStatus.innerHTML = "Calling beebjit";
     const counterInterval = setInterval(myCounter.bind(this), 200);
     const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
@@ -169,7 +169,7 @@ export class Emulator {
           },
         }
       );
-      beebjit_incoming = false
+      beebjit_incoming = false;
       this.state = await response.json();
       const t0 = performance.now();
       this.snapshot.load(this.state,this.cpu);
@@ -179,7 +179,7 @@ export class Emulator {
       this.loopLength= 6000000 + 320000;
 
       const t1 = performance.now();
-      const t2 = Math.round((t1 - t0)*1000)/1000
+      const t2 = Math.round((t1 - t0)*1000)/1000;
       console.log(`State snapshot loaded in ${t2}ms.`);
 
       this.start();
@@ -190,7 +190,7 @@ export class Emulator {
 
     async runProgram(tokenised) {
       if (!this.ready) return;
-      console.log(this.cpu.currentCycles)
+      console.log(this.cpu.currentCycles);
       this.cpu.reset(true);
       const processor = this.cpu;
       await processor.execute(BotStartCycles); // match bbcmicrobot
@@ -232,7 +232,7 @@ export class Emulator {
         this.pause();
         this.state = this.snapshot.save(this.cpu).state;
         this.start();
-        console.log("snapshot taken at "+this.cpu.currentCycles+" cycles")
+        console.log("snapshot taken at "+this.cpu.currentCycles+" cycles");
       }
 
       // Loop back
@@ -303,10 +303,10 @@ export class Emulator {
       this.showCoords = true;
       const processor = this.cpu;
       const screen = this.root.find(".screen");
-      var screenMode = processor.readmem(0x0355);
-      var W;
-      var H;
-      var graphicsMode = true;
+      let screenMode = processor.readmem(0x0355);
+      let W;
+      let H;
+      let graphicsMode = true;
       switch (screenMode) {
         case 0:
           W = 80; H = 32; break;
@@ -328,13 +328,13 @@ export class Emulator {
       }
       // 8 and 16 here are fudges to allow for a margin around the screen
       // canvas - not sure exactly where that comes from...
-      var x = event.offsetX - 8;
-      var y = event.offsetY - 8;
+      let x = event.offsetX - 8;
+      let y = event.offsetY - 8;
       const sw = screen.width() - 16;
       const sh = screen.height() - 16;
-      var X = Math.floor(x * W / sw);
-      var Y = Math.floor(y * H / sh);
-      var html = `Text: (${X},${Y})`;
+      let X = Math.floor(x * W / sw);
+      let Y = Math.floor(y * H / sh);
+      let html = `Text: (${X},${Y})`;
       if (graphicsMode) {
          // Graphics Y increases up the screen.
          y = sh - y;

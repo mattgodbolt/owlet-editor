@@ -5,6 +5,7 @@ import {OwletEditor} from "./owlet";
 import {backwardCompat} from "./tokens";
 import "@fortawesome/fontawesome-free/js/all.js";
 import "@fortawesome/fontawesome-free/css/all.css";
+import logo from "../assets/images/monster.png";
 
 const LastProgramKey = "program";
 
@@ -71,7 +72,7 @@ async function getInitialState(id) {
 
       if (maybeState.v == 1) {
           consumeHash();
-          if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program)}
+          if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program);}
           if (maybeState.id) updateUiForProgram(maybeState.id, maybeState,1);
           return maybeState;
       }
@@ -110,11 +111,30 @@ async function initialise() {
     setTheme("theme-classic");
 
     $("body").append(rootHtml);
+
+    // if the t parameter is set
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const t = urlParams.get("t");
+    if (t) {
+        $("#logo").attr("src", logo);
+        $("#logo").attr("height", "48px");
+        $("#logo").attr("alt", "BBC Microbot gallery");
+        const link = document.querySelector("link[rel*='icon']") || document.createElement("link");
+        link.type = "image/x-icon";
+        link.rel = "shortcut icon";
+        link.href = logo;
+        document.title = "BBC Microbot - Owlet Editor";
+        $("#logo").click(() => {
+            window.location.href = "https://www.bbcmicrobot.com";
+        });
+    }
+
+
     registerBbcBasicLanguage();
 
     // Check if we reference a cached tweet on first load and convert it to URL hash
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
+  
     const owletEditor = new OwletEditor(changedText =>
         localStorage.setItem(LastProgramKey, changedText)
     );
