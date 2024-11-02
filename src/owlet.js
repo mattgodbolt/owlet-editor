@@ -10,7 +10,7 @@ import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
-import tokenise from "jsbeeb/basic-tokenise";
+import * as tokenise from "jsbeeb/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
 import {makeUEF} from "./UEF";
