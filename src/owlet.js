@@ -28,14 +28,13 @@ export class OwletEditor {
     constructor(onChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
-        this.observer = new ResizeObserver(() => this.editor.layout());
-        this.observer.observe(editorPane.parent()[0]);
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
 
         monacoEditor.defineTheme("bbcbasicTheme", {
             base: "vs-dark",
             inherit: true,
+            colors: {},
             rules: [
                 {token: "variable", foreground: "bb8844"},
                 {token: "number", foreground: "22bb88"},
@@ -73,7 +72,7 @@ export class OwletEditor {
         this.editor.addAction({
             id: "expand-code",
             label: "Expand code",
-            keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
+            keybindings: [KeyMod.CtrlCmd | KeyCode.KeyE],
             keybindingContext: null,
             contextMenuGroupId: "navigation",
             contextMenuOrder: 1.5,
@@ -89,6 +88,8 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
+        this.observer = new ResizeObserver(() => this.editor.layout());
+        this.observer.observe(editorPane.parent()[0]);
 
         this.examples = {};
         for (const example of Examples.examples) this.addExample(example);
