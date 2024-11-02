@@ -76,13 +76,8 @@
   "homepage": "https://github.com/mattgodbolt/owlet-editor#readme",
   "private": true,
   "author": "",
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
-  },
   "lint-staged": {
-    "*.js": "eslint --cache --fix",
-    "*.{js,css,md}": "prettier --write"
+    "*.js": ["eslint --cache --fix", "prettier --write"],
+    "*.{css,md}": ["prettier --write"]
   }
 }
