@@ -163,7 +163,7 @@ module.exports = {
             },
             {
                 test: /\.ya?ml$/,
-                use: ["json-loader", "yaml-loader"],
+                use: ["yaml-loader"],
             },
             {
                 test: /.rom$/i,
