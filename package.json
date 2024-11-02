@@ -25,7 +25,6 @@
     "jsbeeb": "github:mattgodbolt/jsbeeb#636f0b9e7668e2a1eaf45b7b1967ff9a045f66cc",
     "monaco-editor": "^0.52.0",
     "promise": "^8.3.0",
-    "resize-observer-polyfill": "^1.5.1",
     "underscore": "^1.13.7",
     "webgl-debug": "^2.0.1"
   },

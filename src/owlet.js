@@ -13,7 +13,6 @@ import {encode} from "base2048";
 import tokenise from "jsbeeb/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
-import ResizeObserver from "resize-observer-polyfill";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 
@@ -57,6 +56,7 @@ export class OwletEditor {
             scrollBeyondLastLine: false,
             wordWrap: "on",
             lineDecorationsWidth: 0,
+            automaticLayout: true,
         });
 
         this.editor.addAction({
@@ -88,8 +88,6 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
-        this.observer = new ResizeObserver(() => this.editor.layout());
-        this.observer.observe(editorPane.parent()[0]);
 
         this.examples = {};
         for (const example of Examples.examples) this.addExample(example);
