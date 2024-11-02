@@ -32,7 +32,6 @@ export default [{
             "no-unused-vars": ["error", {
             "caughtErrorsIgnorePattern": "^e$"
         }]
-
     },
 }, {
     files: ["**/webpack.config.js"],
