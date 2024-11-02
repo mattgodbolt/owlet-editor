@@ -145,7 +145,7 @@ async function initialise() {
 
     await owletEditor.initialise(await getInitialState(urlParams.get("t")));
     window.onhashchange = () => {
-        const state = OwletEditor.decodeStateString(window.location.hash.substr(1));
+        const state = OwletEditor.decodeStateString(window.location.hash.substring(1));
         if (state) {
             owletEditor.setState(state);
             consumeHash();

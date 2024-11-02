@@ -99,12 +99,21 @@ export class OwletEditor {
         return {v: StateVersion, program: program};
     }
 
-    static decodeStateString(stateString) {
+    static decodeStateString(stateString, fixup = true) {
         try {
             const state = JSON.parse(decodeURIComponent(stateString));
             if (state.v !== 3 && state.v !== 1) return null;
             return state;
         } catch (e) {
+            if (e instanceof URIError && fixup) {
+                // URLs shared on Discord lose the "%25" that encodes a literal "%". Handle this as best we can.
+                // See https://github.com/mattgodbolt/owlet-editor/issues/103
+                const fixupRegex = /%([^0-9A-F][^0-9A-F]?)/g;
+                return OwletEditor.decodeStateString(
+                    stateString.replaceAll(fixupRegex, "%25$1"),
+                    false,
+                );
+            }
             return null;
         }
     }
