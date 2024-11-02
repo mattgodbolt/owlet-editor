@@ -1,12 +1,18 @@
 {
   "name": "owlet-editor",
+  "version": "0.0.1",
   "description": "Web-based IDE for the BBC Micro",
-  "authors": [
-    {
-      "name": "Matt Godbolt",
-      "email": "matt@godbolt.org",
-      "url": "https://xania.org"
-    },
+  "homepage": "https://github.com/mattgodbolt/owlet-editor#readme",
+  "bugs": {
+    "url": "https://github.com/mattgodbolt/owlet-editor/issues"
+  },
+  "license": "BSD-2-Clause",
+  "author": {
+    "name": "Matt Godbolt",
+    "email": "matt@godbolt.org",
+    "url": "https://xania.org"
+  },
+  "contributors": [
     {
       "name": "Dominic Pajak",
       "url": "https://www.dompajak.com/"
@@ -16,7 +22,7 @@
     "type": "git",
     "url": "git+https://github.com/mattgodbolt/owlet-editor.git"
   },
-  "version": "0.0.1",
+  "private": true,
   "dependencies": {
     "base2048": "^2.0.2",
     "glob": "^11.0.0",
@@ -71,19 +77,12 @@
     "lint-fix": "eslint --fix .",
     "test": "env TESTBUILD=true webpack && mocha dist/test/main.js"
   },
-  "license": "BSD-2-Clause",
-  "bugs": {
-    "url": "https://github.com/mattgodbolt/owlet-editor/issues"
-  },
-  "homepage": "https://github.com/mattgodbolt/owlet-editor#readme",
-  "private": true,
-  "author": "",
   "lint-staged": {
     "*.{mjs,js,ts}": [
       "eslint --cache --fix",
       "prettier --write"
     ],
-    "*.{css,md}": [
+    "*.{css,md,yaml,json}": [
       "prettier --write"
     ]
   }
