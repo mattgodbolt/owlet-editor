@@ -441,4 +441,8 @@ export class Emulator {
 
         return ret;
     }
+
+    readmem(address) {
+        return this.cpu.readmem(address);
+    }
 }
