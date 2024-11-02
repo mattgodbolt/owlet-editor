@@ -80,7 +80,7 @@
   "private": true,
   "author": "",
   "lint-staged": {
-    "*.m?js": [
+    "*.{mjs,js,ts}": [
       "eslint --cache --fix",
       "prettier --write"
     ],
