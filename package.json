@@ -19,7 +19,7 @@
   "version": "0.0.1",
   "dependencies": {
     "base2048": "^2.0.2",
-    "glob": "^7.2.3",
+    "glob": "^11.0.0",
     "html-webpack-partials-plugin": "^0.8.0",
     "jquery": "^3.7.1",
     "jsbeeb": "github:mattgodbolt/jsbeeb#636f0b9e7668e2a1eaf45b7b1967ff9a045f66cc",
