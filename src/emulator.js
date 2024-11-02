@@ -1,13 +1,13 @@
 import _ from "underscore";
-import Cpu6502 from "jsbeeb/6502";
-import canvasLib from "jsbeeb/canvas";
-import Video from "jsbeeb/video";
-import Debugger from "jsbeeb/debug";
-import SoundChip from "jsbeeb/soundchip";
-import DdNoise from "jsbeeb/ddnoise";
-import models from "jsbeeb/models";
-import Cmos from "jsbeeb/cmos";
-import utils from "jsbeeb/utils";
+import {Cpu6502} from "jsbeeb/6502";
+import * as canvasLib from "jsbeeb/canvas";
+import {Video} from "jsbeeb/video";
+import {Debugger} from "jsbeeb/web/debug";
+import {FakeSoundChip} from "jsbeeb/soundchip";
+import {FakeDdNoise} from "jsbeeb/ddnoise";
+import * as models from "jsbeeb/models";
+import {Cmos} from "jsbeeb/cmos";
+import * as utils from "jsbeeb/utils";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "snapshot";
@@ -49,6 +49,30 @@ class ScreenResizer {
     }
 }
 
+class Emulator6502 extends Cpu6502 {
+    constructor(model, dbgr, video, soundChip, ddNoise, cmos, config) {
+        super(
+            model,
+            dbgr,
+            video,
+            soundChip,
+            ddNoise,
+            null, // Music5000
+            cmos,
+            config,
+            null, // econet
+        );
+    }
+
+    execute(numCyclesToRun) {
+        // Patch to stop it resetting cycle count on execute.
+        // Number.MAX_SAFE_INTEGER should gives us plenty of headroom
+        this.halted = false;
+        this.targetCycles += numCyclesToRun;
+        return this.executeInternalFast();
+    }
+}
+
 export class Emulator {
     constructor(root) {
         this.root = root;
@@ -72,10 +96,10 @@ export class Emulator {
 
         window.theEmulator = this;
 
-        this.video = new Video.Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
+        this.video = new Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
-        this.soundChip = new SoundChip.FakeSoundChip();
-        this.ddNoise = new DdNoise.FakeDdNoise();
+        this.soundChip = new FakeSoundChip();
+        this.ddNoise = new FakeDdNoise();
 
         this.dbgr = new Debugger(this.video);
         const cmos = new Cmos({
@@ -90,7 +114,7 @@ export class Emulator {
             },
         });
         const config = {};
-        this.cpu = new Cpu6502(
+        this.cpu = new Emulator6502(
             Model,
             this.dbgr,
             this.video,
@@ -99,14 +123,6 @@ export class Emulator {
             cmos,
             config,
         );
-
-        // Patch this version of JSbeeb to stop it reseting cycle count.
-        // Number.MAX_SAFE_INTEGER should gives us plenty of headroom
-        this.cpu.execute = function (numCyclesToRun) {
-            this.halted = false;
-            this.targetCycles += numCyclesToRun;
-            return this.executeInternalFast();
-        };
 
         screen.mousemove(event => this.mouseMove(event));
         screen.mouseleave(() => this.mouseLeave());
@@ -158,6 +174,7 @@ export class Emulator {
             this.emuStatus.innerHTML += ".";
             if (this.emuStatus.innerHTML.length > 18) this.emuStatus.innerHTML = "Calling beebjit";
         }
+
         this.emuStatus.innerHTML = "Calling beebjit";
         const counterInterval = setInterval(myCounter.bind(this), 200);
         const basic = btoa(tokenised).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -191,7 +208,6 @@ export class Emulator {
 
     async runProgram(tokenised) {
         if (!this.ready) return;
-        console.log(this.cpu.currentCycles);
         this.cpu.reset(true);
         const processor = this.cpu;
         await processor.execute(BotStartCycles); // match bbcmicrobot
