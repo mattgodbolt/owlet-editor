@@ -60,8 +60,3 @@ dist: export NODE_ENV=production
 dist: export WEBPACK_ARGS=-p
 dist: prereqs webpack  ## Creates a distribution
 	echo $(HASH) > dist/git_hash
-
-.PHONY: install-git-hooks
-install-git-hooks:  ## Install git hooks that will ensure code is linted and tests are run before allowing a check in
-	mkdir -p "$(shell git rev-parse --git-dir)/hooks"
-	ln -sf "$(shell pwd)/scripts/pre-commit-hook.sh" "$(shell git rev-parse --git-dir)/hooks/pre-commit"
