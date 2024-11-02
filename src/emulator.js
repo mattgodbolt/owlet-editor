@@ -245,7 +245,7 @@ export class Emulator {
     frameFunc(now) {
         requestAnimationFrame(this.onAnimFrame);
         // Take snapshot
-        if (this.loop === true && this.state === null && this.cpu.currentCycles >= this.loopStart) {
+        if (this.loop && !this.state && this.cpu.currentCycles >= this.loopStart) {
             this.pause();
             this.state = this.snapshot.save(this.cpu).state;
             this.start();
@@ -253,11 +253,7 @@ export class Emulator {
         }
 
         // Loop back
-        if (
-            this.loop === true &&
-            this.state !== null &&
-            this.cpu.currentCycles >= this.loopStart + this.loopLength
-        ) {
+        if (this.loop && this.state && this.cpu.currentCycles >= this.loopStart + this.loopLength) {
             this.pause();
             this.snapshot.load(this.state, this.cpu);
             this.cpu.currentCycles = this.loopStart;
