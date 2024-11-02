@@ -333,7 +333,7 @@ function detokeniseInternal(text, handler) {
             if (
                 identifier === "REM" ||
                 identifier === "DATA" ||
-                (ch == "." && "DAT".startsWith(identifier))
+                (ch === "." && "DAT".startsWith(identifier))
             ) {
                 // Untokenised REM or DATA or abbreviated DATA.
                 leaveRestOfLine = true;
@@ -342,7 +342,7 @@ function detokeniseInternal(text, handler) {
             if (
                 (ch >= "A" && ch <= "Z") ||
                 (ch >= "a" && ch <= "z") ||
-                ch == "_" ||
+                ch === "_" ||
                 (identifier !== undefined && ch >= "0" && ch <= "9")
             ) {
                 if (identifier === undefined) {

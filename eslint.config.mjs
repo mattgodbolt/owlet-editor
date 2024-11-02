@@ -29,6 +29,7 @@ export default [
         },
 
         rules: {
+            eqeqeq: "error",
             "no-var": "error",
             semi: "error",
             "no-control-regex": "off",

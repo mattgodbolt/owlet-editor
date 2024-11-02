@@ -198,7 +198,6 @@ export class OwletEditor {
             this.emulator.cpu.currentCycles = 2000000 * 60 * 60 * 3;
             this.emulator.cpu.targetCycles = 2000000 * 60 * 60 * 3;
             this.emulator.start();
-            return;
         } else {
             this.emulator.gxr();
             await this.emulator.initialise();
@@ -346,10 +345,11 @@ export class OwletEditor {
 
     async rocket() {
         this.updateProgram();
-        $("#rocket").addClass("backgroundAnimated");
+        const $rocket = $("#rocket");
+        $rocket.addClass("backgroundAnimated");
         const program = await this.tokeniser.tokenise(this.getBasicText());
         await this.emulator.beebjit(program);
-        $("#rocket").removeClass("backgroundAnimated");
+        $rocket.removeClass("backgroundAnimated");
     }
 
     async downloadDisc() {
@@ -457,7 +457,7 @@ export class OwletEditor {
                 while (len--) {
                     let b = this.emulator.readmem(addr++);
                     if (b < 32 || (b >= 127 && b < 161)) {
-                        if (b == 10 || b == 13) alert("problematic byte value " + b);
+                        if (b === 10 || b === 13) alert("problematic byte value " + b);
                         b += 0x100;
                     }
                     data += String.fromCodePoint(b);
