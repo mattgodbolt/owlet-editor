@@ -22,7 +22,7 @@ function getOptimizationSettings() {
     if (isTest) return undefined;
     return {
         minimize: !isDev,
-        minimizer: [new CssMinimizerPlugin(), new TerserPlugin()]
+        minimizer: [new CssMinimizerPlugin(), new TerserPlugin()],
     };
 }
 
@@ -34,30 +34,30 @@ function getPlugins() {
                 {
                     context: path.resolve(__dirname, "node_modules"),
                     from: "jsbeeb/roms/**/*",
-                    globOptions: {ignore: ["**/*.txt", "**/*README*"]}
+                    globOptions: {ignore: ["**/*.txt", "**/*README*"]},
                 },
                 {
                     context: path.resolve(__dirname, "node_modules"),
-                    from: "jsbeeb/sounds/**/*.wav"
-                }
-            ]
+                    from: "jsbeeb/sounds/**/*.wav",
+                },
+            ],
         }),
         new MonacoWebpackPlugin({
             languages: [],
-            filename: isDev ? "[name].worker.js" : `[name].worker.[contenthash].js`
+            filename: isDev ? "[name].worker.js" : `[name].worker.[contenthash].js`,
         }),
         new MiniCssExtractPlugin({
-            filename: isDev ? "[name].css" : "[name].[contenthash].css"
+            filename: isDev ? "[name].css" : "[name].[contenthash].css",
         }),
         new HtmlWebpackPlugin({
-            title: "Owlet BBC BASIC Editor"
+            title: "Owlet BBC BASIC Editor",
         }),
         new HtmlWebpackPartialsPlugin([
             {
                 path: path.resolve(__dirname, "src", "analytics.html"),
                 location: "head",
-                priority: "high"
-            }
+                priority: "high",
+            },
         ]),
         new FaviconsWebpackPlugin({
             logo: "./assets/images/owlet.png",
@@ -65,10 +65,10 @@ function getPlugins() {
             favicons: {
                 icons: {
                     appleIcon: false,
-                    appleStartup: false
-                }
-            }
-        })
+                    appleStartup: false,
+                },
+            },
+        }),
     ];
     if (isTest) {
         plugins.push(
@@ -82,9 +82,9 @@ function getPlugins() {
                             "build",
                             "Release"
                         ),
-                        from: "*.so*"
-                    }
-                ]
+                        from: "*.so*",
+                    },
+                ],
             })
         );
     }
@@ -99,14 +99,14 @@ module.exports = {
     externals: isTest ? ["bufferutil", "utf-8-validate"] : [],
     output: {
         filename: isDev ? "[name].js" : `[name].[contenthash].js`,
-        path: outputPath
+        path: outputPath,
     },
     resolve: {
         alias: {
             jsunzip: path.resolve(__dirname, "node_modules/jsbeeb/lib/jsunzip.js"),
-            fs: path.resolve(__dirname, "src/fake-fs.js")
+            fs: path.resolve(__dirname, "src/fake-fs.js"),
         },
-        preferRelative: true // ugly, for jsbeeb and its love of non-relative imports
+        preferRelative: true, // ugly, for jsbeeb and its love of non-relative imports
     },
     devtool: "source-map",
     plugins: getPlugins(),
@@ -114,15 +114,15 @@ module.exports = {
         hot: isDev,
         static: {
             publicPath: "/",
-            directory: "./"
-        }
+            directory: "./",
+        },
     },
     optimization: getOptimizationSettings(),
     module: {
         rules: [
             {
                 test: /\.(jpg|png)$/,
-                type: "asset/inline"
+                type: "asset/inline",
             },
             {
                 test: /\.less$/,
@@ -130,14 +130,14 @@ module.exports = {
                     isDev
                         ? "style-loader"
                         : {
-                            loader: MiniCssExtractPlugin.loader,
-                            options: {
-                                publicPath: "./"
-                            }
-                        },
+                              loader: MiniCssExtractPlugin.loader,
+                              options: {
+                                  publicPath: "./",
+                              },
+                          },
                     "css-loader",
-                    "less-loader"
-                ]
+                    "less-loader",
+                ],
             },
             {
                 test: /\.css$/,
@@ -145,34 +145,34 @@ module.exports = {
                     isDev
                         ? "style-loader"
                         : {
-                            loader: MiniCssExtractPlugin.loader,
-                            options: {
-                                publicPath: "./"
-                            }
-                        },
-                    "css-loader"
-                ]
+                              loader: MiniCssExtractPlugin.loader,
+                              options: {
+                                  publicPath: "./",
+                              },
+                          },
+                    "css-loader",
+                ],
             },
             {
                 test: /\.ttf$/,
-                type: "asset/resource"
+                type: "asset/resource",
             },
             {
                 test: /\.(html)$/,
-                loader: "html-loader"
+                loader: "html-loader",
             },
             {
                 test: /\.ya?ml$/,
-                use: ["json-loader", "yaml-loader"]
+                use: ["json-loader", "yaml-loader"],
             },
             {
                 test: /.rom$/i,
-                use: ["binary-loader"]
+                use: ["binary-loader"],
             },
             {
                 test: /\.node$/,
-                loader: "node-loader"
-            }
-        ]
-    }
+                loader: "node-loader",
+            },
+        ],
+    },
 };

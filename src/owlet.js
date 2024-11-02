@@ -101,7 +101,7 @@ export class OwletEditor {
     static decodeStateString(stateString) {
         try {
             const state = JSON.parse(decodeURIComponent(stateString));
-            if (state.v !== 3 && state.v !== 1 ) return null;
+            if (state.v !== 3 && state.v !== 1) return null;
             return state;
         } catch (e) {
             return null;
@@ -175,31 +175,27 @@ export class OwletEditor {
     }
 
     async setState(state) {
-
-
-
         const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
             return String.fromCharCode(c.charCodeAt(0) | 0x100);
         });
         this.editor.getModel().setValue(basic);
         this.selectView("screen");
 
-        if (state.mode > 1){
-          //  Load BBC Micro state snapshot
-          await this.updateProgram();
-          this.emulator.pause();
-          this.emulator.snapshot.load(state.state,this.emulator.cpu);
-          console.log(state.state);
-          this.emulator.cpu.currentCycles = 2000000*60*60*3;
-          this.emulator.cpu.targetCycles = 2000000*60*60*3;
-          this.emulator.start();
-          return;
+        if (state.mode > 1) {
+            //  Load BBC Micro state snapshot
+            await this.updateProgram();
+            this.emulator.pause();
+            this.emulator.snapshot.load(state.state, this.emulator.cpu);
+            console.log(state.state);
+            this.emulator.cpu.currentCycles = 2000000 * 60 * 60 * 3;
+            this.emulator.cpu.targetCycles = 2000000 * 60 * 60 * 3;
+            this.emulator.start();
+            return;
         } else {
             this.emulator.gxr();
             await this.emulator.initialise();
             this.updateProgram();
         }
-
     }
 
     lineNumberDetect(text) {
@@ -300,7 +296,7 @@ export class OwletEditor {
         const saveLen = document.getElementById("saveLen");
         saveModal.style.display = "block";
         const PAGE = this.emulator.readmem(0x18) << 8;
-        const TOP = this.emulator.readmem(0x13) << 8 | this.emulator.readmem(0x12);
+        const TOP = (this.emulator.readmem(0x13) << 8) | this.emulator.readmem(0x12);
         saveStartAddr.value = PAGE;
         saveLen.value = TOP - PAGE;
     }
@@ -395,9 +391,7 @@ export class OwletEditor {
     }
 
     async initialise(initialState) {
-
         await this.emulator.initialise();
-
 
         this.tokeniser = await tokenise.create();
 
@@ -447,7 +441,7 @@ export class OwletEditor {
                 this.closeModal();
             },
             copyMem: () => {
-                let data = '';
+                let data = "";
                 const saveStartAddr = document.getElementById("saveStartAddr");
                 const saveLen = document.getElementById("saveLen");
                 let addr = saveStartAddr.value;

@@ -330,17 +330,21 @@ function detokeniseInternal(text, handler) {
             identifier = undefined;
             handler.onCharCode(charCode);
         } else {
-            if (identifier === 'REM' ||
-                identifier === 'DATA' ||
-                (ch == '.' && 'DAT'.startsWith(identifier))) {
+            if (
+                identifier === "REM" ||
+                identifier === "DATA" ||
+                (ch == "." && "DAT".startsWith(identifier))
+            ) {
                 // Untokenised REM or DATA or abbreviated DATA.
                 leaveRestOfLine = true;
             }
             handler.onCharacter(ch);
-            if ((ch >= "A" && ch <= "Z") ||
+            if (
+                (ch >= "A" && ch <= "Z") ||
                 (ch >= "a" && ch <= "z") ||
                 ch == "_" ||
-                (identifier !== undefined && ch >= "0" && ch <= "9")) {
+                (identifier !== undefined && ch >= "0" && ch <= "9")
+            ) {
                 if (identifier === undefined) {
                     identifier = ch;
                 } else {
@@ -418,7 +422,6 @@ function decode2048(input) {
     }
 }
 
-
 // Compatibility with pre-tokenizer keyboard buffer method
 //
 // Only some token values make it through.
@@ -432,14 +435,16 @@ export function backwardCompat(text) {
     let output = "";
     const codePoints = [...text].map(char => char.charCodeAt(0));
     for (const charCode of codePoints) {
-      let newCode = charCode & 0xff;
-      // U+0090-U+009A. U+00A0-U+00AA map to byte 16 lower
-      let ranges16 = ((newCode>=0x90 && newCode <=0x9A) || (newCode>=0xA0 && newCode<=0xAA));
-      // U+00D0-U+00DA, U+00E0-U+00EA, U+00F0-U+00FA
-      //let rangesOK = ((newCode>=0xD0 && newCode <=0xDA) || (newCode>=0xE0 && newCode<=0xEA) || (newCode>=0xF0 && newCode<=0xFA))
-      if (ranges16) {newCode=newCode-16;}
+        let newCode = charCode & 0xff;
+        // U+0090-U+009A. U+00A0-U+00AA map to byte 16 lower
+        let ranges16 = (newCode >= 0x90 && newCode <= 0x9a) || (newCode >= 0xa0 && newCode <= 0xaa);
+        // U+00D0-U+00DA, U+00E0-U+00EA, U+00F0-U+00FA
+        //let rangesOK = ((newCode>=0xD0 && newCode <=0xDA) || (newCode>=0xE0 && newCode<=0xEA) || (newCode>=0xF0 && newCode<=0xFA))
+        if (ranges16) {
+            newCode = newCode - 16;
+        }
 
-      output += String.fromCodePoint(newCode);
+        output += String.fromCodePoint(newCode);
     }
     return output;
 }

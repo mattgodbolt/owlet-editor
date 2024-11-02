@@ -172,7 +172,9 @@ export function registerBbcBasicLanguage() {
 
     // Register a completion item provider for the new language
     // Filter out immediate tokens which aren't valid in a program
-    const uniqueTokens = [...new Set(keywords.filter(kw => kw.token < 0xc6 || kw.token > 0xcd).map(kw => kw.keyword))];
+    const uniqueTokens = [
+        ...new Set(keywords.filter(kw => kw.token < 0xc6 || kw.token > 0xcd).map(kw => kw.keyword)),
+    ];
     languages.registerCompletionItemProvider("BBCBASIC", {
         provideCompletionItems: (model, position) => {
             const linePrefix = model.getLineContent(position.lineNumber).substr(0, position.column);

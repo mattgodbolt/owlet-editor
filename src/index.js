@@ -16,20 +16,20 @@ function programUrl(id) {
 }
 
 function updateUiForProgram(id, json, v) {
+    // Twitter
+    if (v == 1) {
+        $("#like").html(
+            `<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`
+        );
+    }
 
-  // Twitter
-   if (v==1) {
-    $("#like")
-        .html(`<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`);
-      }
-
-  // Mastodon
-   if (v==3) {
-     let author = /@\w+/g.exec(json.src);
-    $("#like")
-        .html(`<a href='${json.src}'><span class="heart">♥</span> code posted by ${author} on Mastodon<a>`);
-      }
-
+    // Mastodon
+    if (v == 3) {
+        let author = /@\w+/g.exec(json.src);
+        $("#like").html(
+            `<a href='${json.src}'><span class="heart">♥</span> code posted by ${author} on Mastodon<a>`
+        );
+    }
 }
 
 window.u = updateUiForProgram;
@@ -68,23 +68,23 @@ async function getInitialState(id) {
     // Try decoding state from the location hash.
     let maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
 
-    if (maybeState !== null){
+    if (maybeState !== null) {
+        if (maybeState.v == 1) {
+            consumeHash();
+            if (maybeState.date < 1590994800) {
+                maybeState.program = backwardCompat(maybeState.program);
+            }
+            if (maybeState.id) updateUiForProgram(maybeState.id, maybeState, 1);
+            return maybeState;
+        }
 
-      if (maybeState.v == 1) {
-          consumeHash();
-          if (maybeState.date<1590994800) {maybeState.program = backwardCompat(maybeState.program);}
-          if (maybeState.id) updateUiForProgram(maybeState.id, maybeState,1);
-          return maybeState;
-      }
+        if (maybeState.v == 3) {
+            consumeHash();
+            if (maybeState.src) updateUiForProgram(maybeState.src, maybeState, 3);
 
-      if (maybeState.v == 3) {
-          consumeHash();
-          if (maybeState.src) updateUiForProgram(maybeState.src, maybeState,3);
-
-          return maybeState;
-      }
-
-  }
+            return maybeState;
+        }
+    }
 
     // If there's no state in the URL, look at the last program the user had in their browser.
     const lastProgram = localStorage.getItem(LastProgramKey);
@@ -97,7 +97,12 @@ async function getInitialState(id) {
 
     // Failing loading an example program (e.g. running a local server, or some other
     // error), then use a boring built-in program.
-    const FallbackDefaultProgram = ["MODE 2","COLOUR RND(7)",'PRINT "HELLO WORLD"', "GOTO 20"].join("\n");
+    const FallbackDefaultProgram = [
+        "MODE 2",
+        "COLOUR RND(7)",
+        'PRINT "HELLO WORLD"',
+        "GOTO 20",
+    ].join("\n");
 
     return OwletEditor.stateForBasicProgram(FallbackDefaultProgram);
 }
@@ -130,11 +135,10 @@ async function initialise() {
         });
     }
 
-
     registerBbcBasicLanguage();
 
     // Check if we reference a cached tweet on first load and convert it to URL hash
-  
+
     const owletEditor = new OwletEditor(changedText =>
         localStorage.setItem(LastProgramKey, changedText)
     );
@@ -153,7 +157,6 @@ async function initialise() {
         const rocket = document.getElementById("rocket");
         rocket.style.display = "block";
     }
-
 }
 
 initialise().then(() => {
