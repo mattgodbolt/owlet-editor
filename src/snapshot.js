@@ -38,7 +38,7 @@ export default class Snapshot {
         for (let p = 0; p < 16; p++) {
             processor.writemem(
                 0xfe21,
-                (p << 4) | (~state.ULApalette[p] & 0b00000111) | (state.ULApalette[p] & 0b00001000)
+                (p << 4) | (~state.ULApalette[p] & 0b00000111) | (state.ULApalette[p] & 0b00001000),
             );
         }
     }

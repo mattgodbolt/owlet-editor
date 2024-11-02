@@ -7,7 +7,7 @@ function checkTokens(text, ...expected) {
         line.map(t => ({
             offset: t.offset,
             type: t.type.replace(".BBCBASIC", ""),
-        }))
+        })),
     );
     assert.deepStrictEqual(tokenized, [...expected]);
 }
@@ -31,7 +31,7 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "keyword"},
                 {offset: 5, type: "variable"},
-            ]
+            ],
         );
     });
     it("should work with assignments", () => {
@@ -41,7 +41,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "variable"},
                 {offset: 1, type: "operator"},
                 {offset: 2, type: "number"},
-            ]
+            ],
         );
         checkTokens(
             ["N%=1"],
@@ -49,7 +49,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "variable"},
                 {offset: 2, type: "operator"},
                 {offset: 3, type: "number"},
-            ]
+            ],
         );
         checkTokens(
             ["N$=1"],
@@ -57,7 +57,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "variable"},
                 {offset: 2, type: "operator"},
                 {offset: 3, type: "number"},
-            ]
+            ],
         );
         checkTokens(
             ["N$ = 1"],
@@ -67,7 +67,7 @@ describe("Tokenisation", () => {
                 {offset: 3, type: "operator"},
                 {offset: 4, type: "white"},
                 {offset: 5, type: "number"},
-            ]
+            ],
         );
     });
     describe("number checks", () => {
@@ -83,7 +83,7 @@ describe("Tokenisation", () => {
                         offset: 2,
                         type: type,
                     },
-                ]
+                ],
             );
         };
         it("should recognise integer numbers", () => {
@@ -122,7 +122,7 @@ describe("Tokenisation", () => {
                 {offset: 11, type: "number"}, // 22400
                 {offset: 16, type: "keyword"}, // STEP
                 {offset: 20, type: "number"}, // 100
-            ]
+            ],
         );
     });
     it("should recognise percent variables", () => {
@@ -147,7 +147,7 @@ describe("Tokenisation", () => {
                 {offset: 13, type: "string"},
                 {offset: 15, type: "string.quote"},
                 {offset: 16, type: "delimiter.parenthesis"},
-            ]
+            ],
         );
     });
     it("should not recognize bad abbreviations", () => {
@@ -167,14 +167,14 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "enum"},
                 {offset: 1, type: "keyword"},
-            ]
+            ],
         );
         checkTokens(
             ["[LDA"],
             [
                 {offset: 0, type: "delimiter.square"},
                 {offset: 1, type: "keyword"},
-            ]
+            ],
         );
         checkTokens(
             ["[", "OPTN%"],
@@ -182,7 +182,7 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "keyword.directive"},
                 {offset: 3, type: "variable"},
-            ]
+            ],
         );
         checkTokens(
             ["[", "EQUB LENA$"],
@@ -192,7 +192,7 @@ describe("Tokenisation", () => {
                 {offset: 4, type: "white"},
                 {offset: 5, type: "keyword"},
                 {offset: 8, type: "variable"},
-            ]
+            ],
         );
         checkTokens(
             ["[", "EQUSFNx"],
@@ -201,7 +201,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "keyword.directive"},
                 {offset: 4, type: "keyword"},
                 {offset: 6, type: "variable"},
-            ]
+            ],
         );
         checkTokens(
             ["[ROR 80\\comment:ROR80\\comment:]P."],
@@ -218,7 +218,7 @@ describe("Tokenisation", () => {
                 {offset: 29, type: "symbol"},
                 {offset: 30, type: "delimiter.square"},
                 {offset: 31, type: "keyword"},
-            ]
+            ],
         );
         // Regression test - `;` was incorrectly treated as a comment.
         checkTokens(
@@ -227,7 +227,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "delimiter.square"},
                 {offset: 1, type: "operator"},
                 {offset: 2, type: "variable"},
-            ]
+            ],
         );
     });
     it("should notice REM statements", () => {
@@ -236,33 +236,33 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "keyword"},
                 {offset: 3, type: "comment"},
-            ]
+            ],
         );
         checkTokens(
             ["REM this is a comment and has PRINT in it"],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 3, type: "comment"},
-            ]
+            ],
         );
         checkTokens(
             ["REM this is a comment doesn't ends at a colon:PRINT"],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 3, type: "comment"},
-            ]
+            ],
         );
         checkTokens(
             ["REMthis is also a comment"],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 3, type: "comment"},
-            ]
+            ],
         );
         checkTokens(
             ["REM", "PRINT"],
             [{offset: 0, type: "keyword"}],
-            [{offset: 0, type: "keyword"}]
+            [{offset: 0, type: "keyword"}],
         );
     });
     it("should handle symbols and operators", () => {
@@ -281,7 +281,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "string.quote"},
                 {offset: 4, type: "variable"},
-            ]
+            ],
         );
     });
     it("should handle an unterminated string gracefully", () => {
@@ -304,7 +304,7 @@ describe("Tokenisation", () => {
                 {offset: 2, type: "string.quote"},
                 {offset: 3, type: "string"},
                 {offset: 5, type: "string.quote"},
-            ]
+            ],
         );
     });
     it("should tokenise continuation tokens when appropriate", () => {
@@ -315,7 +315,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "keyword"},
                 {offset: 4, type: "white"},
                 {offset: 5, type: "variable"},
-            ]
+            ],
         );
     });
     it("should not tokenise continuation tokens followed by alphanum", () => {
@@ -332,7 +332,7 @@ describe("Tokenisation", () => {
                 {offset: 7, type: "keyword"},
                 {offset: 12, type: "variable"},
                 {offset: 14, type: "number.float"},
-            ]
+            ],
         );
     });
     it("should parse floating point number after $", () => {
@@ -342,7 +342,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "operator"},
                 {offset: 3, type: "number.float"},
-            ]
+            ],
         );
     });
     it("should allow FN and PROC names starting with a digit", () => {
@@ -357,7 +357,7 @@ describe("Tokenisation", () => {
                 {offset: 16, type: "symbol"},
                 {offset: 18, type: "keyword"},
                 {offset: 20, type: "variable"},
-            ]
+            ],
         );
     });
 });
@@ -371,8 +371,8 @@ function checkWarnings(text, ...expected) {
                 startLineNumber: 1,
                 endLineNumber: 1,
                 severity: MarkerSeverity.Warning,
-            })
-        )
+            }),
+        ),
     );
 }
 

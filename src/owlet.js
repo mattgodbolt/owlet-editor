@@ -140,7 +140,7 @@ export class OwletEditor {
                         text: newText,
                     },
                 ],
-                previousSelections
+                previousSelections,
             );
             this.editor.pushUndoStop();
         } else {
@@ -373,7 +373,7 @@ export class OwletEditor {
                     bubbles: true,
                     cancelable: true,
                     view: window,
-                })
+                }),
             );
             link.remove();
         }
@@ -383,7 +383,7 @@ export class OwletEditor {
         let tokenized = await this.tokeniser.tokenise(this.getBasicText());
 
         let uef = btoa(
-            String.fromCharCode.apply(null, makeUEF("TWEET", 0x1900, 0x1900, tokenized))
+            String.fromCharCode.apply(null, makeUEF("TWEET", 0x1900, 0x1900, tokenized)),
         );
         console.log(uef);
         uef = uef.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // make URL safe base64
@@ -415,9 +415,9 @@ export class OwletEditor {
             jsbeeb: () =>
                 window.open(
                     `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
-                        this.getBasicText()
+                        this.getBasicText(),
                     )}&rom=gxr.rom`,
-                    "_blank"
+                    "_blank",
                 ),
             rocket: () => this.rocket(),
             copy: () => {

@@ -19,7 +19,7 @@ function updateUiForProgram(id, json, v) {
     // Twitter
     if (v == 1) {
         $("#like").html(
-            `<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`
+            `<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`,
         );
     }
 
@@ -27,7 +27,7 @@ function updateUiForProgram(id, json, v) {
     if (v == 3) {
         let author = /@\w+/g.exec(json.src);
         $("#like").html(
-            `<a href='${json.src}'><span class="heart">♥</span> code posted by ${author} on Mastodon<a>`
+            `<a href='${json.src}'><span class="heart">♥</span> code posted by ${author} on Mastodon<a>`,
         );
     }
 }
@@ -140,7 +140,7 @@ async function initialise() {
     // Check if we reference a cached tweet on first load and convert it to URL hash
 
     const owletEditor = new OwletEditor(changedText =>
-        localStorage.setItem(LastProgramKey, changedText)
+        localStorage.setItem(LastProgramKey, changedText),
     );
 
     await owletEditor.initialise(await getInitialState(urlParams.get("t")));

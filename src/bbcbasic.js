@@ -12,7 +12,7 @@ function isExpressionToken(keyword) {
 }
 
 const conditionalTokens = new Set(
-    keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword)
+    keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword),
 );
 
 const allTokensRegex = keywords
@@ -43,13 +43,13 @@ const invalidAbbreviatedTokensRegex = (() => {
     // "No such variable" if "H" isn't a variable or "No TO" if it is.
     const allNonConditional = new Set(
         allAbbreviations(
-            keywords.filter(kw => !conditionalTokens.has(kw.keyword)).map(kw => kw.keyword)
-        )
+            keywords.filter(kw => !conditionalTokens.has(kw.keyword)).map(kw => kw.keyword),
+        ),
     );
     const allConditional = new Set(
         allAbbreviations(
-            keywords.filter(kw => (kw.flags & Flags.Conditional) !== 0).map(kw => kw.keyword)
-        )
+            keywords.filter(kw => (kw.flags & Flags.Conditional) !== 0).map(kw => kw.keyword),
+        ),
     );
     return [...allConditional]
         .filter(x => !allNonConditional.has(x))
@@ -214,7 +214,7 @@ export function registerBbcBasicLanguage() {
         wordPattern: new RegExp(
             allTokensRegex +
                 "|" +
-                /(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g.source
+                /(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g.source,
         ),
     });
 

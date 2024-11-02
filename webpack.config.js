@@ -80,12 +80,12 @@ function getPlugins() {
                             "node_modules",
                             "canvas",
                             "build",
-                            "Release"
+                            "Release",
                         ),
                         from: "*.so*",
                     },
                 ],
-            })
+            }),
         );
     }
     return plugins;
