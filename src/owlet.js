@@ -28,14 +28,13 @@ export class OwletEditor {
     constructor(onChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
-        this.observer = new ResizeObserver(() => this.editor.layout());
-        this.observer.observe(editorPane.parent()[0]);
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
 
         monacoEditor.defineTheme("bbcbasicTheme", {
             base: "vs-dark",
             inherit: true,
+            colors: {},
             rules: [
                 {token: "variable", foreground: "bb8844"},
                 {token: "number", foreground: "22bb88"},
@@ -73,7 +72,7 @@ export class OwletEditor {
         this.editor.addAction({
             id: "expand-code",
             label: "Expand code",
-            keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
+            keybindings: [KeyMod.CtrlCmd | KeyCode.KeyE],
             keybindingContext: null,
             contextMenuGroupId: "navigation",
             contextMenuOrder: 1.5,
@@ -89,6 +88,8 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
+        this.observer = new ResizeObserver(() => this.editor.layout());
+        this.observer.observe(editorPane.parent()[0]);
 
         this.examples = {};
         for (const example of Examples.examples) this.addExample(example);
@@ -139,7 +140,7 @@ export class OwletEditor {
                         text: newText,
                     },
                 ],
-                previousSelections
+                previousSelections,
             );
             this.editor.pushUndoStop();
         } else {
@@ -372,7 +373,7 @@ export class OwletEditor {
                     bubbles: true,
                     cancelable: true,
                     view: window,
-                })
+                }),
             );
             link.remove();
         }
@@ -382,7 +383,7 @@ export class OwletEditor {
         let tokenized = await this.tokeniser.tokenise(this.getBasicText());
 
         let uef = btoa(
-            String.fromCharCode.apply(null, makeUEF("TWEET", 0x1900, 0x1900, tokenized))
+            String.fromCharCode.apply(null, makeUEF("TWEET", 0x1900, 0x1900, tokenized)),
         );
         console.log(uef);
         uef = uef.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // make URL safe base64
@@ -414,9 +415,9 @@ export class OwletEditor {
             jsbeeb: () =>
                 window.open(
                     `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
-                        this.getBasicText()
+                        this.getBasicText(),
                     )}&rom=gxr.rom`,
-                    "_blank"
+                    "_blank",
                 ),
             rocket: () => this.rocket(),
             copy: () => {

@@ -97,7 +97,7 @@ export class Emulator {
             this.soundChip,
             this.ddNoise,
             cmos,
-            config
+            config,
         );
 
         // Patch this version of JSbeeb to stop it reseting cycle count.
@@ -134,7 +134,7 @@ export class Emulator {
     timer() {
         if (!beebjit_incoming && !this.showCoords) {
             this.emuStatus.innerHTML = `${modelName} | ${Math.floor(
-                this.cpu.currentCycles / 2000000
+                this.cpu.currentCycles / 2000000,
             )} s`;
         }
     }
@@ -168,7 +168,7 @@ export class Emulator {
                 headers: {
                     "x-api-key": "YrqLWPW1mvbEIJs1bT0m3DAoTJLKd9xaGEQaI5xa",
                 },
-            }
+            },
         );
         beebjit_incoming = false;
         this.state = await response.json();
@@ -277,7 +277,7 @@ export class Emulator {
             minx + this.leftMargin + teletextAdjustX,
             miny + this.topMargin,
             maxx - this.rightMargin + teletextAdjustX,
-            maxy - this.bottomMargin
+            maxy - this.bottomMargin,
         );
     }
 

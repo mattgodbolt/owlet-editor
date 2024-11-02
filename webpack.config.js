@@ -14,7 +14,7 @@ const isDev = process.env.NODE_ENV !== "production";
 const isTest = process.env.TESTBUILD !== undefined;
 
 const entry = isTest
-    ? glob.sync(path.resolve(__dirname, "test/**/*.js"))
+    ? glob.sync(path.resolve(__dirname, "test/**/*.js")).sort()
     : path.resolve(__dirname, "./src/index.js");
 const outputPath = isTest ? path.resolve(__dirname, "dist/test") : path.resolve(__dirname, "dist");
 
@@ -80,12 +80,12 @@ function getPlugins() {
                             "node_modules",
                             "canvas",
                             "build",
-                            "Release"
+                            "Release",
                         ),
                         from: "*.so*",
                     },
                 ],
-            })
+            }),
         );
     }
     return plugins;
@@ -163,7 +163,7 @@ module.exports = {
             },
             {
                 test: /\.ya?ml$/,
-                use: ["json-loader", "yaml-loader"],
+                use: ["yaml-loader"],
             },
             {
                 test: /.rom$/i,

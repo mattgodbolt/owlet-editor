@@ -45,7 +45,7 @@ Q=+5:ãJ=0¸16:X=?Q-19:L=Q?1-96:Q=Q+2:ãI=0¸L:æ0,P:ì10*X+64*I,60*Y:ð97,4
 1MODE1:Y=6:P=4420:!3320=RND:GCOL64,0:PLOT97,P,P:VDU535;P;P;P;P;5:GCOL16,0:MOVE80,50:PLOT97,1120,386:GCOL0,0:PLOT&65,80,500
 Q=PAGE+5:FORJ=0TO16:X=?Q-19:L=Q?1-96:Q=Q+2:FORI=0TOL:GCOL0,ATNP:MOVE10*X+64*I,60*Y:PLOT97,48,48:PLOT0,-40,0:GCOL0,3:IFP PLOT0,-8,0:VDU102:PLOT0,-12,-16
 VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
-`
+`,
         );
     });
     it("should add spaces after tokens with the Conditional flag", () => {
@@ -102,7 +102,7 @@ describe("For each basic line", () => {
     it("should handle a single line program", () => {
         const result = [];
         forEachBasicLine('\x0d\x00\x0a\x0d\xf1 "Hello"\x0d\xff', (lineNum, line) =>
-            result.push({num: lineNum, line})
+            result.push({num: lineNum, line}),
         );
         assert.deepStrictEqual(result, [{num: 10, line: '\xf1 "Hello"'}]);
     });
@@ -110,7 +110,7 @@ describe("For each basic line", () => {
         const result = [];
         forEachBasicLine(
             '\x0d\x00\x0a\x0d\xf1 "Hello"\x0d\x00\x14\x05\xf9\x0d\xff',
-            (lineNum, line) => result.push({num: lineNum, line})
+            (lineNum, line) => result.push({num: lineNum, line}),
         );
         assert.deepStrictEqual(result, [
             {num: 10, line: '\xf1 "Hello"'},
