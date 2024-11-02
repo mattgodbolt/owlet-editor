@@ -417,7 +417,7 @@ function decode2048(input) {
         let code = input.match(/🗜(\S*)/);
         code = code === null ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
         return String.fromCharCode.apply(null, decode(code.trim()));
-    } catch (error) {
+    } catch (e) {
         return input;
     }
 }
