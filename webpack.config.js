@@ -8,15 +8,13 @@ const TerserPlugin = require("terser-webpack-plugin");
 const {CleanWebpackPlugin} = require("clean-webpack-plugin");
 const FaviconsWebpackPlugin = require("favicons-webpack-plugin");
 const glob = require("glob");
-const HtmlWebpackPartialsPlugin = require("html-webpack-partials-plugin");
-
-const isDev = process.env.NODE_ENV !== "production";
-const isTest = process.env.TESTBUILD !== undefined;
-
-const entry = isTest
-    ? glob.sync(path.resolve(__dirname, "test/**/*.js")).sort()
-    : path.resolve(__dirname, "./src/index.js");
-const outputPath = isTest ? path.resolve(__dirname, "dist/test") : path.resolve(__dirname, "dist");
+const HtmlWebpackPartialsPlugin = require("html-webpack-partials-plugin"),
+    isDev = process.env.NODE_ENV !== "production",
+    isTest = process.env.TESTBUILD !== undefined,
+    entry = isTest
+        ? glob.sync(path.resolve(__dirname, "test/**/*.js")).sort()
+        : path.resolve(__dirname, "./src/index.js"),
+    outputPath = isTest ? path.resolve(__dirname, "dist/test") : path.resolve(__dirname, "dist");
 
 function getOptimizationSettings() {
     if (isTest) return undefined;
@@ -93,7 +91,7 @@ function getPlugins() {
 
 module.exports = {
     mode: isDev ? "development" : "production",
-    entry: entry,
+    entry,
     target: isTest ? "node" : "web",
     // In test, work around the fact bufferutil and utf-8-validate don't really exist
     externals: isTest ? ["bufferutil", "utf-8-validate"] : [],
@@ -106,7 +104,7 @@ module.exports = {
             jsunzip: path.resolve(__dirname, "node_modules/jsbeeb/lib/jsunzip.js"),
             fs: path.resolve(__dirname, "src/fake-fs.js"),
         },
-        preferRelative: true, // ugly, for jsbeeb and its love of non-relative imports
+        preferRelative: true, // Ugly, for jsbeeb and its love of non-relative imports
     },
     devtool: "source-map",
     plugins: getPlugins(),
