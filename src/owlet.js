@@ -37,6 +37,11 @@ export class OwletEditor {
             rules: [
                 {token: "variable", foreground: "bb8844"},
                 {token: "number", foreground: "22bb88"},
+                {token: "number.hex", fontStyle: "bold"},
+                {token: "number.float", fontStyle: "italic"},
+                {token: "constant.linenum", foreground: "44eeaa"},
+                {token: "keyword.oscli", foreground: "bb66bb"},
+                {token: "keyword.directive", fontStyle: "bold"},
             ],
         });
 

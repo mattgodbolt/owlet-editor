@@ -157,15 +157,15 @@ describe("Tokenisation", () => {
     it("should not recognize 6502 outside of []", () => {
         checkTokens(["LDA"], [{offset: 0, type: "variable"}]);
     });
-    it("should recognize 6502 inside []", () => {
+    it("should recognise 6502 inside []", () => {
         checkTokens(
             ["0[", "1LDA"],
             [
-                {offset: 0, type: "enum"},
+                {offset: 0, type: "constant.linenum"},
                 {offset: 1, type: "delimiter.square"},
             ],
             [
-                {offset: 0, type: "enum"},
+                {offset: 0, type: "constant.linenum"},
                 {offset: 1, type: "keyword"},
             ],
         );
@@ -355,8 +355,35 @@ describe("Tokenisation", () => {
                 {offset: 8, type: "keyword"},
                 {offset: 12, type: "variable"},
                 {offset: 16, type: "symbol"},
+                {offset: 17, type: "operator"},
                 {offset: 18, type: "keyword"},
                 {offset: 20, type: "variable"},
+            ],
+        );
+    });
+    it("should handle OSCLI at start of line", () => {
+        checkTokens(["*INFO"], [{offset: 0, type: "keyword.oscli"}]);
+    });
+    it("should handle OSCLI after line number", () => {
+        checkTokens(
+            ["10 *INFO"],
+            [
+                {offset: 0, type: "constant.linenum"},
+                {offset: 2, type: "white"},
+                {offset: 3, type: "keyword.oscli"},
+            ],
+        );
+    });
+    it("should handle OSCLI at end of line", () => {
+        checkTokens(
+            ["P.2*3:*.0:blah"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "number"},
+                {offset: 5, type: "symbol"},
+                {offset: 6, type: "keyword.oscli"},
             ],
         );
     });
