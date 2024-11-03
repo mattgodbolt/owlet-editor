@@ -31,11 +31,9 @@
     "monaco-editor": "^0.52.0",
     "promise": "^8.3.0",
     "resize-observer-polyfill": "^1.5.1",
-    "underscore": "^1.13.7",
-    "webgl-debug": "^2.0.1"
+    "underscore": "^1.13.7"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.1.0",
     "@eslint/js": "^9.14.0",
     "@fortawesome/fontawesome-free": "^6.6.0",
     "binary-loader": "0.0.1",

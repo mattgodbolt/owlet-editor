@@ -10,7 +10,7 @@ import {Cmos} from "jsbeeb/cmos";
 import * as utils from "jsbeeb/utils";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
-import Snapshot from "snapshot";
+import Snapshot from "./snapshot";
 
 utils.setBaseUrl("jsbeeb/");
 
