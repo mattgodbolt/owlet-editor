@@ -1,5 +1,6 @@
 import {getWarnings, registerBbcBasicLanguage} from "../src/bbcbasic";
-import {assert} from "chai";
+import {describe, it} from "vitest";
+import assert from "assert";
 import {editor, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 
 function checkTokens(text, ...expected) {

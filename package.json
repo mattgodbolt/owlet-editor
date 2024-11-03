@@ -25,7 +25,6 @@
   "private": true,
   "dependencies": {
     "base2048": "^2.0.2",
-    "glob": "^11.0.0",
     "html-webpack-partials-plugin": "^0.8.0",
     "jquery": "^3.7.1",
     "jsbeeb": "github:mattgodbolt/jsbeeb#4e5f3666cbce0613bc9e7006d4aceddcb1095dc4",
@@ -40,8 +39,6 @@
     "@eslint/js": "^9.14.0",
     "@fortawesome/fontawesome-free": "^6.6.0",
     "binary-loader": "0.0.1",
-    "canvas": "^2.11.2",
-    "chai": "^5.1.2",
     "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^7.1.2",
@@ -61,12 +58,12 @@
     "less-loader": "^12.2.0",
     "lint-staged": "^15.2.10",
     "mini-css-extract-plugin": "^2.9.2",
-    "mocha": "^10.8.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "node-loader": "^2.0.0",
     "prettier": "^3.3.3",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "^5.3.10",
+    "vitest": "^2.1.4",
     "webpack": "^5.96.1",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.1.0",
@@ -78,12 +75,13 @@
     "build": "webpack",
     "lint": "eslint .",
     "lint-fix": "eslint --fix .",
-    "test": "env TESTBUILD=true webpack && mocha dist/test/main.js"
+    "test": "vitest"
   },
   "lint-staged": {
     "*.{mjs,js,ts}": [
       "eslint --cache --fix",
-      "prettier --write"
+      "prettier --write",
+      "vitest related --run"
     ],
     "*.{css,md,yaml,json}": [
       "prettier --write"

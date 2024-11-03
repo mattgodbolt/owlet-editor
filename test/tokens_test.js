@@ -1,5 +1,6 @@
 import {debbreviate, detokenise, forEachBasicLine, partialDetokenise} from "../src/tokens";
-import {assert} from "chai";
+import {describe, it} from "vitest";
+import assert from "assert";
 
 describe("Detokenisation", () => {
     it("should detokenise the empty string", () => {
