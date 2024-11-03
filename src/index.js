@@ -17,14 +17,14 @@ function programUrl(id) {
 
 function updateUiForProgram(id, json, v) {
     // Twitter
-    if (v == 1) {
+    if (v === 1) {
         $("#like").html(
             `<span class="heart">♥</span>code originally posted by ${json.author} on Twitter`,
         );
     }
 
     // Mastodon
-    if (v == 3) {
+    if (v === 3) {
         let author = /@\w+/g.exec(json.src);
         $("#like").html(
             `<a href='${json.src}'><span class="heart">♥</span> code posted by ${author} on Mastodon<a>`,
@@ -66,10 +66,10 @@ async function getInitialState(id) {
     }
 
     // Try decoding state from the location hash.
-    let maybeState = OwletEditor.decodeStateString(window.location.hash.substr(1));
+    let maybeState = OwletEditor.decodeStateString(window.location.hash.substring(1));
 
     if (maybeState !== null) {
-        if (maybeState.v == 1) {
+        if (maybeState.v === 1) {
             consumeHash();
             if (maybeState.date < 1590994800) {
                 maybeState.program = backwardCompat(maybeState.program);
@@ -78,7 +78,7 @@ async function getInitialState(id) {
             return maybeState;
         }
 
-        if (maybeState.v == 3) {
+        if (maybeState.v === 3) {
             consumeHash();
             if (maybeState.src) updateUiForProgram(maybeState.src, maybeState, 3);
 
@@ -122,15 +122,16 @@ async function initialise() {
     const urlParams = new URLSearchParams(queryString);
     const t = urlParams.get("t");
     if (t) {
-        $("#logo").attr("src", logo);
-        $("#logo").attr("height", "48px");
-        $("#logo").attr("alt", "BBC Microbot gallery");
+        const $logo = $("#logo");
+        $logo.attr("src", logo);
+        $logo.attr("height", "48px");
+        $logo.attr("alt", "BBC Microbot gallery");
         const link = document.querySelector("link[rel*='icon']") || document.createElement("link");
         link.type = "image/x-icon";
         link.rel = "shortcut icon";
         link.href = logo;
         document.title = "BBC Microbot - Owlet Editor";
-        $("#logo").click(() => {
+        $logo.click(() => {
             window.location.href = "https://www.bbcmicrobot.com";
         });
     }

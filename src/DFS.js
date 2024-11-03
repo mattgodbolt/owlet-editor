@@ -45,9 +45,9 @@ export class AcornDFSdisc {
 
         console.log(`execAdd=`);
         let extra = 0;
-        extra |= ((execAdd & 0xffff0000) == (0xffff0000 | 0) ? 3 : 0) << 6;
+        extra |= ((execAdd & 0xffff0000) === (0xffff0000 | 0) ? 3 : 0) << 6;
         extra |= ((fileData.length >> 16) & 3) << 4;
-        extra |= ((loadAdd & 0xffff0000) == (0xffff0000 | 0) ? 3 : 0) << 2;
+        extra |= ((loadAdd & 0xffff0000) === (0xffff0000 | 0) ? 3 : 0) << 2;
         extra |= ((this.nextSector >> 8) & 3) << 0;
         this.image.write(0x010e, extra, 1);
 

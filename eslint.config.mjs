@@ -1,23 +1,16 @@
-import globals from "globals";
-import path from "node:path";
-import {fileURLToPath} from "node:url";
+import prettier from "eslint-plugin-prettier";
+import eslintConfigPrettier from "eslint-config-prettier";
 import js from "@eslint/js";
-import {FlatCompat} from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all,
-});
+import globals from "globals";
 
 export default [
     {
         ignores: ["**/dist", "test/_polyfills.js"],
     },
-    ...compat.extends("eslint:recommended"),
+    js.configs.recommended,
+    eslintConfigPrettier,
     {
+        plugins: {prettier},
         languageOptions: {
             globals: {
                 ...globals.browser,
@@ -29,9 +22,10 @@ export default [
         },
 
         rules: {
+            eqeqeq: "error",
             "no-var": "error",
             semi: "error",
-            "no-control-regex": "off",
+            camelcase: "error",
             "no-unused-vars": [
                 "error",
                 {
