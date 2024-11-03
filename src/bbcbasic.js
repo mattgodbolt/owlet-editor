@@ -75,6 +75,7 @@ export function registerBbcBasicLanguage() {
     // Register a tokens provider for the language
     languages.setMonarchTokensProvider("BBCBASIC", {
         defaultToken: "invalid",
+        includeLF: true,
         brackets: [["(", ")", "delimiter.parenthesis"]],
         operators: [
             "+",
@@ -104,6 +105,14 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+#=><!*/{}:?$;,~^']+/,
         tokenizer: {
             root: [
+                {include: "@whitespace"},
+                [/\d+/, "constant.linenum"], // line numbers
+                [/(?=[^*])/, "", "@statement"], // As soon as we know this statement doesn't start with * we can process it with statement
+                [/\*.*/, {token: "keyword.oscli"}],
+            ],
+            statement: [
+                ["\n", "", "@pop"],
+                [":", "symbol", "@pop"],
                 [/(\bREM|\xf4)$/, {token: "keyword"}], // A REM on its own line
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
@@ -117,7 +126,6 @@ export function registerBbcBasicLanguage() {
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
             common: [
-                [/^\s*\d+/, "enum"], // line numbers
                 {include: "@whitespace"},
                 // immediate
                 [
@@ -155,7 +163,7 @@ export function registerBbcBasicLanguage() {
             remStatement: [[/.*/, "comment", "@pop"]],
             asm: [
                 [
-                    /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/,
+                    /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BR[AK]|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/,
                     "keyword",
                 ],
                 [/OPT|EQU[BDSW]/, "keyword.directive"],
@@ -164,6 +172,7 @@ export function registerBbcBasicLanguage() {
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
                 [allTokensForAsmRegex, "keyword"],
+                [/^\d+/, "constant.linenum"], // line numbers
                 {include: "@common"},
                 ["]", {token: "delimiter.square", next: "@pop"}],
             ],
