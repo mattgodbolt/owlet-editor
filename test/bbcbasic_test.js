@@ -388,6 +388,23 @@ describe("Tokenisation", () => {
             ],
         );
     });
+    it("should handle OSCLI after THEN and ELSE", () => {
+        checkTokens(
+            ["IF1THEN*HIMEM", "IF0ELSE*HIMEM"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "keyword"},
+                {offset: 7, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "keyword"},
+                {offset: 7, type: "keyword.oscli"},
+            ],
+        );
+    });
 });
 
 function checkWarnings(text, ...expected) {
