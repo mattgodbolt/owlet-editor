@@ -116,6 +116,7 @@ export function registerBbcBasicLanguage() {
                 [/(\bREM|\xf4)$/, {token: "keyword"}], // A REM on its own line
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
+                [/THEN|ELSE|\u018c|\u018b/, "keyword", "@pop"], // ELSE or THEN end a statement
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
