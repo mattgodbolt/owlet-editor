@@ -82,13 +82,9 @@ export function registerBbcBasicLanguage() {
             "-",
             "*",
             "/",
-            "<<",
-            ">>",
             "^",
             "=",
-            "==",
             "<>",
-            "!=",
             "<",
             ">",
             "<=",
@@ -128,6 +124,14 @@ export function registerBbcBasicLanguage() {
             ],
             common: [
                 {include: "@whitespace"},
+                // Common operators from other languages which are not BBC BASIC operators.
+                [/[=!]=/, "invalid"], // C and many other languages
+                [/\*\*/, "invalid"], // Fortran, Javascript, Perl, Python and various other languages
+                [/></, "invalid"], // E.g. Apple][ BASIC
+                [/=[<>]/, "invalid"], // E.g. Apple][ BASIC
+                [/[-+/*^]=/, "invalid"], // C and many other languages
+                [/<</, "invalid"], // C and many other languages
+                [/>>/, "invalid"], // C and many other languages
                 // immediate
                 [
                     "@symbols",
@@ -261,6 +265,15 @@ export function registerBbcBasicLanguage() {
 
 const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?![%$])`);
 
+const InvalidOperatorMap = new Map([
+    ['==', '='],
+    ['!=', '<>'],
+    ['**', '^'],
+    ['><', '<>'],
+    ['=<', '<='],
+    ['=>', '>='],
+]);
+
 export function getWarnings(lineNum, line, lineTokens) {
     const warnings = [];
 
@@ -277,6 +290,24 @@ export function getWarnings(lineNum, line, lineTokens) {
                 startColumn: token.offset + 1,
                 endLineNumber: lineNum,
                 endColumn: token.offset + match[0].length + 1,
+            });
+        }
+    }
+    // Suggest replacements for common operators from other languages.
+    for (const token of lineTokens.filter(token => token.type === "invalid.BBCBASIC")) {
+        // FIXME: The token string and length don't seem to be available, but
+        // they are all 2 characters long currently so we can assume that.
+        const tokenLen = 2;
+        const badOperator = line.substr(token.offset, tokenLen);
+        if (InvalidOperatorMap.has(badOperator)) {
+            const goodOperator = InvalidOperatorMap.get(badOperator);
+            warnings.push({
+                severity: MarkerSeverity.Warning,
+                message: `${badOperator} is not a BBC BASIC operator, did you mean ${goodOperator}?`,
+                startLineNumber: lineNum,
+                startColumn: token.offset + 1,
+                endLineNumber: lineNum,
+                endColumn: token.offset + tokenLen + 1,
             });
         }
     }
