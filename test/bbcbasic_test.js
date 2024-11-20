@@ -390,7 +390,20 @@ describe("Tokenisation", () => {
     });
     it("should handle OSCLI after THEN and ELSE", () => {
         checkTokens(
-            ["IF1THEN*HIMEM", "IF0ELSE*HIMEM"],
+            [
+                "IF1THEN*H.",
+                "IF1THE.*H.",
+                "IF1TH.*H.",
+                "\xe71\u018c*H.",
+                "IF0ELSE*H.",
+                "IF0ELS.*H.",
+                "IF0EL.*H.",
+                "\xe70\u018b*H.",
+                "ONERROR*H.",
+                "ONERRO.*H.",
+                "ONERR.*H.",
+                "\xee\u0185*H.",
+            ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
@@ -402,6 +415,58 @@ describe("Tokenisation", () => {
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
                 {offset: 7, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "keyword"},
+                {offset: 6, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 1, type: "number"},
+                {offset: 2, type: "keyword"},
+                {offset: 3, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "keyword"},
+                {offset: 7, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "keyword"},
+                {offset: 7, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "number"},
+                {offset: 3, type: "keyword"},
+                {offset: 6, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 1, type: "number"},
+                {offset: 2, type: "keyword"},
+                {offset: 3, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 7, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 7, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 6, type: "keyword.oscli"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "keyword.oscli"},
             ],
         );
     });
