@@ -29,9 +29,12 @@ const allTokensForAsmRegex = keywords
     .map(escape)
     .join("|");
 
-const allByteTokensRegex = "[" + keywords
-    .map(kw => String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token))
-    .join("") + "]";
+const allByteTokensRegex =
+    "[" +
+    keywords
+        .map(kw => String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token))
+        .join("") +
+    "]";
 
 function allAbbreviations(tokens) {
     const prefixes = new Set();
@@ -116,7 +119,11 @@ export function registerBbcBasicLanguage() {
                 [/(\bREM|\xf4)$/, {token: "keyword"}], // A REM on its own line
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
-                [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|ERROR|ERRO\.|ERR\.|\u018c|\u018b|\u0185/, "keyword", "@pop"], // THEN, ELSE, ERROR end a statement
+                [
+                    /THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|ERROR|ERRO\.|ERR\.|\u018c|\u018b|\u0185/,
+                    "keyword",
+                    "@pop",
+                ], // THEN, ELSE, ERROR end a statement
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
@@ -271,12 +278,12 @@ export function registerBbcBasicLanguage() {
 const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?![%$])`);
 
 const InvalidOperatorMap = new Map([
-    ['==', '='],
-    ['!=', '<>'],
-    ['**', '^'],
-    ['><', '<>'],
-    ['=<', '<='],
-    ['=>', '>='],
+    ["==", "="],
+    ["!=", "<>"],
+    ["**", "^"],
+    ["><", "<>"],
+    ["=<", "<="],
+    ["=>", ">="],
 ]);
 
 export function getWarnings(lineNum, line, lineTokens) {

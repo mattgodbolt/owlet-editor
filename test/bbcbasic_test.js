@@ -472,12 +472,7 @@ describe("Tokenisation", () => {
     });
     it("should highlight invalid operators from other languages", () => {
         checkTokens(
-            [
-                "INVALID=1==2OR8!=2**3",
-                "IFA><1ORB=<2ORB=>6GOTO10",
-                "A+=2",
-                "A=B<<C OR D>>E"
-            ],
+            ["INVALID=1==2OR8!=2**3", "IFA><1ORB=<2ORB=>6GOTO10", "A+=2", "A=B<<C OR D>>E"],
             [
                 {offset: 0, type: "variable"},
                 {offset: 7, type: "operator"},
