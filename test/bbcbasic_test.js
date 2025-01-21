@@ -470,6 +470,63 @@ describe("Tokenisation", () => {
             ],
         );
     });
+    it("should highlight invalid operators from other languages", () => {
+        checkTokens(
+            [
+                "INVALID=1==2OR8!=2**3",
+                "IFA><1ORB=<2ORB=>6GOTO10",
+                "A+=2",
+                "A=B<<C OR D>>E"
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 7, type: "operator"},
+                {offset: 8, type: "number"},
+                {offset: 9, type: "invalid"},
+                {offset: 11, type: "number"},
+                {offset: 12, type: "keyword"},
+                {offset: 14, type: "number"},
+                {offset: 15, type: "invalid"},
+                {offset: 17, type: "number"},
+                {offset: 18, type: "invalid"},
+                {offset: 20, type: "number"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "variable"},
+                {offset: 3, type: "invalid"},
+                {offset: 5, type: "number"},
+                {offset: 6, type: "keyword"},
+                {offset: 8, type: "variable"},
+                {offset: 9, type: "invalid"},
+                {offset: 11, type: "number"},
+                {offset: 12, type: "keyword"},
+                {offset: 14, type: "variable"},
+                {offset: 15, type: "invalid"},
+                {offset: 17, type: "number"},
+                {offset: 18, type: "keyword"},
+                {offset: 22, type: "number"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "invalid"},
+                {offset: 3, type: "number"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "variable"},
+                {offset: 3, type: "invalid"},
+                {offset: 5, type: "variable"},
+                {offset: 6, type: "white"},
+                {offset: 7, type: "keyword"},
+                {offset: 9, type: "white"},
+                {offset: 10, type: "variable"},
+                {offset: 11, type: "invalid"},
+                {offset: 13, type: "variable"},
+            ],
+        );
+    });
 });
 
 function checkWarnings(text, ...expected) {
@@ -514,5 +571,37 @@ describe("Line warnings", () => {
     it("should not generate case warnings for variables matching immediate commands", () => {
         checkWarnings("old=new");
         checkWarnings("auto=delete+load/list+renumber*save");
+    });
+    it("should warn on invalid operators from other languages", () => {
+        checkWarnings("==", {
+            message: "== is not a BBC BASIC operator, did you mean =?",
+            startColumn: 1,
+            endColumn: 3,
+        });
+        checkWarnings("!=", {
+            message: "!= is not a BBC BASIC operator, did you mean <>?",
+            startColumn: 1,
+            endColumn: 3,
+        });
+        checkWarnings("A=2**3", {
+            message: "** is not a BBC BASIC operator, did you mean ^?",
+            startColumn: 4,
+            endColumn: 6,
+        });
+        checkWarnings("><", {
+            message: ">< is not a BBC BASIC operator, did you mean <>?",
+            startColumn: 1,
+            endColumn: 3,
+        });
+        checkWarnings("=<", {
+            message: "=< is not a BBC BASIC operator, did you mean <=?",
+            startColumn: 1,
+            endColumn: 3,
+        });
+        checkWarnings("=>", {
+            message: "=> is not a BBC BASIC operator, did you mean >=?",
+            startColumn: 1,
+            endColumn: 3,
+        });
     });
 });
