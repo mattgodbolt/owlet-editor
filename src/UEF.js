@@ -1,6 +1,6 @@
 // Takes data and returns a Acorn Data Cassette in UEF format
 
-// http://beebwiki.mdfs.net/CRC-16
+// https://beebwiki.mdfs.net/CRC-16
 function crc16(d) {
     const poly = 0x1021;
     let crc = 0x0000;
