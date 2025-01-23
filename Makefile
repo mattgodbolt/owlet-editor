@@ -23,7 +23,7 @@ ROM_DIR:=./node_modules/jsbeeb/roms
 roms: $(ROM_DIR)/gxr.rom
 
 $(ROM_DIR)/gxr.rom: $(NPM_UPDATED)
-	curl -sL http://mdfs.net/System/ROMs/Graphics/GXR120 -o $@
+	curl -sL https://mdfs.net/System/ROMs/Graphics/GXR120 -o $@
 
 WEBPACK:=./node_modules/webpack-cli/bin/cli.js
 .PHONY: webpack
