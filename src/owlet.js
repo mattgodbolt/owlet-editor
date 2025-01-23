@@ -460,10 +460,13 @@ export class OwletEditor {
                 const saveLen = document.getElementById("saveLen");
                 let addr = saveStartAddr.value;
                 let len = saveLen.value;
+                let byte10Count = 0;
+                let byte13Count = 0;
                 while (len--) {
                     let b = this.emulator.readmem(addr++);
                     if (b < 32 || (b >= 127 && b < 161)) {
-                        if (b === 10 || b === 13) alert("problematic byte value " + b);
+                        if (b === 10) ++byte10Count;
+                        if (b === 13) ++byte13Count;
                         b += 0x100;
                     }
                     data += String.fromCodePoint(b);
@@ -472,6 +475,16 @@ export class OwletEditor {
                 saveLen.select();
                 saveLen.setSelectionRange(0, 99999); // For mobile devices
                 document.execCommand("copy");
+                if (byte10Count || byte13Count) {
+                    let message = "problematic byte values:";
+                    if (byte10Count) {
+                        message += " 10 (x" + byte10Count.toString() + ")";
+                    }
+                    if (byte13Count) {
+                        message += " 13 (x" + byte13Count.toString() + ")";
+                    }
+                    alert(message);
+                }
                 this.closeModal();
             },
             closeModal: () => this.closeModal(),
