@@ -220,7 +220,6 @@ export function registerBbcBasicLanguage() {
 
     languages.setLanguageConfiguration("BBCBASIC", {
         comments: {
-            blockComment: ["REM", ":"],
             lineComment: "REM",
         },
         brackets: [
