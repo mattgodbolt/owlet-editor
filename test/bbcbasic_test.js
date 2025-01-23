@@ -96,6 +96,16 @@ describe("Tokenisation", () => {
         it("should recognise floating point numbers in E format", () => {
             checkNum("123.450E-1", "number.float");
             checkNum("2E4", "number.float");
+            checkNum("9E+", "number.float");
+            checkNum("9E-", "number.float");
+            checkNum("9.E+", "number.float");
+            checkNum("9.E-", "number.float");
+            checkNum(".9E+", "number.float");
+            checkNum(".9E-", "number.float");
+            checkNum("3.14E+", "number.float");
+            checkNum("2.7E-", "number.float");
+            checkNum(".E-", "number.float");
+            checkNum(".E+", "number.float");
         });
         it("should handle floating numbers with no suffix", () => {
             checkNum("1.", "number.float");

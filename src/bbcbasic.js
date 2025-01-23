@@ -155,8 +155,8 @@ export function registerBbcBasicLanguage() {
                     },
                 ],
                 // numbers
-                [/\d*\.\d*(E[-+]?\d+)?/, "number.float"],
-                [/\d+E[-+]?\d+/, "number.float"],
+                [/\d*\.\d*(E[-+\d]\d*)?/, "number.float"],
+                [/\d+E[-+\d]\d*/, "number.float"],
                 [/\d+/, "number"],
                 [/&[0-9A-F]+/, "number.hex"],
                 [/[{}()]/, "@brackets"],
