@@ -105,7 +105,7 @@ export function registerBbcBasicLanguage() {
             "'",
         ],
         tokenPrefix: allAbbreviations(keywords.map(kw => kw.keyword)),
-        symbols: /[-+#=><!*/{}:?$;,~^']+/,
+        symbols: /[-+#=><!*/:?$;,~^']+/,
         tokenizer: {
             root: [
                 {include: "@whitespace"},
@@ -159,7 +159,7 @@ export function registerBbcBasicLanguage() {
                 [/\d+E[-+]?\d+/, "number.float"],
                 [/\d+/, "number"],
                 [/&[0-9A-F]+/, "number.hex"],
-                [/[{}()]/, "@brackets"],
+                [/[()]/, "@brackets"],
                 [/[a-zA-Z_][\w]*[$%]?/, "variable"],
                 // strings
                 [
