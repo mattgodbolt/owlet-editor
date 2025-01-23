@@ -94,6 +94,16 @@ describe("Debbreviation", () => {
     it("should not expand abbreviation after conditional token", () => {
         assert.strictEqual(debbreviate("PIP=1:P.PIP."), "PIP=1:PRINTPIP.");
     });
+    it("should not expand abbreviation in *-command", () => {
+        assert.strictEqual(debbreviate("*H."), "*H.");
+        assert.strictEqual(debbreviate("10*H."), "10*H.");
+        assert.strictEqual(debbreviate("IF1*H.:*H."), "IF1*HIMEM:*H.");
+        assert.strictEqual(debbreviate("ONERR.*K.0PA.=4608|MO.|MRU.|M"),
+                           "ONERROR*K.0PA.=4608|MO.|MRU.|M");
+        assert.strictEqual(debbreviate("IFCOU.TH.*LO. P.DATA"),
+                           "IFCOUNTTHEN*LO. P.DATA");
+        assert.strictEqual(debbreviate("P.\n*H.\nP."), "PRINT\n*H.\nPRINT");
+    });
 });
 
 describe("For each basic line", () => {
