@@ -372,7 +372,7 @@ describe("Tokenisation", () => {
     });
     it("should allow FN and PROC names starting with a digit", () => {
         checkTokens(
-            ["DEFFN3D PROC1to1:=FN42"],
+            ["DEFFN3D PROC1to1:PRO.2too:=FN42"],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 5, type: "variable"},
@@ -380,9 +380,12 @@ describe("Tokenisation", () => {
                 {offset: 8, type: "keyword"},
                 {offset: 12, type: "variable"},
                 {offset: 16, type: "symbol"},
-                {offset: 17, type: "operator"},
-                {offset: 18, type: "keyword"},
-                {offset: 20, type: "variable"},
+                {offset: 17, type: "keyword"},
+                {offset: 21, type: "variable"},
+                {offset: 25, type: "symbol"},
+                {offset: 26, type: "operator"},
+                {offset: 27, type: "keyword"},
+                {offset: 29, type: "variable"},
             ],
         );
     });
