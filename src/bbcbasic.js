@@ -116,7 +116,6 @@ export function registerBbcBasicLanguage() {
             statement: [
                 ["\n", "", "@pop"],
                 [":", "symbol", "@pop"],
-                [/(\bREM|\xf4)$/, {token: "keyword"}], // A REM on its own line
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
                 [
