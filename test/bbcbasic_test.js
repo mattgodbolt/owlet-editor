@@ -275,6 +275,20 @@ describe("Tokenisation", () => {
         checkTokens(["^"], [{offset: 0, type: "operator"}]);
         checkTokens(["'"], [{offset: 0, type: "operator"}]);
     });
+    it("should correctly handle invalid symbols", () => {
+        checkTokens(
+            ["DEFFNmain:{=0}"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "variable"},
+                {offset: 9, type: "symbol"},
+                {offset: 10, type: "invalid"},
+                {offset: 11, type: "operator"},
+                {offset: 12, type: "number"},
+                {offset: 13, type: "invalid"},
+            ]
+        );
+    });
     it("should not treat C specially after a string", () => {
         checkTokens(
             ['P.""C1'],
