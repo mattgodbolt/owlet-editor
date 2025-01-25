@@ -276,6 +276,64 @@ describe("Tokenisation", () => {
             [{offset: 0, type: "keyword"}],
         );
     });
+    it("should suitably highlight DATA statements", () => {
+        checkTokens(
+            [
+                "DATA",
+                "D.a b,c",
+                "DA.,,,7,",
+                "DAT.PI,COS0,SQRLN@%",
+                "DATA3 ,\"comma,quoted\", \"esc\"\"ape\", qu\"te,q\", 3x",
+            ],
+            [
+                {offset: 0, type: "keyword"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "string.unquoted"},
+                {offset: 5, type: "symbol"},
+                {offset: 6, type: "string.unquoted"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 3, type: "symbol"},
+                {offset: 6, type: "string.unquoted"},
+                {offset: 7, type: "symbol"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 4, type: "string.unquoted"},
+                {offset: 6, type: "symbol"},
+                {offset: 7, type: "string.unquoted"},
+                {offset: 11, type: "symbol"},
+                {offset: 12, type: "string.unquoted"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 4, type: "string.unquoted"},
+                {offset: 5, type: "white"},
+                {offset: 6, type: "symbol"},
+                {offset: 7, type: "string.quote"},
+                {offset: 8, type: "string"},
+                {offset: 20, type: "string.quote"},
+                {offset: 21, type: "symbol"},
+                {offset: 22, type: "white"},
+                {offset: 23, type: "string.quote"},
+                {offset: 24, type: "string"},
+                {offset: 27, type: "string.quote"},
+                {offset: 29, type: "string"},
+                {offset: 32, type: "string.quote"},
+                {offset: 33, type: "symbol"},
+                {offset: 34, type: "white"},
+                {offset: 35, type: "string.unquoted"},
+                {offset: 40, type: "symbol"},
+                {offset: 41, type: "string.unquoted"},
+                {offset: 43, type: "symbol"},
+                {offset: 44, type: "white"},
+                {offset: 45, type: "string.unquoted"},
+            ],
+        );
+    });
     it("should handle symbols and operators", () => {
         checkTokens(["~"], [{offset: 0, type: "operator"}]);
         checkTokens(["#"], [{offset: 0, type: "symbol"}]);

@@ -118,6 +118,7 @@ export function registerBbcBasicLanguage() {
                 [":", "symbol", "@pop"],
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|PRO\.|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
+                [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", next: "@dataStatement"}], // DATA consumes to EOL
                 [
                     /THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|ERROR|ERRO\.|ERR\.|\u018c|\u018b|\u0185/,
                     "keyword",
@@ -177,6 +178,13 @@ export function registerBbcBasicLanguage() {
                 [/["\u201c\u201d]/, {token: "string.quote", next: "@pop"}],
             ],
             remStatement: [[/.*/, "comment", "@pop"]],
+            dataStatement: [
+                [/(?=\n)/, "", "@pop"],
+                [",", "symbol"],
+                {include: "@whitespace"},
+                [/["\u201c\u201d]/, {token: "string.quote", next: "@string"}],
+                [/[^,\n]*[^,\n ]/, "string.unquoted"],
+            ],
             asm: [
                 [
                     /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/,
