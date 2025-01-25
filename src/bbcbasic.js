@@ -255,7 +255,7 @@ export function registerBbcBasicLanguage() {
                         edits: [
                             {
                                 resource: model.uri,
-                                edit: {
+                                textEdit: {
                                     range: marker,
                                     text: text.toUpperCase(),
                                 },
