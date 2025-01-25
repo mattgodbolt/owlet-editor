@@ -113,7 +113,9 @@ export class Emulator {
                 window.localStorage.cmosRam = JSON.stringify(data);
             },
         });
-        const config = {};
+        const config = {
+            keyLayout: 'natural',
+        };
         this.cpu = new Emulator6502(
             Model,
             this.dbgr,
