@@ -247,17 +247,20 @@ export function registerBbcBasicLanguage() {
         provideCodeActions(model, range, context) {
             const actions = context.markers.map(marker => {
                 const text = model.getValueInRange(marker);
+                const replacement = InvalidOperatorMap.has(text) ?
+                    InvalidOperatorMap.get(text) :
+                    text.toUpperCase();
                 return {
-                    title: `Replace with ${text.toUpperCase()}`,
+                    title: `Replace with ${replacement}`,
                     diagnostics: [marker],
                     kind: "quickfix",
                     edit: {
                         edits: [
                             {
                                 resource: model.uri,
-                                edit: {
+                                textEdit: {
                                     range: marker,
-                                    text: text.toUpperCase(),
+                                    text: replacement,
                                 },
                             },
                         ],
