@@ -426,13 +426,15 @@ export class OwletEditor {
             examples: () => this.selectView("examples"),
             about: () => this.selectView("about"),
 
-            jsbeeb: () =>
+            jsbeeb: () => {
+                const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";
                 window.open(
                     `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
                         this.getBasicText(),
-                    )}&rom=gxr.rom`,
+                    )}${gxr}`,
                     "_blank",
-                ),
+                )
+            },
             rocket: () => this.rocket(),
             copy: () => {
                 this.copy();

@@ -149,6 +149,10 @@ export class Emulator {
         modelName += " | GXR";
     }
 
+    hasGxr() {
+        return modelName.indexOf("GXR") >= 0;
+    }
+
     timer() {
         if (!beebjitIncoming && !this.showCoords) {
             this.emuStatus.innerHTML = `${modelName} | ${Math.floor(
