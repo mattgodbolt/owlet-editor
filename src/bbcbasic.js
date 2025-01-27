@@ -166,7 +166,7 @@ export function registerBbcBasicLanguage() {
                     /"([^"]|"")*$/,
                     "invalid.string",
                 ],
-                [/"/, {token: "string.quote", next: "@string"}],
+                ['"', {token: "string.quote", next: "@string"}],
                 // Unusual cases. We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
             ],
@@ -175,7 +175,7 @@ export function registerBbcBasicLanguage() {
             whitespace: [[/[ \t\r\n]+/, "white"]],
             string: [
                 [/[^"]+/, "string"],
-                [/"/, {token: "string.quote", next: "@pop"}],
+                ['"', {token: "string.quote", next: "@pop"}],
             ],
             remStatement: [[/.*/, "comment", "@pop"]],
             dataStatement: [
