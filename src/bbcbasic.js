@@ -162,10 +162,10 @@ export function registerBbcBasicLanguage() {
                 [/[a-zA-Z_][\w]*[$%]?/, "variable"],
                 // strings
                 [
-                    /["\u201c\u201d]([^"\u201c\u201d]|["\u201c\u201d]["\u201c\u201d])*$/,
+                    /"([^"]|"")*$/,
                     "invalid.string",
                 ],
-                [/["\u201c\u201d]/, {token: "string.quote", next: "@string"}],
+                [/"/, {token: "string.quote", next: "@string"}],
                 // Unusual cases. We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
             ],
@@ -173,8 +173,8 @@ export function registerBbcBasicLanguage() {
             fnProcName: [[/[a-zA-Z0-9_]+/, "variable", "@pop"]],
             whitespace: [[/[ \t\r\n]+/, "white"]],
             string: [
-                [/[^"\u201c\u201d]+/, "string"],
-                [/["\u201c\u201d]/, {token: "string.quote", next: "@pop"}],
+                [/[^"]+/, "string"],
+                [/"/, {token: "string.quote", next: "@pop"}],
             ],
             remStatement: [[/.*/, "comment", "@pop"]],
             asm: [
