@@ -182,7 +182,7 @@ export function registerBbcBasicLanguage() {
                 [/(?=\n)/, "", "@pop"],
                 [",", "symbol"],
                 {include: "@whitespace"},
-                [/["\u201c\u201d]/, {token: "string.quote", next: "@string"}],
+                ['"', {token: "string.quote", next: "@string"}],
                 [/[^,\n]*[^,\n ]/, "string.unquoted"],
             ],
             asm: [
