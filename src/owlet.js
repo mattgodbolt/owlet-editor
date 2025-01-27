@@ -190,11 +190,9 @@ export class OwletEditor {
     async setState(state) {
         // Turn invisible characters into equivalent visible ones.
         // eslint-disable-next-line no-control-regex
-        let basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
+        const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
             return String.fromCharCode(c.charCodeAt(0) | 0x100);
-        });
-        // BBCMicrobot normalises smartquotes like this.
-        basic = basic.replace(/[\u201c\u201d]/g, '"');
+        }).replace(/[\u201c\u201d]/g, '"'); // BBCMicrobot normalises smartquotes like this.
         this.editor.getModel().setValue(basic);
         this.selectView("screen");
 
