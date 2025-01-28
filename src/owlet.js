@@ -426,7 +426,7 @@ export class OwletEditor {
             examples: () => this.selectView("examples"),
             about: () => this.selectView("about"),
 
-            jsbeeb: () => {
+            virtualbeeb: () => {
                 const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";
                 window.open(
                     `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
@@ -434,6 +434,17 @@ export class OwletEditor {
                     )}${gxr}`,
                     "_blank",
                 )
+                this.closeModal();
+            },
+            jsbeeb: () => {
+                const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";
+                window.open(
+                    `https://bbc.xania.org/?embedBasic=${encodeURIComponent(
+                        this.getBasicText(),
+                    )}${gxr}`,
+                    "_blank",
+                )
+                this.closeModal();
             },
             rocket: () => this.rocket(),
             copy: () => {
