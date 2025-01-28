@@ -105,7 +105,7 @@ export function registerBbcBasicLanguage() {
             "'",
         ],
         tokenPrefix: allAbbreviations(keywords.map(kw => kw.keyword)),
-        symbols: /[-+#=><!*/:?$;,~^']+/,
+        symbols: /[-+=><!*/:?$;,~^']+/,
         tokenizer: {
             root: [
                 {include: "@whitespace"},
@@ -119,6 +119,12 @@ export function registerBbcBasicLanguage() {
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|PRO\.|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
                 [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", switchTo: "@dataStatement"}], // DATA consumes to EOL
+                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", next: "@optionalHash"}],
+                [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)/, {token: "keyword", next: "@optionalHash"}],
+                [
+                    /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\b|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
+                    {token: "keyword", next: "@optionalHash"},
+                ],
                 [
                     /THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|ERROR|ERRO\.|ERR\.|\u018c|\u018b|\u0185/,
                     "keyword",
@@ -172,6 +178,11 @@ export function registerBbcBasicLanguage() {
             ],
             // FN and PROC names can start with a digit.
             fnProcName: [[/[a-zA-Z0-9_]+/, "variable", "@pop"]],
+            optionalHash: [
+                {include: "@whitespace"},
+                ["#", "symbol"],
+                ["", "", "@pop"],
+            ],
             whitespace: [[/[ \t\r\n]+/, "white"]],
             string: [
                 [/[^"]+/, "string"],
@@ -193,6 +204,7 @@ export function registerBbcBasicLanguage() {
                 [/OPT|EQU[BDSW]/, "keyword.directive"],
                 [/\\[^:]*/, "comment"],
                 [/,\s*[XY]/, "keyword"],
+                ["#", "symbol"], // Immediate addressing
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
                 [allTokensForAsmRegex, "keyword"],

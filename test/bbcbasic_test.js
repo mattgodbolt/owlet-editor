@@ -170,7 +170,7 @@ describe("Tokenisation", () => {
     });
     it("should recognise 6502 inside []", () => {
         checkTokens(
-            ["0[", "1LDA"],
+            ["0[", "1LDA#42"],
             [
                 {offset: 0, type: "constant.linenum"},
                 {offset: 1, type: "delimiter.square"},
@@ -178,6 +178,8 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "constant.linenum"},
                 {offset: 1, type: "keyword"},
+                {offset: 4, type: "symbol"},
+                {offset: 5, type: "number"},
             ],
         );
         checkTokens(
@@ -336,7 +338,6 @@ describe("Tokenisation", () => {
     });
     it("should handle symbols and operators", () => {
         checkTokens(["~"], [{offset: 0, type: "operator"}]);
-        checkTokens(["#"], [{offset: 0, type: "symbol"}]);
         checkTokens(["!"], [{offset: 0, type: "operator"}]);
         checkTokens([":"], [{offset: 0, type: "symbol"}]);
         checkTokens(["="], [{offset: 0, type: "operator"}]);
@@ -356,6 +357,95 @@ describe("Tokenisation", () => {
                 {offset: 13, type: "invalid"},
             ]
         );
+        checkTokens(["#"], [{offset: 0, type: "invalid"}]);
+    });
+    it("should handle # operator where valid", () => {
+        checkTokens(
+            ["P. #X,D$:CLOSE#X"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "white"},
+                {offset: 3, type: "symbol"},
+                {offset: 4, type: "variable"},
+                {offset: 5, type: "operator"},
+                {offset: 6, type: "variable"},
+                {offset: 8, type: "symbol"},
+                {offset: 9, type: "keyword"},
+                {offset: 14, type: "symbol"},
+                {offset: 15, type: "variable"},
+            ]
+        );
+        checkTokens(
+            ["INPUT#X,A,B$"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "symbol"},
+                {offset: 6, type: "variable"},
+                {offset: 7, type: "operator"},
+                {offset: 8, type: "variable"},
+                {offset: 9, type: "operator"},
+                {offset: 10, type: "variable"},
+            ]
+        );
+        checkTokens(
+            ["U.EOF# Y"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "symbol"},
+                {offset: 6, type: "white"},
+                {offset: 7, type: "variable"},
+            ]
+        );
+        checkTokens(
+            ["c=BGET# (channel)"],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "keyword"},
+                {offset: 6, type: "symbol"},
+                {offset: 7, type: "white"},
+                {offset: 8, type: "delimiter.parenthesis"},
+                {offset: 9, type: "variable"},
+                {offset: 16, type: "delimiter.parenthesis"},
+            ]
+        );
+        checkTokens(
+            ["BP.#N,32"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 3, type: "symbol"},
+                {offset: 4, type: "variable"},
+                {offset: 5, type: "operator"},
+                {offset: 6, type: "number"},
+            ]
+        );
+        checkTokens(
+            ["P.EXT#C%"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "symbol"},
+                {offset: 6, type: "variable"},
+            ]
+        );
+        checkTokens(
+            ["PTR#f=PT.#f+4"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 3, type: "symbol"},
+                {offset: 4, type: "variable"},
+                {offset: 5, type: "operator"},
+                {offset: 6, type: "keyword"},
+                {offset: 9, type: "symbol"},
+                {offset: 10, type: "variable"},
+                {offset: 11, type: "operator"},
+                {offset: 12, type: "number"},
+            ]
+        );
+        checkTokens(["!"], [{offset: 0, type: "operator"}]);
+        checkTokens([":"], [{offset: 0, type: "symbol"}]);
+        checkTokens(["="], [{offset: 0, type: "operator"}]);
+        checkTokens(["^"], [{offset: 0, type: "operator"}]);
+        checkTokens(["'"], [{offset: 0, type: "operator"}]);
     });
     it("should not treat C specially after a string", () => {
         checkTokens(
