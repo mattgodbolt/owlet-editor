@@ -118,7 +118,7 @@ export function registerBbcBasicLanguage() {
                 [":", "symbol", "@pop"],
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|PRO\.|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
-                [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", next: "@dataStatement"}], // DATA consumes to EOL
+                [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", switchTo: "@dataStatement"}], // DATA consumes to EOL
                 [
                     /THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|ERROR|ERRO\.|ERR\.|\u018c|\u018b|\u0185/,
                     "keyword",
@@ -179,7 +179,7 @@ export function registerBbcBasicLanguage() {
             ],
             remStatement: [[/.*/, "comment", "@pop"]],
             dataStatement: [
-                [/(?=\n)/, "", "@pop"],
+                ["\n", "", "@pop"],
                 [",", "symbol"],
                 {include: "@whitespace"},
                 ['"', {token: "string.quote", next: "@string"}],
