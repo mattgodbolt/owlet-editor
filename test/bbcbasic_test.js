@@ -183,10 +183,37 @@ describe("Tokenisation", () => {
             ],
         );
         checkTokens(
-            ["[LDA"],
+            ["[LDA(&70,X)"],
             [
                 {offset: 0, type: "delimiter.square"},
                 {offset: 1, type: "keyword"},
+                {offset: 4, type: "delimiter.parenthesis"},
+                {offset: 5, type: "number.hex"},
+                {offset: 8, type: "symbol"},
+                {offset: 9, type: "keyword"},
+                {offset: 10, type: "delimiter.parenthesis"},
+            ],
+        );
+        checkTokens(
+            ["[STA(&80),Y"],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "keyword"},
+                {offset: 4, type: "delimiter.parenthesis"},
+                {offset: 5, type: "number.hex"},
+                {offset: 8, type: "delimiter.parenthesis"},
+                {offset: 9, type: "symbol"},
+                {offset: 10, type: "keyword"},
+            ],
+        );
+        checkTokens(
+            ["[ORA@%,X"],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "keyword"},
+                {offset: 4, type: "variable"},
+                {offset: 6, type: "symbol"},
+                {offset: 7, type: "keyword"},
             ],
         );
         checkTokens(

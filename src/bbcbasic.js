@@ -203,7 +203,7 @@ export function registerBbcBasicLanguage() {
                 ],
                 [/OPT|EQU[BDSW]/, "keyword.directive"],
                 [/\\[^:]*/, "comment"],
-                [/,\s*[XY]/, "keyword"],
+                [/,(?= *[XY]\b)/, {token: "symbol", switchTo: "@asmIndex"}],
                 ["#", "symbol"], // Immediate addressing
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
@@ -211,6 +211,10 @@ export function registerBbcBasicLanguage() {
                 [/^\d+/, "constant.linenum"], // line numbers
                 {include: "@common"},
                 ["]", {token: "delimiter.square", next: "@pop"}],
+            ],
+            asmIndex: [
+                {include: "@whitespace"},
+                [/[XY]/, {token: "keyword", switchTo: "@asm"}],
             ],
         },
     });
