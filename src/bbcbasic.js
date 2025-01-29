@@ -8,7 +8,7 @@ function escape(token) {
 function isExpressionToken(keyword) {
     // Does this token look like it'd be useful in an expression. Used to find sensible things to tokenise
     // in assembly statements (like LEN).
-    return (keyword.flags & ~Flags.Conditional) === 0 || keyword.keyword === "FN";
+    return (keyword.flags & Flags.Expr);
 }
 
 const conditionalTokens = new Set(
@@ -32,6 +32,14 @@ const allTokensForAsmRegex = keywords
 const allByteTokensRegex =
     "[" +
     keywords
+        .map(kw => String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token))
+        .join("") +
+    "]";
+
+const allByteTokensForAsmRegex =
+    "[" +
+    keywords
+        .filter(isExpressionToken)
         .map(kw => String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token))
         .join("") +
     "]";
@@ -208,6 +216,11 @@ export function registerBbcBasicLanguage() {
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
                 [allTokensForAsmRegex, "keyword"],
+                [allByteTokensForAsmRegex, "keyword"],
+                [allTokensRegex, "invalid"],
+                [allByteTokensRegex, "invalid"],
+                [abbreviatedDollarTokensRegex, "invalid"],
+                [invalidAbbreviatedTokensRegex, "invalid"],
                 [/^\d+/, "constant.linenum"], // line numbers
                 {include: "@common"},
                 ["]", {token: "delimiter.square", next: "@pop"}],

@@ -270,6 +270,63 @@ describe("Tokenisation", () => {
             ],
         );
     });
+    it("should highlight tokens invalid in assembler", () => {
+        checkTokens(
+            [
+                "[LDA CLEAR+CLG+CLS+DEF+ENDPROC+END+LINE+NEW+OLD+OFF",
+                "STA RETURN+REPEAT+REPORT+RUN+STEP+SPC+STOP+TO+TAB(1):]"
+            ],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "keyword"},
+                {offset: 4, type: "white"},
+                {offset: 5, type: "invalid"},
+                {offset: 10, type: "operator"},
+                {offset: 11, type: "invalid"},
+                {offset: 14, type: "operator"},
+                {offset: 15, type: "invalid"},
+                {offset: 18, type: "operator"},
+                {offset: 19, type: "invalid"},
+                {offset: 22, type: "operator"},
+                {offset: 23, type: "invalid"},
+                {offset: 30, type: "operator"},
+                {offset: 31, type: "invalid"},
+                {offset: 34, type: "operator"},
+                {offset: 35, type: "invalid"},
+                {offset: 39, type: "operator"},
+                {offset: 40, type: "invalid"},
+                {offset: 43, type: "operator"},
+                {offset: 44, type: "invalid"},
+                {offset: 47, type: "operator"},
+                {offset: 48, type: "invalid"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 3, type: "white"},
+                {offset: 4, type: "invalid"},
+                {offset: 10, type: "operator"},
+                {offset: 11, type: "invalid"},
+                {offset: 17, type: "operator"},
+                {offset: 18, type: "invalid"},
+                {offset: 24, type: "operator"},
+                {offset: 25, type: "invalid"},
+                {offset: 28, type: "operator"},
+                {offset: 29, type: "invalid"},
+                {offset: 33, type: "operator"},
+                {offset: 34, type: "invalid"},
+                {offset: 37, type: "operator"},
+                {offset: 38, type: "invalid"},
+                {offset: 42, type: "operator"},
+                {offset: 43, type: "invalid"},
+                {offset: 45, type: "operator"},
+                {offset: 46, type: "invalid"},
+                {offset: 50, type: "number"},
+                {offset: 51, type: "delimiter.parenthesis"},
+                {offset: 52, type: "symbol"},
+                {offset: 53, type: "delimiter.square"},
+            ],
+        );
+    });
     it("should notice REM statements", () => {
         checkTokens(
             ["REM this is a comment"],
