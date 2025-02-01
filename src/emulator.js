@@ -1,10 +1,10 @@
+import $ from "jquery";
 import _ from "underscore";
 import {Cpu6502} from "jsbeeb/6502";
 import * as canvasLib from "jsbeeb/canvas";
 import {Video} from "jsbeeb/video";
 import {Debugger} from "jsbeeb/web/debug";
-import {FakeSoundChip} from "jsbeeb/soundchip";
-import {FakeDdNoise} from "jsbeeb/ddnoise";
+import {AudioHandler} from "jsbeeb/web/audio-handler";
 import * as models from "jsbeeb/models";
 import {Cmos} from "jsbeeb/cmos";
 import * as utils from "jsbeeb/utils";
@@ -98,8 +98,14 @@ export class Emulator {
 
         this.video = new Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
 
-        this.soundChip = new FakeSoundChip();
-        this.ddNoise = new FakeDdNoise();
+        const audioFilterFreq = 7000;
+        const audioFilterQ = 5;
+        const noSeek = false;
+        this.audioHandler = new AudioHandler($("#audio-warning"), audioFilterFreq, audioFilterQ, noSeek);
+        // Firefox will report that audio is suspended even when it will
+        // start playing without user interaction, so we need to delay a
+        // little to get a reliable indication.
+        window.setTimeout(() => this.audioHandler.checkStatus(), 1000);
 
         this.dbgr = new Debugger(this.video);
         const cmos = new Cmos({
@@ -120,8 +126,8 @@ export class Emulator {
             Model,
             this.dbgr,
             this.video,
-            this.soundChip,
-            this.ddNoise,
+            this.audioHandler.soundChip,
+            this.audioHandler.ddNoise,
             cmos,
             config,
         );
@@ -140,7 +146,7 @@ export class Emulator {
     }
 
     async initialise() {
-        await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
+        await Promise.all([this.audioHandler.initialise(), this.cpu.initialise()]);
         this.ready = true;
     }
 
@@ -163,11 +169,13 @@ export class Emulator {
 
     start() {
         if (this.running) return;
+        this.audioHandler.unmute();
         this.running = true;
         requestAnimationFrame(this.onAnimFrame);
     }
 
     pause() {
+        this.audioHandler.mute();
         this.running = false;
     }
 
@@ -299,6 +307,7 @@ export class Emulator {
 
     keyDown(event) {
         if (!this.running) return;
+        this.audioHandler.tryResume();
 
         const code = this.keyCode(event);
         const processor = this.cpu;
@@ -323,6 +332,7 @@ export class Emulator {
     }
 
     mouseMove(event) {
+        this.audioHandler.tryResume();
         this.showCoords = true;
         const processor = this.cpu;
         const screen = this.root.find(".screen");
