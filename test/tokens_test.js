@@ -139,7 +139,7 @@ describe("Partial detokenisation", () => {
     it("should leave non-tens line numbers", () => {
         const rawProgram =
             '\x0d\x00\x0a\x14 \xf1 "Hello world"\x0d\x00\x0b\x0b \xe5 \x8d\x54\x4a\x40\x0d\xff';
-        assert.strictEqual(partialDetokenise(rawProgram), '10 \xf1 "Hello world"\n11 \xe5 10');
+        assert.strictEqual(partialDetokenise(rawProgram), '\xf1 "Hello world"\n11 \xe5 10');
     });
     it("should not result in invisible Unicode characters", () => {
         const rawProgram = "\x0d\x00\x0a\x08\xf1\x9f\x841\x0d\xff";

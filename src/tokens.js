@@ -411,15 +411,6 @@ export function forEachBasicLine(tokenised, lineHandler) {
     }
 }
 
-function goesUpInTensOnly(sequence) {
-    let prev = 0;
-    for (const num of sequence) {
-        if (num !== prev + 10) return false;
-        prev = num;
-    }
-    return true;
-}
-
 class PartialHandler extends StringHandler {
     constructor() {
         super();
@@ -439,10 +430,18 @@ export function partialDetokenise(rawText) {
         detokeniseInternal(line, handler);
         lines.push({num: lineNum, line: handler.output});
     });
-    if (goesUpInTensOnly(lines.map(x => x.num))) {
-        return lines.map(x => x.line.trimStart()).join("\n");
+    let lineno = 0;
+    return lines.map(x => addLineNo(lineno += 10, x)).join("\n");
+}
+
+function addLineNo(lineno, x) {
+    if (lineno === x.num) {
+        // Omit the line number if it is the same as the implicit line number
+        // since we want to avoid "Shrink" making a program with a mixture of
+        // implicit and explicit line numbers larger.
+        return x.line.trimStart();
     } else {
-        return lines.map(x => `${x.num}${x.line}`).join("\n");
+        return `${x.num}${x.line}`;
     }
 }
 
