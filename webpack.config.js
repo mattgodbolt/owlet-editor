@@ -27,12 +27,12 @@ function getPlugins() {
             patterns: [
                 {
                     context: path.resolve(__dirname, "node_modules"),
-                    from: "jsbeeb/src/public/roms/**/*",
+                    from: "jsbeeb/public/roms/**/*",
                     globOptions: {ignore: ["**/*.txt", "**/*README*"]},
                 },
                 {
                     context: path.resolve(__dirname, "node_modules"),
-                    from: "jsbeeb/src/public/sounds/**/*.wav",
+                    from: "jsbeeb/public/sounds/**/*.wav",
                 },
             ],
         }),
