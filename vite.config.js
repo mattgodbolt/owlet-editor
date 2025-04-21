@@ -11,12 +11,6 @@ import { createHtmlPlugin } from 'vite-plugin-html';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      jsunzip: resolve(__dirname, 'node_modules/jsbeeb/lib/jsunzip.js'),
-      fs: resolve(__dirname, 'src/fake-fs.js'),
-    },
-  },
   plugins: [
     monacoEditorPlugin({}),
     nodePolyfills(),
