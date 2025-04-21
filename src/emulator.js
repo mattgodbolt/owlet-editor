@@ -103,6 +103,7 @@ export class Emulator {
         const noSeek = false;
         this.audioHandler = new AudioHandler(
             $("#audio-warning"),
+            $("#audio-stats")[0],
             audioFilterFreq,
             audioFilterQ,
             noSeek,
