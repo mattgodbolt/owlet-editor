@@ -5,7 +5,6 @@ import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import yaml from '@rollup/plugin-yaml';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import { ViteFaviconsPlugin } from 'vite-plugin-favicon';
 import { createHtmlPlugin } from 'vite-plugin-html';
 
 // Get the directory name equivalent in ESM
@@ -22,7 +21,6 @@ export default defineConfig({
     monacoEditorPlugin({}),
     nodePolyfills(),
     yaml(),
-    ViteFaviconsPlugin('./assets/images/owlet.png'),
     createHtmlPlugin({
       inject: {
         data: {
