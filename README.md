@@ -26,7 +26,13 @@ Try the beta now at [bbcmic.ro](https://bbcmic.ro) and get coding!
 ## To develop
 
 ```
-$ make run
+$ make run   # Starts the Vite development server
+$ npm run build   # Build for production
+$ npm run preview   # Preview the production build locally
 ```
 
-then visit http://localhost:8080
+Then visit http://localhost:8080
+
+## Build System
+
+Owlet Editor uses Vite as its build system. The project was migrated from webpack to Vite to align with the jsbeeb dependency, which also uses Vite.
