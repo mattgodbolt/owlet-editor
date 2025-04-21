@@ -1,18 +1,53 @@
-import {builtinEnvironments} from "vitest/environments";
+import { builtinEnvironments } from 'vitest/environments';
 
-// With reference to https://github.com/microsoft/monaco-editor/blob/main/test/unit/all.js
-// and https://github.com/mswjs/socket.io-binding/blob/0db8a6193f06c2196cfd1880d07e153fa702e591/vitest.node-with-websockets.ts
 export default {
-    name: "monaco",
-    transformMode: "ssr",
-    async setup(global, options) {
-        const {teardown} = await builtinEnvironments.jsdom.setup(global, options);
-        window.matchMedia = function () {
-            return {
-                matches: false,
-                addEventListener: function () {},
-            };
-        };
-        return {teardown};
-    },
+  name: 'monaco',
+  // Force jsdom mode to ensure browser environment
+  async setup(global, options) {
+    // Set up jsdom environment
+    const jsdomEnv = await builtinEnvironments.jsdom.setup(global, options);
+    
+    // Mock browser APIs needed by Monaco
+    global.window.matchMedia = () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => true,
+    });
+    
+    // Create a fake ResizeObserver
+    global.window.ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+    
+    // Create a fake IntersectionObserver
+    global.window.IntersectionObserver = class IntersectionObserver {
+      constructor(callback) {
+        this.callback = callback;
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+    
+    // More needed browser APIs
+    global.window.HTMLElement.prototype.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      width: 0,
+      height: 0,
+    });
+    
+    return {
+      teardown: async () => {
+        await jsdomEnv.teardown();
+      },
+    };
+  },
 };
