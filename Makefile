@@ -19,7 +19,7 @@ $(NPM_UPDATED): package.json
 	@touch $@
 
 .PHONY: roms
-ROM_DIR:=./node_modules/jsbeeb/roms
+ROM_DIR:=./node_modules/jsbeeb/public/roms
 roms: $(ROM_DIR)/gxr.rom
 
 $(ROM_DIR)/gxr.rom: $(NPM_UPDATED)
