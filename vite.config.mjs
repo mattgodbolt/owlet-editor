@@ -5,6 +5,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import yaml from '@rollup/plugin-yaml';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import favicons from 'vite-plugin-favicons';
+import { configDefaults } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
@@ -67,5 +68,10 @@ export default defineConfig({
         javascriptEnabled: true,
       },
     },
+  },
+  // Vitest configuration
+  test: {
+    include: [...configDefaults.include, "test/**/*_test.js"],
+    environmentMatchGlobs: [["test/bbcbasic_test.js", "./test/vitest-environment-monaco.js"]],
   },
 });
