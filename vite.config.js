@@ -4,8 +4,7 @@ import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import yaml from '@rollup/plugin-yaml';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import favicons from 'vite-plugin-favicons';
-import { configDefaults } from 'vitest/config';
+import { ViteFaviconsPlugin } from 'vite-plugin-favicon';
 
 export default defineConfig({
   resolve: {
@@ -18,13 +17,7 @@ export default defineConfig({
     monacoEditorPlugin({}),
     nodePolyfills(),
     yaml(),
-    favicons({
-      icons: {
-        favicons: {
-          source: './assets/images/owlet.png',
-        }
-      }
-    }),
+    ViteFaviconsPlugin('./assets/images/owlet.png'),
     viteStaticCopy({
       targets: [
         {
@@ -68,10 +61,5 @@ export default defineConfig({
         javascriptEnabled: true,
       },
     },
-  },
-  // Vitest configuration
-  test: {
-    include: [...configDefaults.include, "test/**/*_test.js"],
-    environmentMatchGlobs: [["test/bbcbasic_test.js", "./test/vitest-environment-monaco.js"]],
   },
 });
