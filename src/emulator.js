@@ -12,7 +12,7 @@ import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
 
-utils.setBaseUrl("jsbeeb/public/");
+utils.setBaseUrl("/");
 
 const BotStartCycles = 725000; // bbcmicrobot start time
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;
