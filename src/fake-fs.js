@@ -1,2 +1,1 @@
-// here as I'm too dumb to configure webpack to ignore the conditional
-// require(fs) in jsbeeb
+// Provides a fake fs module for browser compatibility when importing jsbeeb

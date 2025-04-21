@@ -19,15 +19,14 @@ $(NPM_UPDATED): package.json
 	@touch $@
 
 .PHONY: roms
-ROM_DIR:=./node_modules/jsbeeb/roms
+ROM_DIR:=./node_modules/jsbeeb/public/roms
 roms: $(ROM_DIR)/gxr.rom
 
 $(ROM_DIR)/gxr.rom: $(NPM_UPDATED)
 	curl -sL https://mdfs.net/System/ROMs/Graphics/GXR120 -o $@
 
-WEBPACK:=./node_modules/webpack-cli/bin/cli.js
-.PHONY: webpack
-webpack: prereqs  ## Runs webpack (useful only for debugging webpack)
+.PHONY: build
+build: prereqs  ## Builds the project
 	$(NPM) run build
 
 .PHONY: lint
@@ -52,11 +51,10 @@ clean:  ## Cleans up everything
 
 .PHONY: run
 run: prereqs  ## Runs a local version on port 8080
-	$(NPM) start
+	$(NPM) run dev
 
 HASH := $(shell git rev-parse HEAD)
 .PHONY: dist
 dist: export NODE_ENV=production
-dist: export WEBPACK_ARGS=-p
-dist: prereqs webpack  ## Creates a distribution
+dist: prereqs build  ## Creates a distribution
 	echo $(HASH) > dist/git_hash

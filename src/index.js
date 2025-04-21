@@ -1,11 +1,12 @@
 import $ from "jquery";
 import {registerBbcBasicLanguage} from "./bbcbasic";
-import rootHtml from "./root.html";
+import rootHtml from "./root.html?raw";
 import {OwletEditor} from "./owlet";
 import {backwardCompat} from "./tokens";
 import "@fortawesome/fontawesome-free/js/all.js";
 import "@fortawesome/fontawesome-free/css/all.css";
-import logo from "../assets/images/monster.png";
+import logo from "/assets/images/monster.png";
+import "./owlet-editor.less";
 
 const LastProgramKey = "program";
 

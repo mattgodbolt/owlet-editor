@@ -10,7 +10,7 @@ import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
-import * as tokenise from "jsbeeb/basic-tokenise";
+import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
 import {makeUEF} from "./UEF";
@@ -190,9 +190,11 @@ export class OwletEditor {
     async setState(state) {
         // Turn invisible characters into equivalent visible ones.
         // eslint-disable-next-line no-control-regex
-        const basic = state.program.replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
-            return String.fromCharCode(c.charCodeAt(0) | 0x100);
-        }).replace(/[\u201c\u201d]/g, '"'); // BBCMicrobot normalises smartquotes like this.
+        const basic = state.program
+            .replace(/[\x00-\x09\x0b-\x1f\x7f-\u009f]/g, function (c) {
+                return String.fromCharCode(c.charCodeAt(0) | 0x100);
+            })
+            .replace(/[\u201c\u201d]/g, '"'); // BBCMicrobot normalises smartquotes like this.
         this.editor.getModel().setValue(basic);
         this.selectView("screen");
 
@@ -433,7 +435,7 @@ export class OwletEditor {
                         this.getBasicText(),
                     )}${gxr}`,
                     "_blank",
-                )
+                );
                 this.closeModal();
             },
             jsbeeb: () => {
@@ -443,7 +445,7 @@ export class OwletEditor {
                         this.getBasicText(),
                     )}${gxr}`,
                     "_blank",
-                )
+                );
                 this.closeModal();
             },
             rocket: () => this.rocket(),

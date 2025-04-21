@@ -1,18 +1,18 @@
 import $ from "jquery";
 import _ from "underscore";
-import {Cpu6502} from "jsbeeb/6502";
-import * as canvasLib from "jsbeeb/canvas";
-import {Video} from "jsbeeb/video";
-import {Debugger} from "jsbeeb/web/debug";
-import {AudioHandler} from "jsbeeb/web/audio-handler";
-import * as models from "jsbeeb/models";
-import {Cmos} from "jsbeeb/cmos";
-import * as utils from "jsbeeb/utils";
+import {Cpu6502} from "jsbeeb/src/6502";
+import * as canvasLib from "jsbeeb/src/canvas";
+import {Video} from "jsbeeb/src/video";
+import {Debugger} from "jsbeeb/src/web/debug";
+import {AudioHandler} from "jsbeeb/src/web/audio-handler";
+import * as models from "jsbeeb/src/models";
+import {Cmos} from "jsbeeb/src/cmos";
+import * as utils from "jsbeeb/src/utils";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
 
-utils.setBaseUrl("jsbeeb/");
+utils.setBaseUrl("/");
 
 const BotStartCycles = 725000; // bbcmicrobot start time
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;
@@ -101,7 +101,12 @@ export class Emulator {
         const audioFilterFreq = 7000;
         const audioFilterQ = 5;
         const noSeek = false;
-        this.audioHandler = new AudioHandler($("#audio-warning"), audioFilterFreq, audioFilterQ, noSeek);
+        this.audioHandler = new AudioHandler(
+            $("#audio-warning"),
+            audioFilterFreq,
+            audioFilterQ,
+            noSeek,
+        );
         // Firefox will report that audio is suspended even when it will
         // start playing without user interaction, so we need to delay a
         // little to get a reliable indication.
@@ -120,7 +125,7 @@ export class Emulator {
             },
         });
         const config = {
-            keyLayout: 'natural',
+            keyLayout: "natural",
         };
         this.cpu = new Emulator6502(
             Model,
