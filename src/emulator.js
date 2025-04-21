@@ -1,18 +1,18 @@
 import _ from "underscore";
-import {Cpu6502} from "jsbeeb/6502";
-import * as canvasLib from "jsbeeb/canvas";
-import {Video} from "jsbeeb/video";
-import {Debugger} from "jsbeeb/web/debug";
-import {FakeSoundChip} from "jsbeeb/soundchip";
-import {FakeDdNoise} from "jsbeeb/ddnoise";
-import * as models from "jsbeeb/models";
-import {Cmos} from "jsbeeb/cmos";
-import * as utils from "jsbeeb/utils";
+import {Cpu6502} from "jsbeeb/src/6502";
+import * as canvasLib from "jsbeeb/src/canvas";
+import {Video} from "jsbeeb/src/video";
+import {Debugger} from "jsbeeb/src/web/debug";
+import {FakeSoundChip} from "jsbeeb/src/soundchip";
+import {FakeDdNoise} from "jsbeeb/src/ddnoise";
+import * as models from "jsbeeb/src/models";
+import {Cmos} from "jsbeeb/src/cmos";
+import * as utils from "jsbeeb/src/utils";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
 
-utils.setBaseUrl("jsbeeb/");
+utils.setBaseUrl("jsbeeb/public/");
 
 const BotStartCycles = 725000; // bbcmicrobot start time
 const ClocksPerSecond = (2 * 1000 * 1000) | 0;

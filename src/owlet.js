@@ -10,7 +10,7 @@ import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
-import * as tokenise from "jsbeeb/basic-tokenise";
+import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
 import {makeUEF} from "./UEF";
@@ -433,7 +433,7 @@ export class OwletEditor {
                         this.getBasicText(),
                     )}${gxr}`,
                     "_blank",
-                )
+                );
                 this.closeModal();
             },
             jsbeeb: () => {
@@ -443,7 +443,7 @@ export class OwletEditor {
                         this.getBasicText(),
                     )}${gxr}`,
                     "_blank",
-                )
+                );
                 this.closeModal();
             },
             rocket: () => this.rocket(),
