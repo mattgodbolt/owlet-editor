@@ -4,6 +4,7 @@ import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import yaml from '@rollup/plugin-yaml';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import favicons from 'vite-plugin-favicons';
 
 export default defineConfig({
   resolve: {
@@ -16,6 +17,13 @@ export default defineConfig({
     monacoEditorPlugin({}),
     nodePolyfills(),
     yaml(),
+    favicons({
+      icons: {
+        favicons: {
+          source: './assets/images/owlet.png',
+        }
+      }
+    }),
     viteStaticCopy({
       targets: [
         {
@@ -51,5 +59,13 @@ export default defineConfig({
   },
   server: {
     port: 8080,
+  },
+  css: {
+    devSourcemap: true,
+    preprocessorOptions: {
+      less: {
+        javascriptEnabled: true,
+      },
+    },
   },
 });
