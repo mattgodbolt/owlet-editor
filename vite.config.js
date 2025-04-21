@@ -1,10 +1,14 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import yaml from '@rollup/plugin-yaml';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { ViteFaviconsPlugin } from 'vite-plugin-favicon';
+
+// Get the directory name equivalent in ESM
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   resolve: {
