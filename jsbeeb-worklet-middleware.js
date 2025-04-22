@@ -82,7 +82,7 @@ export default function jsbeebWorkletPlugin() {
         transform(code, id) {
             // Look for specific modules to transform
             if (id.includes("jsbeeb/src/web/audio-handler.js")) {
-                console.log(`[transform] Transforming audio-handler.js`);
+                console.log(`[transform] Transforming audio-handler.js for development mode`);
 
                 // Replace the problematic imports and fix audio context for development mode
                 return code
