@@ -27,6 +27,7 @@
     "base2048": "^2.0.2",
     "jquery": "^3.7.1",
     "jsbeeb": "github:mattgodbolt/jsbeeb#77be55899c28223d964493c9ad8b60b1ffd37185",
+    "mime-types": "^3.0.1",
     "monaco-editor": "^0.52.2",
     "promise": "^8.3.0",
     "resize-observer-polyfill": "^1.5.1",

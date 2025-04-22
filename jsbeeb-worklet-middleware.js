@@ -3,16 +3,11 @@
 import {build} from "esbuild";
 import {resolve} from "path";
 import fs from "fs";
+import mime from "mime-types";
 
 // Path to jsbeeb in node_modules
 // Using '.' is more reliable than process.cwd() and avoids ESLint errors
 const jsbeebPath = resolve(".", "node_modules/jsbeeb");
-
-// Map of worklet endpoints to their source files
-const workletMap = {
-    "audio-renderer.js": resolve(jsbeebPath, "src/web/audio-renderer.js"),
-    "music5000-worklet.js": resolve(jsbeebPath, "src/music5000-worklet.js"),
-};
 
 // Base path to jsbeeb sound files
 const jsbeebSoundsPath = resolve(jsbeebPath, "public/sounds");
@@ -20,14 +15,31 @@ const jsbeebSoundsPath = resolve(jsbeebPath, "public/sounds");
 // Create Vite plugin
 export default function jsbeebWorkletPlugin() {
     console.log("Initializing jsbeeb worklet middleware plugin");
-    // Helper function to serve sound files (WAV, etc.)
+
+    // Map of worklet endpoints to their source files (using Map for better performance)
+    const workletMap = new Map([
+        ["audio-renderer.js", resolve(jsbeebPath, "src/web/audio-renderer.js")],
+        ["music5000-worklet.js", resolve(jsbeebPath, "src/music5000-worklet.js")],
+    ]);
+
+    // Helper function for handling errors consistently
+    function handleError(res, message, error, statusCode = 500) {
+        console.error(`[jsbeeb-worklet-middleware] ${message}:`, error);
+        res.statusCode = statusCode;
+        res.end(`${message}: ${error.message}`);
+    }
+
+    // Helper function to serve sound files
     function serveSound(soundPath, res) {
         try {
             // Ensure the sound file exists
             if (!fs.existsSync(soundPath)) {
-                console.error(`[jsbeeb-worklet-middleware] Sound file not found: ${soundPath}`);
-                res.statusCode = 404;
-                res.end(`Sound file not found: ${soundPath}`);
+                handleError(
+                    res,
+                    `Sound file not found: ${soundPath}`,
+                    {message: "File not found"},
+                    404,
+                );
                 return;
             }
 
@@ -36,14 +48,14 @@ export default function jsbeebWorkletPlugin() {
             // Read the sound file as binary
             const soundData = fs.readFileSync(soundPath);
 
-            // Set appropriate content type for WAV files
-            res.setHeader("Content-Type", "audio/wav");
+            // Determine content type based on file extension
+            const contentType = mime.lookup(soundPath) || "application/octet-stream";
+
+            res.setHeader("Content-Type", contentType);
             res.setHeader("Content-Length", soundData.length);
             res.end(soundData);
         } catch (error) {
-            console.error(`[jsbeeb-worklet-middleware] Error serving sound file:`, error);
-            res.statusCode = 500;
-            res.end(`Error serving sound file: ${error.message}`);
+            handleError(res, "Error serving sound file", error);
         }
     }
 
@@ -52,9 +64,12 @@ export default function jsbeebWorkletPlugin() {
         try {
             // Ensure the source file exists
             if (!fs.existsSync(sourcePath)) {
-                console.error(`[jsbeeb-worklet-middleware] Source file not found: ${sourcePath}`);
-                res.statusCode = 404;
-                res.end(`Worklet source file not found: ${sourcePath}`);
+                handleError(
+                    res,
+                    `Worklet source file not found: ${sourcePath}`,
+                    {message: "File not found"},
+                    404,
+                );
                 return;
             }
 
@@ -95,9 +110,7 @@ export default function jsbeebWorkletPlugin() {
             res.setHeader("Content-Type", "application/javascript");
             res.end(result.outputFiles[0].text);
         } catch (error) {
-            console.error(`[jsbeeb-worklet-middleware] Error building worklet:`, error);
-            res.statusCode = 500;
-            res.end(`Error building worklet: ${error.message}`);
+            handleError(res, "Error building worklet", error);
         }
     }
 
@@ -127,16 +140,14 @@ export default function jsbeebWorkletPlugin() {
                     );
             }
 
-            // We don't need to transform ddnoise.js - just serve the sound files correctly
-
-            // Also transform the worklet files directly to ensure they're properly formatted for AudioWorklet
-            if (
-                id.includes("jsbeeb/src/web/audio-renderer.js") ||
-                id.includes("jsbeeb/src/music5000-worklet.js")
-            ) {
-                console.log(`[transform] Transforming worklet file: ${id}`);
-                // No transformations needed for the worklet files themselves, just ensure they're processed
-                return code;
+            // Check if this is a worklet file that needs transformation
+            // Use the workletMap values to identify worklet source files
+            for (const [, sourcePath] of workletMap) {
+                if (id.includes(sourcePath)) {
+                    console.log(`[transform] Transforming worklet file: ${id}`);
+                    // No transformations needed for the worklet files themselves, just ensure they're processed
+                    return code;
+                }
             }
 
             // Add other transformation rules for different files if needed
@@ -146,92 +157,73 @@ export default function jsbeebWorkletPlugin() {
         configureServer(server) {
             console.log("[jsbeeb-worklet-middleware] Setting up middleware for worklets");
 
-            // Handler function for smoothie
-            const handleSmoothie = (req, res) => {
-                console.log(`[jsbeeb-worklet-middleware] Intercepting smoothie.js`);
-                const shimPath = resolve(".", "src/smoothie-shim.js");
-
-                try {
-                    const content = fs.readFileSync(shimPath, "utf8");
-                    res.setHeader("Content-Type", "application/javascript");
-                    res.end(content);
-                } catch (error) {
-                    console.error(
-                        `[jsbeeb-worklet-middleware] Error serving smoothie shim:`,
-                        error,
-                    );
-                    res.statusCode = 500;
-                    res.end(`Error serving smoothie shim: ${error.message}`);
-                }
-            };
-
             // Add the main middleware handler using recommended Vite approach
             server.middlewares.use(async (req, res, next) => {
                 const url = req.url;
+                const parsedUrl = new URL(url, "http://localhost");
+                const pathname = parsedUrl.pathname;
 
                 // Log all relevant requests for debugging
                 if (
-                    url.includes("jsbeeb") ||
-                    url.includes("worklet") ||
-                    url.includes("smoothie") ||
-                    url.includes("sounds/")
+                    pathname.includes("jsbeeb") ||
+                    pathname.includes("worklet") ||
+                    pathname.includes("smoothie") ||
+                    pathname.includes("sounds/")
                 ) {
-                    console.log(`[jsbeeb-worklet-middleware] Request: ${url}`);
+                    console.log(`[jsbeeb-worklet-middleware] Request: ${pathname}`);
                 }
 
-                // Check for the specific imports we need to handle
-                if (url.includes("smoothie.js")) {
-                    handleSmoothie(req, res);
+                // Check for smoothie.js import
+                if (pathname.includes("smoothie.js")) {
+                    console.log(`[jsbeeb-worklet-middleware] Intercepting smoothie.js`);
+                    const shimPath = resolve(".", "src/smoothie-shim.js");
+
+                    try {
+                        const content = fs.readFileSync(shimPath, "utf8");
+                        res.setHeader("Content-Type", "application/javascript");
+                        res.end(content);
+                    } catch (error) {
+                        handleError(res, "Error serving smoothie shim", error);
+                    }
                     return;
                 }
 
                 // Handle sound file requests with a general pattern
-                if (url.startsWith("/sounds/") && url.endsWith(".wav")) {
+                if (pathname.startsWith("/sounds/")) {
                     // Map the URL path to the corresponding file in jsbeeb node_modules
-                    const soundPath = resolve(jsbeebSoundsPath, url.substring("/sounds/".length));
-                    console.log(`[jsbeeb-worklet-middleware] Serving sound file: ${url}`);
+                    const soundPath = resolve(
+                        jsbeebSoundsPath,
+                        pathname.substring("/sounds/".length),
+                    );
+                    console.log(`[jsbeeb-worklet-middleware] Serving sound file: ${pathname}`);
                     serveSound(soundPath, res);
                     return;
                 }
 
-                // Handle dedicated worklet endpoints
-                for (const workletKey in workletMap) {
-                    if (url === `/jsbeeb-worklets/${workletKey}`) {
-                        console.log(`[jsbeeb-worklet-middleware] Serving worklet: ${workletKey}`);
-                        try {
-                            await serveWorklet(workletMap[workletKey], res);
-                        } catch (error) {
-                            console.error(`Error serving worklet: ${error.message}`);
-                            res.statusCode = 500;
-                            res.end(`Error serving worklet: ${error.message}`);
+                // Extract worklet name from URL path for various patterns
+                let workletName = null;
+
+                // Check for dedicated endpoints first (most specific)
+                if (pathname.startsWith("/jsbeeb-worklets/")) {
+                    workletName = pathname.substring("/jsbeeb-worklets/".length);
+                }
+                // Then check for any other pattern containing known worklet names
+                else {
+                    for (const [key] of workletMap) {
+                        if (pathname.includes(key)) {
+                            workletName = key;
+                            break;
                         }
-                        return;
                     }
                 }
 
-                // Handle various URL patterns that might be used for worklet requests
-                // Simplify pattern matching - the key is that we catch all possible variations
-                // of worklet URLs from either the URL import syntax or direct path references
-                if (url.includes("audio-renderer.js")) {
-                    console.log(`[jsbeeb-worklet-middleware] Serving audio renderer: ${url}`);
+                // If we found a worklet name, try to serve it
+                if (workletName && workletMap.has(workletName)) {
+                    console.log(`[jsbeeb-worklet-middleware] Serving worklet: ${workletName}`);
                     try {
-                        await serveWorklet(workletMap["audio-renderer.js"], res);
+                        await serveWorklet(workletMap.get(workletName), res);
                     } catch (error) {
-                        console.error(`Error serving audio renderer: ${error.message}`);
-                        res.statusCode = 500;
-                        res.end(`Error serving worklet: ${error.message}`);
-                    }
-                    return;
-                }
-
-                if (url.includes("music5000-worklet.js")) {
-                    console.log(`[jsbeeb-worklet-middleware] Serving music5000 worklet: ${url}`);
-                    try {
-                        await serveWorklet(workletMap["music5000-worklet.js"], res);
-                    } catch (error) {
-                        console.error(`Error serving music5000 worklet: ${error.message}`);
-                        res.statusCode = 500;
-                        res.end(`Error serving worklet: ${error.message}`);
+                        handleError(res, `Error serving worklet ${workletName}`, error);
                     }
                     return;
                 }
@@ -239,8 +231,6 @@ export default function jsbeebWorkletPlugin() {
                 // Otherwise continue with the next middleware
                 next();
             });
-
-            // No need for extra watchers - Vite's HMR will trigger transform hooks automatically
         },
     };
 }
