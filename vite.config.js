@@ -68,16 +68,6 @@ export default defineConfig({
         port: 8080,
     },
 
-    // Add this resolve section to directly alias problematic imports
-    resolve: {
-        alias: [
-            // Alias the smoothie package to our shim
-            {
-                find: "smoothie",
-                replacement: resolve(__dirname, "src/smoothie-shim.js"),
-            },
-        ],
-    },
     optimizeDeps: {
         // Explicitly exclude the worklet files from optimization
         // This is critical as worklets need to be separate files

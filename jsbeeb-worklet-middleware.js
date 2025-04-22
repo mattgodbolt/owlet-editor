@@ -83,8 +83,6 @@ export default function jsbeebWorkletPlugin() {
             // The global 'sampleRate' and 'currentTime' variables are expected in worklets
             const preamble = `
         // Worklet environment setup for development mode
-        const sampleRate = 44100;  // Default sample rate for most audio contexts
-        const currentTime = globalThis.currentTime || 0;
       `;
 
             const result = await build({
@@ -101,8 +99,6 @@ export default function jsbeebWorkletPlugin() {
                 define: {
                     "process.env.NODE_ENV": '"development"',
                 },
-                // Add any necessary external modules
-                external: ["smoothie"],
             });
 
             // Serve the compiled result
@@ -133,10 +129,6 @@ export default function jsbeebWorkletPlugin() {
                         `const music5000WorkletUrl = new URL("../music5000-worklet.js", import.meta.url).href;`,
                         `// Modified by worklet middleware for dev mode
              const music5000WorkletUrl = "/jsbeeb-worklets/music5000-worklet.js";`,
-                    )
-                    .replace(
-                        `import { SmoothieChart, TimeSeries } from "smoothie";`,
-                        `import { SmoothieChart, TimeSeries } from "/src/smoothie-shim.js";`,
                     );
             }
 
@@ -167,25 +159,9 @@ export default function jsbeebWorkletPlugin() {
                 if (
                     pathname.includes("jsbeeb") ||
                     pathname.includes("worklet") ||
-                    pathname.includes("smoothie") ||
                     pathname.includes("sounds/")
                 ) {
                     console.log(`[jsbeeb-worklet-middleware] Request: ${pathname}`);
-                }
-
-                // Check for smoothie.js import
-                if (pathname.includes("smoothie.js")) {
-                    console.log(`[jsbeeb-worklet-middleware] Intercepting smoothie.js`);
-                    const shimPath = resolve(".", "src/smoothie-shim.js");
-
-                    try {
-                        const content = fs.readFileSync(shimPath, "utf8");
-                        res.setHeader("Content-Type", "application/javascript");
-                        res.end(content);
-                    } catch (error) {
-                        handleError(res, "Error serving smoothie shim", error);
-                    }
-                    return;
                 }
 
                 // Handle sound file requests with a general pattern
