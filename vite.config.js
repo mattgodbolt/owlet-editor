@@ -38,7 +38,7 @@ export default defineConfig({
                     },
                 },
                 {
-                    src: "node_modules/jsbeeb/public/sounds/**/*.wav",
+                    src: "node_modules/jsbeeb/public/sounds/**/*",
                     dest: "sounds",
                 },
             ],
@@ -68,11 +68,6 @@ export default defineConfig({
         port: 8080,
     },
 
-    optimizeDeps: {
-        // Explicitly exclude the worklet files from optimization
-        // This is critical as worklets need to be separate files
-        exclude: ["jsbeeb/src/web/audio-renderer.js", "jsbeeb/src/music5000-worklet.js"],
-    },
     css: {
         devSourcemap: true,
         preprocessorOptions: {

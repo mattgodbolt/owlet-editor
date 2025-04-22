@@ -3,14 +3,10 @@
 import {build} from "esbuild";
 import {resolve} from "path";
 import fs from "fs";
-import mime from "mime-types";
 
 // Path to jsbeeb in node_modules
 // Using '.' is more reliable than process.cwd() and avoids ESLint errors
 const jsbeebPath = resolve(".", "node_modules/jsbeeb");
-
-// Base path to jsbeeb sound files
-const jsbeebSoundsPath = resolve(jsbeebPath, "public/sounds");
 
 // Create Vite plugin
 export default function jsbeebWorkletPlugin() {
@@ -27,36 +23,6 @@ export default function jsbeebWorkletPlugin() {
         console.error(`[jsbeeb-worklet-middleware] ${message}:`, error);
         res.statusCode = statusCode;
         res.end(`${message}: ${error.message}`);
-    }
-
-    // Helper function to serve sound files
-    function serveSound(soundPath, res) {
-        try {
-            // Ensure the sound file exists
-            if (!fs.existsSync(soundPath)) {
-                handleError(
-                    res,
-                    `Sound file not found: ${soundPath}`,
-                    {message: "File not found"},
-                    404,
-                );
-                return;
-            }
-
-            console.log(`[jsbeeb-worklet-middleware] Serving sound file from: ${soundPath}`);
-
-            // Read the sound file as binary
-            const soundData = fs.readFileSync(soundPath);
-
-            // Determine content type based on file extension
-            const contentType = mime.lookup(soundPath) || "application/octet-stream";
-
-            res.setHeader("Content-Type", contentType);
-            res.setHeader("Content-Length", soundData.length);
-            res.end(soundData);
-        } catch (error) {
-            handleError(res, "Error serving sound file", error);
-        }
     }
 
     // Helper function to build and serve a worklet
@@ -156,24 +122,8 @@ export default function jsbeebWorkletPlugin() {
                 const pathname = parsedUrl.pathname;
 
                 // Log all relevant requests for debugging
-                if (
-                    pathname.includes("jsbeeb") ||
-                    pathname.includes("worklet") ||
-                    pathname.includes("sounds/")
-                ) {
+                if (pathname.includes("jsbeeb") || pathname.includes("worklet")) {
                     console.log(`[jsbeeb-worklet-middleware] Request: ${pathname}`);
-                }
-
-                // Handle sound file requests with a general pattern
-                if (pathname.startsWith("/sounds/")) {
-                    // Map the URL path to the corresponding file in jsbeeb node_modules
-                    const soundPath = resolve(
-                        jsbeebSoundsPath,
-                        pathname.substring("/sounds/".length),
-                    );
-                    console.log(`[jsbeeb-worklet-middleware] Serving sound file: ${pathname}`);
-                    serveSound(soundPath, res);
-                    return;
                 }
 
                 // Extract worklet name from URL path for various patterns
