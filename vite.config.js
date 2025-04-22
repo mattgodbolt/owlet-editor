@@ -6,12 +6,15 @@ import {viteStaticCopy} from "vite-plugin-static-copy";
 import yaml from "@rollup/plugin-yaml";
 import {nodePolyfills} from "vite-plugin-node-polyfills";
 import {createHtmlPlugin} from "vite-plugin-html";
+import jsbeebWorkletPlugin from "./jsbeeb-worklet-middleware.js";
 
 // Get the directory name equivalent in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
     plugins: [
+        // Add our custom middleware for jsbeeb worklets
+        jsbeebWorkletPlugin(),
         monacoEditorPlugin({}),
         nodePolyfills(),
         yaml(),
@@ -43,6 +46,9 @@ export default defineConfig({
     ],
     assetsInclude: ["**/*.ttf", "**/*.rom"],
     build: {
+        // This setting is critical for worklets to work correctly
+        // It prevents worklet files from being inlined which would break them
+        assetsInlineLimit: 0,
         outDir: "dist",
         minify: true,
         sourcemap: true,
@@ -60,6 +66,22 @@ export default defineConfig({
     },
     server: {
         port: 8080,
+    },
+
+    // Add this resolve section to directly alias problematic imports
+    resolve: {
+        alias: [
+            // Alias the smoothie package to our shim
+            {
+                find: "smoothie",
+                replacement: resolve(__dirname, "src/smoothie-shim.js"),
+            },
+        ],
+    },
+    optimizeDeps: {
+        // Explicitly exclude the worklet files from optimization
+        // This is critical as worklets need to be separate files
+        exclude: ["jsbeeb/src/web/audio-renderer.js", "jsbeeb/src/music5000-worklet.js"],
     },
     css: {
         devSourcemap: true,
