@@ -23,6 +23,9 @@
     "url": "git+https://github.com/mattgodbolt/owlet-editor.git"
   },
   "private": true,
+  "engines": {
+    "node": ">=24.15.0"
+  },
   "dependencies": {
     "base2048": "^2.0.2",
     "jquery": "^3.7.1",
