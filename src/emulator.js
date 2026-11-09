@@ -12,9 +12,9 @@ import {machineSpec, nullIo} from "jsbeeb/src/machine-spec";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
+import {ClocksPerSecond, setTotalCycles, totalCycles} from "./cycles";
 
 const BotStartCycles = 725000; // bbcmicrobot start time
-const ClocksPerSecond = (2 * 1000 * 1000) | 0;
 const MaxCyclesPerFrame = ClocksPerSecond / 10;
 const urlParams = new URLSearchParams(window.location.search);
 
@@ -142,14 +142,12 @@ export class Emulator {
         return modelName.indexOf("GXR") >= 0;
     }
 
-    // jsbeeb keeps the cycle count within a second, and counts the whole seconds separately.
     get totalCycles() {
-        return this.cpu.cycleSeconds * ClocksPerSecond + this.cpu.currentCycles;
+        return totalCycles(this.cpu);
     }
 
     setTotalCycles(cycles) {
-        this.cpu.cycleSeconds = Math.floor(cycles / ClocksPerSecond);
-        this.cpu.currentCycles = this.cpu.targetCycles = cycles % ClocksPerSecond;
+        setTotalCycles(this.cpu, cycles);
     }
 
     timer() {
@@ -305,7 +303,12 @@ export class Emulator {
 
     keyDown(event) {
         if (!this.keyboard) return;
-        if (this.running && event.code === keyCodes.HOME && event.ctrlKey) {
+        // A keypad Home, with Num Lock off, is "Numpad7" by code but "Home" by key.
+        if (
+            this.running &&
+            event.ctrlKey &&
+            (event.code === keyCodes.HOME || event.key === "Home")
+        ) {
             this.pause();
             event.preventDefault();
             return;
