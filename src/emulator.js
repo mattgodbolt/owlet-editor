@@ -99,7 +99,7 @@ export class Emulator {
     }
 
     buildCpu() {
-        this.cpu = new Model.Cpu(Model, {
+        return new Model.Cpu(Model, {
             ...nullIo({
                 video: this.video,
                 soundChip: this.soundChip,
@@ -115,18 +115,21 @@ export class Emulator {
                 extraRoms: this.useGxr ? ["gxr.rom"] : [],
             }),
         });
-        this.keyboard = new Keyboard({
-            processor: this.cpu,
-            inputEnabledFunction: () => false,
-            runningFunction: () => this.running,
-            keyLayout: "natural",
-        });
     }
 
     async initialise() {
         // The ROMs a machine is fitted with are fixed when it is built, so each initialise builds afresh.
-        this.buildCpu();
-        await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
+        // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
+        const cpu = this.buildCpu();
+        await Promise.all([cpu.initialise(), this.ddNoise.initialise()]);
+        this.clearKeys();
+        this.cpu = cpu;
+        this.keyboard = new Keyboard({
+            processor: cpu,
+            inputEnabledFunction: () => false,
+            runningFunction: () => this.running,
+            keyLayout: "natural",
+        });
         this.ready = true;
     }
 
