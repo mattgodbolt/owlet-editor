@@ -13,8 +13,17 @@ Try the beta now at [bbcmic.ro](https://bbcmic.ro) and get coding!
 ## BBC Micro emulator for instant feedback
 
 * Integrated with JSbeeb emulator
+* Sound, which starts off: use the Sound button under the emulator to turn it on
 * Share your entire program as a URL
 * Export to external emulator for interactive use
+
+### Links that ask for sound
+
+Browsers only allow a page to make sound after a click or key press, so a link can't turn it on by itself.
+Adding `?sound` to the address (for example `https://bbcmic.ro/?sound#...`) makes the Sound button flash, and the
+first click or key press anywhere on the page turns sound on. Without it sound is off, so every existing link stays
+quiet. The Share dialog adds `?sound` to the link it makes when sound was on. The setting isn't remembered between
+visits.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 

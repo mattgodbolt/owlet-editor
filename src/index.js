@@ -3,6 +3,7 @@ import {registerBbcBasicLanguage} from "./bbcbasic";
 import rootHtml from "./root.html?raw";
 import {OwletEditor} from "./owlet";
 import {backwardCompat} from "./tokens";
+import {soundRequested} from "./sound";
 import "@fortawesome/fontawesome-free/js/all.js";
 import "@fortawesome/fontawesome-free/css/all.css";
 import logo from "/assets/images/monster.png";
@@ -153,6 +154,8 @@ async function initialise() {
             consumeHash();
         }
     };
+
+    if (soundRequested(queryString)) owletEditor.armSound();
 
     if (urlParams.get("experimental")) {
         console.log("experimental features enabled");

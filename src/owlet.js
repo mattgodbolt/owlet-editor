@@ -302,7 +302,9 @@ export class OwletEditor {
         const shareModal = document.getElementById("share");
         const copyText = document.getElementById("copyText");
         shareModal.style.display = "block";
-        copyText.value = `${location.origin}/#${this.toStateString(this.getBasicText())}`;
+        // A link made with the sound on asks for it, though the browser still needs a click to allow it.
+        const sound = this.emulator.sound.isOn ? "?sound" : "";
+        copyText.value = `${location.origin}/${sound}#${this.toStateString(this.getBasicText())}`;
     }
 
     save() {
@@ -349,6 +351,40 @@ export class OwletEditor {
             text = encode(text.split("").map(c => c.charCodeAt(0)));
         }
         return encodeURIComponent(text);
+    }
+
+    toggleSound() {
+        const {sound} = this.emulator;
+        if (sound.isOn) sound.disable();
+        else sound.enable();
+    }
+
+    showSound(state) {
+        const $sound = $("#sound");
+        const labels = {
+            off: ["Sound off", "Turn sound on"],
+            armed: [
+                "Click for sound",
+                "Sound is on its way: click anywhere or press a key to turn it on",
+            ],
+            on: ["Sound on", "Turn sound off"],
+            unavailable: [
+                "No sound",
+                `Sound is not available: ${this.emulator.sound.failure}. Click to try again`,
+            ],
+        };
+        const [label, title] = labels[state];
+        $sound.attr({
+            "data-state": state,
+            "aria-pressed": state === "on",
+            "aria-label": title,
+            title,
+        });
+        $("#sound-label").text(label);
+    }
+
+    armSound() {
+        this.emulator.sound.arm();
     }
 
     async rocket() {
@@ -411,6 +447,7 @@ export class OwletEditor {
 
         this.tokeniser = await tokenise.create();
 
+        this.emulator.sound.onChange = state => this.showSound(state);
         const actions = {
             run: () => {
                 this.updateProgram();
@@ -448,6 +485,7 @@ export class OwletEditor {
                 this.closeModal();
             },
             rocket: () => this.rocket(),
+            sound: () => this.toggleSound(),
             copy: () => {
                 this.copy();
                 this.closeModal();

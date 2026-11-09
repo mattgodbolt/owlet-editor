@@ -134,6 +134,46 @@ canvas.screen {
   border: none;
 }
 
+#sound {
+  white-space: nowrap;
+
+  // Clicks should land on the button, whichever part of it was hit.
+  * {
+    pointer-events: none;
+  }
+
+  .sound-icon-on {
+    display: none;
+  }
+
+  &[data-state="on"] {
+    .sound-icon-on {
+      display: inline-block;
+    }
+
+    .sound-icon-off {
+      display: none;
+    }
+  }
+
+  &[data-state="armed"] {
+    animation: soundPrompt 2s ease-in-out infinite;
+  }
+}
+
+// On a phone the icon alone has to do, as the footer has no room for its words.
+@media (orientation: portrait) {
+  #sound-label {
+    display: none;
+  }
+}
+
+@keyframes soundPrompt {
+  50% {
+    background-color: var(--color-highlight);
+  }
+}
+
 #about {
   padding: 32px;
   display: none;

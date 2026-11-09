@@ -62,6 +62,10 @@
     </div>
     <div class="footer" id="emu_footer">
         <button data-action="virtualbeeb" title="Load into a 3D emulator">3D</button>
+        <button data-action="sound" id="sound" data-state="off" aria-pressed="false" title="Turn sound on">
+            <i class="fa-solid fa-volume-xmark sound-icon-off"></i><i class="fa-solid fa-volume-high sound-icon-on"></i>
+            <span id="sound-label">Sound off</span>
+        </button>
         <button data-action="rocket" id="rocket" title="send to beebjit" style="display:none;"><i class="fa-solid fa-rocket" style="pointer-events: none;"></i></button>
         <div id="emu_status"></div>
         <div id="coords"></div>
