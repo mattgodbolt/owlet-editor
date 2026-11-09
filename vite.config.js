@@ -54,6 +54,11 @@ export default defineConfig({
             },
         },
     },
+    // jsbeeb imports its shaders with ?raw, which esbuild's dependency pre-bundling cannot load,
+    // so let Vite serve and transform jsbeeb itself.
+    optimizeDeps: {
+        exclude: ["jsbeeb"],
+    },
     server: {
         port: 8080,
     },
