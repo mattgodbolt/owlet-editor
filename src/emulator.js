@@ -1,27 +1,37 @@
 import _ from "underscore";
-import {Cpu6502} from "jsbeeb/src/6502";
-import * as canvasLib from "jsbeeb/src/canvas";
+import * as canvasLib from "jsbeeb/src/web/canvas";
+import {PassthroughFilter} from "jsbeeb/src/video-filters/passthrough-filter";
+import {Keyboard} from "jsbeeb/src/web/keyboard";
+import {keyCodes} from "jsbeeb/src/keymap";
 import {Video} from "jsbeeb/src/video";
-import {Debugger} from "jsbeeb/src/web/debug";
 import {FakeSoundChip} from "jsbeeb/src/soundchip";
 import {FakeDdNoise} from "jsbeeb/src/ddnoise";
 import * as models from "jsbeeb/src/models";
-import {Cmos} from "jsbeeb/src/cmos";
-import * as utils from "jsbeeb/src/utils";
+import {machineSpec, nullIo} from "jsbeeb/src/machine-spec";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
-
-utils.setBaseUrl("/");
+import {setTotalCycles, totalCycles} from "./cycles";
 
 const BotStartCycles = 725000; // bbcmicrobot start time
-const ClocksPerSecond = (2 * 1000 * 1000) | 0;
-const MaxCyclesPerFrame = ClocksPerSecond / 10;
+const MaxSecondsPerFrame = 0.1;
 const urlParams = new URLSearchParams(window.location.search);
 
 let modelName = "BBC Micro Model B";
 let beebjitIncoming = false;
 const Model = models.findModel("B");
+
+// jsbeeb maps the keypad's Enter to the Master's keypad key, which a Model B lacks; Owlet has always made it Return.
+function keypadEnterAsReturn(event) {
+    if (event.code !== "NumpadEnter") return event;
+    return new Proxy(event, {
+        get: (target, property) => {
+            if (property === "code") return keyCodes.ENTER;
+            const value = target[property];
+            return typeof value === "function" ? value.bind(target) : value;
+        },
+    });
+}
 
 class ScreenResizer {
     constructor(screen) {
@@ -49,35 +59,11 @@ class ScreenResizer {
     }
 }
 
-class Emulator6502 extends Cpu6502 {
-    constructor(model, dbgr, video, soundChip, ddNoise, cmos, config) {
-        super(
-            model,
-            dbgr,
-            video,
-            soundChip,
-            ddNoise,
-            null, // Music5000
-            cmos,
-            config,
-            null, // econet
-        );
-    }
-
-    execute(numCyclesToRun) {
-        // Patch to stop it resetting cycle count on execute.
-        // Number.MAX_SAFE_INTEGER should gives us plenty of headroom
-        this.halted = false;
-        this.targetCycles += numCyclesToRun;
-        return this.executeInternalFast();
-    }
-}
-
 export class Emulator {
     constructor(root) {
         this.root = root;
         const screen = this.root.find(".screen");
-        this.canvas = canvasLib.bestCanvas(screen[0]);
+        this.canvas = canvasLib.bestCanvas(screen[0], PassthroughFilter);
         this.emuStatus = document.getElementById("emu_status");
         this.frames = 0;
         this.frameSkip = 0;
@@ -95,68 +81,90 @@ export class Emulator {
         this.showCoords = false; // coordinate display mode
 
         window.theEmulator = this;
+        const emulator = this;
 
-        this.video = new Video(Model.isMaster, this.canvas.fb32, _.bind(this.paint, this));
+        this.video = new Video(
+            Model.isMaster,
+            this.canvas.fb32.length,
+            // jsbeeb's video chip paints into a framebuffer of its own, so copy it over to the canvas's.
+            function (minx, miny, maxx, maxy) {
+                emulator.paint(this, minx, miny, maxx, maxy);
+            },
+        );
 
         this.soundChip = new FakeSoundChip();
         this.ddNoise = new FakeDdNoise();
-
-        this.dbgr = new Debugger(this.video);
-        const cmos = new Cmos({
-            load: function () {
-                if (window.localStorage.cmosRam) {
-                    return JSON.parse(window.localStorage.cmosRam);
-                }
-                return null;
-            },
-            save: function (data) {
-                window.localStorage.cmosRam = JSON.stringify(data);
-            },
-        });
-        const config = {
-            keyLayout: 'natural',
-        };
-        this.cpu = new Emulator6502(
-            Model,
-            this.dbgr,
-            this.video,
-            this.soundChip,
-            this.ddNoise,
-            cmos,
-            config,
-        );
+        this.useGxr = false;
+        this.cpu = null;
+        this.keyboard = null;
 
         screen.mousemove(event => this.mouseMove(event));
         screen.mouseleave(() => this.mouseLeave());
-        screen.keyup(event => this.keyUp(event));
-        screen.keydown(event => this.keyDown(event));
+        screen.keyup(event => this.keyUp(event.originalEvent));
+        screen.keydown(event => this.keyDown(event.originalEvent));
         screen.blur(() => this.clearKeys());
         setInterval(this.timer.bind(this), 1000);
         this.lastFrameTime = 0;
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
+    }
 
-        this.lastShiftLocation = this.lastAltLocation = this.lastCtrlLocation = 0;
+    buildCpu() {
+        return new Model.Cpu(Model, {
+            ...nullIo({
+                video: this.video,
+                soundChip: this.soundChip,
+                model: Model,
+            }),
+            ddNoise: this.ddNoise,
+            config: machineSpec({
+                keyLayout: "natural",
+                extraRoms: this.useGxr ? ["gxr.rom"] : [],
+            }),
+        });
     }
 
     async initialise() {
-        await Promise.all([this.cpu.initialise(), this.ddNoise.initialise()]);
+        // The ROMs a machine is fitted with are fixed when it is built, so each initialise builds afresh.
+        // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
+        const cpu = this.buildCpu();
+        await Promise.all([cpu.initialise(), this.ddNoise.initialise()]);
+        this.clearKeys();
+        this.cpu = cpu;
+        this.keyboard = new Keyboard({
+            processor: cpu,
+            inputEnabledFunction: () => false,
+            runningFunction: () => this.running,
+            keyLayout: "natural",
+        });
         this.ready = true;
     }
 
     gxr() {
-        Model.os.push("gxr.rom");
-        modelName += " | GXR";
+        this.useGxr = true;
+        modelName = "BBC Micro Model B | GXR";
     }
 
     hasGxr() {
         return modelName.indexOf("GXR") >= 0;
     }
 
+    get cyclesPerSecond() {
+        return this.cpu.model.cyclesPerSecond;
+    }
+
+    get totalCycles() {
+        return totalCycles(this.cpu);
+    }
+
+    setTotalCycles(cycles) {
+        setTotalCycles(this.cpu, cycles);
+    }
+
     timer() {
-        if (!beebjitIncoming && !this.showCoords) {
+        if (this.cpu && !beebjitIncoming && !this.showCoords) {
             this.emuStatus.innerHTML = `${modelName} | ${Math.floor(
-                this.cpu.currentCycles / 2000000,
+                this.totalCycles / this.cyclesPerSecond,
             )} s`;
         }
     }
@@ -197,9 +205,8 @@ export class Emulator {
         this.state = await response.json();
         const t0 = performance.now();
         this.snapshot.load(this.state, this.cpu);
-        this.cpu.currentCycles = 2000000 * 60 * 60 * 3; // 3 hours
-        this.cpu.targetCycles = 2000000 * 60 * 60 * 3;
-        this.loopStart = 2000000 * 60 * 60 * 3;
+        this.loopStart = this.cyclesPerSecond * 60 * 60 * 3; // 3 hours
+        this.setTotalCycles(this.loopStart);
         this.loopLength = 6000000 + 320000;
 
         const t1 = performance.now();
@@ -251,70 +258,77 @@ export class Emulator {
     frameFunc(now) {
         requestAnimationFrame(this.onAnimFrame);
         // Take snapshot
-        if (this.loop && !this.state && this.cpu.currentCycles >= this.loopStart) {
+        if (this.loop && !this.state && this.totalCycles >= this.loopStart) {
             this.pause();
             this.state = this.snapshot.save(this.cpu).state;
             this.start();
-            console.log("snapshot taken at " + this.cpu.currentCycles + " cycles");
+            console.log("snapshot taken at " + this.totalCycles + " cycles");
         }
 
         // Loop back
-        if (this.loop && this.state && this.cpu.currentCycles >= this.loopStart + this.loopLength) {
+        if (this.loop && this.state && this.totalCycles >= this.loopStart + this.loopLength) {
             this.pause();
             this.snapshot.load(this.state, this.cpu);
-            this.cpu.currentCycles = this.loopStart;
-            this.cpu.targetCycles = this.loopStart;
+            this.setTotalCycles(this.loopStart);
             this.start();
         }
 
         if (this.running && this.lastFrameTime !== 0) {
             const sinceLast = now - this.lastFrameTime;
-            let cycles = ((sinceLast * ClocksPerSecond) / 1000) | 0;
-            cycles = Math.min(cycles, MaxCyclesPerFrame);
+            let cycles = ((sinceLast * this.cyclesPerSecond) / 1000) | 0;
+            cycles = Math.min(cycles, this.cyclesPerSecond * MaxSecondsPerFrame);
             try {
                 if (!this.cpu.execute(cycles)) {
                     this.running = false; // TODO: breakpoint
                 }
             } catch (e) {
                 this.running = false;
-                this.dbgr.debug(this.cpu.pc);
+                console.log(`Emulator stopped at PC=${this.cpu.pc.toString(16)}`);
                 throw e;
             }
         }
         this.lastFrameTime = now;
     }
 
-    paint(minx, miny, maxx, maxy) {
+    paint(video, minx, miny, maxx, maxy) {
         this.frames++;
         if (this.frames < this.frameSkip) return;
         this.frames = 0;
-        const teletextAdjustX = this.video && this.video.teletextMode ? 15 : 0;
+        this.canvas.fb32.set(video.fb32.subarray(miny * 1024, maxy * 1024), miny * 1024);
+        const teletextAdjustX = video.teletextMode ? 15 : 0;
         this.canvas.paint(
             minx + this.leftMargin + teletextAdjustX,
             miny + this.topMargin,
             maxx - this.rightMargin + teletextAdjustX,
             maxy - this.bottomMargin,
+            {
+                fields: 1,
+                lineBaseEven: video.lineBaseEven,
+                lineBaseOdd: video.lineBaseOdd,
+                phaseBaseEven: video.phaseBaseEven,
+                phaseBaseOdd: video.phaseBaseOdd,
+                lineGrid: video.lineGrid,
+            },
         );
     }
 
     keyDown(event) {
-        if (!this.running) return;
-
-        const code = this.keyCode(event);
-        const processor = this.cpu;
-        if (code === utils.keyCodes.HOME && event.ctrlKey) {
+        if (!this.keyboard) return;
+        // A keypad Home, with Num Lock off, is "Numpad7" by code but "Home" by key.
+        if (
+            this.running &&
+            event.ctrlKey &&
+            (event.code === keyCodes.HOME || event.key === "Home")
+        ) {
             this.pause();
-        } else if (code === utils.keyCodes.F12 || code === utils.keyCodes.BREAK) {
-            processor.setReset(true);
-        } else {
-            processor.sysvia.keyDown(code, event.shiftKey);
+            event.preventDefault();
+            return;
         }
-        event.preventDefault();
+        this.keyboard.keyDown(keypadEnterAsReturn(event));
     }
 
     clearKeys() {
-        const processor = this.cpu;
-        if (processor && processor.sysvia) processor.sysvia.clearKeys();
+        if (this.keyboard) this.keyboard.clearKeys();
     }
 
     mouseLeave() {
@@ -323,6 +337,7 @@ export class Emulator {
     }
 
     mouseMove(event) {
+        if (!this.cpu) return;
         this.showCoords = true;
         const processor = this.cpu;
         const screen = this.root.find(".screen");
@@ -384,78 +399,7 @@ export class Emulator {
     }
 
     keyUp(event) {
-        // Always let the key ups come through.
-        const code = this.keyCode(event);
-        const processor = this.cpu;
-        if (processor && processor.sysvia) processor.sysvia.keyUp(code);
-        if (!this.running) return;
-        if (code === utils.keyCodes.F12 || code === utils.keyCodes.BREAK) {
-            processor.setReset(false);
-        }
-        event.preventDefault();
-    }
-
-    keyCode(event) {
-        const ret = event.which || event.charCode || event.keyCode;
-        const keyCodes = utils.keyCodes;
-        switch (event.location) {
-            default:
-                // keyUp events seem to pass location = 0 (Chrome)
-                switch (ret) {
-                    case keyCodes.SHIFT:
-                        return this.lastShiftLocation === 1
-                            ? keyCodes.SHIFT_LEFT
-                            : keyCodes.SHIFT_RIGHT;
-                    case keyCodes.ALT:
-                        return this.lastAltLocation === 1 ? keyCodes.ALT_LEFT : keyCodes.ALT_RIGHT;
-                    case keyCodes.CTRL:
-                        return this.lastCtrlLocation === 1
-                            ? keyCodes.CTRL_LEFT
-                            : keyCodes.CTRL_RIGHT;
-                }
-                break;
-            case 1:
-                switch (ret) {
-                    case keyCodes.SHIFT:
-                        this.lastShiftLocation = 1;
-                        return keyCodes.SHIFT_LEFT;
-
-                    case keyCodes.ALT:
-                        this.lastAltLocation = 1;
-                        return keyCodes.ALT_LEFT;
-
-                    case keyCodes.CTRL:
-                        this.lastCtrlLocation = 1;
-                        return keyCodes.CTRL_LEFT;
-                }
-                break;
-            case 2:
-                switch (ret) {
-                    case keyCodes.SHIFT:
-                        this.lastShiftLocation = 2;
-                        return keyCodes.SHIFT_RIGHT;
-
-                    case keyCodes.ALT:
-                        this.lastAltLocation = 2;
-                        return keyCodes.ALT_RIGHT;
-
-                    case keyCodes.CTRL:
-                        this.lastCtrlLocation = 2;
-                        return keyCodes.CTRL_RIGHT;
-                }
-                break;
-            case 3: // numpad
-                switch (ret) {
-                    case keyCodes.ENTER:
-                        return utils.keyCodes.NUMPADENTER;
-
-                    case keyCodes.DELETE:
-                        return utils.keyCodes.NUMPAD_DECIMAL_POINT;
-                }
-                break;
-        }
-
-        return ret;
+        if (this.keyboard) this.keyboard.keyUp(keypadEnterAsReturn(event));
     }
 
     readmem(address) {
