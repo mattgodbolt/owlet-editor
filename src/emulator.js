@@ -11,10 +11,10 @@ import {machineSpec, nullIo} from "jsbeeb/src/machine-spec";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
-import {ClocksPerSecond, setTotalCycles, totalCycles} from "./cycles";
+import {setTotalCycles, totalCycles} from "./cycles";
 
 const BotStartCycles = 725000; // bbcmicrobot start time
-const MaxCyclesPerFrame = ClocksPerSecond / 10;
+const MaxSecondsPerFrame = 0.1;
 const urlParams = new URLSearchParams(window.location.search);
 
 let modelName = "BBC Micro Model B";
@@ -149,6 +149,10 @@ export class Emulator {
         return modelName.indexOf("GXR") >= 0;
     }
 
+    get cyclesPerSecond() {
+        return this.cpu.model.cyclesPerSecond;
+    }
+
     get totalCycles() {
         return totalCycles(this.cpu);
     }
@@ -160,7 +164,7 @@ export class Emulator {
     timer() {
         if (this.cpu && !beebjitIncoming && !this.showCoords) {
             this.emuStatus.innerHTML = `${modelName} | ${Math.floor(
-                this.totalCycles / ClocksPerSecond,
+                this.totalCycles / this.cyclesPerSecond,
             )} s`;
         }
     }
@@ -201,7 +205,7 @@ export class Emulator {
         this.state = await response.json();
         const t0 = performance.now();
         this.snapshot.load(this.state, this.cpu);
-        this.loopStart = ClocksPerSecond * 60 * 60 * 3; // 3 hours
+        this.loopStart = this.cyclesPerSecond * 60 * 60 * 3; // 3 hours
         this.setTotalCycles(this.loopStart);
         this.loopLength = 6000000 + 320000;
 
@@ -271,8 +275,8 @@ export class Emulator {
 
         if (this.running && this.lastFrameTime !== 0) {
             const sinceLast = now - this.lastFrameTime;
-            let cycles = ((sinceLast * ClocksPerSecond) / 1000) | 0;
-            cycles = Math.min(cycles, MaxCyclesPerFrame);
+            let cycles = ((sinceLast * this.cyclesPerSecond) / 1000) | 0;
+            cycles = Math.min(cycles, this.cyclesPerSecond * MaxSecondsPerFrame);
             try {
                 if (!this.cpu.execute(cycles)) {
                     this.running = false; // TODO: breakpoint

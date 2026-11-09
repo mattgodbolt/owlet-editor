@@ -204,7 +204,7 @@ export class OwletEditor {
             this.emulator.pause();
             this.emulator.snapshot.load(state.state, this.emulator.cpu);
             console.log(state.state);
-            this.emulator.setTotalCycles(2000000 * 60 * 60 * 3);
+            this.emulator.setTotalCycles(this.emulator.cyclesPerSecond * 60 * 60 * 3);
             this.emulator.start();
         } else {
             this.emulator.gxr();
