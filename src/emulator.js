@@ -7,7 +7,6 @@ import {Video} from "jsbeeb/src/video";
 import {FakeSoundChip} from "jsbeeb/src/soundchip";
 import {FakeDdNoise} from "jsbeeb/src/ddnoise";
 import * as models from "jsbeeb/src/models";
-import {localStoragePersistence} from "jsbeeb/src/cmos";
 import {machineSpec, nullIo} from "jsbeeb/src/machine-spec";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
@@ -116,10 +115,6 @@ export class Emulator {
                 video: this.video,
                 soundChip: this.soundChip,
                 model: Model,
-                cmosPersistence: localStoragePersistence(
-                    () => window.localStorage,
-                    error => console.log(`Unable to store the CMOS settings: ${error}`),
-                ),
             }),
             ddNoise: this.ddNoise,
             config: machineSpec({
