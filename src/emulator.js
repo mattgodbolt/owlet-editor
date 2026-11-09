@@ -22,6 +22,18 @@ let modelName = "BBC Micro Model B";
 let beebjitIncoming = false;
 const Model = models.findModel("B");
 
+// jsbeeb maps the keypad's Enter to the Master's keypad key, which a Model B lacks; Owlet has always made it Return.
+function keypadEnterAsReturn(event) {
+    if (event.code !== "NumpadEnter") return event;
+    return new Proxy(event, {
+        get: (target, property) => {
+            if (property === "code") return keyCodes.ENTER;
+            const value = target[property];
+            return typeof value === "function" ? value.bind(target) : value;
+        },
+    });
+}
+
 class ScreenResizer {
     constructor(screen) {
         this.screen = screen;
@@ -313,7 +325,7 @@ export class Emulator {
             event.preventDefault();
             return;
         }
-        this.keyboard.keyDown(event);
+        this.keyboard.keyDown(keypadEnterAsReturn(event));
     }
 
     clearKeys() {
@@ -388,7 +400,7 @@ export class Emulator {
     }
 
     keyUp(event) {
-        if (this.keyboard) this.keyboard.keyUp(event);
+        if (this.keyboard) this.keyboard.keyUp(keypadEnterAsReturn(event));
     }
 
     readmem(address) {
