@@ -370,25 +370,20 @@ export class OwletEditor {
             on: ["Sound on", "Turn sound off"],
             unavailable: [
                 "No sound",
-                `Sound is not available: ${this.emulator.sound.failure}. Click to try again`,
+                `Sound is not available: ${this.emulator.sound.failure}${this.emulator.sound.retryable ? ". Click to try again" : ""}`,
             ],
         };
         const [label, title] = labels[state];
         $sound.attr({
             "data-state": state,
             "aria-pressed": state === "on",
-            "aria-label": title,
             title,
         });
         $("#sound-label").text(label);
     }
 
     armSound() {
-        // The button turns sound on itself, so the click that is for it is not also taken as the one that arms.
-        this.emulator.sound.arm(
-            window,
-            event => event.target instanceof Element && event.target.closest("#sound"),
-        );
+        this.emulator.sound.arm();
     }
 
     async rocket() {

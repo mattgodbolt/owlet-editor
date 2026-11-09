@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from "vitest";
-import {Sound, soundRequested} from "../src/sound";
+import {Sound, failureText, soundRequested} from "../src/sound";
 
 const fakeContext = state => Object.assign(new EventTarget(), {state});
 
@@ -29,6 +29,27 @@ describe("Sound links", () => {
         ["?x=1&sound", true],
     ])("should read %j as sound %s", (search, requested) => {
         expect(soundRequested(search)).toBe(requested);
+    });
+});
+
+describe("Sound failures", () => {
+    it.each([
+        [
+            "a page with no audio worklet API",
+            "No audio worklet API was found - there will be no audio. If you are...",
+            false,
+            "sound needs a secure page (https)",
+        ],
+        [
+            "an audio system that would not start",
+            "There will be no sound: the audio system could not be started (Blocked). Reloading the page may help.",
+            true,
+            "the audio system could not be started (Blocked). Reloading the page may help.",
+        ],
+        ["no Web Audio at all", "", false, "this browser has no Web Audio"],
+        ["nothing said, with audio", "  ", true, "this browser would not start audio"],
+    ])("should explain %s", (_name, warningText, hasAudioContext, expected) => {
+        expect(failureText(warningText, hasAudioContext)).toBe(expected);
     });
 });
 

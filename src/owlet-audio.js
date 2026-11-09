@@ -1,5 +1,6 @@
 import {AudioHandler} from "jsbeeb/src/web/audio-handler";
 import {DefaultAudioOutput} from "jsbeeb/src/audio-output";
+import {failureText} from "./sound";
 
 /**
  * jsbeeb's audio handler, without its page: the "audio is suspended" banner it manages goes to a node that is
@@ -57,8 +58,6 @@ export class OwletAudio extends AudioHandler {
     }
 
     get failure() {
-        if (!this.audioContext) return "this browser has no Web Audio";
-        if (!this.audioContext.audioWorklet) return "sound needs a secure page (https)";
-        return this.warningNode.textContent.trim() || "this browser would not start audio";
+        return failureText(this.warningNode.textContent, !!this.audioContext);
     }
 }

@@ -9,6 +9,18 @@ export function soundRequested(search) {
 }
 
 /**
+ * Why there is no sound, in words for the user, from what jsbeeb's audio handler left in its warning node (which it
+ * fills in for an audio system that would not start, or a page with no audio worklet API) and whether it has an
+ * audio context at all.
+ */
+export function failureText(warningText, hasAudioContext) {
+    const text = warningText.trim();
+    if (text.startsWith("No audio worklet API")) return "sound needs a secure page (https)";
+    if (text) return text.replace(/^There will be no sound:\s*/, "");
+    return hasAudioContext ? "this browser would not start audio" : "this browser has no Web Audio";
+}
+
+/**
  * Whether the machine is heard. It is off until switched on, and is not remembered: browsers only let a page make
  * sound after a click or key press, so `enable` has to be called from one.
  *
