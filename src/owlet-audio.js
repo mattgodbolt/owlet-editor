@@ -41,7 +41,13 @@ export class OwletAudio extends AudioHandler {
         this._chipEvents = [];
     }
 
+    suspend() {
+        this.audioContext?.suspend().catch(() => {});
+    }
+
     get failure() {
+        if (!this.audioContext) return "this browser has no Web Audio";
+        if (!this.audioContext.audioWorklet) return "sound needs a secure page (https)";
         return this.warningNode.textContent.trim() || "this browser would not start audio";
     }
 }

@@ -233,7 +233,8 @@ export class Emulator {
     }
 
     async runProgram(tokenised) {
-        if (!this.ready) return;
+        // A CPU that is being replaced must not run, as the new one has taken the sound chip's scheduler.
+        if (!this.ready || this.rebuilding) return;
         this.cpu.reset(true);
         const processor = this.cpu;
         await processor.execute(BotStartCycles); // match bbcmicrobot
@@ -292,10 +293,10 @@ export class Emulator {
             cycles = Math.min(cycles, this.cyclesPerSecond * MaxSecondsPerFrame);
             try {
                 if (!this.cpu.execute(cycles)) {
-                    this.running = false; // TODO: breakpoint
+                    this.pause(); // TODO: breakpoint
                 }
             } catch (e) {
-                this.running = false;
+                this.pause();
                 console.log(`Emulator stopped at PC=${this.cpu.pc.toString(16)}`);
                 throw e;
             }

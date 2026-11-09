@@ -1,8 +1,10 @@
 import {describe, expect, it, vi} from "vitest";
 import {Sound, soundRequested} from "../src/sound";
 
+const fakeContext = state => Object.assign(new EventTarget(), {state});
+
 const fakeAudio = (contextState = "running") => ({
-    audioContext: {state: contextState},
+    audioContext: contextState ? fakeContext(contextState) : null,
     noAudio: false,
     ready: Promise.resolve("ok"),
     failure: "no worklet",
@@ -11,6 +13,7 @@ const fakeAudio = (contextState = "running") => ({
     stopListening: vi.fn(),
     mute: vi.fn(),
     unmute: vi.fn(),
+    suspend: vi.fn(),
 });
 
 describe("Sound links", () => {
@@ -75,6 +78,53 @@ describe("Sound", () => {
         expect(audio.mute).toHaveBeenCalled();
     });
 
+    it("should suspend the audio when turned off, so that nothing runs for nothing", async () => {
+        const audio = fakeAudio();
+        const sound = new Sound(audio);
+        await sound.enable();
+        expect(audio.suspend).not.toHaveBeenCalled();
+        sound.disable();
+        expect(audio.suspend).toHaveBeenCalled();
+    });
+
+    it("should start only once however many times it is asked while starting", async () => {
+        const audio = fakeAudio();
+        const sound = new Sound(audio);
+        await Promise.all([sound.enable(), sound.enable()]);
+        expect(audio.tryResume).toHaveBeenCalledTimes(1);
+        expect(audio.startListening).toHaveBeenCalledTimes(1);
+    });
+
+    describe("when the browser stops the audio of its own accord", () => {
+        it("should say so, and turn on again at the next gesture", async () => {
+            const audio = fakeAudio();
+            const sound = new Sound(audio);
+            sound.setRunning(true);
+            await sound.enable();
+            audio.stopListening.mockClear();
+
+            audio.audioContext.state = "interrupted";
+            audio.audioContext.dispatchEvent(new Event("statechange"));
+            expect(sound.state).toBe("armed");
+            expect(audio.stopListening).toHaveBeenCalled();
+
+            audio.audioContext.state = "running";
+            window.dispatchEvent(new Event("pointerdown"));
+            await vi.waitFor(() => expect(sound.state).toBe("on"));
+            sound.disable();
+        });
+
+        it("should not mind the audio being suspended by turning it off", async () => {
+            const audio = fakeAudio();
+            const sound = new Sound(audio);
+            await sound.enable();
+            sound.disable();
+            audio.audioContext.state = "suspended";
+            audio.audioContext.dispatchEvent(new Event("statechange"));
+            expect(sound.state).toBe("off");
+        });
+    });
+
     it("should say when the browser will not start audio", async () => {
         vi.useFakeTimers();
         const sound = new Sound(fakeAudio("suspended"));
@@ -83,6 +133,7 @@ describe("Sound", () => {
         await enabled;
         expect(sound.state).toBe("unavailable");
         expect(sound.failure).toBe("no worklet");
+        expect(sound.retryable).toBe(true);
         vi.useRealTimers();
     });
 
@@ -94,7 +145,33 @@ describe("Sound", () => {
         expect(onChange.mock.calls.map(([state]) => state)).toEqual(["on", "off"]);
     });
 
+    describe("when there is no audio at all", () => {
+        it("should say so rather than wait for a gesture that cannot help", async () => {
+            const sound = new Sound(fakeAudio(null));
+            sound.arm(window);
+            window.dispatchEvent(new Event("pointerdown"));
+            await vi.waitFor(() => expect(sound.state).toBe("unavailable"));
+            expect(sound.retryable).toBe(false);
+        });
+    });
+
     describe("armed by a link", () => {
+        it("should leave a gesture to whatever turns sound on itself", async () => {
+            const audio = fakeAudio();
+            const sound = new Sound(audio);
+            const button = document.body.appendChild(document.createElement("button"));
+            sound.arm(window, event => event.target === button);
+
+            button.dispatchEvent(new Event("pointerdown", {bubbles: true}));
+            await Promise.resolve();
+            expect(sound.state).toBe("armed");
+            expect(audio.tryResume).not.toHaveBeenCalled();
+
+            document.body.dispatchEvent(new Event("pointerdown", {bubbles: true}));
+            await vi.waitFor(() => expect(sound.state).toBe("on"));
+            button.remove();
+        });
+
         it("should turn on at the first click, and only listen once", async () => {
             const audio = fakeAudio();
             const sound = new Sound(audio);

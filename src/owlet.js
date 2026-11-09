@@ -384,7 +384,11 @@ export class OwletEditor {
     }
 
     armSound() {
-        this.emulator.sound.arm();
+        // The button turns sound on itself, so the click that is for it is not also taken as the one that arms.
+        this.emulator.sound.arm(
+            window,
+            event => event.target instanceof Element && event.target.closest("#sound"),
+        );
     }
 
     async rocket() {

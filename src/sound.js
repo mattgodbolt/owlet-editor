@@ -23,18 +23,32 @@ export class Sound {
         this.failure = null;
         this.running = false;
         this.stopArming = null;
+        this.armedBy = [window, () => false];
+        this.pending = null;
         this.apply();
+        audio.audioContext?.addEventListener?.("statechange", () => this.contextChanged());
     }
 
     get isOn() {
         return this.state === "on";
     }
 
-    /** Turns sound on at the next click or key press, for a link that asked for it. */
-    arm(target = window) {
+    /** Whether trying again could work, which it cannot when the browser has no audio to start. */
+    get retryable() {
+        return this.state === "unavailable" && !this.audio.noAudio && !!this.audio.audioContext;
+    }
+
+    /**
+     * Turns sound on at the next click or key press, for a link that asked for it. A gesture that `ignore` says
+     * is for something that turns sound on itself (the button) is left to that.
+     */
+    arm(target = window, ignore = () => false) {
         if (this.isOn) return;
+        this.armedBy = [target, ignore];
         this.stopArming?.();
-        const turnOn = () => this.enable();
+        const turnOn = event => {
+            if (!ignore(event)) this.enable();
+        };
         for (const gesture of Gestures) target.addEventListener(gesture, turnOn, true);
         this.stopArming = () => {
             for (const gesture of Gestures) target.removeEventListener(gesture, turnOn, true);
@@ -44,8 +58,17 @@ export class Sound {
     }
 
     /** Call this straight from a click or key press. */
-    async enable() {
-        if (this.state === "on") return;
+    enable() {
+        if (this.isOn) return Promise.resolve();
+        if (!this.pending) {
+            this.pending = this.start().finally(() => {
+                this.pending = null;
+            });
+        }
+        return this.pending;
+    }
+
+    async start() {
         const wasArmed = this.state === "armed";
         this.stopArming?.();
         // resume() waits for a gesture the browser accepts rather than failing, so do not wait for it for long.
@@ -58,9 +81,9 @@ export class Sound {
             this.audio.startListening();
             this.failure = null;
             this.setState("on");
-        } else if (wasArmed && !noAudio) {
+        } else if (wasArmed && !noAudio && audioContext) {
             // That was not a gesture the browser counts, such as Escape, so wait for the next.
-            this.arm();
+            this.arm(...this.armedBy);
         } else {
             this.failure = this.audio.failure;
             this.setState("unavailable");
@@ -72,12 +95,22 @@ export class Sound {
         this.audio.stopListening();
         this.failure = null;
         this.setState("off");
+        this.audio.suspend();
     }
 
     /** Whether the machine is running, as it is only heard while it does. */
     setRunning(running) {
         this.running = running;
         this.apply();
+    }
+
+    // The browser can stop the audio of its own accord (an interruption on a phone, say), and only a
+    // gesture can start it again.
+    contextChanged() {
+        if (!this.isOn || this.audio.audioContext.state === "running") return;
+        this.audio.stopListening();
+        this.state = "off";
+        this.arm(...this.armedBy);
     }
 
     setState(state) {
