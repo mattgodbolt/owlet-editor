@@ -23,7 +23,9 @@ export class Sound {
         this.failure = null;
         this.running = false;
         this.stopArming = null;
-        this.armedBy = [window, () => false];
+        this.armTarget = window;
+        // A gesture this says is for something that turns sound on itself (the button) is left to that.
+        this.ignore = () => false;
         this.pending = null;
         this.apply();
         audio.audioContext?.addEventListener?.("statechange", () => this.contextChanged());
@@ -38,16 +40,13 @@ export class Sound {
         return this.state === "unavailable" && !this.audio.noAudio && !!this.audio.audioContext;
     }
 
-    /**
-     * Turns sound on at the next click or key press, for a link that asked for it. A gesture that `ignore` says
-     * is for something that turns sound on itself (the button) is left to that.
-     */
-    arm(target = window, ignore = () => false) {
+    /** Turns sound on at the next click or key press, for a link that asked for it. */
+    arm(target = window) {
         if (this.isOn) return;
-        this.armedBy = [target, ignore];
+        this.armTarget = target;
         this.stopArming?.();
         const turnOn = event => {
-            if (!ignore(event)) this.enable();
+            if (!this.ignore(event)) this.enable();
         };
         for (const gesture of Gestures) target.addEventListener(gesture, turnOn, true);
         this.stopArming = () => {
@@ -60,6 +59,8 @@ export class Sound {
     /** Call this straight from a click or key press. */
     enable() {
         if (this.isOn) return Promise.resolve();
+        // The start in flight may be waiting on a gesture the browser did not accept, so this one tries too.
+        if (this.pending) this.audio.tryResume();
         if (!this.pending) {
             this.pending = this.start().finally(() => {
                 this.pending = null;
@@ -70,7 +71,6 @@ export class Sound {
 
     async start() {
         const wasArmed = this.state === "armed";
-        this.stopArming?.();
         // resume() waits for a gesture the browser accepts rather than failing, so do not wait for it for long.
         await Promise.race([
             Promise.all([this.audio.tryResume(), this.audio.ready]),
@@ -78,13 +78,15 @@ export class Sound {
         ]);
         const {audioContext, noAudio} = this.audio;
         if (!noAudio && audioContext?.state === "running") {
+            this.stopArming?.();
             this.audio.startListening();
             this.failure = null;
             this.setState("on");
         } else if (wasArmed && !noAudio && audioContext) {
             // That was not a gesture the browser counts, such as Escape, so wait for the next.
-            this.arm(...this.armedBy);
+            this.arm(this.armTarget);
         } else {
+            this.stopArming?.();
             this.failure = this.audio.failure;
             this.setState("unavailable");
         }
@@ -110,7 +112,7 @@ export class Sound {
         if (!this.isOn || this.audio.audioContext.state === "running") return;
         this.audio.stopListening();
         this.state = "off";
-        this.arm(...this.armedBy);
+        this.arm(this.armTarget);
     }
 
     setState(state) {

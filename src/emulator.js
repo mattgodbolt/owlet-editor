@@ -134,6 +134,7 @@ export class Emulator {
         // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
         // Building it hands the one sound chip to its scheduler, so the old CPU must not run in the meantime.
         this.rebuilding = true;
+        const bindings = this.audio.bindings();
         try {
             const cpu = this.buildCpu();
             await Promise.all([cpu.initialise(), this.audio.ddNoise.initialise()]);
@@ -146,6 +147,10 @@ export class Emulator {
                 keyLayout: "natural",
             });
             this.ready = true;
+        } catch (e) {
+            // The old CPU goes on, so it keeps the sound chip.
+            this.audio.restoreBindings(bindings);
+            throw e;
         } finally {
             this.rebuilding = false;
         }

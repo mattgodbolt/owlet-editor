@@ -91,8 +91,8 @@ describe("Sound", () => {
         const audio = fakeAudio();
         const sound = new Sound(audio);
         await Promise.all([sound.enable(), sound.enable()]);
-        expect(audio.tryResume).toHaveBeenCalledTimes(1);
         expect(audio.startListening).toHaveBeenCalledTimes(1);
+        expect(audio.tryResume).toHaveBeenCalledTimes(2);
     });
 
     describe("when the browser stops the audio of its own accord", () => {
@@ -112,6 +112,25 @@ describe("Sound", () => {
             window.dispatchEvent(new Event("pointerdown"));
             await vi.waitFor(() => expect(sound.state).toBe("on"));
             sound.disable();
+        });
+
+        it("should go on leaving a click on the button to the button", async () => {
+            const audio = fakeAudio();
+            const sound = new Sound(audio);
+            const button = document.body.appendChild(document.createElement("button"));
+            sound.ignore = event => event.target === button;
+            await sound.enable();
+
+            audio.audioContext.state = "interrupted";
+            audio.audioContext.dispatchEvent(new Event("statechange"));
+            audio.tryResume.mockClear();
+            button.dispatchEvent(new Event("pointerdown", {bubbles: true}));
+            await Promise.resolve();
+
+            expect(sound.state).toBe("armed");
+            expect(audio.tryResume).not.toHaveBeenCalled();
+            sound.disable();
+            button.remove();
         });
 
         it("should not mind the audio being suspended by turning it off", async () => {
@@ -160,7 +179,8 @@ describe("Sound", () => {
             const audio = fakeAudio();
             const sound = new Sound(audio);
             const button = document.body.appendChild(document.createElement("button"));
-            sound.arm(window, event => event.target === button);
+            sound.ignore = event => event.target === button;
+            sound.arm(window);
 
             button.dispatchEvent(new Event("pointerdown", {bubbles: true}));
             await Promise.resolve();
@@ -204,6 +224,26 @@ describe("Sound", () => {
             await vi.advanceTimersByTimeAsync(10);
             expect(sound.state).toBe("on");
             vi.useRealTimers();
+        });
+
+        it("should use a gesture that arrives while an earlier one is still being waited on", async () => {
+            const audio = fakeAudio("suspended");
+            let firstResume;
+            audio.tryResume = vi.fn(() => {
+                if (audio.tryResume.mock.calls.length === 1)
+                    return new Promise(resolve => (firstResume = resolve));
+                audio.audioContext.state = "running";
+                firstResume();
+                return Promise.resolve();
+            });
+            const sound = new Sound(audio);
+            sound.arm(window);
+
+            window.dispatchEvent(new Event("keydown"));
+            window.dispatchEvent(new Event("pointerdown"));
+
+            await vi.waitFor(() => expect(sound.state).toBe("on"));
+            expect(audio.tryResume).toHaveBeenCalledTimes(2);
         });
 
         it("should not listen any more once switched off", () => {

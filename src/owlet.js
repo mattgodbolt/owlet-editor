@@ -451,7 +451,11 @@ export class OwletEditor {
 
         this.tokeniser = await tokenise.create();
 
-        this.emulator.sound.onChange = state => this.showSound(state);
+        const {sound} = this.emulator;
+        sound.onChange = state => this.showSound(state);
+        // The button turns sound on itself, so a click on it is not also taken as the one that arms.
+        sound.ignore = event =>
+            event.target instanceof Element && event.target.closest("#sound") !== null;
         const actions = {
             run: () => {
                 this.updateProgram();

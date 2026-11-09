@@ -41,6 +41,17 @@ export class OwletAudio extends AudioHandler {
         this._chipEvents = [];
     }
 
+    // What ties the chip to a CPU's scheduler, so that a CPU which fails to build can give it back to the one
+    // that is still running: that one's own tasks go on using these.
+    bindings() {
+        const {scheduler, lastRunEpoch, activeTask, progressTask} = this.soundChip;
+        return {scheduler, lastRunEpoch, activeTask, progressTask};
+    }
+
+    restoreBindings(bindings) {
+        Object.assign(this.soundChip, bindings);
+    }
+
     suspend() {
         this.audioContext?.suspend().catch(() => {});
     }
