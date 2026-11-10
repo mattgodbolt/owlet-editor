@@ -1,7 +1,7 @@
 import {getWarnings, registerBbcBasicLanguage} from "../src/bbcbasic";
-import {describe, it} from "vitest";
+import {describe, it, vi, afterEach} from "vitest";
 import assert from "assert";
-import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, languages, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
 function checkTokens(text, ...expected) {
     const tokenized = editor.tokenize(text.join("\n"), "BBCBASIC").map(line =>
@@ -1115,5 +1115,64 @@ describe("Line warnings", () => {
             startColumn: 1,
             endColumn: 3,
         });
+    });
+});
+
+describe("Abbreviation spacing warnings", () => {
+    it("should suggest a space after an abbreviation that is followed by letters", () => {
+        checkWarnings("H.TO", {
+            message:
+                'H. is not read as an abbreviation when followed directly by letters or digits, did you mean "H. TO"?',
+            code: "space-after-abbreviation",
+            startColumn: 1,
+            endColumn: 5,
+        });
+        checkWarnings("F.A=1 TO H.TO8", {
+            message:
+                'H. is not read as an abbreviation when followed directly by letters or digits, did you mean "H. TO8"?',
+            code: "space-after-abbreviation",
+            startColumn: 10,
+            endColumn: 15,
+        });
+    });
+    it("should not warn when the abbreviation is valid or already spaced", () => {
+        checkWarnings("H. TO");
+        checkWarnings("P.TO");
+        checkWarnings("A=H.");
+    });
+});
+
+describe("Quick fixes", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    // Registers the language again to capture the code action provider, then applies the first quick fix for the
+    // line's first warning and returns the line as the edit leaves it.
+    function applyQuickFix(text) {
+        const register = vi.spyOn(languages, "registerCodeActionProvider");
+        registerBbcBasicLanguage();
+        const provider = register.mock.calls[0][1];
+        const model = editor.createModel(text, "BBCBASIC");
+        try {
+            const markers = getWarnings(1, text, editor.tokenize(text, "BBCBASIC")[0]);
+            const {actions} = provider.provideCodeActions(model, markers[0], {markers});
+            const {title, edit} = actions[0];
+            const {range, text: inserted} = edit.edits[0].textEdit;
+            const start = range.startColumn - 1;
+            const end = range.endColumn - 1;
+            return {title, result: text.slice(0, start) + inserted + text.slice(end)};
+        } finally {
+            model.dispose();
+        }
+    }
+
+    it("should insert a space after the abbreviation", () => {
+        assert.deepStrictEqual(applyQuickFix("H.TO"), {title: "Insert a space after H.", result: "H. TO"});
+        assert.deepStrictEqual(applyQuickFix("F.A=1 TO H.TO8"), {
+            title: "Insert a space after H.",
+            result: "F.A=1 TO H. TO8",
+        });
+    });
+    it("should still offer the upper-case fix for keywords typed in lower case", () => {
+        assert.deepStrictEqual(applyQuickFix("colour"), {title: "Replace with COLOUR", result: "COLOUR"});
     });
 });

@@ -5,6 +5,8 @@ import {
     KeyMod,
     MarkerSeverity,
 } from "monaco-editor/esm/vs/editor/editor.api";
+import "monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution";
+import "monaco-editor/esm/vs/editor/contrib/codeAction/browser/codeActionContributions";
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";

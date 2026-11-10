@@ -82,6 +82,8 @@ const invalidAbbreviatedTokensRegex = (() => {
         .join("|");
 })();
 
+const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
+
 const abbreviatedDollarTokensRegex = (() => {
     // Find all abbreviated forms containing a "$".  It'll always be right before the "."
     // because tokens with a "$" always end with either the "$" (and have no abbreviated
@@ -381,6 +383,31 @@ export function registerBbcBasicLanguage() {
         provideCodeActions(model, range, context) {
             const actions = context.markers.map(marker => {
                 const text = model.getValueInRange(marker);
+                if (marker.code === SpaceAfterAbbreviationCode) {
+                    const insertAt = marker.startColumn + text.indexOf(".") + 1;
+                    return {
+                        title: `Insert a space after ${text.slice(0, text.indexOf(".") + 1)}`,
+                        diagnostics: [marker],
+                        kind: "quickfix",
+                        edit: {
+                            edits: [
+                                {
+                                    resource: model.uri,
+                                    textEdit: {
+                                        range: {
+                                            startLineNumber: marker.startLineNumber,
+                                            startColumn: insertAt,
+                                            endLineNumber: marker.startLineNumber,
+                                            endColumn: insertAt,
+                                        },
+                                        text: " ",
+                                    },
+                                },
+                            ],
+                        },
+                        isPreferred: true,
+                    };
+                }
                 const replacement = InvalidOperatorMap.has(text) ?
                     InvalidOperatorMap.get(text) :
                     text.toUpperCase();
@@ -411,6 +438,8 @@ export function registerBbcBasicLanguage() {
 }
 
 const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?![%$])`);
+
+const SpaceAfterAbbreviationCode = "space-after-abbreviation";
 
 const InvalidOperatorMap = new Map([
     ["==", "="],
@@ -446,6 +475,22 @@ export function getWarnings(lineNum, line, lineTokens) {
         // they are all 2 characters long currently so we can assume that.
         const tokenLen = 2;
         const badOperator = line.substr(token.offset, tokenLen);
+        // A keyword that can't be abbreviated when followed by letters or digits, e.g. "H.TO" is the variable
+        // H, then ".TO". The tokeniser has been checked to produce the keyword for "H. TO" instead.
+        const abbreviated = line.substr(token.offset).match(invalidAbbreviatedTokenAtStart);
+        if (abbreviated) {
+            const abbreviation = abbreviated[0].slice(0, abbreviated[0].indexOf(".") + 1);
+            warnings.push({
+                severity: MarkerSeverity.Warning,
+                message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
+                code: SpaceAfterAbbreviationCode,
+                startLineNumber: lineNum,
+                startColumn: token.offset + 1,
+                endLineNumber: lineNum,
+                endColumn: token.offset + abbreviated[0].length + 1,
+            });
+            continue;
+        }
         if (InvalidOperatorMap.has(badOperator)) {
             const goodOperator = InvalidOperatorMap.get(badOperator);
             warnings.push({
