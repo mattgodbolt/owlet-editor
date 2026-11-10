@@ -990,6 +990,10 @@ describe("Line warnings", () => {
         checkWarnings('P."I am a mongoose"');
         checkWarnings("colour%=123");
         checkWarnings("colour$=a$");
+        // A variable that merely starts with a keyword is fine: only a whole lower-case keyword is suspicious.
+        for (const name of ["radius%", "order%", "cosang", "sinang", "colour3", "printer$", "my_get"]) {
+            checkWarnings(`${name}=1`);
+        }
         checkWarnings("H. TO");
         checkWarnings("P.TO");
         checkWarnings("A=H.");
@@ -1004,6 +1008,22 @@ describe("Line warnings", () => {
             message: "BASIC keywords should be upper case, did you mean CHR$?",
             startColumn: 1,
             endColumn: 5,
+        });
+        checkWarnings('print"hi"', {
+            message: "BASIC keywords should be upper case, did you mean PRINT?",
+            startColumn: 1,
+            endColumn: 6,
+        });
+        // Keywords that end in a bracket carry the bracket, so the name is not followed by a name character.
+        checkWarnings("A=left$(B$,1)", {
+            message: "BASIC keywords should be upper case, did you mean LEFT$(?",
+            startColumn: 3,
+            endColumn: 9,
+        });
+        checkWarnings("A=len(B$)", {
+            message: "BASIC keywords should be upper case, did you mean LEN?",
+            startColumn: 3,
+            endColumn: 6,
         });
         // Both GET and GET$ are tokens - check that doesn't trip us up.
         checkWarnings("A$=get$", {

@@ -15,15 +15,19 @@ const conditionalTokens = new Set(
     keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword),
 );
 
-const allTokensRegex = keywords
-    .map(kw => kw.keyword)
-    .sort((x, y) => y.length - x.length)
-    .map(kw => {
-        // A keyword that begins an earlier one in the table is not read before a dot: "END." is ENDPROC.
-        const beforeDot = abbreviatedKeyword(`${kw}.`).keyword === kw ? "" : "(?!\\.)";
-        return escape(kw) + beforeDot + (conditionalTokens.has(kw) ? "\\b" : "");
-    })
-    .join("|");
+function tokensRegex(kws) {
+    return kws
+        .map(kw => kw.keyword)
+        .sort((x, y) => y.length - x.length)
+        .map(kw => {
+            // A keyword that begins an earlier one in the table is not read before a dot: "END." is ENDPROC.
+            const beforeDot = abbreviatedKeyword(`${kw}.`).keyword === kw ? "" : "(?!\\.)";
+            return escape(kw) + beforeDot + (conditionalTokens.has(kw) ? "\\b" : "");
+        })
+        .join("|");
+}
+
+const allTokensRegex = tokensRegex(keywords);
 
 function keywordsRegex(kws) {
     return kws
@@ -370,7 +374,11 @@ function quickFix(model, marker, title, range, text) {
     };
 }
 
-const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?![%$])`);
+// A whole lower-case keyword: not the start of a longer name (`radius%`) or a suffixed one (`print$`), though a
+// keyword that ends in a bracket is the whole name already.
+const LowerCaseTokenRegex = new RegExp(
+    `^(?:(${tokensRegex(openParenKeywords).toLowerCase()})|(${tokensRegex(keywords.filter(kw => !openParenKeywords.includes(kw))).toLowerCase()})(?![\\w%$]))`,
+);
 
 const SpaceAfterAbbreviationCode = "space-after-abbreviation";
 
