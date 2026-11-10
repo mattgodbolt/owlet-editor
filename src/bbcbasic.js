@@ -161,7 +161,7 @@ export function registerBbcBasicLanguage() {
                 [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|\u018c|\u018b/, "keyword", "@pop"], // THEN and ELSE end a statement
                 // A number after ERROR is not a line number, but a * command may follow ON ERROR.
                 [/(ERROR|ERRO\.|ERR\.|\u0185)(?=[ \t]*\*)/, "keyword", "@pop"],
-                [/(STR\$|STR\.|\xc3)(?=[ \t]*~)/, {token: "keyword", next: "@afterStr"}],
+                [/(STR\$|STR\.|\xc3)([ \t]*)(~)/, ["keyword", "white", "operator"]],
                 [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
                 [/TOP|\xb8P/, "keyword"],
                 // This is slower than using the "tokens" built in to monarch but
@@ -177,11 +177,10 @@ export function registerBbcBasicLanguage() {
             // `~` (hex) is only valid at the start of a PRINT item, never after an operator or `(`.
             printStatement: [
                 // A separator is split from any operator that follows it, so `;-~B` is caught below.
-                [/[;,']/, {cases: {"@operators": "operator", "@default": "symbol"}}],
-                [/[-+=<>*/^!?$]+(?=[ \t]*~)/, {token: "operator", next: "@afterOperator"}],
-                [new RegExp(`(?:${logicalOperatorsRegex})(?=[ \\t]*~)`), {token: "keyword", next: "@afterOperator"}],
-                [/\((?=[ \t]*~)/, {token: "@brackets", next: "@afterOperator"}],
-                [new RegExp(`(?:${parenTokensRegex})(?=[ \\t]*~)`), {token: "keyword", next: "@afterOperator"}],
+                [/[;,']/, "operator"],
+                [/([-+=<>*/^!?$]+)([ \t]*)(~)/, ["operator", "white", "invalid"]],
+                [new RegExp(`(${logicalOperatorsRegex}|${parenTokensRegex})([ \\t]*)(~)`), ["keyword", "white", "invalid"]],
+                [/(\()([ \t]*)(~)/, ["@brackets", "white", "invalid"]],
                 [/~/, "operator"],
                 {include: "@statement"},
             ],
@@ -189,16 +188,6 @@ export function registerBbcBasicLanguage() {
                 [/[ \t\r]+/, "white"],
                 ["#", {token: "symbol", switchTo: "@statement"}],
                 ["", {token: "", switchTo: "@printStatement"}],
-            ],
-            afterOperator: [
-                [/[ \t]+/, "white"],
-                [/~/, "invalid", "@pop"],
-                ["", "", "@pop"],
-            ],
-            afterStr: [
-                [/[ \t]+/, "white"],
-                [/~/, "operator", "@pop"],
-                ["", "", "@pop"],
             ],
             // In a FOR statement TO ends the loop's start expression, except where an operand is expected:
             // there the tokeniser's TO followed by P is TOP.
