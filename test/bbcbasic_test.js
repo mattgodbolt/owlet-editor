@@ -526,6 +526,8 @@ describe("Tokenisation", () => {
         // After a keyword that takes an operand, TOP is still the function.
         assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "keyword"), ["FOR", "ABS", "TOP", "TO", "TOP"]);
         assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "variable"), ["I"]);
+        assert.deepStrictEqual(spans("FOR I=AB. TOP TO TOP", "keyword"), ["FOR", "AB.", "TOP", "TO", "TOP"]);
+        assert.deepStrictEqual(spans("FOR I=AB.TOP TO TOP", "variable"), ["I"]);
         assert.deepStrictEqual(spans("FOR I=1 AND TOP TO 2", "keyword"), ["FOR", "AND", "TOP", "TO"]);
     });
     it("should only allow ~ in PRINT items and after STR$", () => {

@@ -226,10 +226,17 @@ export function registerBbcBasicLanguage() {
                     {token: "keyword", next: "@forOperand"},
                 ],
                 [/TO|\xb8/, {token: "keyword", switchTo: "@statement"}],
-                // A function or other keyword that takes an operand, as in `ABS TOP`.
+                // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
+                [invalidAbbreviatedTokensRegex, "invalid"],
                 [
-                    new RegExp(`(?:${allTokensRegex}|${allByteTokensRegex})(?=[ \\t]*(TOP|\\xb8P))`),
-                    {token: "keyword", next: "@forOperand"},
+                    new RegExp(`(?:${allTokensRegex}|${allByteTokensRegex}|[A-Z]+\\.)(?=[ \\t]*(TOP|\\xb8P))`),
+                    {
+                        cases: {
+                            "@tokenPrefix": {token: "keyword", next: "@forOperand"},
+                            "[A-Z]+\\.": {token: "@rematch", next: "@dotAfterName"},
+                            "@default": {token: "keyword", next: "@forOperand"},
+                        },
+                    },
                 ],
                 {include: "@statement"},
             ],
