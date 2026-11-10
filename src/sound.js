@@ -37,6 +37,7 @@ export class Sound {
         // A gesture this says is for something that turns sound on itself (the button) is left to that.
         this.ignore = () => false;
         this.pending = null;
+        this.starting = false;
         this.apply();
         audio.audioContext?.addEventListener?.("statechange", () => this.contextChanged());
     }
@@ -72,8 +73,11 @@ export class Sound {
         // The start in flight may be waiting on a gesture the browser did not accept, so this one tries too.
         if (this.pending) this.audio.tryResume();
         if (!this.pending) {
+            // Set first, as start() can be told the audio is running before it returns.
+            this.starting = true;
             this.pending = this.start().finally(() => {
                 this.pending = null;
+                this.starting = false;
             });
         }
         return this.pending;
@@ -115,9 +119,18 @@ export class Sound {
     }
 
     // The browser can stop the audio of its own accord (an interruption on a phone, say), and only a
-    // gesture can start it again.
+    // gesture can start it again. It can also start it of its own accord (a browser that lets a page make sound
+    // unasked, or a resume that finished after start() gave up); nothing wanted that unless a link asked for it,
+    // and a running context is fed the chip's events whether or not they are heard.
     contextChanged() {
-        if (!this.isOn || this.audio.audioContext.state === "running") return;
+        const {audioContext} = this.audio;
+        if (audioContext.state === "running") {
+            if (this.isOn || this.starting) return;
+            if (this.state === "armed") this.enable();
+            else audioContext.suspend().catch(() => {});
+            return;
+        }
+        if (!this.isOn) return;
         this.state = "off";
         this.arm(this.armTarget);
     }

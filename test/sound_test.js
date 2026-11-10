@@ -147,6 +147,62 @@ describe("Sound", () => {
             button.remove();
         });
 
+        it("should stop audio that starts when nobody asked for it", () => {
+            const audio = fakeAudio("suspended");
+            const sound = new Sound(audio);
+
+            audio.audioContext.state = "running";
+            audio.audioContext.dispatchEvent(new Event("statechange"));
+
+            expect(audio.audioContext.suspend).toHaveBeenCalled();
+            expect(sound.state).toBe("off");
+        });
+
+        it("should not stop audio that is starting because it was asked for", async () => {
+            const audio = fakeAudio("suspended");
+            audio.tryResume = vi.fn(async () => {
+                audio.audioContext.state = "running";
+                audio.audioContext.dispatchEvent(new Event("statechange"));
+            });
+            const sound = new Sound(audio);
+
+            await sound.enable();
+
+            expect(sound.state).toBe("on");
+            expect(audio.audioContext.suspend).not.toHaveBeenCalled();
+        });
+
+        it("should turn on at once, when a link asked for sound, if the browser lets the audio start", async () => {
+            const audio = fakeAudio("suspended");
+            const sound = new Sound(audio);
+            sound.arm(window);
+
+            audio.audioContext.state = "running";
+            audio.audioContext.dispatchEvent(new Event("statechange"));
+
+            await vi.waitFor(() => expect(sound.state).toBe("on"));
+            expect(audio.audioContext.suspend).not.toHaveBeenCalled();
+            sound.disable();
+        });
+
+        it("should stop audio that starts after the wait for it was given up", async () => {
+            vi.useFakeTimers();
+            const audio = fakeAudio("suspended");
+            audio.tryResume = vi.fn(() => new Promise(() => {}));
+            const sound = new Sound(audio);
+            const enabled = sound.enable();
+            await vi.advanceTimersByTimeAsync(2000);
+            await enabled;
+            expect(sound.state).toBe("unavailable");
+
+            audio.audioContext.state = "running";
+            audio.audioContext.dispatchEvent(new Event("statechange"));
+
+            expect(audio.audioContext.suspend).toHaveBeenCalled();
+            expect(sound.state).toBe("unavailable");
+            vi.useRealTimers();
+        });
+
         it("should not mind the audio being suspended by turning it off", async () => {
             const audio = fakeAudio();
             const sound = new Sound(audio);

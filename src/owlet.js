@@ -382,10 +382,6 @@ export class OwletEditor {
         $("#sound-label").text(label);
     }
 
-    armSound() {
-        this.emulator.sound.arm();
-    }
-
     async rocket() {
         this.updateProgram();
         const $rocket = $("#rocket");
@@ -448,6 +444,7 @@ export class OwletEditor {
 
         const {sound} = this.emulator;
         sound.onChange = state => this.showSound(state);
+        this.showSound(sound.state);
         // The button turns sound on itself, so a click on it is not also taken as the one that arms.
         sound.ignore = event =>
             event.target instanceof Element && event.target.closest("#sound") !== null;

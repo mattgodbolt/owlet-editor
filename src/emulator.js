@@ -12,7 +12,7 @@ import Snapshot from "./snapshot";
 import {setTotalCycles, totalCycles} from "./cycles";
 import {AudioHandler} from "jsbeeb/src/web/audio-handler";
 import {chipBindings, restoreChipBindings} from "./chip-bindings";
-import {Sound} from "./sound";
+import {Sound, soundRequested} from "./sound";
 
 const BotStartCycles = 725000; // bbcmicrobot start time
 const MaxSecondsPerFrame = 0.1;
@@ -100,6 +100,9 @@ export class Emulator {
             noSeek: true,
         });
         this.sound = new Sound(this.audio);
+        // Armed now, before the browser can start the audio of its own accord, which a link that asked for sound
+        // wants and anything else does not.
+        if (soundRequested(window.location.search)) this.sound.arm();
         this.useGxr = false;
         this.cpu = null;
         this.keyboard = null;
