@@ -193,15 +193,10 @@ export function registerBbcBasicLanguage() {
             // there the tokeniser's TO followed by P is TOP.
             forStatement: [
                 [
-                    /[-+=<>*/^,!?$]+(?=[ \t]*(TOP|\xb8P))/,
-                    {
-                        cases: {
-                            "@operators": {token: "operator", next: "@forOperand"},
-                            "@default": {token: "symbol", next: "@forOperand"},
-                        },
-                    },
+                    /([-+=<>*/^,!?$]+)([ \t]*)(TOP|\xb8P)/,
+                    [{cases: {"@operators": "operator", "@default": "symbol"}}, "white", "keyword"],
                 ],
-                [/\((?=[ \t]*(TOP|\xb8P))/, {token: "@brackets", next: "@forOperand"}],
+                [/(\()([ \t]*)(TOP|\xb8P)/, ["@brackets", "white", "keyword"]],
                 [/TO|\xb8/, {token: "keyword", switchTo: "@statement"}],
                 // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
                 [invalidAbbreviatedTokensRegex, "invalid"],
