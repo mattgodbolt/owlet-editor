@@ -130,7 +130,7 @@ export function registerBbcBasicLanguage() {
                 [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", next: "@optionalHash"}],
                 [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)/, {token: "keyword", next: "@optionalHash"}],
                 [
-                    /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\b|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
+                    /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
                     {token: "keyword", next: "@optionalHash"},
                 ],
                 [
@@ -144,7 +144,10 @@ export function registerBbcBasicLanguage() {
                 [allByteTokensRegex, "keyword"],
                 [abbreviatedDollarTokensRegex, "keyword"],
                 [invalidAbbreviatedTokensRegex, "invalid"],
-                [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword"}}],
+                [
+                    /[A-Z]+\./,
+                    {cases: {"@tokenPrefix": "keyword", "@default": {token: "@rematch", next: "@dotAfterName"}}},
+                ],
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
@@ -177,17 +180,22 @@ export function registerBbcBasicLanguage() {
                 [/[a-zA-Z_][\w]*[$%]?/, "variable"],
                 // strings
                 [
-                    /"([^"]|"")*$/,
+                    /"([^"\n]|"")*(?=\n|$)/,
                     "invalid.string",
                 ],
                 ['"', {token: "string.quote", next: "@string"}],
                 // Unusual cases. We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
             ],
+            // Not an abbreviation, so the dot is a number (e.g. P.X.), not part of the name.
+            dotAfterName: [[/[A-Z]+/, "variable", "@pop"]],
             // FN and PROC names can start with a digit.
-            fnProcName: [[/[a-zA-Z0-9_]+/, "variable", "@pop"]],
+            fnProcName: [
+                [/[a-zA-Z0-9_]+/, "variable", "@pop"],
+                ["", "", "@pop"],
+            ],
             optionalHash: [
-                {include: "@whitespace"},
+                [/[ \t\r]+/, "white"],
                 ["#", "symbol"],
                 ["", "", "@pop"],
             ],
@@ -201,6 +209,7 @@ export function registerBbcBasicLanguage() {
                 ["\n", "", "@pop"],
                 [",", "symbol"],
                 {include: "@whitespace"},
+                [/"([^"\n]|"")*(?=\n|$)/, "string"], // No closing quote before the end of the line
                 ['"', {token: "string.quote", next: "@string"}],
                 [/[^,\n]*[^,\n ]/, "string.unquoted"],
             ],
