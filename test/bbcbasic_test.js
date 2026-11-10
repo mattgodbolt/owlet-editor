@@ -529,6 +529,11 @@ describe("Tokenisation", () => {
         assert.deepStrictEqual(spans("FOR I=AB. TOP TO TOP", "keyword"), ["FOR", "AB.", "TOP", "TO", "TOP"]);
         assert.deepStrictEqual(spans("FOR I=AB.TOP TO TOP", "variable"), ["I"]);
         assert.deepStrictEqual(spans("FOR I=1 AND TOP TO 2", "keyword"), ["FOR", "AND", "TOP", "TO"]);
+        // Abbreviated and raw token forms, checked against the ROM by running them.
+        assert.deepStrictEqual(spans("FO.I=TOP TO TOP+1", "keyword"), ["FO.", "TOP", "TO", "TOP"]);
+        assert.deepStrictEqual(spans("\xe3I=\xb8P \xb8 \xb8P+1", "keyword"), ["\xe3", "\xb8P", "\xb8", "\xb8P"]);
+        assert.deepStrictEqual(spans("\xe3P=\xb8P \xb8P:\xf1P", "variable"), ["P", "P", "P"]);
+        assert.deepStrictEqual(spans("\xe3I=\u0194\xb8P \xb8 \xb8P", "variable"), ["I"]);
     });
     it("should only allow ~ in PRINT items and after STR$", () => {
         const valid = [
@@ -543,6 +548,10 @@ describe("Tokenisation", () => {
             ["A$=STR$~(A)", 1],
             ["A$=STR.~A", 1],
             ["IF A THEN PRINT ~A ELSE PRINT ~B", 2],
+            ["P.STR.~255", 1],
+            ["\xf1\xc3~255", 1],
+            ["A$=\xc3~255", 1],
+            ["PRINT ~TOP-TOP", 1],
         ];
         for (const [text, count] of valid) {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
@@ -551,6 +560,7 @@ describe("Tokenisation", () => {
         const invalid = [
             "A=~B",
             "A$=STR$(~12)",
+            "A$=\xc3(~1)",
             "PRINT#0,~A",
             "INPUT ~A",
             "VDU ~A",
