@@ -988,3 +988,27 @@ describe("Line warnings", () => {
         });
     });
 });
+
+describe("Abbreviation spacing warnings", () => {
+    it("should suggest a space after an abbreviation that is followed by letters", () => {
+        checkWarnings("H.TO", {
+            message:
+                'H. is not read as an abbreviation when followed directly by letters or digits, did you mean "H. TO"?',
+            code: "space-after-abbreviation",
+            startColumn: 1,
+            endColumn: 5,
+        });
+        checkWarnings("F.A=1 TO H.TO8", {
+            message:
+                'H. is not read as an abbreviation when followed directly by letters or digits, did you mean "H. TO8"?',
+            code: "space-after-abbreviation",
+            startColumn: 10,
+            endColumn: 15,
+        });
+    });
+    it("should not warn when the abbreviation is valid or already spaced", () => {
+        checkWarnings("H. TO");
+        checkWarnings("P.TO");
+        checkWarnings("A=H.");
+    });
+});
