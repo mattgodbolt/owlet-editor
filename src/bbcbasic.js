@@ -386,6 +386,15 @@ const InvalidOperatorMap = new Map([
 
 export function getWarnings(lineNum, line, lineTokens) {
     const warnings = [];
+    const warn = (offset, length, details) =>
+        warnings.push({
+            severity: MarkerSeverity.Warning,
+            ...details,
+            startLineNumber: lineNum,
+            startColumn: offset + 1,
+            endLineNumber: lineNum,
+            endColumn: offset + length + 1,
+        });
 
     for (const token of lineTokens.filter(token => token.type === "variable.BBCBASIC")) {
         const match = line.substr(token.offset).match(LowerCaseTokenRegex);
@@ -393,13 +402,8 @@ export function getWarnings(lineNum, line, lineTokens) {
             const upper = match[0].toUpperCase();
             // Don't warn about lower case versions of immediate commands, e.g. `new`.
             if (immediateCommands.indexOf(upper) !== -1) continue;
-            warnings.push({
-                severity: MarkerSeverity.Warning,
+            warn(token.offset, match[0].length, {
                 message: `BASIC keywords should be upper case, did you mean ${upper}?`,
-                startLineNumber: lineNum,
-                startColumn: token.offset + 1,
-                endLineNumber: lineNum,
-                endColumn: token.offset + match[0].length + 1,
             });
         }
     }
@@ -409,31 +413,18 @@ export function getWarnings(lineNum, line, lineTokens) {
         // they are all 2 characters long currently so we can assume that.
         const tokenLen = 2;
         const badOperator = line.substr(token.offset, tokenLen);
-        // A keyword that can't be abbreviated when followed by letters or digits, e.g. "H.TO" is the variable
-        // H, then ".TO". The tokeniser has been checked to produce the keyword for "H. TO" instead.
         const abbreviated = line.substr(token.offset).match(invalidAbbreviatedTokenAtStart);
         if (abbreviated) {
             const abbreviation = abbreviated[0].slice(0, abbreviated[0].indexOf(".") + 1);
-            warnings.push({
-                severity: MarkerSeverity.Warning,
+            warn(token.offset, abbreviated[0].length, {
                 message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
                 code: SpaceAfterAbbreviationCode,
-                startLineNumber: lineNum,
-                startColumn: token.offset + 1,
-                endLineNumber: lineNum,
-                endColumn: token.offset + abbreviated[0].length + 1,
             });
             continue;
         }
         if (InvalidOperatorMap.has(badOperator)) {
-            const goodOperator = InvalidOperatorMap.get(badOperator);
-            warnings.push({
-                severity: MarkerSeverity.Warning,
-                message: `${badOperator} is not a BBC BASIC operator, did you mean ${goodOperator}?`,
-                startLineNumber: lineNum,
-                startColumn: token.offset + 1,
-                endLineNumber: lineNum,
-                endColumn: token.offset + tokenLen + 1,
+            warn(token.offset, tokenLen, {
+                message: `${badOperator} is not a BBC BASIC operator, did you mean ${InvalidOperatorMap.get(badOperator)}?`,
             });
         }
     }
