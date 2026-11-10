@@ -496,6 +496,7 @@ describe("Tokenisation", () => {
         assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "variable"), ["I"]);
         assert.deepStrictEqual(spans("FOR I=AB. TOP TO TOP", "keyword"), ["FOR", "AB.", "TOP", "TO", "TOP"]);
         assert.deepStrictEqual(spans("FOR I=AB.TOP TO TOP", "variable"), ["I"]);
+        assert.deepStrictEqual(spans("FOR I=XY.TOP", "variable"), ["I", "XY", "P"]);
         assert.deepStrictEqual(spans("FOR I=1 AND TOP TO 2", "keyword"), ["FOR", "AND", "TOP", "TO"]);
         // Abbreviated and raw token forms, checked against the ROM by running them.
         assert.deepStrictEqual(spans("FO.I=TOP TO TOP+1", "keyword"), ["FO.", "TOP", "TO", "TOP"]);
