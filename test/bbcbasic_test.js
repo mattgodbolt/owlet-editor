@@ -990,6 +990,10 @@ describe("Line warnings", () => {
         checkWarnings('P."I am a mongoose"');
         checkWarnings("colour%=123");
         checkWarnings("colour$=a$");
+        // A variable that merely starts with a keyword is fine: only a whole lower-case keyword is suspicious.
+        for (const name of ["radius%", "order%", "cosang", "sinang", "colour3", "printer$", "print_x"]) {
+            checkWarnings(`${name}=1`);
+        }
         checkWarnings("H. TO");
         checkWarnings("P.TO");
         checkWarnings("A=H.");
@@ -1005,6 +1009,40 @@ describe("Line warnings", () => {
             startColumn: 1,
             endColumn: 5,
         });
+        checkWarnings('print"hi"', {
+            message: "BASIC keywords should be upper case, did you mean PRINT?",
+            startColumn: 1,
+            endColumn: 6,
+        });
+        // A name ends at a `$`, and a keyword ends at its bracket, so whatever follows them is not part of the name.
+        checkWarnings("A=left$(B$,1)", {
+            message: "BASIC keywords should be upper case, did you mean LEFT$(?",
+            startColumn: 3,
+            endColumn: 9,
+        });
+        checkWarnings("P.chr$65", {
+            message: "BASIC keywords should be upper case, did you mean CHR$?",
+            startColumn: 3,
+            endColumn: 7,
+        });
+        checkWarnings("A$=inkey$0", {
+            message: "BASIC keywords should be upper case, did you mean INKEY$?",
+            startColumn: 4,
+            endColumn: 10,
+        });
+        checkWarnings("A=len(B$)", {
+            message: "BASIC keywords should be upper case, did you mean LEN?",
+            startColumn: 3,
+            endColumn: 6,
+        });
+        // The whole name is a keyword when something that cannot be part of a name follows it.
+        for (const follower of [",", ":", ";", " ", "."]) {
+            checkWarnings(`print${follower}`, {
+                message: "BASIC keywords should be upper case, did you mean PRINT?",
+                startColumn: 1,
+                endColumn: 6,
+            });
+        }
         // Both GET and GET$ are tokens - check that doesn't trip us up.
         checkWarnings("A$=get$", {
             message: "BASIC keywords should be upper case, did you mean GET$?",
