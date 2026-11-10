@@ -161,9 +161,52 @@ describe("Tokenisation", () => {
             ],
         );
     });
-    it("should not recognize bad abbreviations", () => {
-        checkTokens(["Z."], [{offset: 0, type: "invalid"}]);
-        checkTokens(["PRIT."], [{offset: 0, type: "invalid"}]);
+    it("should treat a non-abbreviation followed by a dot as a name and a number", () => {
+        // See #85: this prints 10 as X. is X followed by the number ".".
+        checkTokens(
+            ["P.X.", "X=Y.5", "PRIT."],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "variable"},
+                {offset: 3, type: "number.float"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "variable"},
+                {offset: 3, type: "number.float"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 4, type: "number.float"},
+            ],
+        );
+    });
+    it("should not treat BG as an abbreviation without the dot", () => {
+        // BGET abbreviates to B., BG. and BGE. but plain BG is just a variable.
+        checkTokens(
+            ["BG=1", "BG%=2", "BG$=\"\"", "BG.#1"],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 2, type: "operator"},
+                {offset: 3, type: "number"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "number"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "string.quote"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 3, type: "symbol"},
+                {offset: 4, type: "number"},
+            ],
+        );
     });
     it("should not recognize 6502 outside of []", () => {
         checkTokens(["LDA"], [{offset: 0, type: "variable"}]);
@@ -420,6 +463,32 @@ describe("Tokenisation", () => {
             ],
         );
     });
+    it("should end an unterminated quote in DATA at the end of the line", () => {
+        checkTokens(
+            ['DATA "abc', "PRINT 1", 'D.1,"x', "A=2"],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 4, type: "white"},
+                {offset: 5, type: "string"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 5, type: "white"},
+                {offset: 6, type: "number"},
+            ],
+            [
+                {offset: 0, type: "keyword"},
+                {offset: 2, type: "string.unquoted"},
+                {offset: 3, type: "symbol"},
+                {offset: 4, type: "string"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "number"},
+            ],
+        );
+    });
     it("should handle symbols and operators", () => {
         checkTokens(["~"], [{offset: 0, type: "operator"}]);
         checkTokens(["!"], [{offset: 0, type: "operator"}]);
@@ -564,6 +633,23 @@ describe("Tokenisation", () => {
             ],
         );
     });
+    it("should not let an unterminated string affect the next line", () => {
+        checkTokens(
+            ['A$="ABC', "10X=1", "*FX15"],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 2, type: "operator"},
+                {offset: 3, type: "invalid.string"},
+            ],
+            [
+                {offset: 0, type: "constant.linenum"},
+                {offset: 2, type: "variable"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "number"},
+            ],
+            [{offset: 0, type: "keyword.oscli"}],
+        );
+    });
     it("should tokenise continuation tokens when appropriate", () => {
         checkTokens(["TIME"], [{offset: 0, type: "keyword"}]);
         checkTokens(
@@ -619,6 +705,49 @@ describe("Tokenisation", () => {
                 {offset: 27, type: "keyword"},
                 {offset: 29, type: "variable"},
             ],
+        );
+    });
+    it("should reset to start of line after a keyword at the end of a line", () => {
+        // A bare PRINT or INPUT must not leave the next line mid-statement.
+        checkTokens(
+            ["10PRINT", "20PRINT ", "30INPUT", "*FX15", "A=1"],
+            [
+                {offset: 0, type: "constant.linenum"},
+                {offset: 2, type: "keyword"},
+            ],
+            [
+                {offset: 0, type: "constant.linenum"},
+                {offset: 2, type: "keyword"},
+                {offset: 7, type: "white"},
+            ],
+            [
+                {offset: 0, type: "constant.linenum"},
+                {offset: 2, type: "keyword"},
+            ],
+            [{offset: 0, type: "keyword.oscli"}],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "number"},
+            ],
+        );
+    });
+    it("should not let a PROC or FN with no name affect the next line", () => {
+        checkTokens(
+            ["PROC", "10X=1", "A=FN", "*FX15"],
+            [{offset: 0, type: "keyword"}],
+            [
+                {offset: 0, type: "constant.linenum"},
+                {offset: 2, type: "variable"},
+                {offset: 3, type: "operator"},
+                {offset: 4, type: "number"},
+            ],
+            [
+                {offset: 0, type: "variable"},
+                {offset: 1, type: "operator"},
+                {offset: 2, type: "keyword"},
+            ],
+            [{offset: 0, type: "keyword.oscli"}],
         );
     });
     it("should handle OSCLI at start of line", () => {
