@@ -717,7 +717,7 @@ describe("Tokenisation", () => {
                 {offset: 3, type: "operator"},
                 {offset: 4, type: "number"},
             ],
-            [{offset: 0, type: "keyword.oscli"}],
+            [{offset: 0, type: "keyword.oscli.string"}],
         );
     });
     it("should tokenise continuation tokens when appropriate", () => {
@@ -794,7 +794,7 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "constant.linenum"},
                 {offset: 2, type: "keyword"},
             ],
-            [{offset: 0, type: "keyword.oscli"}],
+            [{offset: 0, type: "keyword.oscli.string"}],
             [
                 {offset: 0, type: "variable"},
                 {offset: 1, type: "operator"},
@@ -817,11 +817,11 @@ describe("Tokenisation", () => {
                 {offset: 1, type: "operator"},
                 {offset: 2, type: "keyword"},
             ],
-            [{offset: 0, type: "keyword.oscli"}],
+            [{offset: 0, type: "keyword.oscli.string"}],
         );
     });
     it("should handle OSCLI at start of line", () => {
-        checkTokens(["*INFO"], [{offset: 0, type: "keyword.oscli"}]);
+        checkTokens(["*INFO"], [{offset: 0, type: "keyword.oscli.string"}]);
     });
     it("should handle OSCLI after line number", () => {
         checkTokens(
@@ -829,7 +829,7 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "constant.linenum"},
                 {offset: 2, type: "white"},
-                {offset: 3, type: "keyword.oscli"},
+                {offset: 3, type: "keyword.oscli.string"},
             ],
         );
     });
@@ -842,7 +842,7 @@ describe("Tokenisation", () => {
                 {offset: 3, type: "operator"},
                 {offset: 4, type: "number"},
                 {offset: 5, type: "symbol"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
         );
     });
@@ -866,65 +866,65 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 1, type: "number"},
                 {offset: 2, type: "keyword"},
-                {offset: 3, type: "keyword.oscli"},
+                {offset: 3, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 1, type: "number"},
                 {offset: 2, type: "keyword"},
-                {offset: 3, type: "keyword.oscli"},
+                {offset: 3, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 2, type: "keyword.oscli"},
+                {offset: 2, type: "keyword.oscli.string"},
             ],
         );
     });
@@ -1052,6 +1052,10 @@ describe("Bracket matching", () => {
     it("should ignore keywords in strings and comments", () => {
         assert.deepStrictEqual(brackets('P."RI.A$,1)"'), []);
         assert.deepStrictEqual(brackets("REM RI.A$,1)"), []);
+    });
+    it("should ignore brackets in * commands", () => {
+        assert.deepStrictEqual(brackets("*FX 1)"), []);
+        assert.deepStrictEqual(brackets("10 *RUN RI.("), []);
     });
 });
 

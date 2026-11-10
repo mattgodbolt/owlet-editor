@@ -147,7 +147,7 @@ export function registerBbcBasicLanguage() {
                 {include: "@whitespace"},
                 [/\d+/, "constant.linenum"], // line numbers
                 [/(?=[^*])/, "", "@statement"], // As soon as we know this statement doesn't start with * we can process it with statement
-                [/\*.*/, {token: "keyword.oscli"}],
+                [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
             ],
             statement: [
                 ["\n", "", "@pop"],
