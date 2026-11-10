@@ -343,57 +343,32 @@ export function registerBbcBasicLanguage() {
             const actions = context.markers.map(marker => {
                 const text = model.getValueInRange(marker);
                 if (marker.code === SpaceAfterAbbreviationCode) {
-                    const insertAt = marker.startColumn + text.indexOf(".") + 1;
-                    return {
-                        title: `Insert a space after ${text.slice(0, text.indexOf(".") + 1)}`,
-                        diagnostics: [marker],
-                        kind: "quickfix",
-                        edit: {
-                            edits: [
-                                {
-                                    resource: model.uri,
-                                    textEdit: {
-                                        range: {
-                                            startLineNumber: marker.startLineNumber,
-                                            startColumn: insertAt,
-                                            endLineNumber: marker.startLineNumber,
-                                            endColumn: insertAt,
-                                        },
-                                        text: " ",
-                                    },
-                                },
-                            ],
-                        },
-                        isPreferred: true,
+                    const abbreviation = text.slice(0, text.indexOf(".") + 1);
+                    const column = marker.startColumn + abbreviation.length;
+                    const at = {
+                        startLineNumber: marker.startLineNumber,
+                        startColumn: column,
+                        endLineNumber: marker.startLineNumber,
+                        endColumn: column,
                     };
+                    return quickFix(model, marker, `Insert a space after ${abbreviation}`, at, " ");
                 }
-                const replacement = InvalidOperatorMap.has(text) ?
-                    InvalidOperatorMap.get(text) :
-                    text.toUpperCase();
-                return {
-                    title: `Replace with ${replacement}`,
-                    diagnostics: [marker],
-                    kind: "quickfix",
-                    edit: {
-                        edits: [
-                            {
-                                resource: model.uri,
-                                textEdit: {
-                                    range: marker,
-                                    text: replacement,
-                                },
-                            },
-                        ],
-                    },
-                    isPreferred: true,
-                };
+                const replacement = InvalidOperatorMap.get(text) || text.toUpperCase();
+                return quickFix(model, marker, `Replace with ${replacement}`, marker, replacement);
             });
-            return {
-                actions: actions,
-                dispose: () => {},
-            };
+            return {actions, dispose: () => {}};
         },
     });
+}
+
+function quickFix(model, marker, title, range, text) {
+    return {
+        title,
+        diagnostics: [marker],
+        kind: "quickfix",
+        edit: {edits: [{resource: model.uri, textEdit: {range, text}}]},
+        isPreferred: true,
+    };
 }
 
 const LowerCaseTokenRegex = new RegExp(`^(${allTokensRegex.toLowerCase()})(?![%$])`);
