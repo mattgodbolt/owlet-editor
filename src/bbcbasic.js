@@ -29,6 +29,13 @@ const allTokensForAsmRegex = keywords
     .map(escape)
     .join("|");
 
+const parenTokensRegex = keywords
+    .map(kw => kw.keyword)
+    .filter(kw => kw.endsWith("("))
+    .sort((x, y) => y.length - x.length)
+    .map(escape)
+    .join("|");
+
 const allByteTokensRegex =
     "[" +
     keywords
@@ -108,12 +115,11 @@ export function registerBbcBasicLanguage() {
             "?",
             ";",
             ",",
-            "~",
             "!",
             "'",
         ],
         tokenPrefix: allAbbreviations(keywords.map(kw => kw.keyword)),
-        symbols: /[-+=><!*/:?$;,~^']+/,
+        symbols: /[-+=><!*/:?$;,^']+/,
         tokenizer: {
             root: [
                 {include: "@whitespace"},
@@ -127,7 +133,7 @@ export function registerBbcBasicLanguage() {
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|PRO\.|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
                 [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", switchTo: "@dataStatement"}], // DATA consumes to EOL
-                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", next: "@optionalHash"}],
+                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printHash"}],
                 [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)/, {token: "keyword", next: "@optionalHash"}],
                 [
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
@@ -138,6 +144,9 @@ export function registerBbcBasicLanguage() {
                     "keyword",
                     "@pop",
                 ], // THEN, ELSE, ERROR end a statement
+                [/(STR\$|STR\.|\xc3)(?=[ \t]*~)/, {token: "keyword", next: "@afterStr"}],
+                [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
+                [/TOP|\xb8P/, "keyword"],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [allTokensRegex, "keyword"],
@@ -151,8 +160,54 @@ export function registerBbcBasicLanguage() {
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
+            // `~` (hex) is only valid at the start of a PRINT item, never after an operator or `(`.
+            printStatement: [
+                [/[-+=<>*/^]+(?=[ \t]*~)/, {token: "operator", next: "@afterOperator"}],
+                [/\((?=[ \t]*~)/, {token: "@brackets", next: "@afterOperator"}],
+                [new RegExp(`(?:${parenTokensRegex})(?=[ \\t]*~)`), {token: "keyword", next: "@afterOperator"}],
+                [/~/, "operator"],
+                {include: "@statement"},
+            ],
+            printHash: [
+                [/[ \t\r]+/, "white"],
+                ["#", {token: "symbol", switchTo: "@statement"}],
+                ["", {token: "", switchTo: "@printStatement"}],
+            ],
+            afterOperator: [
+                [/[ \t]+/, "white"],
+                [/~/, "invalid", "@pop"],
+                ["", "", "@pop"],
+            ],
+            afterStr: [
+                [/[ \t]+/, "white"],
+                [/~/, "operator", "@pop"],
+                ["", "", "@pop"],
+            ],
+            // In a FOR statement TO ends the loop's start expression, except where an operand is expected:
+            // there the tokeniser's TO followed by P is TOP.
+            forStatement: [
+                [
+                    /[-+=<>*/^,!?$]+(?=[ \t]*(TOP|\xb8P))/,
+                    {
+                        cases: {
+                            "@operators": {token: "operator", next: "@forOperand"},
+                            "@default": {token: "symbol", next: "@forOperand"},
+                        },
+                    },
+                ],
+                [/\((?=[ \t]*(TOP|\xb8P))/, {token: "@brackets", next: "@forOperand"}],
+                [/(AND|OR|EOR|MOD|DIV|NOT)(?=[ \t]*(TOP|\xb8P))/, {token: "keyword", next: "@forOperand"}],
+                [/TO|\xb8/, {token: "keyword", switchTo: "@statement"}],
+                {include: "@statement"},
+            ],
+            forOperand: [
+                [/[ \t]+/, "white"],
+                [/TOP|\xb8P/, "keyword", "@pop"],
+                ["", "", "@pop"],
+            ],
             common: [
                 {include: "@whitespace"},
+                [/~/, "invalid"],
                 // Common operators from other languages which are not BBC BASIC operators.
                 [/[=!]=/, "invalid"], // C and many other languages
                 [/\*\*/, "invalid"], // Fortran, Javascript, Perl, Python and various other languages
@@ -224,6 +279,7 @@ export function registerBbcBasicLanguage() {
                 ["#", "symbol"], // Immediate addressing
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
+                [/TOP|\xb8P/, "keyword"],
                 [allTokensForAsmRegex, "keyword"],
                 [allByteTokensForAsmRegex, "keyword"],
                 [allTokensRegex, "invalid"],

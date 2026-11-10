@@ -490,12 +490,73 @@ describe("Tokenisation", () => {
         );
     });
     it("should handle symbols and operators", () => {
-        checkTokens(["~"], [{offset: 0, type: "operator"}]);
         checkTokens(["!"], [{offset: 0, type: "operator"}]);
         checkTokens([":"], [{offset: 0, type: "symbol"}]);
         checkTokens(["="], [{offset: 0, type: "operator"}]);
         checkTokens(["^"], [{offset: 0, type: "operator"}]);
         checkTokens(["'"], [{offset: 0, type: "operator"}]);
+    });
+    // The source text of each token of the given type.
+    function spans(text, type) {
+        const [line] = editor.tokenize(text, "BBCBASIC");
+        return line.flatMap((t, i) =>
+            t.type.replace(".BBCBASIC", "") === type ?
+                [text.slice(t.offset, i + 1 < line.length ? line[i + 1].offset : text.length)] :
+                [],
+        );
+    }
+    it("should treat TO followed by P as the single keyword TOP", () => {
+        assert.deepStrictEqual(spans("PRINT TOP", "keyword"), ["PRINT", "TOP"]);
+        assert.deepStrictEqual(spans("PRINT TOP", "variable"), []);
+        assert.deepStrictEqual(spans("A=TOP+1", "keyword"), ["TOP"]);
+        assert.deepStrictEqual(spans("X=TOP-PAGE", "keyword"), ["TOP", "PAGE"]);
+        assert.deepStrictEqual(spans("[LDA #TOP MOD 256", "keyword"), ["LDA", "TOP", "MOD"]);
+        assert.deepStrictEqual(spans("[LDA #TOP MOD 256", "invalid"), []);
+    });
+    it("should read TO P in a FOR statement as the loop's TO unless an operand is expected", () => {
+        // The first TOP is the function, the second is TO then the variable P.
+        assert.deepStrictEqual(spans("F.P=TOP TOP:P.P:N.", "keyword"), ["F.", "TOP", "TO", "P.", "N."]);
+        assert.deepStrictEqual(spans("F.P=TOP TOP:P.P:N.", "variable"), ["P", "P", "P"]);
+        assert.deepStrictEqual(spans("FOR I=1 TO P", "keyword"), ["FOR", "TO"]);
+        assert.deepStrictEqual(spans("FOR I=1TOP", "variable"), ["I", "P"]);
+        assert.deepStrictEqual(spans("FOR I=(TOP) TO TOP+1", "keyword"), ["FOR", "TOP", "TO", "TOP"]);
+        assert.deepStrictEqual(spans("FOR I=A+TOP TO P STEP 2", "keyword"), ["FOR", "TOP", "TO", "STEP"]);
+        // The FOR statement ends at a colon.
+        assert.deepStrictEqual(spans("FOR I=1 TO 2:PRINT TOP", "keyword"), ["FOR", "TO", "PRINT", "TOP"]);
+    });
+    it("should only allow ~ in PRINT items and after STR$", () => {
+        const valid = [
+            ["PRINT ~A", 1],
+            ["PRINT ~A,~B", 2],
+            ["PRINT A;~B", 1],
+            ["PRINT'~A", 1],
+            ["P.~A", 1],
+            ['PRINT "x"~A', 1],
+            ["PRINT A$+STR$~A", 1],
+            ["PRINT STR$ ~A", 1],
+            ["A$=STR$~(A)", 1],
+            ["A$=STR.~A", 1],
+            ["IF A THEN PRINT ~A ELSE PRINT ~B", 2],
+        ];
+        for (const [text, count] of valid) {
+            assert.deepStrictEqual(spans(text, "invalid"), [], text);
+            assert.strictEqual(spans(text, "operator").join("").split("~").length - 1, count, text);
+        }
+        const invalid = [
+            "A=~B",
+            "A$=STR$(~12)",
+            "PRINT#0,~A",
+            "INPUT ~A",
+            "VDU ~A",
+            "PRINT 1+~A",
+            "PRINT (~A)",
+            "PRINT TAB(~A)",
+            "PRINT ~A:B=~A",
+            "~",
+        ];
+        for (const text of invalid) {
+            assert.deepStrictEqual(spans(text, "invalid"), ["~"], text);
+        }
     });
     it("should correctly handle invalid symbols", () => {
         checkTokens(
