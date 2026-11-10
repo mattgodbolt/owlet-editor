@@ -1,7 +1,7 @@
 import {getWarnings, registerBbcBasicLanguage} from "../src/bbcbasic";
 import {describe, it, vi, afterEach} from "vitest";
 import assert from "assert";
-import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, languages, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
 function checkTokens(text, ...expected) {
     const tokenized = editor.tokenize(text.join("\n"), "BBCBASIC").map(line =>
@@ -925,6 +925,65 @@ function checkWarnings(text, ...expected) {
         ),
     );
 }
+
+describe("Bracket matching", () => {
+    registerBbcBasicLanguage();
+    // Returns [startColumn, endColumn, isInvalid] for each bracket Monaco finds on a single line.
+    function brackets(text) {
+        const model = editor.createModel(text, "BBCBASIC");
+        try {
+            model.tokenization.forceTokenization(1);
+            return model.bracketPairs
+                .getBracketsInRange(new Range(1, 1, 1, text.length + 1))
+                .toArray()
+                .map(b => [b.range.startColumn, b.range.endColumn, b.isInvalid]);
+        } finally {
+            model.dispose();
+        }
+    }
+    function unbalancedColumns(text) {
+        return brackets(text)
+            .filter(b => b[2])
+            .map(b => b[0]);
+    }
+    it("should pair plain brackets", () => {
+        assert.deepStrictEqual(brackets("P.(1+2)"), [
+            [3, 4, false],
+            [7, 8, false],
+        ]);
+    });
+    it("should pair the hidden ( in abbreviated and unabbreviated keywords", () => {
+        for (const keyword of ["RIGHT$(", "RIGHT$.", "RI.", "LE.", "MI.", "MID$(", "TAB(", "POINT(", "STRING$("]) {
+            const text = `P.${keyword}A$,1)`;
+            assert.deepStrictEqual(unbalancedColumns(text), [], text);
+        }
+    });
+    it("should pair the hidden ( in raw token characters", () => {
+        for (const token of [0x18a, 0xa7, 0xc0, 0xc1, 0xb0, 0xc2, 0xc4]) {
+            const text = `P.${String.fromCodePoint(token)}A$,1)`;
+            assert.deepStrictEqual(unbalancedColumns(text), [], text);
+        }
+    });
+    it("should handle the example from #114", () => {
+        assert.deepStrictEqual(
+            unbalancedColumns('A$="OWLET":P.RI.A$,1)LE.A$,2)MI.A$,4,1)MI.A$,3,1)'),
+            [],
+        );
+    });
+    it("should still flag genuinely unbalanced brackets", () => {
+        assert.deepStrictEqual(unbalancedColumns("P.(1+2))"), [8]);
+        assert.deepStrictEqual(unbalancedColumns("P.RI.A$,1))"), [11]);
+        assert.deepStrictEqual(unbalancedColumns("P.RIGHT$(A$,1))"), [15]);
+    });
+    it("should not treat other abbreviations as a hidden (", () => {
+        // PRI. is PRINT, not RIGHT$(.
+        assert.deepStrictEqual(unbalancedColumns("PRI.A$,1)"), [9]);
+    });
+    it("should ignore keywords in strings and comments", () => {
+        assert.deepStrictEqual(brackets('P."RI.A$,1)"'), []);
+        assert.deepStrictEqual(brackets("REM RI.A$,1)"), []);
+    });
+});
 
 describe("Line warnings", () => {
     it("should not generate warnings on lines that are fine", () => {
