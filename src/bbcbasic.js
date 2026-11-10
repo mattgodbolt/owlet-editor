@@ -374,10 +374,11 @@ function quickFix(model, marker, title, range, text) {
     };
 }
 
-// A whole lower-case keyword: not the start of a longer name (`radius%`) or a suffixed one (`print$`), though a
-// keyword that ends in a bracket is the whole name already.
+// A whole lower-case keyword. A name ends at its `$`, and these keywords end at their bracket, so what follows them
+// is not part of the name; any other keyword must not be followed by a name character (`radius%` is not RAD).
+const nameEndKeywords = keywords.filter(kw => /[($]$/.test(kw.keyword));
 const LowerCaseTokenRegex = new RegExp(
-    `^(?:(${tokensRegex(openParenKeywords).toLowerCase()})|(${tokensRegex(keywords.filter(kw => !openParenKeywords.includes(kw))).toLowerCase()})(?![\\w%$]))`,
+    `^(?:(${tokensRegex(nameEndKeywords).toLowerCase()})|(${tokensRegex(keywords.filter(kw => !nameEndKeywords.includes(kw))).toLowerCase()})(?![\\w%$]))`,
 );
 
 const SpaceAfterAbbreviationCode = "space-after-abbreviation";
