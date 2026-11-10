@@ -202,10 +202,6 @@ export function registerBbcBasicLanguage() {
                     },
                 ],
                 [/\((?=[ \t]*(TOP|\xb8P))/, {token: "@brackets", next: "@forOperand"}],
-                [
-                    new RegExp(`(?:${logicalOperatorsRegex})(?=[ \\t]*(TOP|\\xb8P))`),
-                    {token: "keyword", next: "@forOperand"},
-                ],
                 [/TO|\xb8/, {token: "keyword", switchTo: "@statement"}],
                 // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
                 [invalidAbbreviatedTokensRegex, "invalid"],
