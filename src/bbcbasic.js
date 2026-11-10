@@ -92,20 +92,12 @@ const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDoll
 
 // Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
-const hiddenOpenParens = (() => {
-    const forms = new Set();
-    for (const kw of openParenKeywords) {
-        forms.add(kw.keyword);
-        forms.add(tokenChar(kw));
-        if (kw.keyword.endsWith("$(")) forms.add(kw.keyword.slice(0, -1) + ".");
-    }
-    for (const abbreviation of allAbbreviations(openParenKeywords.map(kw => kw.keyword))) {
-        if (/^[A-Z]+\.$/.test(abbreviation) && abbreviatedKeyword(abbreviation).keyword.endsWith("(")) {
-            forms.add(abbreviation);
-        }
-    }
-    return [...forms];
-})();
+const hiddenOpenParens = [
+    ...openParenKeywords.flatMap(kw => [kw.keyword, tokenChar(kw)]),
+    ...allAbbreviations(openParenKeywords.map(kw => kw.keyword)).filter(abbreviation =>
+        abbreviatedKeyword(abbreviation).keyword.endsWith("("),
+    ),
+];
 
 export function registerBbcBasicLanguage() {
     languages.register({id: "BBCBASIC"});
