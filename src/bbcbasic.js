@@ -18,8 +18,11 @@ const conditionalTokens = new Set(
 const allTokensRegex = keywords
     .map(kw => kw.keyword)
     .sort((x, y) => y.length - x.length)
-    .map(escape)
-    .map(kw => (conditionalTokens.has(kw) ? kw + "\\b" : kw))
+    .map(kw => {
+        // A keyword that begins an earlier one in the table is not read before a dot: "END." is ENDPROC.
+        const beforeDot = abbreviatedKeyword(`${kw}.`).keyword === kw ? "" : "(?!\\.)";
+        return escape(kw) + beforeDot + (conditionalTokens.has(kw) ? "\\b" : "");
+    })
     .join("|");
 
 const allTokensForAsmRegex = keywords

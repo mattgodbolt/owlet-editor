@@ -746,6 +746,14 @@ describe("Tokenisation", () => {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
         }
     });
+    it("should read a keyword and a dot as the abbreviation of an earlier keyword it begins", () => {
+        // END. is ENDPROC, MOD. is MODE and so on, since those come first in the table.
+        for (const text of ["END.", "ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"]) {
+            assert.deepStrictEqual(spans(text, "keyword"), [text.match(/[A-Z]+\./)[0]], text);
+        }
+        assert.deepStrictEqual(spans("END.X", "invalid"), ["END.X"]);
+        assert.deepStrictEqual(spans("A=8MOD 3", "keyword"), ["MOD"]);
+    });
     it("should not include $ mid token/identifier", () => {
         checkTokens(
             ["IFVALA$PRINTA$.1"],
