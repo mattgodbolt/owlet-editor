@@ -36,6 +36,8 @@ const parenTokensRegex = keywords
     .map(escape)
     .join("|");
 
+const logicalOperatorsRegex = "AND|OR|EOR|MOD|DIV|NOT|[\\u0180-\\u0184\\xac]";
+
 const allByteTokensRegex =
     "[" +
     keywords
@@ -162,7 +164,10 @@ export function registerBbcBasicLanguage() {
             ],
             // `~` (hex) is only valid at the start of a PRINT item, never after an operator or `(`.
             printStatement: [
-                [/[-+=<>*/^]+(?=[ \t]*~)/, {token: "operator", next: "@afterOperator"}],
+                // A separator is split from any operator that follows it, so `;-~B` is caught below.
+                [/[;,']/, {cases: {"@operators": "operator", "@default": "symbol"}}],
+                [/[-+=<>*/^!?$]+(?=[ \t]*~)/, {token: "operator", next: "@afterOperator"}],
+                [new RegExp(`(?:${logicalOperatorsRegex})(?=[ \\t]*~)`), {token: "keyword", next: "@afterOperator"}],
                 [/\((?=[ \t]*~)/, {token: "@brackets", next: "@afterOperator"}],
                 [new RegExp(`(?:${parenTokensRegex})(?=[ \\t]*~)`), {token: "keyword", next: "@afterOperator"}],
                 [/~/, "operator"],
@@ -196,8 +201,16 @@ export function registerBbcBasicLanguage() {
                     },
                 ],
                 [/\((?=[ \t]*(TOP|\xb8P))/, {token: "@brackets", next: "@forOperand"}],
-                [/(AND|OR|EOR|MOD|DIV|NOT)(?=[ \t]*(TOP|\xb8P))/, {token: "keyword", next: "@forOperand"}],
+                [
+                    new RegExp(`(?:${logicalOperatorsRegex})(?=[ \\t]*(TOP|\\xb8P))`),
+                    {token: "keyword", next: "@forOperand"},
+                ],
                 [/TO|\xb8/, {token: "keyword", switchTo: "@statement"}],
+                // A function or other keyword that takes an operand, as in `ABS TOP`.
+                [
+                    new RegExp(`(?:${allTokensRegex}|${allByteTokensRegex})(?=[ \\t]*(TOP|\\xb8P))`),
+                    {token: "keyword", next: "@forOperand"},
+                ],
                 {include: "@statement"},
             ],
             forOperand: [

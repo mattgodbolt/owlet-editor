@@ -523,6 +523,10 @@ describe("Tokenisation", () => {
         assert.deepStrictEqual(spans("FOR I=A+TOP TO P STEP 2", "keyword"), ["FOR", "TOP", "TO", "STEP"]);
         // The FOR statement ends at a colon.
         assert.deepStrictEqual(spans("FOR I=1 TO 2:PRINT TOP", "keyword"), ["FOR", "TO", "PRINT", "TOP"]);
+        // After a keyword that takes an operand, TOP is still the function.
+        assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "keyword"), ["FOR", "ABS", "TOP", "TO", "TOP"]);
+        assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "variable"), ["I"]);
+        assert.deepStrictEqual(spans("FOR I=1 AND TOP TO 2", "keyword"), ["FOR", "AND", "TOP", "TO"]);
     });
     it("should only allow ~ in PRINT items and after STR$", () => {
         const valid = [
@@ -552,6 +556,11 @@ describe("Tokenisation", () => {
             "PRINT (~A)",
             "PRINT TAB(~A)",
             "PRINT ~A:B=~A",
+            "PRINT !~A",
+            "PRINT ?~A",
+            "PRINT ;-~B",
+            "PRINT A AND ~B",
+            "PRINT A MOD~B",
             "~",
         ];
         for (const text of invalid) {
