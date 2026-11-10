@@ -91,6 +91,8 @@ const abbreviatedDollarTokensRegex = (() => {
     return "(" + orRegex + ")\\$.";
 })();
 
+const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
+
 // Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
 const hiddenOpenParens = (() => {
@@ -163,12 +165,9 @@ export function registerBbcBasicLanguage() {
                 [/(ERROR|ERRO\.|ERR\.|\u0185)(?=[ \t]*\*)/, "keyword", "@pop"],
                 [/(STR\$|STR\.|\xc3)([ \t]*)(~)/, ["keyword", "white", "operator"]],
                 [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
-                [/TOP|\xb8P/, "keyword"],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
-                [allTokensRegex, "keyword"],
-                [allByteTokensRegex, "keyword"],
-                [abbreviatedDollarTokensRegex, "keyword"],
+                [new RegExp(`TOP|\\xb8P|${anyTokenRegex}`), "keyword"],
                 // Not an abbreviation, so the dot is a number (e.g. P.X.), not part of the name.
                 [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword", "@default": {token: "variable", goBack: 1}}}],
                 {include: "@common"},
@@ -289,13 +288,8 @@ export function registerBbcBasicLanguage() {
                 ["#", "symbol"], // Immediate addressing
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
-                [/TOP|\xb8P/, "keyword"],
-                [allTokensForAsmRegex, "keyword"],
-                [allByteTokensForAsmRegex, "keyword"],
-                [allTokensRegex, "invalid"],
-                [allByteTokensRegex, "invalid"],
-                [abbreviatedDollarTokensRegex, "invalid"],
-                [invalidAbbreviatedTokensRegex, "invalid"],
+                [new RegExp(`TOP|\\xb8P|${allTokensForAsmRegex}|${allByteTokensForAsmRegex}`), "keyword"],
+                [new RegExp(`${anyTokenRegex}|${invalidAbbreviatedTokensRegex}`), "invalid"],
                 [/^\d+/, "constant.linenum"], // line numbers
                 {include: "@common"},
                 ["]", {token: "delimiter.square", next: "@pop"}],
