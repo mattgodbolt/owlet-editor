@@ -7,8 +7,7 @@ import "@fortawesome/fontawesome-free/js/all.js";
 import "@fortawesome/fontawesome-free/css/all.css";
 import logo from "/assets/images/monster.png";
 import "./owlet-editor.less";
-
-const LastProgramKey = "program";
+import {saveProgram, savedProgram} from "./saved-program";
 
 function programUrl(id) {
     //if (window.location.hostname !== "localhost")
@@ -88,8 +87,8 @@ async function getInitialState(id) {
     }
 
     // If there's no state in the URL, look at the last program the user had in their browser.
-    const lastProgram = localStorage.getItem(LastProgramKey);
-    if (lastProgram) return OwletEditor.stateForBasicProgram(lastProgram);
+    const lastProgram = savedProgram();
+    if (lastProgram !== null) return OwletEditor.stateForBasicProgram(lastProgram);
 
     // // Try loading an example program - TODO we will cache in s3
     // const ExampleProgramId = "toot.bas"; // This is the only way I toot now
@@ -141,9 +140,7 @@ async function initialise() {
 
     // Check if we reference a cached tweet on first load and convert it to URL hash
 
-    const owletEditor = new OwletEditor(changedText =>
-        localStorage.setItem(LastProgramKey, changedText),
-    );
+    const owletEditor = new OwletEditor(saveProgram);
 
     await owletEditor.initialise(await getInitialState(urlParams.get("t")));
     window.onhashchange = () => {
