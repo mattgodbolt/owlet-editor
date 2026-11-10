@@ -71,8 +71,7 @@ function abbreviatedKeyword(abbreviation) {
 // "No such variable" if "H" isn't a variable or "No TO" if it is.
 const invalidAbbreviatedTokensRegex = allAbbreviations(keywords.map(kw => kw.keyword))
     .filter(abbreviation => abbreviatedKeyword(abbreviation).flags & Flags.Conditional)
-    .map(escape)
-    .map(kw => kw + "[a-zA-Z0-9]+")
+    .map(abbreviation => escape(abbreviation) + "[a-zA-Z0-9]+")
     .join("|");
 
 const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
@@ -185,8 +184,8 @@ export function registerBbcBasicLanguage() {
                 ],
                 [/(\()([ \t]*)(TOP|\xb8P)/, ["@brackets", "white", "keyword"]],
                 [/TO|\xb8/, {token: "keyword", switchTo: "@statement"}],
-                // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
                 [invalidAbbreviatedTokensRegex, "invalid"],
+                // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
                 [
                     new RegExp(`(?:${allTokensRegex}|${allByteTokensRegex}|[A-Z]+\\.)(?=[ \\t]*(TOP|\\xb8P))`),
                     {
