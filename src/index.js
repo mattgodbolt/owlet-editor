@@ -88,7 +88,7 @@ async function getInitialState(id) {
 
     // If there's no state in the URL, look at the last program the user had in their browser.
     const lastProgram = savedProgram();
-    if (lastProgram) return OwletEditor.stateForBasicProgram(lastProgram);
+    if (lastProgram !== null) return OwletEditor.stateForBasicProgram(lastProgram);
 
     // // Try loading an example program - TODO we will cache in s3
     // const ExampleProgramId = "toot.bas"; // This is the only way I toot now
