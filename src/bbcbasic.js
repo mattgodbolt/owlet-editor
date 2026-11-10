@@ -169,10 +169,8 @@ export function registerBbcBasicLanguage() {
                 [allTokensRegex, "keyword"],
                 [allByteTokensRegex, "keyword"],
                 [abbreviatedDollarTokensRegex, "keyword"],
-                [
-                    /[A-Z]+\./,
-                    {cases: {"@tokenPrefix": "keyword", "@default": {token: "@rematch", next: "@dotAfterName"}}},
-                ],
+                // Not an abbreviation, so the dot is a number (e.g. P.X.), not part of the name.
+                [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword", "@default": {token: "variable", goBack: 1}}}],
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
@@ -227,7 +225,7 @@ export function registerBbcBasicLanguage() {
                     {
                         cases: {
                             "@tokenPrefix": {token: "keyword", next: "@forOperand"},
-                            "[A-Z]+\\.": {token: "@rematch", next: "@dotAfterName"},
+                            "[A-Z]+\\.": {token: "variable", goBack: 1},
                             "@default": {token: "keyword", next: "@forOperand"},
                         },
                     },
@@ -276,8 +274,6 @@ export function registerBbcBasicLanguage() {
                 // Unusual cases. We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
             ],
-            // Not an abbreviation, so the dot is a number (e.g. P.X.), not part of the name.
-            dotAfterName: [[/[A-Z]+/, "variable", "@pop"]],
             // FN and PROC names can start with a digit.
             fnProcName: [
                 [/[a-zA-Z0-9_]+/, "variable", "@pop"],
