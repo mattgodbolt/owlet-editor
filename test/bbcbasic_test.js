@@ -946,6 +946,14 @@ describe("Tokenisation", () => {
             ],
         );
     });
+    it("should read a number after THEN or ELSE as a line number, but not after ERROR", () => {
+        assert.deepStrictEqual(spans("IF A THEN 30 ELSE 40", "constant.linenum"), ["30", "40"]);
+        assert.deepStrictEqual(spans("IF A TH.30 EL.40", "constant.linenum"), ["30", "40"]);
+        for (const text of ["ON ERROR 30", 'ERROR 5,"x"', "ON ERR. 30", "\xee\u0185 30"]) {
+            assert.deepStrictEqual(spans(text, "constant.linenum"), [], text);
+            assert.deepStrictEqual(spans(text, "number"), [text.match(/\d+/)[0]], text);
+        }
+    });
     it("should highlight invalid operators from other languages", () => {
         checkTokens(
             ["INVALID=1==2OR8!=2**3", "IFA><1ORB=<2ORB=>6GOTO10", "A+=2", "A=B<<C OR D>>E"],
