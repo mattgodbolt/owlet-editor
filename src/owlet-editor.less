@@ -205,6 +205,12 @@ canvas.screen {
   .code {
     font-family: ModeSeven;
   }
+
+  // The cards are a fixed height, so a snippet that is too wide for the panel ends in an ellipsis rather than being cut off.
+  pre {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 @-o-keyframes fadeIt {
@@ -243,7 +249,13 @@ canvas.screen {
   padding: 4px;
   margin-bottom: 8px;
   height: 100px;
+  overflow: hidden;
   display: flex;
+
+  // Let the text column shrink below its longest line, so the panel can truncate it.
+  > div {
+    min-width: 0;
+  }
 }
 
 .template {
