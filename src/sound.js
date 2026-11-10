@@ -9,15 +9,13 @@ export function soundRequested(search) {
 }
 
 /**
- * Why there is no sound, in words for the user, from what jsbeeb's audio handler left in its warning node (which it
- * fills in for an audio system that would not start, or a page with no audio worklet API) and whether it has an
- * audio context at all.
+ * Why there is no sound, in words for the user, from the `failure` of jsbeeb's audio handler, which is null when
+ * the audio is fine but the browser would not let it start.
  */
-export function failureText(warningText, hasAudioContext) {
-    const text = warningText.trim();
-    if (text.startsWith("No audio worklet API")) return "sound needs a secure page (https)";
-    if (text) return text.replace(/^There will be no sound:\s*/, "");
-    return hasAudioContext ? "this browser would not start audio" : "this browser has no Web Audio";
+export function failureText(failure) {
+    if (!failure) return "this browser would not start audio";
+    if (failure.startsWith("No audio worklet API")) return "sound needs a secure page (https)";
+    return failure.charAt(0).toLowerCase() + failure.slice(1);
 }
 
 /**
@@ -91,7 +89,6 @@ export class Sound {
         const {audioContext, noAudio} = this.audio;
         if (!noAudio && audioContext?.state === "running") {
             this.stopArming?.();
-            this.audio.startListening();
             this.failure = null;
             this.setState("on");
         } else if (wasArmed && !noAudio && audioContext) {
@@ -99,17 +96,16 @@ export class Sound {
             this.arm(this.armTarget);
         } else {
             this.stopArming?.();
-            this.failure = this.audio.failure;
+            this.failure = failureText(this.audio.failure);
             this.setState("unavailable");
         }
     }
 
     disable() {
         this.stopArming?.();
-        this.audio.stopListening();
         this.failure = null;
         this.setState("off");
-        this.audio.suspend();
+        this.audio.audioContext?.suspend().catch(() => {});
     }
 
     /** Whether the machine is running, as it is only heard while it does. */
@@ -122,7 +118,6 @@ export class Sound {
     // gesture can start it again.
     contextChanged() {
         if (!this.isOn || this.audio.audioContext.state === "running") return;
-        this.audio.stopListening();
         this.state = "off";
         this.arm(this.armTarget);
     }

@@ -1,7 +1,8 @@
 import {describe, expect, it, vi} from "vitest";
 import {Sound, failureText, soundRequested} from "../src/sound";
 
-const fakeContext = state => Object.assign(new EventTarget(), {state});
+const fakeContext = state =>
+    Object.assign(new EventTarget(), {state, suspend: vi.fn(async () => {})});
 
 const fakeAudio = (contextState = "running") => ({
     audioContext: contextState ? fakeContext(contextState) : null,
@@ -9,11 +10,8 @@ const fakeAudio = (contextState = "running") => ({
     ready: Promise.resolve("ok"),
     failure: "no worklet",
     tryResume: vi.fn(async () => {}),
-    startListening: vi.fn(),
-    stopListening: vi.fn(),
     mute: vi.fn(),
     unmute: vi.fn(),
-    suspend: vi.fn(),
 });
 
 describe("Sound links", () => {
@@ -36,20 +34,18 @@ describe("Sound failures", () => {
     it.each([
         [
             "a page with no audio worklet API",
-            "No audio worklet API was found - there will be no audio. If you are...",
-            false,
+            "No audio worklet API was found",
             "sound needs a secure page (https)",
         ],
         [
             "an audio system that would not start",
-            "There will be no sound: the audio system could not be started (Blocked). Reloading the page may help.",
-            true,
-            "the audio system could not be started (Blocked). Reloading the page may help.",
+            "The audio system could not be started (Blocked by an extension)",
+            "the audio system could not be started (Blocked by an extension)",
         ],
-        ["no Web Audio at all", "", false, "this browser has no Web Audio"],
-        ["nothing said, with audio", "  ", true, "this browser would not start audio"],
-    ])("should explain %s", (_name, warningText, hasAudioContext, expected) => {
-        expect(failureText(warningText, hasAudioContext)).toBe(expected);
+        ["no Web Audio at all", "This browser has no Web Audio", "this browser has no Web Audio"],
+        ["a browser that would not let it start", null, "this browser would not start audio"],
+    ])("should explain %s", (_name, failure, expected) => {
+        expect(failureText(failure)).toBe(expected);
     });
 });
 
@@ -69,7 +65,6 @@ describe("Sound", () => {
         expect(audio.unmute).not.toHaveBeenCalled();
         await sound.enable();
         expect(sound.state).toBe("on");
-        expect(audio.startListening).toHaveBeenCalled();
         expect(audio.unmute).toHaveBeenCalled();
         audio.mute.mockClear();
         sound.setRunning(false);
@@ -95,7 +90,6 @@ describe("Sound", () => {
         audio.mute.mockClear();
         sound.disable();
         expect(sound.state).toBe("off");
-        expect(audio.stopListening).toHaveBeenCalled();
         expect(audio.mute).toHaveBeenCalled();
     });
 
@@ -103,16 +97,17 @@ describe("Sound", () => {
         const audio = fakeAudio();
         const sound = new Sound(audio);
         await sound.enable();
-        expect(audio.suspend).not.toHaveBeenCalled();
+        expect(audio.audioContext.suspend).not.toHaveBeenCalled();
         sound.disable();
-        expect(audio.suspend).toHaveBeenCalled();
+        expect(audio.audioContext.suspend).toHaveBeenCalled();
     });
 
     it("should start only once however many times it is asked while starting", async () => {
         const audio = fakeAudio();
-        const sound = new Sound(audio);
+        const onChange = vi.fn();
+        const sound = new Sound(audio, onChange);
         await Promise.all([sound.enable(), sound.enable()]);
-        expect(audio.startListening).toHaveBeenCalledTimes(1);
+        expect(onChange.mock.calls).toEqual([["on"]]);
         expect(audio.tryResume).toHaveBeenCalledTimes(2);
     });
 
@@ -122,12 +117,10 @@ describe("Sound", () => {
             const sound = new Sound(audio);
             sound.setRunning(true);
             await sound.enable();
-            audio.stopListening.mockClear();
 
             audio.audioContext.state = "interrupted";
             audio.audioContext.dispatchEvent(new Event("statechange"));
             expect(sound.state).toBe("armed");
-            expect(audio.stopListening).toHaveBeenCalled();
 
             audio.audioContext.state = "running";
             window.dispatchEvent(new Event("pointerdown"));

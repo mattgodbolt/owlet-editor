@@ -10,7 +10,8 @@ import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
 import {setTotalCycles, totalCycles} from "./cycles";
-import {OwletAudio} from "./owlet-audio";
+import {AudioHandler} from "jsbeeb/src/web/audio-handler";
+import {chipBindings, restoreChipBindings} from "./chip-bindings";
 import {Sound} from "./sound";
 
 const BotStartCycles = 725000; // bbcmicrobot start time
@@ -92,10 +93,11 @@ export class Emulator {
             },
         );
 
-        this.audio = new OwletAudio({
+        this.audio = new AudioHandler({
             cpuSpeed: Model.cyclesPerSecond,
             isAtom: false,
             hasMusic5000: false,
+            noSeek: true,
         });
         this.sound = new Sound(this.audio);
         this.useGxr = false;
@@ -134,7 +136,7 @@ export class Emulator {
         // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
         // Building it hands the one sound chip to its scheduler, so the old CPU must not run in the meantime.
         this.rebuilding = true;
-        const bindings = this.audio.bindings();
+        const bindings = chipBindings(this.audio.soundChip);
         try {
             const cpu = this.buildCpu();
             await Promise.all([cpu.initialise(), this.audio.ddNoise.initialise()]);
@@ -149,7 +151,7 @@ export class Emulator {
             this.ready = true;
         } catch (e) {
             // The old CPU goes on, so it keeps the sound chip.
-            this.audio.restoreBindings(bindings);
+            restoreChipBindings(this.audio.soundChip, bindings);
             throw e;
         } finally {
             this.rebuilding = false;
