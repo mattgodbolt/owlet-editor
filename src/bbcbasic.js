@@ -84,6 +84,24 @@ const abbreviatedDollarTokensRegex = (() => {
     return "(" + orRegex + ")\\$.";
 })();
 
+// Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
+// bracket matching scans the text, so it needs these as openers to pair them with their ")".
+const hiddenOpenParens = (() => {
+    const forms = new Set();
+    const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
+    for (const kw of openParenKeywords) {
+        forms.add(kw.keyword);
+        forms.add(String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token));
+        if (kw.keyword.endsWith("$(")) forms.add(kw.keyword.slice(0, -1) + ".");
+    }
+    for (const abbreviation of allAbbreviations(openParenKeywords.map(kw => kw.keyword))) {
+        // Only the first keyword in the table with this prefix is what BASIC expands it to.
+        const first = keywords.find(kw => kw.keyword.startsWith(abbreviation.slice(0, -1)));
+        if (/^[A-Z]+\.$/.test(abbreviation) && first.keyword.endsWith("(")) forms.add(abbreviation);
+    }
+    return [...forms];
+})();
+
 export function registerBbcBasicLanguage() {
     languages.register({id: "BBCBASIC"});
 
@@ -270,6 +288,7 @@ export function registerBbcBasicLanguage() {
         brackets: [
             ["[", "]"],
             ["(", ")"],
+            ...hiddenOpenParens.map(open => [open.toLowerCase(), ")"]),
         ],
         autoClosingPairs: [
             {open: "(", close: ")"},
