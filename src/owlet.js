@@ -374,9 +374,11 @@ export class OwletEditor {
             ],
         };
         const [label, title] = labels[state];
+        // The name is the words on the button (and stays when portrait hides them), so "click Sound off" matches it;
+        // it says whether sound is on, so aria-pressed would only say it again.
         $sound.attr({
             "data-state": state,
-            "aria-pressed": state === "on",
+            "aria-label": label,
             title,
         });
         $("#sound-label").text(label);

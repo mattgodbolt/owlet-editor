@@ -39,7 +39,7 @@ export class Sound {
         this.pending = null;
         this.starting = false;
         this.apply();
-        audio.audioContext?.addEventListener?.("statechange", () => this.contextChanged());
+        audio.audioContext?.addEventListener?.("statechange", () => this.reconcile());
     }
 
     get isOn() {
@@ -118,12 +118,16 @@ export class Sound {
         this.apply();
     }
 
+    // Brings what Sound says into line with the audio context, which is told to it as the context changes and
+    // once when the page is built (a browser may hand over a context that is already running).
+    //
     // The browser can stop the audio of its own accord (an interruption on a phone, say), and only a
     // gesture can start it again. It can also start it of its own accord (a browser that lets a page make sound
     // unasked, or a resume that finished after start() gave up); nothing wanted that unless a link asked for it,
     // and a running context is fed the chip's events whether or not they are heard.
-    contextChanged() {
+    reconcile() {
         const {audioContext} = this.audio;
+        if (!audioContext) return;
         if (audioContext.state === "running") {
             if (this.isOn || this.starting) return;
             if (this.state === "armed") this.enable();

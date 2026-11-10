@@ -234,7 +234,47 @@ describe("Sound", () => {
         expect(onChange.mock.calls.map(([state]) => state)).toEqual(["on", "off"]);
     });
 
+    describe("when the browser hands over a context that is already running", () => {
+        it("should stop it when nobody asked for sound", () => {
+            const audio = fakeAudio("running");
+            const sound = new Sound(audio);
+
+            sound.reconcile();
+
+            expect(audio.audioContext.suspend).toHaveBeenCalled();
+            expect(sound.state).toBe("off");
+        });
+
+        it("should turn sound on at once when a link asked for it", async () => {
+            const audio = fakeAudio("running");
+            const sound = new Sound(audio);
+            sound.arm(window);
+
+            sound.reconcile();
+
+            await vi.waitFor(() => expect(sound.state).toBe("on"));
+            expect(audio.audioContext.suspend).not.toHaveBeenCalled();
+            sound.disable();
+        });
+
+        it("should leave a context that is not running alone", () => {
+            const audio = fakeAudio("suspended");
+            const sound = new Sound(audio);
+
+            sound.reconcile();
+
+            expect(audio.audioContext.suspend).not.toHaveBeenCalled();
+            expect(sound.state).toBe("off");
+        });
+    });
+
     describe("when there is no audio at all", () => {
+        it("should have nothing to reconcile", () => {
+            const sound = new Sound(fakeAudio(null));
+            expect(() => sound.reconcile()).not.toThrow();
+            expect(sound.state).toBe("off");
+        });
+
         it("should say so rather than wait for a gesture that cannot help", async () => {
             const sound = new Sound(fakeAudio(null));
             sound.arm(window);

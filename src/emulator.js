@@ -103,6 +103,7 @@ export class Emulator {
         // Armed now, before the browser can start the audio of its own accord, which a link that asked for sound
         // wants and anything else does not.
         if (soundRequested(window.location.search)) this.sound.arm();
+        this.sound.reconcile();
         this.useGxr = false;
         this.cpu = null;
         this.keyboard = null;
