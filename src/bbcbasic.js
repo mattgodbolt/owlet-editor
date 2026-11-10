@@ -25,36 +25,33 @@ const allTokensRegex = keywords
     })
     .join("|");
 
-const allTokensForAsmRegex = keywords
-    .filter(isExpressionToken)
-    .map(kw => kw.keyword)
-    .sort((x, y) => y.length - x.length)
-    .map(escape)
-    .join("|");
+function keywordsRegex(kws) {
+    return kws
+        .map(kw => kw.keyword)
+        .sort((x, y) => y.length - x.length)
+        .map(escape)
+        .join("|");
+}
 
-const parenTokensRegex = keywords
-    .map(kw => kw.keyword)
-    .filter(kw => kw.endsWith("("))
-    .sort((x, y) => y.length - x.length)
-    .map(escape)
-    .join("|");
+function tokenChar(kw) {
+    return String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token);
+}
+
+function byteTokensRegex(kws) {
+    return `[${kws.map(tokenChar).join("")}]`;
+}
+
+const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
+
+const allTokensForAsmRegex = keywordsRegex(keywords.filter(isExpressionToken));
+
+const parenTokensRegex = keywordsRegex(openParenKeywords);
 
 const logicalOperatorsRegex = "AND|OR|EOR|MOD|DIV|NOT|[\\u0180-\\u0184\\xac]";
 
-const allByteTokensRegex =
-    "[" +
-    keywords
-        .map(kw => String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token))
-        .join("") +
-    "]";
+const allByteTokensRegex = byteTokensRegex(keywords);
 
-const allByteTokensForAsmRegex =
-    "[" +
-    keywords
-        .filter(isExpressionToken)
-        .map(kw => String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token))
-        .join("") +
-    "]";
+const allByteTokensForAsmRegex = byteTokensRegex(keywords.filter(isExpressionToken));
 
 function allAbbreviations(tokens) {
     const prefixes = new Set();
@@ -97,10 +94,9 @@ const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDoll
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
 const hiddenOpenParens = (() => {
     const forms = new Set();
-    const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
     for (const kw of openParenKeywords) {
         forms.add(kw.keyword);
-        forms.add(String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token));
+        forms.add(tokenChar(kw));
         if (kw.keyword.endsWith("$(")) forms.add(kw.keyword.slice(0, -1) + ".");
     }
     for (const abbreviation of allAbbreviations(openParenKeywords.map(kw => kw.keyword))) {
