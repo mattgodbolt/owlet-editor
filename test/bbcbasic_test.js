@@ -737,6 +737,14 @@ describe("Tokenisation", () => {
         checkTokens(["TIMER"], [{offset: 0, type: "variable"}]);
         // Surprisingly even abbreviations are affected by the continuation. See #36.
         checkTokens(["H.TO"], [{offset: 0, type: "invalid"}]);
+        // An abbreviation stands for the first keyword in the table with that prefix (B. is BGET, R. is RETURN),
+        // so it is conditional if that keyword is, whatever later keywords share the prefix.
+        for (const text of ["B.X", "BG.X", "BP.X", "CLO.X", "EO.X", "PT.X", "E.X", "EN.X", "ER.X", "O.X", "R.X", "RE.X"]) {
+            assert.deepStrictEqual(spans(text, "invalid"), [text], text);
+        }
+        for (const text of ["B. X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"]) {
+            assert.deepStrictEqual(spans(text, "invalid"), [], text);
+        }
     });
     it("should not include $ mid token/identifier", () => {
         checkTokens(

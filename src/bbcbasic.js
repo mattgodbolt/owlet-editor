@@ -61,26 +61,19 @@ function allAbbreviations(tokens) {
     return [...prefixes].map(prefix => prefix + ".");
 }
 
-const invalidAbbreviatedTokensRegex = (() => {
-    // The "Conditional" bit applies even to abbreviations, so "F.A=H.TO8^5" is
-    // parsed as a variable named "H" followed by ".", and BASIC reports error
-    // "No such variable" if "H" isn't a variable or "No TO" if it is.
-    const allNonConditional = new Set(
-        allAbbreviations(
-            keywords.filter(kw => !conditionalTokens.has(kw.keyword)).map(kw => kw.keyword),
-        ),
-    );
-    const allConditional = new Set(
-        allAbbreviations(
-            keywords.filter(kw => (kw.flags & Flags.Conditional) !== 0).map(kw => kw.keyword),
-        ),
-    );
-    return [...allConditional]
-        .filter(x => !allNonConditional.has(x))
-        .map(escape)
-        .map(kw => kw + "[a-zA-Z0-9]+")
-        .join("|");
-})();
+// BASIC expands an abbreviation to the first keyword in the table with its prefix.
+function abbreviatedKeyword(abbreviation) {
+    return keywords.find(kw => kw.keyword.startsWith(abbreviation.slice(0, -1)));
+}
+
+// The "Conditional" bit applies even to abbreviations, so "F.A=H.TO8^5" is
+// parsed as a variable named "H" followed by ".", and BASIC reports error
+// "No such variable" if "H" isn't a variable or "No TO" if it is.
+const invalidAbbreviatedTokensRegex = allAbbreviations(keywords.map(kw => kw.keyword))
+    .filter(abbreviation => abbreviatedKeyword(abbreviation).flags & Flags.Conditional)
+    .map(escape)
+    .map(kw => kw + "[a-zA-Z0-9]+")
+    .join("|");
 
 const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
 
@@ -106,9 +99,9 @@ const hiddenOpenParens = (() => {
         if (kw.keyword.endsWith("$(")) forms.add(kw.keyword.slice(0, -1) + ".");
     }
     for (const abbreviation of allAbbreviations(openParenKeywords.map(kw => kw.keyword))) {
-        // Only the first keyword in the table with this prefix is what BASIC expands it to.
-        const first = keywords.find(kw => kw.keyword.startsWith(abbreviation.slice(0, -1)));
-        if (/^[A-Z]+\.$/.test(abbreviation) && first.keyword.endsWith("(")) forms.add(abbreviation);
+        if (/^[A-Z]+\.$/.test(abbreviation) && abbreviatedKeyword(abbreviation).keyword.endsWith("(")) {
+            forms.add(abbreviation);
+        }
     }
     return [...forms];
 })();
@@ -157,6 +150,7 @@ export function registerBbcBasicLanguage() {
                 [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", switchTo: "@dataStatement"}], // DATA consumes to EOL
                 [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printHash"}],
                 [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)/, {token: "keyword", next: "@optionalHash"}],
+                [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
                     {token: "keyword", next: "@optionalHash"},
@@ -174,7 +168,6 @@ export function registerBbcBasicLanguage() {
                 [allTokensRegex, "keyword"],
                 [allByteTokensRegex, "keyword"],
                 [abbreviatedDollarTokensRegex, "keyword"],
-                [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     /[A-Z]+\./,
                     {cases: {"@tokenPrefix": "keyword", "@default": {token: "@rematch", next: "@dotAfterName"}}},
