@@ -20,10 +20,25 @@ $(NPM_UPDATED): package.json
 
 .PHONY: roms
 ROM_DIR:=./node_modules/jsbeeb/public/roms
+# The GXR ROM is not ours to keep in the repo, so it is fetched once into a cache outside node_modules (where CI can
+# keep it between runs, and npm reinstalling jsbeeb does not wipe it), checked against its hash, and copied in.
+ROM_CACHE:=.cache/roms
+GXR_URL:=https://mdfs.net/System/ROMs/Graphics/GXR120
+GXR_SHA256:=d434f9288b737907c1937cf72e34bed51c1e07e6e31b422ae7922bc3063e4f5e
+GXR_CACHED:=$(ROM_CACHE)/gxr-$(GXR_SHA256).rom
 roms: $(ROM_DIR)/gxr.rom
 
-$(ROM_DIR)/gxr.rom: $(NPM_UPDATED)
-	curl -sL https://mdfs.net/System/ROMs/Graphics/GXR120 -o $@
+# The hash is in the name, so a new expected hash is a new file that has to be fetched and checked.
+$(GXR_CACHED):
+	@mkdir -p $(dir $@)
+	curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 120 -o $@.tmp $(GXR_URL) || { rm -f $@.tmp; exit 1; }
+	@node -e 'const h=require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest("hex"); if (h !== process.argv[2]) { console.error("gxr.rom: expected sha256 " + process.argv[2] + " but got " + h); process.exit(1); }' $@.tmp $(GXR_SHA256) || { rm -f $@.tmp; exit 1; }
+	mv $@.tmp $@
+
+# Order-only on npm: installing must come first, but a newer install is no reason to copy the ROM again.
+$(ROM_DIR)/gxr.rom: $(GXR_CACHED) | $(NPM_UPDATED)
+	@mkdir -p $(ROM_DIR)
+	cp $< $@
 
 .PHONY: build
 build: prereqs  ## Builds the project
@@ -47,7 +62,7 @@ check: test lint-fix  ## Runs all checks required before committing (fixing triv
 
 .PHONY: clean
 clean:  ## Cleans up everything
-	rm -rf node_modules .*-updated .*-bin dist
+	rm -rf node_modules .*-updated .*-bin .cache dist
 
 .PHONY: run
 run: prereqs  ## Runs a local version on port 8080

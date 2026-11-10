@@ -10,6 +10,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
+      - uses: actions/cache@v4
+        with:
+          path: .cache/roms
+          key: roms-${{ hashFiles('Makefile') }}
       - run: make check
   deploy-code:
     needs: build-and-test
@@ -20,6 +24,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
+      - uses: actions/cache@v4
+        with:
+          path: .cache/roms
+          key: roms-${{ hashFiles('Makefile') }}
       - run: make dist
       - name: upload distribution to s3
         uses: jakejarvis/s3-sync-action@v0.5.1
