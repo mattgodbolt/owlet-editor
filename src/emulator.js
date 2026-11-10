@@ -4,14 +4,15 @@ import {PassthroughFilter} from "jsbeeb/src/video-filters/passthrough-filter";
 import {Keyboard} from "jsbeeb/src/web/keyboard";
 import {keyCodes} from "jsbeeb/src/keymap";
 import {Video} from "jsbeeb/src/video";
-import {FakeSoundChip} from "jsbeeb/src/soundchip";
-import {FakeDdNoise} from "jsbeeb/src/ddnoise";
 import * as models from "jsbeeb/src/models";
 import {machineSpec, nullIo} from "jsbeeb/src/machine-spec";
 import Promise from "promise";
 import ResizeObserver from "resize-observer-polyfill";
 import Snapshot from "./snapshot";
 import {setTotalCycles, totalCycles} from "./cycles";
+import {AudioHandler} from "jsbeeb/src/web/audio-handler";
+import {chipBindings, restoreChipBindings} from "./chip-bindings";
+import {Sound, soundRequested} from "./sound";
 
 const BotStartCycles = 725000; // bbcmicrobot start time
 const MaxSecondsPerFrame = 0.1;
@@ -92,8 +93,17 @@ export class Emulator {
             },
         );
 
-        this.soundChip = new FakeSoundChip();
-        this.ddNoise = new FakeDdNoise();
+        this.audio = new AudioHandler({
+            cpuSpeed: Model.cyclesPerSecond,
+            isAtom: false,
+            hasMusic5000: false,
+            noSeek: true,
+        });
+        this.sound = new Sound(this.audio);
+        // Armed now, before the browser can start the audio of its own accord, which a link that asked for sound
+        // wants and anything else does not.
+        if (soundRequested(window.location.search)) this.sound.arm();
+        this.sound.reconcile();
         this.useGxr = false;
         this.cpu = null;
         this.keyboard = null;
@@ -107,16 +117,17 @@ export class Emulator {
         this.lastFrameTime = 0;
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
+        this.rebuilding = false;
     }
 
     buildCpu() {
         return new Model.Cpu(Model, {
             ...nullIo({
                 video: this.video,
-                soundChip: this.soundChip,
+                soundChip: this.audio.soundChip,
                 model: Model,
             }),
-            ddNoise: this.ddNoise,
+            ddNoise: this.audio.ddNoise,
             config: machineSpec({
                 keyLayout: "natural",
                 extraRoms: this.useGxr ? ["gxr.rom"] : [],
@@ -127,17 +138,28 @@ export class Emulator {
     async initialise() {
         // The ROMs a machine is fitted with are fixed when it is built, so each initialise builds afresh.
         // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
-        const cpu = this.buildCpu();
-        await Promise.all([cpu.initialise(), this.ddNoise.initialise()]);
-        this.clearKeys();
-        this.cpu = cpu;
-        this.keyboard = new Keyboard({
-            processor: cpu,
-            inputEnabledFunction: () => false,
-            runningFunction: () => this.running,
-            keyLayout: "natural",
-        });
-        this.ready = true;
+        // Building it hands the one sound chip to its scheduler, so the old CPU must not run in the meantime.
+        this.rebuilding = true;
+        const bindings = chipBindings(this.audio.soundChip);
+        try {
+            const cpu = this.buildCpu();
+            await Promise.all([cpu.initialise(), this.audio.ddNoise.initialise()]);
+            this.clearKeys();
+            this.cpu = cpu;
+            this.keyboard = new Keyboard({
+                processor: cpu,
+                inputEnabledFunction: () => false,
+                runningFunction: () => this.running,
+                keyLayout: "natural",
+            });
+            this.ready = true;
+        } catch (e) {
+            // The old CPU goes on, so it keeps the sound chip.
+            restoreChipBindings(this.audio.soundChip, bindings);
+            throw e;
+        } finally {
+            this.rebuilding = false;
+        }
     }
 
     gxr() {
@@ -172,11 +194,13 @@ export class Emulator {
     start() {
         if (this.running) return;
         this.running = true;
+        this.sound.setRunning(true);
         requestAnimationFrame(this.onAnimFrame);
     }
 
     pause() {
         this.running = false;
+        this.sound.setRunning(false);
     }
 
     async beebjit(tokenised) {
@@ -220,7 +244,8 @@ export class Emulator {
     }
 
     async runProgram(tokenised) {
-        if (!this.ready) return;
+        // A CPU that is being replaced must not run, as the new one has taken the sound chip's scheduler.
+        if (!this.ready || this.rebuilding) return;
         this.cpu.reset(true);
         const processor = this.cpu;
         await processor.execute(BotStartCycles); // match bbcmicrobot
@@ -273,16 +298,16 @@ export class Emulator {
             this.start();
         }
 
-        if (this.running && this.lastFrameTime !== 0) {
+        if (this.running && !this.rebuilding && this.lastFrameTime !== 0) {
             const sinceLast = now - this.lastFrameTime;
             let cycles = ((sinceLast * this.cyclesPerSecond) / 1000) | 0;
             cycles = Math.min(cycles, this.cyclesPerSecond * MaxSecondsPerFrame);
             try {
                 if (!this.cpu.execute(cycles)) {
-                    this.running = false; // TODO: breakpoint
+                    this.pause(); // TODO: breakpoint
                 }
             } catch (e) {
-                this.running = false;
+                this.pause();
                 console.log(`Emulator stopped at PC=${this.cpu.pc.toString(16)}`);
                 throw e;
             }
