@@ -184,29 +184,11 @@ describe("Tokenisation", () => {
     });
     it("should not treat BG as an abbreviation without the dot", () => {
         // BGET abbreviates to B., BG. and BGE. but plain BG is just a variable.
-        checkTokens(
-            ["BG=1", "BG%=2", "BG$=\"\"", "BG.#1"],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 2, type: "operator"},
-                {offset: 3, type: "number"},
-            ],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 3, type: "operator"},
-                {offset: 4, type: "number"},
-            ],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 3, type: "operator"},
-                {offset: 4, type: "string.quote"},
-            ],
-            [
-                {offset: 0, type: "keyword"},
-                {offset: 3, type: "symbol"},
-                {offset: 4, type: "number"},
-            ],
-        );
+        for (const text of ["BG=1", "BG%=2", 'BG$=""']) {
+            assert.deepStrictEqual(spans(text, "keyword"), [], text);
+        }
+        assert.deepStrictEqual(spans("BG.#1", "keyword"), ["BG."]);
+        assert.deepStrictEqual(spans("BG.#1", "symbol"), ["#"]);
     });
     it("should not recognize 6502 outside of []", () => {
         checkTokens(["LDA"], [{offset: 0, type: "variable"}]);
@@ -463,31 +445,17 @@ describe("Tokenisation", () => {
             ],
         );
     });
-    it("should end an unterminated quote in DATA at the end of the line", () => {
-        checkTokens(
-            ['DATA "abc', "PRINT 1", 'D.1,"x', "A=2"],
-            [
-                {offset: 0, type: "keyword"},
-                {offset: 4, type: "white"},
-                {offset: 5, type: "string"},
-            ],
-            [
-                {offset: 0, type: "keyword"},
-                {offset: 5, type: "white"},
-                {offset: 6, type: "number"},
-            ],
-            [
-                {offset: 0, type: "keyword"},
-                {offset: 2, type: "string.unquoted"},
-                {offset: 3, type: "symbol"},
-                {offset: 4, type: "string"},
-            ],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 1, type: "operator"},
-                {offset: 2, type: "number"},
-            ],
-        );
+    it("should start each line afresh, whatever ended the line before", () => {
+        for (const first of ['A$="ABC', 'DATA "abc', 'D.1,"x', "10PRINT", "20PRINT ", "30INPUT", "PROC", "A=FN"]) {
+            const [, ...next] = editor.tokenize([first, "10X=1", "*FX15"].join("\n"), "BBCBASIC");
+            assert.deepStrictEqual(
+                next.map(line => line.map(t => t.type.replace(".BBCBASIC", ""))),
+                [["constant.linenum", "variable", "operator", "number"], ["keyword.oscli.string"]],
+                first,
+            );
+        }
+        assert.deepStrictEqual(spans('DATA "abc', "string"), ['"abc']);
+        assert.deepStrictEqual(spans('D.1,"x', "string"), ['"x']);
     });
     it("should handle symbols and operators", () => {
         checkTokens(["!"], [{offset: 0, type: "operator"}]);
@@ -526,7 +494,15 @@ describe("Tokenisation", () => {
         // After a keyword that takes an operand, TOP is still the function.
         assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "keyword"), ["FOR", "ABS", "TOP", "TO", "TOP"]);
         assert.deepStrictEqual(spans("FOR I=ABS TOP TO TOP", "variable"), ["I"]);
+        assert.deepStrictEqual(spans("FOR I=AB. TOP TO TOP", "keyword"), ["FOR", "AB.", "TOP", "TO", "TOP"]);
+        assert.deepStrictEqual(spans("FOR I=AB.TOP TO TOP", "variable"), ["I"]);
+        assert.deepStrictEqual(spans("FOR I=XY.TOP", "variable"), ["I", "XY", "P"]);
         assert.deepStrictEqual(spans("FOR I=1 AND TOP TO 2", "keyword"), ["FOR", "AND", "TOP", "TO"]);
+        // Abbreviated and raw token forms, checked against the ROM by running them.
+        assert.deepStrictEqual(spans("FO.I=TOP TO TOP+1", "keyword"), ["FO.", "TOP", "TO", "TOP"]);
+        assert.deepStrictEqual(spans("\xe3I=\xb8P \xb8 \xb8P+1", "keyword"), ["\xe3", "\xb8P", "\xb8", "\xb8P"]);
+        assert.deepStrictEqual(spans("\xe3P=\xb8P \xb8P:\xf1P", "variable"), ["P", "P", "P"]);
+        assert.deepStrictEqual(spans("\xe3I=\u0194\xb8P \xb8 \xb8P", "variable"), ["I"]);
     });
     it("should only allow ~ in PRINT items and after STR$", () => {
         const valid = [
@@ -541,6 +517,10 @@ describe("Tokenisation", () => {
             ["A$=STR$~(A)", 1],
             ["A$=STR.~A", 1],
             ["IF A THEN PRINT ~A ELSE PRINT ~B", 2],
+            ["P.STR.~255", 1],
+            ["\xf1\xc3~255", 1],
+            ["A$=\xc3~255", 1],
+            ["PRINT ~TOP-TOP", 1],
         ];
         for (const [text, count] of valid) {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
@@ -549,6 +529,7 @@ describe("Tokenisation", () => {
         const invalid = [
             "A=~B",
             "A$=STR$(~12)",
+            "A$=\xc3(~1)",
             "PRINT#0,~A",
             "INPUT ~A",
             "VDU ~A",
@@ -703,23 +684,6 @@ describe("Tokenisation", () => {
             ],
         );
     });
-    it("should not let an unterminated string affect the next line", () => {
-        checkTokens(
-            ['A$="ABC', "10X=1", "*FX15"],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 2, type: "operator"},
-                {offset: 3, type: "invalid.string"},
-            ],
-            [
-                {offset: 0, type: "constant.linenum"},
-                {offset: 2, type: "variable"},
-                {offset: 3, type: "operator"},
-                {offset: 4, type: "number"},
-            ],
-            [{offset: 0, type: "keyword.oscli"}],
-        );
-    });
     it("should tokenise continuation tokens when appropriate", () => {
         checkTokens(["TIME"], [{offset: 0, type: "keyword"}]);
         checkTokens(
@@ -735,6 +699,22 @@ describe("Tokenisation", () => {
         checkTokens(["TIMER"], [{offset: 0, type: "variable"}]);
         // Surprisingly even abbreviations are affected by the continuation. See #36.
         checkTokens(["H.TO"], [{offset: 0, type: "invalid"}]);
+        // An abbreviation stands for the first keyword in the table with that prefix (B. is BGET, R. is RETURN),
+        // so it is conditional if that keyword is, whatever later keywords share the prefix.
+        for (const text of ["B.X", "BG.X", "BP.X", "CLO.X", "EO.X", "PT.X", "E.X", "EN.X", "ER.X", "O.X", "R.X", "RE.X"]) {
+            assert.deepStrictEqual(spans(text, "invalid"), [text], text);
+        }
+        for (const text of ["B. X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"]) {
+            assert.deepStrictEqual(spans(text, "invalid"), [], text);
+        }
+    });
+    it("should read a keyword and a dot as the abbreviation of an earlier keyword it begins", () => {
+        // END. is ENDPROC, MOD. is MODE and so on, since those come first in the table.
+        for (const text of ["END.", "ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"]) {
+            assert.deepStrictEqual(spans(text, "keyword"), [text.match(/[A-Z]+\./)[0]], text);
+        }
+        assert.deepStrictEqual(spans("END.X", "invalid"), ["END.X"]);
+        assert.deepStrictEqual(spans("A=8MOD 3", "keyword"), ["MOD"]);
     });
     it("should not include $ mid token/identifier", () => {
         checkTokens(
@@ -777,51 +757,8 @@ describe("Tokenisation", () => {
             ],
         );
     });
-    it("should reset to start of line after a keyword at the end of a line", () => {
-        // A bare PRINT or INPUT must not leave the next line mid-statement.
-        checkTokens(
-            ["10PRINT", "20PRINT ", "30INPUT", "*FX15", "A=1"],
-            [
-                {offset: 0, type: "constant.linenum"},
-                {offset: 2, type: "keyword"},
-            ],
-            [
-                {offset: 0, type: "constant.linenum"},
-                {offset: 2, type: "keyword"},
-                {offset: 7, type: "white"},
-            ],
-            [
-                {offset: 0, type: "constant.linenum"},
-                {offset: 2, type: "keyword"},
-            ],
-            [{offset: 0, type: "keyword.oscli"}],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 1, type: "operator"},
-                {offset: 2, type: "number"},
-            ],
-        );
-    });
-    it("should not let a PROC or FN with no name affect the next line", () => {
-        checkTokens(
-            ["PROC", "10X=1", "A=FN", "*FX15"],
-            [{offset: 0, type: "keyword"}],
-            [
-                {offset: 0, type: "constant.linenum"},
-                {offset: 2, type: "variable"},
-                {offset: 3, type: "operator"},
-                {offset: 4, type: "number"},
-            ],
-            [
-                {offset: 0, type: "variable"},
-                {offset: 1, type: "operator"},
-                {offset: 2, type: "keyword"},
-            ],
-            [{offset: 0, type: "keyword.oscli"}],
-        );
-    });
     it("should handle OSCLI at start of line", () => {
-        checkTokens(["*INFO"], [{offset: 0, type: "keyword.oscli"}]);
+        checkTokens(["*INFO"], [{offset: 0, type: "keyword.oscli.string"}]);
     });
     it("should handle OSCLI after line number", () => {
         checkTokens(
@@ -829,7 +766,7 @@ describe("Tokenisation", () => {
             [
                 {offset: 0, type: "constant.linenum"},
                 {offset: 2, type: "white"},
-                {offset: 3, type: "keyword.oscli"},
+                {offset: 3, type: "keyword.oscli.string"},
             ],
         );
     });
@@ -842,7 +779,7 @@ describe("Tokenisation", () => {
                 {offset: 3, type: "operator"},
                 {offset: 4, type: "number"},
                 {offset: 5, type: "symbol"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
         );
     });
@@ -866,67 +803,75 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 1, type: "number"},
                 {offset: 2, type: "keyword"},
-                {offset: 3, type: "keyword.oscli"},
+                {offset: 3, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "number"},
                 {offset: 3, type: "keyword"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 1, type: "number"},
                 {offset: 2, type: "keyword"},
-                {offset: 3, type: "keyword.oscli"},
+                {offset: 3, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 7, type: "keyword.oscli"},
+                {offset: 7, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 6, type: "keyword.oscli"},
+                {offset: 6, type: "keyword.oscli.string"},
             ],
             [
                 {offset: 0, type: "keyword"},
-                {offset: 2, type: "keyword.oscli"},
+                {offset: 2, type: "keyword.oscli.string"},
             ],
         );
+    });
+    it("should read a number after THEN or ELSE as a line number, but not after ERROR", () => {
+        assert.deepStrictEqual(spans("IF A THEN 30 ELSE 40", "constant.linenum"), ["30", "40"]);
+        assert.deepStrictEqual(spans("IF A TH.30 EL.40", "constant.linenum"), ["30", "40"]);
+        for (const text of ["ON ERROR 30", 'ERROR 5,"x"', "ON ERR. 30", "\xee\u0185 30"]) {
+            assert.deepStrictEqual(spans(text, "constant.linenum"), [], text);
+            assert.deepStrictEqual(spans(text, "number"), [text.match(/\d+/)[0]], text);
+        }
     });
     it("should highlight invalid operators from other languages", () => {
         checkTokens(
@@ -1011,47 +956,31 @@ describe("Bracket matching", () => {
             model.dispose();
         }
     }
-    function unbalancedColumns(text) {
-        return brackets(text)
-            .filter(b => b[2])
-            .map(b => b[0]);
-    }
     it("should pair plain brackets", () => {
         assert.deepStrictEqual(brackets("P.(1+2)"), [
             [3, 4, false],
             [7, 8, false],
         ]);
     });
-    it("should pair the hidden ( in abbreviated and unabbreviated keywords", () => {
-        for (const keyword of ["RIGHT$(", "RIGHT$.", "RI.", "LE.", "MI.", "MID$(", "TAB(", "POINT(", "STRING$("]) {
-            const text = `P.${keyword}A$,1)`;
-            assert.deepStrictEqual(unbalancedColumns(text), [], text);
+    it("should pair each ) with its (, including the hidden ( of keywords, abbreviations and tokens", () => {
+        const hidden = ["RIGHT$(", "RIGHT$.", "RI.", "LE.", "MI.", "MID$(", "TAB(", "POINT(", "STRING$("];
+        const tokens = [0x18a, 0xa7, 0xc0, 0xc1, 0xb0, 0xc2, 0xc4].map(token => String.fromCodePoint(token));
+        const cases = [
+            ...[...hidden, ...tokens].map(keyword => [`P.${keyword}A$,1)`, []]),
+            ['A$="OWLET":P.RI.A$,1)LE.A$,2)MI.A$,4,1)MI.A$,3,1)', []], // #114
+            ["P.(1+2))", [8]],
+            ["P.RI.A$,1))", [11]],
+            ["P.RIGHT$(A$,1))", [15]],
+            ["PRI.A$,1)", [9]], // PRI. is PRINT, not RIGHT$(
+        ];
+        for (const [text, unbalanced] of cases) {
+            assert.deepStrictEqual(brackets(text).filter(b => b[2]).map(b => b[0]), unbalanced, text);
         }
     });
-    it("should pair the hidden ( in raw token characters", () => {
-        for (const token of [0x18a, 0xa7, 0xc0, 0xc1, 0xb0, 0xc2, 0xc4]) {
-            const text = `P.${String.fromCodePoint(token)}A$,1)`;
-            assert.deepStrictEqual(unbalancedColumns(text), [], text);
+    it("should ignore brackets in strings, comments and * commands", () => {
+        for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("]) {
+            assert.deepStrictEqual(brackets(text), [], text);
         }
-    });
-    it("should handle the example from #114", () => {
-        assert.deepStrictEqual(
-            unbalancedColumns('A$="OWLET":P.RI.A$,1)LE.A$,2)MI.A$,4,1)MI.A$,3,1)'),
-            [],
-        );
-    });
-    it("should still flag genuinely unbalanced brackets", () => {
-        assert.deepStrictEqual(unbalancedColumns("P.(1+2))"), [8]);
-        assert.deepStrictEqual(unbalancedColumns("P.RI.A$,1))"), [11]);
-        assert.deepStrictEqual(unbalancedColumns("P.RIGHT$(A$,1))"), [15]);
-    });
-    it("should not treat other abbreviations as a hidden (", () => {
-        // PRI. is PRINT, not RIGHT$(.
-        assert.deepStrictEqual(unbalancedColumns("PRI.A$,1)"), [9]);
-    });
-    it("should ignore keywords in strings and comments", () => {
-        assert.deepStrictEqual(brackets('P."RI.A$,1)"'), []);
-        assert.deepStrictEqual(brackets("REM RI.A$,1)"), []);
     });
 });
 
@@ -1061,6 +990,9 @@ describe("Line warnings", () => {
         checkWarnings('P."I am a mongoose"');
         checkWarnings("colour%=123");
         checkWarnings("colour$=a$");
+        checkWarnings("H. TO");
+        checkWarnings("P.TO");
+        checkWarnings("A=H.");
     });
     it("should warn on suspicious variable names", () => {
         checkWarnings("colour", {
@@ -1116,9 +1048,6 @@ describe("Line warnings", () => {
             endColumn: 3,
         });
     });
-});
-
-describe("Abbreviation spacing warnings", () => {
     it("should suggest a space after an abbreviation that is followed by letters", () => {
         checkWarnings("H.TO", {
             message:
@@ -1134,11 +1063,6 @@ describe("Abbreviation spacing warnings", () => {
             startColumn: 10,
             endColumn: 15,
         });
-    });
-    it("should not warn when the abbreviation is valid or already spaced", () => {
-        checkWarnings("H. TO");
-        checkWarnings("P.TO");
-        checkWarnings("A=H.");
     });
 });
 
