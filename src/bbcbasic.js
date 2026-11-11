@@ -374,7 +374,7 @@ export function registerBbcBasicLanguage() {
         wordPattern: new RegExp(
             allTokensRegex +
                 "|" +
-                /(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g.source,
+                /(@%)|(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+%?)/g.source,
         ),
     });
 

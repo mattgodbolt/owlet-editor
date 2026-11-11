@@ -94,6 +94,15 @@ describe("Occurrences", () => {
             assert.strictEqual(changeAll(text, "X"), null, text);
         }
     });
+
+    // Monaco's word highlighter only asks for the occurrences where it finds a word.
+    it("should make the whole name the word at the cursor", () => {
+        for (const text of ["‸@%=1", "@‸%=1", "@%‸=1", "‸A%=1", "A‸%=1", "A%‸=1", "A$‸=1"]) {
+            const {text: line, position} = withCursor(text);
+            const word = withModel(line, model => model.getWordAtPosition(position)?.word);
+            assert.strictEqual(word, line.split("=")[0], text);
+        }
+    });
 });
 
 describe("Rename", () => {
