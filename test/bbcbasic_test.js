@@ -213,8 +213,8 @@ describe("Tokenisation", () => {
         for (const text of ["BG=1", "BG%=2", 'BG$=""']) {
             assert.deepStrictEqual(spans(text, "keyword"), [], text);
         }
-        assert.deepStrictEqual(spans("BG.#1", "keyword"), ["BG."]);
-        assert.deepStrictEqual(spans("BG.#1", "symbol"), ["#"]);
+        assert.deepStrictEqual(spans("A=BG.#1", "keyword"), ["BG."]);
+        assert.deepStrictEqual(spans("A=BG.#1", "symbol"), ["#"]);
     });
     it("should not recognize 6502 outside of []", () => {
         checkTokens(["LDA"], [{offset: 0, type: "variable"}]);
@@ -730,14 +730,14 @@ describe("Tokenisation", () => {
         for (const text of ["B.X", "BG.X", "BP.X", "CLO.X", "EO.X", "PT.X", "E.X", "EN.X", "ER.X", "O.X", "R.X", "RE.X"]) {
             assert.deepStrictEqual(spans(text, "invalid"), [text], text);
         }
-        for (const text of ["B. X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"]) {
+        for (const text of ["A=B. #X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"]) {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
         }
     });
     it("should read a keyword and a dot as the abbreviation of an earlier keyword it begins", () => {
         // END. is ENDPROC, MOD. is MODE and so on, since those come first in the table.
-        for (const text of ["END.", "ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"]) {
-            assert.deepStrictEqual(spans(text, "keyword"), [text.match(/[A-Z]+\./)[0]], text);
+        for (const text of ["END.", "ON ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"]) {
+            assert.deepStrictEqual(spans(text, "keyword").slice(-1), [text.match(/[A-Z]+\./)[0]], text);
         }
         assert.deepStrictEqual(spans("END.X", "invalid"), ["END.X"]);
         assert.deepStrictEqual(spans("A=8MOD 3", "keyword"), ["MOD"]);
@@ -890,6 +890,32 @@ describe("Tokenisation", () => {
                 {offset: 2, type: "keyword.oscli.string"},
             ],
         );
+    });
+    it("should highlight a keyword that cannot start a statement", () => {
+        // See #151, checked on the ROM, where each invalid case is a syntax error.
+        const cases = [
+            ['ERROR5,"x"', ["ERROR"]],
+            ["RND(-TIME)", ["RND"]],
+            ["STEP1", ["STEP"]],
+            ["TOOMUCH=1", ["TO"]],
+            ["A=1:ABS A", ["ABS"]],
+            ["IF A THEN TO", ["TO"]],
+            ["IF 0 THEN 10 ELSE FNf", ["FN"]],
+            ["A.", ["A."]],
+            ["10 THEN", ["THEN"]],
+            ["\u0185", ["\u0185"]],
+            ["ON ERROR OFF", []],
+            ['ON ERROR PRINT "x"', []],
+            ["TIME=0", []],
+            ["PTR#0=0:HIMEM=HIMEM", []],
+            ["ELSE", []],
+            ["IF 1 THEN ELSE", []],
+            ["RNDX=1", []],
+            ["MODE 7", []],
+        ];
+        for (const [text, invalid] of cases) {
+            assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+        }
     });
     it("should read a number after THEN or ELSE as a line number, but not after ERROR", () => {
         assert.deepStrictEqual(spans("IF A THEN 30 ELSE 40", "constant.linenum"), ["30", "40"]);
