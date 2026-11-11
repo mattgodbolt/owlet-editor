@@ -328,7 +328,7 @@ export function registerBbcBasicLanguage() {
                 ["#", "symbol"], // Immediate addressing
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
-                [bracketCollisionRegex, "keyword.string"],
+                [bracketCollisionRegex, "invalid.string"],
                 [new RegExp(`TOP|\\xb8P|${allTokensForAsmRegex}|${allByteTokensForAsmRegex}`), "keyword"],
                 [new RegExp(`${anyTokenRegex}|${invalidAbbreviatedTokensRegex}`), "invalid"],
                 [/^\d+/, "constant.linenum"], // line numbers

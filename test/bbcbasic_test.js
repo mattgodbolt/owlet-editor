@@ -1219,6 +1219,10 @@ describe("Bracket matching of raw token characters", () => {
     it("pairs a raw LEFT$( with its close", () => {
         assert.strictEqual(bracketPairs("A$=ÀA$,1)"), 1);
     });
+    it("keeps the raw END token invalid in the assembler", () => {
+        const types = editor.tokenize("[\nLDA #\u00e0\n]", "BBCBASIC")[1].map(t => t.type.replace(".BBCBASIC", ""));
+        assert.strictEqual(types.at(-1), "invalid.string");
+    });
     it("does not read END, ENDPROC, ENVELOPE or GOSUB as open brackets", () => {
         for (const code of [0xe0, 0xe1, 0xe2, 0xe4]) {
             const char = String.fromCodePoint(code);
