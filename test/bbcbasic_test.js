@@ -1210,9 +1210,20 @@ describe("A * command after REPEAT or ON ERROR LOCAL", () => {
     registerBbcBasicLanguage();
     const types = text => editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
     it("is a command, whatever it says", () => {
-        for (const text of ["REPEAT *|", "REPEAT **", "REPEAT *FX 0", "ON ERROR LOCAL *|", "ON ERROR LOCAL **", "ON ERROR LOCAL *FX 0"])
+        for (const text of [
+            "REPEAT *|",
+            "REPEAT **",
+            "REPEAT *FX 0",
+            "ON ERROR LOCAL *|",
+            "ON ERROR LOCAL **",
+            "ON ERROR LOCAL *FX 0",
+            "REP. *|",
+            "\xf5 *|",
+            "ON ERR. LOC. *|",
+            "\xee \u0185 \xea *|",
+        ])
             assert.ok(types(text).includes("keyword.oscli.string"), text);
-        for (const text of ["REPEAT *|", "ON ERROR LOCAL **"])
+        for (const text of ["REPEAT *|", "ON ERROR LOCAL **", "REP. *|", "\xf5 *|", "ON ERR. LOC. *|", "\xee \u0185 \xea *|"])
             assert.ok(!types(text).some(type => type.startsWith("invalid")), text);
     });
     it("leaves the neighbouring cases alone", () => {
