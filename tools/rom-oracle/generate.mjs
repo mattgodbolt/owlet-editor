@@ -69,6 +69,21 @@ function* exhaustive() {
             yield {shape: "name then dot at statement start", text: name + tail};
         }
     }
+    for (const lead of ["PRINT ", "P.", "PRINT X;", 'PRINT "a"', "A$=", "A$=A$+"]) {
+        for (const tilde of [
+            "~",
+            "~~",
+            "~~~",
+            "~ ~",
+            "STR$~",
+            "STR$~~",
+            "STR$ ~~",
+            "STR$~ ~",
+            "STR.~~",
+        ]) {
+            yield {shape: "~ (hex) runs", text: `${lead}${tilde}42`};
+        }
+    }
     for (const n of Numbers) {
         yield {shape: "number form", text: `X=${n}`};
         yield {shape: "number form", text: `PRINT ${n}`};

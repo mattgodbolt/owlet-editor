@@ -15,11 +15,14 @@ const SupportProgram = [
 const Prelude = 'X=1:Y=2:Z=3:A=1:I=1:X%=1:A%=1:X$="a":A$="a":DIM X(3),X%(3),X$(3),D 20';
 
 // Syntax errors from BBC BASIC II; any other error is raised while running a statement and stops BASIC reading it.
+// No such variable is here because the prelude defines every name the generator uses: BASIC reports it when what
+// should be a value is not one, as in PRINT STR$~~1, or for a name with nothing after it, as in CALL.
 export const SyntaxErrors = new Map([
     [4, "Mistake"],
     [5, "Missing ,"],
     [9, 'Missing "'],
     [16, "Syntax error"],
+    [26, "No such variable"],
     [27, "Missing )"],
     [28, "Bad HEX"],
     [36, "No TO"],
