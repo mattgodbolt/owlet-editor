@@ -1206,6 +1206,22 @@ describe("Quick fixes", () => {
     });
 });
 
+describe("A * command after REPEAT or ON ERROR LOCAL", () => {
+    registerBbcBasicLanguage();
+    const types = text => editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
+    it("is a command, whatever it says", () => {
+        for (const text of ["REPEAT *|", "REPEAT **", "REPEAT *FX 0", "ON ERROR LOCAL *|", "ON ERROR LOCAL **", "ON ERROR LOCAL *FX 0"])
+            assert.ok(types(text).includes("keyword.oscli.string"), text);
+        for (const text of ["REPEAT *|", "ON ERROR LOCAL **"])
+            assert.ok(!types(text).some(type => type.startsWith("invalid")), text);
+    });
+    it("leaves the neighbouring cases alone", () => {
+        assert.ok(!types("REPEAT X=X+1").some(type => type.startsWith("invalid")));
+        assert.ok(!types("ON ERROR LOCAL PRINT 1").some(type => type.startsWith("invalid")));
+        assert.ok(types("LOCAL *").some(type => type.startsWith("invalid") || type === "operator"));
+    });
+});
+
 describe("Bracket matching of raw token characters", () => {
     registerBbcBasicLanguage();
     const invalidBrackets = text => {
