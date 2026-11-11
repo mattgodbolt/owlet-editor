@@ -159,15 +159,14 @@ function showMessage(model, position, message) {
     if (messages) messages.showMessage(message, position);
 }
 
-const renameProvider = {
+export const renameProvider = {
     resolveRenameLocation(model, position) {
         const target = symbolAt(modelSymbols(model), position);
         if (!target) return {range: null, text: "", rejectReason: NotANameReason};
         return {range: range(target), text: target.name};
     },
     provideRenameEdits(model, position, newName) {
-        const target = symbolAt(modelSymbols(model), position);
-        const error = target ? renameError(model, target, newName) : NotANameReason;
+        const error = renameError(model, symbolAt(modelSymbols(model), position), newName);
         if (error) {
             showMessage(model, position, error);
             return {edits: [], rejectReason: error};
