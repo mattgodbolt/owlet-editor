@@ -482,11 +482,14 @@ export function backwardCompat(text) {
     return output;
 }
 
-export function expandCode(text) {
+// fits says whether a line, as expanded, can still be tokenised: expanding can add a space (TIME before a name, say),
+// which can push a full line over the limit, and then the line is left as it was.
+export function expandCode(text, fits = () => true) {
     if (text !== decode2048(text)) {
         return decode2048(text);
     }
-    text = debbreviate(text);
-    text = detokenise(text);
-    return text;
+    const original = text.split("\n");
+    const expanded = detokenise(debbreviate(text)).split("\n");
+    if (original.length !== expanded.length) return expanded.join("\n");
+    return expanded.map((line, i) => (fits(line) ? line : original[i])).join("\n");
 }
