@@ -15,6 +15,7 @@ import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings} from "./bbcbasic";
+import {addChangeAllOccurrences} from "./occurrences";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 
@@ -85,6 +86,7 @@ export class OwletEditor {
             contextMenuOrder: 1.5,
             run: () => this.expandCode(),
         });
+        addChangeAllOccurrences(this.editor);
 
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
