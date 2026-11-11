@@ -1248,6 +1248,10 @@ describe("Bracket matching of raw token characters", () => {
         assert.strictEqual(invalidBrackets("PRINTLE.A$,1)"), 1);
         assert.strictEqual(invalidBrackets("PRINT LE.A$,1)"), 0);
         assert.strictEqual(invalidBrackets("PRINTLEFT$(A$,1)"), 0);
+        // A dot before the opener is a word boundary, so fully abbreviated code is fine, unless a keyword with no
+        // abbreviation (LEN) comes first.
+        assert.strictEqual(invalidBrackets("P.LE.A$,1)"), 0);
+        assert.strictEqual(invalidBrackets("P.LENMI.A$,2)"), 1);
     });
     it("keeps the raw END token invalid in the assembler", () => {
         const types = editor.tokenize("[\nLDA #\u00e0\n]", "BBCBASIC")[1].map(t => t.type.replace(".BBCBASIC", ""));
