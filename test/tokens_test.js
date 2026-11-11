@@ -183,4 +183,7 @@ describe("Expanding code", () => {
         assert.strictEqual(expandCode("\xf4A\u020aB"), "REMA\u020aB");
         assert.strictEqual(expandCode("*FX\u010aP."), "*FX\u010aP.");
     });
+    it("still reads a newline byte inside an encoded line number", () => {
+        assert.strictEqual(expandCode("\xe5\x8dT\u010a@"), "GOTO74");
+    });
 });

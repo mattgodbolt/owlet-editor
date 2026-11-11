@@ -305,7 +305,7 @@ function detokeniseInternal(text, handler) {
         const codeUnit = char.charCodeAt(0);
         const charCode = codeUnit & 0xff;
         let ch = String.fromCodePoint(charCode);
-        if (charCode === Chars.NewLine && codeUnit !== Chars.NewLine) {
+        if (charCode === Chars.NewLine && codeUnit !== Chars.NewLine && lineNumberBuffer === null) {
             // U+010A stands for the byte &0A (data), and only a real newline ends a line.
             handler.onCharacter(char);
             continue;
