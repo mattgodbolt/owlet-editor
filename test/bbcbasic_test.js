@@ -1204,3 +1204,25 @@ describe("Quick fixes", () => {
         assert.deepStrictEqual(applyQuickFix("colour"), {title: "Replace with COLOUR", result: "COLOUR"});
     });
 });
+
+describe("Bracket matching of raw token characters", () => {
+    registerBbcBasicLanguage();
+    const bracketPairs = text => {
+        const model = editor.createModel(text, "BBCBASIC");
+        try {
+            model.tokenization.forceTokenization(model.getLineCount());
+            return model.bracketPairs.getBracketPairsInRange(model.getFullModelRange()).toArray().length;
+        } finally {
+            model.dispose();
+        }
+    };
+    it("pairs a raw LEFT$( with its close", () => {
+        assert.strictEqual(bracketPairs("A$=ÀA$,1)"), 1);
+    });
+    it("does not read END, ENDPROC, ENVELOPE or GOSUB as open brackets", () => {
+        for (const code of [0xe0, 0xe1, 0xe2, 0xe4]) {
+            const char = String.fromCodePoint(code);
+            assert.strictEqual(bracketPairs(`${char}\n(1)`), 1, `U+${code.toString(16)}`);
+        }
+    });
+});
