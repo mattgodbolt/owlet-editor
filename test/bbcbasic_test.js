@@ -1243,7 +1243,7 @@ describe("Bracket matching of raw token characters", () => {
                 assert.strictEqual(invalidBrackets(text), 0, `U+${char.codePointAt(0).toString(16)} in ${text}`);
         }
     });
-    it("has a known limit: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
+    it("has a known limitation: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
         // Monaco merges neighbouring same-coloured tokens, so its \b-guarded opener match fails in "PRINTLE.".
         assert.strictEqual(invalidBrackets("PRINTLE.A$,1)"), 1);
         assert.strictEqual(invalidBrackets("PRINT LE.A$,1)"), 0);
