@@ -89,7 +89,8 @@ export async function createRom() {
         try {
             for (let inputs = 0; ; ++inputs) {
                 const {buffer, caller} = await nextLineRead();
-                if (caller === promptCaller) break;
+                // BASIC reads the prompt and its INPUT statements through the same routine; only the buffer differs.
+                if (caller === promptCaller && buffer === InputBuffer) break;
                 if (inputs === MaxInputs) return {timeout: true};
                 answer(buffer, "1");
             }

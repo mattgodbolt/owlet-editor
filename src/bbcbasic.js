@@ -106,7 +106,7 @@ const notStatementRegex = (() => {
     const begunStatements = [...statementKeywords].filter(statement =>
         notStatementKeywords.some(kw => statement !== kw.keyword && statement.startsWith(kw.keyword)),
     );
-    // A conditional keyword's abbreviation followed by a letter or digit is a name (see below).
+    // A conditional keyword's abbreviation followed by a letter or digit is a name.
     const abbreviations = allAbbreviations(keywords.map(kw => kw.keyword))
         .filter(abbreviation => notStatementKeywords.includes(abbreviatedKeyword(abbreviation)))
         .map(abbreviation =>
@@ -173,7 +173,7 @@ export function registerBbcBasicLanguage() {
                 [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1|INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)(?=[ \t]*#)/, "keyword", "@optionalHash"],
                 // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
                 [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printStatement.list"}],
-                [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8|VDU|VD\.|V\.|\xef)/, {token: "keyword", switchTo: "@statement.list"}],
+                [/(VDU|VD\.|V\.|\xef)/, {token: "keyword", switchTo: "@statement.list"}],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,

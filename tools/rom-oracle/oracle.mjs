@@ -13,7 +13,7 @@
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. The ROM cannot judge
-// what it skips (the rest of a line after REM, DATA, DEF or a false IF), so the generator leaves those out, along
+// what it skips (the rest of a line after REM, DATA, DEF, ELSE or a false IF), so the generator leaves those out, along
 // with * commands and the assembler. A disagreement is per statement: it does not say where the error is.
 // Not run by npm test.
 import {spawnSync} from "child_process";

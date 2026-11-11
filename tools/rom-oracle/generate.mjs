@@ -4,8 +4,8 @@ import {Flags, keywords} from "../../src/tokens.js";
 
 const Names = [...new Set(keywords.map(kw => kw.keyword))];
 // Statements the ROM cannot judge in immediate mode, or that leave nothing to compare: REM and DATA skip the line,
-// DEF is skipped when executed, and the * commands and assembler are outside the highlighter's BASIC grammar.
-const Unjudged = new Set("REM|DATA|DEF|AUTO|LIST|RENUMBER|DELETE|LOAD|SAVE|CHAIN".split("|"));
+// DEF is skipped when executed, ELSE at the start skips the rest of the line, and the * commands and assembler are outside the highlighter's BASIC grammar.
+const Unjudged = new Set("REM|DATA|DEF|ELSE|AUTO|LIST|RENUMBER|DELETE|LOAD|SAVE|CHAIN".split("|"));
 const NumVars = ["X", "Y", "Z", "X%", "A%", "X(1)", "X%(1)", "@%"];
 const StrVars = ["X$", "A$", "X$(1)"];
 const Numbers = ["7", ".7", "7.", ".", "7.5", "&FF", "&", "%101", "1E5", "1E", ".5E2", "7E-1"];
