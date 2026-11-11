@@ -169,4 +169,18 @@ describe("Expanding code", () => {
     it("leaves lines that are not tokens alone", () => {
         assert.strictEqual(expandCode("P.A", () => false), "P.A");
     });
+    it("does not mistake a short ASCII program for base2048", () => {
+        for (const program of ["END", "RUN", "GOTO10"]) assert.strictEqual(expandCode(program), program);
+    });
+    it("still decodes base2048, with or without the clamp emoji", () => {
+        assert.strictEqual(expandCode("🗜༤ı3"), "\xf1A\r");
+        assert.strictEqual(expandCode("༤ı3"), "\xf1A\r");
+    });
+    it("keeps the stand-in for a newline byte inside a REM or string as data", () => {
+        // U+010A stands for the byte &0A; only a real newline ends a line.
+        assert.strictEqual(expandCode("\xf4A\u010aB\xf1"), "REMA\u010aB\xf1");
+        assert.strictEqual(expandCode('\xf1"A\u010aB"\xf1'), 'PRINT"A\u010aB"PRINT');
+        assert.strictEqual(expandCode("\xf4A\u020aB"), "REMA\u020aB");
+        assert.strictEqual(expandCode("*FX\u010aP."), "*FX\u010aP.");
+    });
 });
