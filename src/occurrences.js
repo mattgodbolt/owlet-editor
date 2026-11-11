@@ -11,7 +11,7 @@ const WhiteType = `white.${LanguageId}`;
 // The tokeniser joins abutting names into one token (e.g. "A%B"), so a token can hold more than one name.
 const NameRegex = /@%|\w+[$%]?/g;
 const FnRegex = /(?:FN|\xa4)$/;
-const ProcRegex = /(?<!END)(?:PROC|PRO\.)$|\xf2$/;
+const ProcRegex = /(?:PROC|PRO\.|\xf2)$/;
 const AccumulatorModeRegex = /^(?:ASL|LSR|ROL|ROR)$/;
 const MessageControllerId = "editor.contrib.messageController";
 const NotANameReason = "Only variables, arrays, FNs and PROCs can be renamed";
@@ -40,17 +40,9 @@ export function programSymbols(text) {
             const afterKeyword = previous && previous.type === KeywordType ? previous.text : "";
             if (token.type === LabelType) {
                 symbols.push(symbol(Kind.Variable, text.slice(1), lineNumber, token.offset + 1));
-            } else if (
-                token.type === VariableType &&
-                FnRegex.test(afterKeyword) &&
-                previous.end === token.offset
-            ) {
+            } else if (token.type === VariableType && FnRegex.test(afterKeyword)) {
                 symbols.push(symbol(Kind.Fn, text, lineNumber, token.offset));
-            } else if (
-                token.type === VariableType &&
-                ProcRegex.test(afterKeyword) &&
-                previous.end === token.offset
-            ) {
+            } else if (token.type === VariableType && ProcRegex.test(afterKeyword)) {
                 symbols.push(symbol(Kind.Proc, text, lineNumber, token.offset));
             } else if (token.type === VariableType) {
                 for (const match of text.matchAll(NameRegex)) {
@@ -61,7 +53,7 @@ export function programSymbols(text) {
                     symbols.push(symbol(kind, name, lineNumber, offset));
                 }
             }
-            if (token.type !== WhiteType) previous = {type: token.type, text, end};
+            if (token.type !== WhiteType) previous = {type: token.type, text};
         });
     });
     return symbols;
