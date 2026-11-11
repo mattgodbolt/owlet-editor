@@ -321,7 +321,9 @@ export class OwletEditor {
     }
 
     expandCode() {
+        // The tokeniser is created asynchronously at startup; until it exists nothing can be judged, so expand as before.
         const fits = line => {
+            if (!this.tokeniser) return true;
             try {
                 this.tokeniser.tokenise(line);
                 return true;
