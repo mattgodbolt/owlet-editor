@@ -161,10 +161,11 @@ describe("Tokenisation", () => {
             ],
         );
     });
-    it("should treat a non-abbreviation followed by a dot as a name and a number", () => {
-        // See #85: this prints 10 as X. is X followed by the number ".".
+    it("should read a dot after a name as a number only where one value can follow another", () => {
+        // See #85, #149 and #150, checked on the ROM: PRINT, VDU and INPUT take one value directly after another,
+        // so P.X. prints X and then 0, but Y=X.7 is a syntax error and Z. is a Mistake.
         checkTokens(
-            ["P.X.", "X=Y.5", "PRIT."],
+            ["P.X.", "Y=X.7", "PRIT."],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "variable"},
@@ -174,13 +175,38 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "variable"},
                 {offset: 1, type: "operator"},
                 {offset: 2, type: "variable"},
-                {offset: 3, type: "number.float"},
+                {offset: 3, type: "invalid"},
             ],
             [
                 {offset: 0, type: "variable"},
-                {offset: 4, type: "number.float"},
+                {offset: 4, type: "invalid"},
             ],
         );
+        const cases = [
+            ["PRINT X.7", []],
+            ["V.X.", []],
+            ["VDU X.7,1", []],
+            ["INPUT X.", []],
+            ['PRINT "a".5', []],
+            ["PRINT STR$(1);.5", []],
+            ["VDU1,2.5", []],
+            ["IF 0 THEN P.X. ELSE P.Y.", []],
+            ["X=Y.5", [".5"]],
+            ["Z.", ["."]],
+            ["X%=X%.5", [".5"]],
+            ["x=x.5", [".5"]],
+            ["FOR I=1 TO X.", ["."]],
+            ["FOR I=X. TOP", ["."]],
+            ["A=X. TO", ["."]],
+            ["IF X. THEN PRINT", ["."]],
+            ["COLOUR X.", ["."]],
+            ["PRINT#X.,1", ["."]],
+            ["INPUT#X.,Y", ["."]],
+            ["P.X.:Y=X.", ["."]],
+        ];
+        for (const [text, invalid] of cases) {
+            assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+        }
     });
     it("should not treat BG as an abbreviation without the dot", () => {
         // BGET abbreviates to B., BG. and BGE. but plain BG is just a variable.
@@ -446,7 +472,7 @@ describe("Tokenisation", () => {
         );
     });
     it("should start each line afresh, whatever ended the line before", () => {
-        for (const first of ['A$="ABC', 'DATA "abc', 'D.1,"x', "10PRINT", "20PRINT ", "30INPUT", "PROC", "A=FN"]) {
+        for (const first of ['A$="ABC', 'DATA "abc', 'D.1,"x', "10PRINT", "20PRINT ", "30INPUT", "PROC", "A=FN", "A=1 "]) {
             const [, ...next] = editor.tokenize([first, "10X=1", "*FX15"].join("\n"), "BBCBASIC");
             assert.deepStrictEqual(
                 next.map(line => line.map(t => t.type.replace(".BBCBASIC", ""))),

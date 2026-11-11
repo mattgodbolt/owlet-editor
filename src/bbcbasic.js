@@ -139,13 +139,16 @@ export function registerBbcBasicLanguage() {
                 [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
             ],
             statement: [
-                ["\n", "", "@pop"],
+                // Before the white space rule, which would take the newline too and carry this state to the next line.
+                [/([ \t\r]*)(\n)/, ["white", {token: "", next: "@pop"}]],
                 [":", "symbol", "@pop"],
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|PRO\.|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
                 [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", switchTo: "@dataStatement"}], // DATA consumes to EOL
-                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printHash"}],
-                [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)/, {token: "keyword", next: "@optionalHash"}],
+                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1|INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)(?=[ \t]*#)/, "keyword", "@optionalHash"],
+                // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
+                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printStatement.list"}],
+                [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8|VDU|VD\.|V\.|\xef)/, {token: "keyword", switchTo: "@statement.list"}],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
@@ -159,8 +162,18 @@ export function registerBbcBasicLanguage() {
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [new RegExp(`TOP|\\xb8P|${anyTokenRegex}`), "keyword"],
-                // Not an abbreviation, so the dot is a number (e.g. P.X.), not part of the name.
-                [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword", "@default": {token: "variable", goBack: 1}}}],
+                // Not an abbreviation, so a name then a dot: the number "." in a list (P.X. prints X then 0), and
+                // otherwise a syntax error.
+                [
+                    /[a-zA-Z_]\w*[$%]?\./,
+                    {
+                        cases: {
+                            "@tokenPrefix": "keyword",
+                            "$S2==list": {token: "variable", goBack: 1},
+                            "@default": {token: "variable", goBack: 1, next: "@strayDot"},
+                        },
+                    },
+                ],
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
@@ -173,11 +186,6 @@ export function registerBbcBasicLanguage() {
                 [/(\()([ \t]*)(~)/, ["@brackets", "white", "invalid"]],
                 [/~/, "operator"],
                 {include: "@statement"},
-            ],
-            printHash: [
-                [/[ \t\r]+/, "white"],
-                ["#", {token: "symbol", switchTo: "@statement"}],
-                ["", {token: "", switchTo: "@printStatement"}],
             ],
             // In a FOR statement TO ends the loop's start expression, except where an operand is expected:
             // there the tokeniser's TO followed by P is TOP.
@@ -195,7 +203,7 @@ export function registerBbcBasicLanguage() {
                     {
                         cases: {
                             "@tokenPrefix": {token: "keyword", next: "@forOperand"},
-                            "[A-Z]+\\.": {token: "variable", goBack: 1},
+                            "[A-Z]+\\.": {token: "variable", goBack: 1, next: "@strayDot"},
                             "@default": {token: "keyword", next: "@forOperand"},
                         },
                     },
@@ -249,9 +257,10 @@ export function registerBbcBasicLanguage() {
                 [/[a-zA-Z0-9_]+/, "variable", "@pop"],
                 ["", "", "@pop"],
             ],
+            strayDot: [[/\.\d*/, "invalid", "@pop"]],
             optionalHash: [
                 [/[ \t\r]+/, "white"],
-                ["#", "symbol"],
+                ["#", "symbol", "@pop"],
                 ["", "", "@pop"],
             ],
             whitespace: [[/[ \t\r\n]+/, "white"]],
