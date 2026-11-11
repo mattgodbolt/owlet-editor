@@ -161,10 +161,11 @@ describe("Tokenisation", () => {
             ],
         );
     });
-    it("should treat a non-abbreviation followed by a dot as a name and a number", () => {
-        // See #85: this prints 10 as X. is X followed by the number ".".
+    it("should read a dot after a name as a number only where one value can follow another", () => {
+        // See #85, #149 and #150, checked on the ROM: PRINT, VDU and INPUT take one value directly after another,
+        // so P.X. prints X and then 0, but Y=X.7 is a syntax error and Z. is a Mistake.
         checkTokens(
-            ["P.X.", "X=Y.5", "PRIT."],
+            ["P.X.", "Y=X.7", "PRIT."],
             [
                 {offset: 0, type: "keyword"},
                 {offset: 2, type: "variable"},
@@ -174,21 +175,48 @@ describe("Tokenisation", () => {
                 {offset: 0, type: "variable"},
                 {offset: 1, type: "operator"},
                 {offset: 2, type: "variable"},
-                {offset: 3, type: "number.float"},
+                {offset: 3, type: "invalid"},
             ],
             [
                 {offset: 0, type: "variable"},
-                {offset: 4, type: "number.float"},
+                {offset: 4, type: "invalid"},
             ],
         );
+        const cases = [
+            ["PRINT X.7", []],
+            ["V.X.", []],
+            ["VDU X.7,1", []],
+            ["INPUT X.", ["."]],
+            ["I.X.7", [".7"]],
+            ["A=BGET##1", ["#"]],
+            ['PRINT "a".5', []],
+            ["PRINT STR$(1);.5", []],
+            ["VDU1,2.5", []],
+            ["IF 0 THEN P.X. ELSE P.Y.", []],
+            ["X=Y.5", [".5"]],
+            ["Z.", ["."]],
+            ["X%=X%.5", [".5"]],
+            ["x=x.5", [".5"]],
+            ["FOR I=1 TO X.", ["."]],
+            ["FOR I=X. TOP", ["."]],
+            ["A=X. TO", ["."]],
+            ["IF X. THEN PRINT", ["."]],
+            ["COLOUR X.", ["."]],
+            ["PRINT#X.,1", ["."]],
+            ["INPUT#X.,Y", ["."]],
+            ["P.X.:Y=X.", ["."]],
+        ];
+        for (const [text, invalid] of cases) {
+            assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+        }
     });
     it("should not treat BG as an abbreviation without the dot", () => {
         // BGET abbreviates to B., BG. and BGE. but plain BG is just a variable.
         for (const text of ["BG=1", "BG%=2", 'BG$=""']) {
             assert.deepStrictEqual(spans(text, "keyword"), [], text);
         }
-        assert.deepStrictEqual(spans("BG.#1", "keyword"), ["BG."]);
-        assert.deepStrictEqual(spans("BG.#1", "symbol"), ["#"]);
+        assert.deepStrictEqual(spans("A=BG.#1", "keyword"), ["BG."]);
+        assert.deepStrictEqual(spans("A=BG.#1", "symbol"), ["#"]);
     });
     it("should not recognize 6502 outside of []", () => {
         checkTokens(["LDA"], [{offset: 0, type: "variable"}]);
@@ -446,7 +474,7 @@ describe("Tokenisation", () => {
         );
     });
     it("should start each line afresh, whatever ended the line before", () => {
-        for (const first of ['A$="ABC', 'DATA "abc', 'D.1,"x', "10PRINT", "20PRINT ", "30INPUT", "PROC", "A=FN"]) {
+        for (const first of ['A$="ABC', 'DATA "abc', 'D.1,"x', "10PRINT", "20PRINT ", "30INPUT", "PROC", "A=FN", "A=1 "]) {
             const [, ...next] = editor.tokenize([first, "10X=1", "*FX15"].join("\n"), "BBCBASIC");
             assert.deepStrictEqual(
                 next.map(line => line.map(t => t.type.replace(".BBCBASIC", ""))),
@@ -521,6 +549,9 @@ describe("Tokenisation", () => {
             ["\xf1\xc3~255", 1],
             ["A$=\xc3~255", 1],
             ["PRINT ~TOP-TOP", 1],
+            ["P.~~42", 2],
+            ["P.~~~42", 3],
+            ["P.STR$~42", 1],
         ];
         for (const [text, count] of valid) {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
@@ -543,6 +574,10 @@ describe("Tokenisation", () => {
             "PRINT A AND ~B",
             "PRINT A MOD~B",
             "~",
+            // See #152: STR$ takes one ~, though PRINT takes any number.
+            "P.STR$~~42",
+            "A$=STR$~~42",
+            "P.STR.~~42",
         ];
         for (const text of invalid) {
             assert.deepStrictEqual(spans(text, "invalid"), ["~"], text);
@@ -704,14 +739,14 @@ describe("Tokenisation", () => {
         for (const text of ["B.X", "BG.X", "BP.X", "CLO.X", "EO.X", "PT.X", "E.X", "EN.X", "ER.X", "O.X", "R.X", "RE.X"]) {
             assert.deepStrictEqual(spans(text, "invalid"), [text], text);
         }
-        for (const text of ["B. X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"]) {
+        for (const text of ["A=B. #X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"]) {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
         }
     });
     it("should read a keyword and a dot as the abbreviation of an earlier keyword it begins", () => {
         // END. is ENDPROC, MOD. is MODE and so on, since those come first in the table.
-        for (const text of ["END.", "ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"]) {
-            assert.deepStrictEqual(spans(text, "keyword"), [text.match(/[A-Z]+\./)[0]], text);
+        for (const text of ["END.", "ON ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"]) {
+            assert.deepStrictEqual(spans(text, "keyword").slice(-1), [text.match(/[A-Z]+\./)[0]], text);
         }
         assert.deepStrictEqual(spans("END.X", "invalid"), ["END.X"]);
         assert.deepStrictEqual(spans("A=8MOD 3", "keyword"), ["MOD"]);
@@ -864,6 +899,37 @@ describe("Tokenisation", () => {
                 {offset: 2, type: "keyword.oscli.string"},
             ],
         );
+    });
+    it("should highlight a keyword that cannot start a statement", () => {
+        // See #151, checked on the ROM, where each invalid case is a syntax error.
+        const cases = [
+            ['ERROR5,"x"', ["ERROR"]],
+            ["RND(-TIME)", ["RND"]],
+            ["STEP1", ["STEP"]],
+            ["TOOMUCH=1", ["TO"]],
+            ["A=1:ABS A", ["ABS"]],
+            ["IF A THEN TO", ["TO"]],
+            ["IF 0 THEN 10 ELSE FNf", ["FN"]],
+            ["A.", ["A."]],
+            ["10 THEN", ["THEN"]],
+            ["\u0185", ["\u0185"]],
+            // PTR, PAGE and TIME as functions (tokens &8F, &90, &91) cannot start a statement, their statement forms can.
+            ["\u018f#0=1", ["\u018f#"]],
+            ["\u0190=1", ["\u0190"]],
+            ["\xcf#0=1", []],
+            ["\xd0=1", []],
+            ["ON ERROR OFF", []],
+            ['ON ERROR PRINT "x"', []],
+            ["TIME=0", []],
+            ["PTR#0=0:HIMEM=HIMEM", []],
+            ["ELSE", []],
+            ["IF 1 THEN ELSE", []],
+            ["RNDX=1", []],
+            ["MODE 7", []],
+        ];
+        for (const [text, invalid] of cases) {
+            assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+        }
     });
     it("should read a number after THEN or ELSE as a line number, but not after ERROR", () => {
         assert.deepStrictEqual(spans("IF A THEN 30 ELSE 40", "constant.linenum"), ["30", "40"]);

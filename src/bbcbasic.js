@@ -93,6 +93,33 @@ const abbreviatedDollarTokensRegex = (() => {
 
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
 
+// BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
+// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
+const FirstStatementToken = 0xc6;
+const statementKeywords = new Set([
+    "ELSE",
+    ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),
+]);
+const notStatementKeywords = keywords.filter(kw => !statementKeywords.has(kw.keyword));
+// By token number, not name: PTR, PAGE, TIME, LOMEM and HIMEM have a statement token and a different expression one.
+const notStatementTokens = keywords.filter(kw => kw.token < FirstStatementToken && kw.keyword !== "ELSE");
+const notStatementRegex = (() => {
+    // MOD begins MODE.
+    const begunStatements = [...statementKeywords].filter(statement =>
+        notStatementKeywords.some(kw => statement !== kw.keyword && statement.startsWith(kw.keyword)),
+    );
+    // A conditional keyword's abbreviation followed by a letter or digit is a name.
+    const abbreviations = allAbbreviations(keywords.map(kw => kw.keyword))
+        .filter(abbreviation => notStatementKeywords.includes(abbreviatedKeyword(abbreviation)))
+        .map(abbreviation =>
+            escape(abbreviation) + (abbreviatedKeyword(abbreviation).flags & Flags.Conditional ? "(?![a-zA-Z0-9])" : ""),
+        );
+    return new RegExp(
+        `(?!${keywordsRegex(begunStatements.map(keyword => ({keyword})))})` +
+            `(?:${[...abbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementTokens)].join("|")})`,
+    );
+})();
+
 // Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
 const hiddenOpenParens = [
@@ -135,6 +162,7 @@ export function registerBbcBasicLanguage() {
             root: [
                 {include: "@whitespace"},
                 [/\d+/, "constant.linenum"], // line numbers
+                [notStatementRegex, "invalid", "@statement"],
                 [/(?=[^*])/, "", "@statement"], // As soon as we know this statement doesn't start with * we can process it with statement
                 [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
             ],
@@ -144,8 +172,10 @@ export function registerBbcBasicLanguage() {
                 [/(\bREM|\xf4)/, {token: "keyword", next: "@remStatement"}], // A REM consumes to EOL
                 [/(FN|PROC|PRO\.|\xa4|\xf2)/, {token: "keyword", next: "@fnProcName"}],
                 [/(\bDATA|\bDAT\.|\bDA\.|\bD\.|\xdc)/, {token: "keyword", switchTo: "@dataStatement"}], // DATA consumes to EOL
-                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printHash"}],
-                [/(INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)/, {token: "keyword", next: "@optionalHash"}],
+                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1|INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)(?=[ \t]*#)/, "keyword", "@optionalHash"],
+                // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
+                [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printStatement.list"}],
+                [/(VDU|VD\.|V\.|\xef)/, {token: "keyword", switchTo: "@statement.list"}],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
@@ -154,13 +184,24 @@ export function registerBbcBasicLanguage() {
                 [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|\u018c|\u018b/, "keyword", "@pop"], // THEN and ELSE end a statement
                 // A number after ERROR is not a line number, but a * command may follow ON ERROR.
                 [/(ERROR|ERRO\.|ERR\.|\u0185)(?=[ \t]*\*)/, "keyword", "@pop"],
-                [/(STR\$|STR\.|\xc3)([ \t]*)(~)/, ["keyword", "white", "operator"]],
+                // STR$ takes one ~, though a PRINT item can start with any number.
+                [/(STR\$|STR\.|\xc3)([ \t]*)(~)((?:[ \t]*~)*)/, ["keyword", "white", "operator", "invalid"]],
                 [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [new RegExp(`TOP|\\xb8P|${anyTokenRegex}`), "keyword"],
-                // Not an abbreviation, so the dot is a number (e.g. P.X.), not part of the name.
-                [/[A-Z]+\./, {cases: {"@tokenPrefix": "keyword", "@default": {token: "variable", goBack: 1}}}],
+                // Not an abbreviation, so a name then a dot: the number "." in a list (P.X. prints X then 0), and
+                // otherwise a syntax error.
+                [
+                    /[a-zA-Z_]\w*[$%]?\./,
+                    {
+                        cases: {
+                            "@tokenPrefix": "keyword",
+                            "$S2==list": {token: "variable", goBack: 1},
+                            "@default": {token: "variable", goBack: 1, next: "@strayDot"},
+                        },
+                    },
+                ],
                 {include: "@common"},
                 ["\\[", {token: "delimiter.square", next: "@asm"}],
             ],
@@ -173,11 +214,6 @@ export function registerBbcBasicLanguage() {
                 [/(\()([ \t]*)(~)/, ["@brackets", "white", "invalid"]],
                 [/~/, "operator"],
                 {include: "@statement"},
-            ],
-            printHash: [
-                [/[ \t\r]+/, "white"],
-                ["#", {token: "symbol", switchTo: "@statement"}],
-                ["", {token: "", switchTo: "@printStatement"}],
             ],
             // In a FOR statement TO ends the loop's start expression, except where an operand is expected:
             // there the tokeniser's TO followed by P is TOP.
@@ -195,7 +231,7 @@ export function registerBbcBasicLanguage() {
                     {
                         cases: {
                             "@tokenPrefix": {token: "keyword", next: "@forOperand"},
-                            "[A-Z]+\\.": {token: "variable", goBack: 1},
+                            "[A-Z]+\\.": {token: "variable", goBack: 1, next: "@strayDot"},
                             "@default": {token: "keyword", next: "@forOperand"},
                         },
                     },
@@ -249,12 +285,14 @@ export function registerBbcBasicLanguage() {
                 [/[a-zA-Z0-9_]+/, "variable", "@pop"],
                 ["", "", "@pop"],
             ],
+            strayDot: [[/\.\d*/, "invalid", "@pop"]],
             optionalHash: [
                 [/[ \t\r]+/, "white"],
-                ["#", "symbol"],
+                ["#", "symbol", "@pop"],
                 ["", "", "@pop"],
             ],
-            whitespace: [[/[ \t\r\n]+/, "white"]],
+            // Not the newline, which would carry a state such as this statement's on to the next line.
+            whitespace: [[/[ \t\r]+/, "white"]],
             string: [
                 [/[^"]+/, "string"],
                 ['"', {token: "string.quote", next: "@pop"}],
