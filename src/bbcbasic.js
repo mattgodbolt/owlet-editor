@@ -101,6 +101,8 @@ const statementKeywords = new Set([
     ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),
 ]);
 const notStatementKeywords = keywords.filter(kw => !statementKeywords.has(kw.keyword));
+// By token number, not name: PTR, PAGE, TIME, LOMEM and HIMEM have a statement token and a different expression one.
+const notStatementTokens = keywords.filter(kw => kw.token < FirstStatementToken && kw.keyword !== "ELSE");
 const notStatementRegex = (() => {
     // MOD begins MODE.
     const begunStatements = [...statementKeywords].filter(statement =>
@@ -114,7 +116,7 @@ const notStatementRegex = (() => {
         );
     return new RegExp(
         `(?!${keywordsRegex(begunStatements.map(keyword => ({keyword})))})` +
-            `(?:${[...abbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementKeywords)].join("|")})`,
+            `(?:${[...abbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementTokens)].join("|")})`,
     );
 })();
 

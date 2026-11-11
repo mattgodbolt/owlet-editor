@@ -913,6 +913,11 @@ describe("Tokenisation", () => {
             ["A.", ["A."]],
             ["10 THEN", ["THEN"]],
             ["\u0185", ["\u0185"]],
+            // PTR, PAGE and TIME as functions (tokens &8F, &90, &91) cannot start a statement, their statement forms can.
+            ["\u018f#0=1", ["\u018f#"]],
+            ["\u0190=1", ["\u0190"]],
+            ["\xcf#0=1", []],
+            ["\xd0=1", []],
             ["ON ERROR OFF", []],
             ['ON ERROR PRINT "x"', []],
             ["TIME=0", []],
