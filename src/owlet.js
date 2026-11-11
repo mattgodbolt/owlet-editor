@@ -321,7 +321,15 @@ export class OwletEditor {
     }
 
     expandCode() {
-        this.updateEditorText(expandCode(this.getBasicText()), "expand code");
+        const fits = line => {
+            try {
+                this.tokeniser.tokenise(line);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        };
+        this.updateEditorText(expandCode(this.getBasicText(), fits), "expand code");
     }
 
     tokenise() {
