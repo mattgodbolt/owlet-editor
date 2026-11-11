@@ -1,4 +1,4 @@
-import {debbreviate, detokenise, forEachBasicLine, partialDetokenise} from "../src/tokens";
+import {debbreviate, detokenise, expandCode, forEachBasicLine, partialDetokenise} from "../src/tokens";
 import {describe, it} from "vitest";
 import assert from "assert";
 
@@ -153,5 +153,20 @@ describe("Partial detokenisation", () => {
     it("should not expand line number token in literal string", () => {
         const rawProgram = '\x0d\x00\x0a\x13\xf1"\x8dHello":\xe5\x8d\x54\x4a\x40\x0d\xff';
         assert.strictEqual(partialDetokenise(rawProgram), '\xf1"\u018dHello":\xe510');
+    });
+});
+
+describe("Expanding code", () => {
+    // PRINT and TIME as token characters, then A%: expanding gives "PRINTTIME A%", with the space that TIME needs.
+    const tokens = "\xf1\u0191A%";
+    it("expands every line when it all fits", () => {
+        assert.strictEqual(expandCode(`${tokens}\n\xf1A`), "PRINTTIME A%\nPRINTA");
+    });
+    it("leaves a line as it was when its expansion would not tokenise", () => {
+        const fits = line => line.length <= 8;
+        assert.strictEqual(expandCode(`${tokens}\n\xf1A`, fits), `${tokens}\nPRINTA`);
+    });
+    it("leaves lines that are not tokens alone", () => {
+        assert.strictEqual(expandCode("P.A", () => false), "P.A");
     });
 });
