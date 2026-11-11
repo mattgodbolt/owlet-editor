@@ -11,7 +11,7 @@ const WhiteType = `white.${LanguageId}`;
 // The tokeniser joins abutting names into one token (e.g. "A%B"), so a token can hold more than one name.
 const NameRegex = /@%|\w+[$%]?/g;
 const FnRegex = /(?:FN|\xa4)$/;
-const ProcRegex = /(?<!END)(?:PROC|PRO\.)$|\xf2$/;
+const ProcRegex = /(?:PROC|PRO\.|\xf2)$/;
 const AccumulatorModeRegex = /^(?:ASL|LSR|ROL|ROR)$/;
 const MessageControllerId = "editor.contrib.messageController";
 const NotANameReason = "Only variables, arrays, FNs and PROCs can be renamed";
@@ -40,17 +40,9 @@ export function programSymbols(text) {
             const afterKeyword = previous && previous.type === KeywordType ? previous.text : "";
             if (token.type === LabelType) {
                 symbols.push(symbol(Kind.Variable, text.slice(1), lineNumber, token.offset + 1));
-            } else if (
-                token.type === VariableType &&
-                FnRegex.test(afterKeyword) &&
-                previous.end === token.offset
-            ) {
+            } else if (token.type === VariableType && FnRegex.test(afterKeyword)) {
                 symbols.push(symbol(Kind.Fn, text, lineNumber, token.offset));
-            } else if (
-                token.type === VariableType &&
-                ProcRegex.test(afterKeyword) &&
-                previous.end === token.offset
-            ) {
+            } else if (token.type === VariableType && ProcRegex.test(afterKeyword)) {
                 symbols.push(symbol(Kind.Proc, text, lineNumber, token.offset));
             } else if (token.type === VariableType) {
                 for (const match of text.matchAll(NameRegex)) {
@@ -61,7 +53,7 @@ export function programSymbols(text) {
                     symbols.push(symbol(kind, name, lineNumber, offset));
                 }
             }
-            if (token.type !== WhiteType) previous = {type: token.type, text, end};
+            if (token.type !== WhiteType) previous = {type: token.type, text};
         });
     });
     return symbols;
@@ -131,6 +123,9 @@ function renameError(model, target, newName) {
     if (probe.length !== 1 || !sameSymbol(probe[0], renamed)) {
         return `${newName} is not a valid name for ${displayName(target)}`;
     }
+    if ([target.name, newName].includes("@%")) {
+        return `Renaming ${target.name} to ${newName} would change how numbers are printed`;
+    }
     if (typeSuffix(newName) !== typeSuffix(target.name)) {
         return `Renaming ${target.name} to ${newName} would change its type`;
     }
@@ -156,15 +151,14 @@ function showMessage(model, position, message) {
     if (messages) messages.showMessage(message, position);
 }
 
-const renameProvider = {
+export const renameProvider = {
     resolveRenameLocation(model, position) {
         const target = symbolAt(modelSymbols(model), position);
         if (!target) return {range: null, text: "", rejectReason: NotANameReason};
         return {range: range(target), text: target.name};
     },
     provideRenameEdits(model, position, newName) {
-        const target = symbolAt(modelSymbols(model), position);
-        const error = target ? renameError(model, target, newName) : NotANameReason;
+        const error = renameError(model, symbolAt(modelSymbols(model), position), newName);
         if (error) {
             showMessage(model, position, error);
             return {edits: [], rejectReason: error};
@@ -193,17 +187,14 @@ function selectOccurrences(codeEditor) {
     );
 }
 
-// Monaco's own "Change All Occurrences" finds the word's text wherever it appears, so Owlet has this one instead.
-export function addChangeAllOccurrences(codeEditor) {
-    codeEditor.addAction({
+export function registerOccurrences() {
+    languages.registerDocumentHighlightProvider(LanguageId, highlightProvider);
+    languages.registerRenameProvider(LanguageId, renameProvider);
+    // Monaco's own "Change All Occurrences" finds the word's text wherever it appears, so Owlet has this one instead.
+    editor.addEditorAction({
         id: "change-all-occurrences",
         label: "Change All Occurrences",
         keybindings: [KeyMod.CtrlCmd | KeyCode.F2],
         run: selectOccurrences,
     });
-}
-
-export function registerOccurrences() {
-    languages.registerDocumentHighlightProvider(LanguageId, highlightProvider);
-    languages.registerRenameProvider(LanguageId, renameProvider);
 }
