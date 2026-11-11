@@ -1206,6 +1206,25 @@ describe("Quick fixes", () => {
     });
 });
 
+describe("Numbers with an empty exponent", () => {
+    registerBbcBasicLanguage();
+    const invalidTokens = text =>
+        editor
+            .tokenize(text, "BBCBASIC")
+            .flat()
+            .filter(t => t.type.startsWith("invalid")).length;
+    it("are numbers followed by a new list item, not an abbreviation", () => {
+        // The ROM reads "1E" as a number and ".5" or ".X" as the next item.
+        for (const text of ["PRINT 1E.5", "VDU 1E.5", "P.1E.X", "PRINT 1.5E.5 +1", "PRINT 5.E.5:", "PRINT 1E.5ERL"])
+            assert.strictEqual(invalidTokens(text), 0, text);
+    });
+    it("leave the neighbouring cases as they were", () => {
+        for (const text of ["PRINT 1E+.5", "PRINT 1E .5", "PRINT 1E5", "P.X.", "PRINT X."])
+            assert.strictEqual(invalidTokens(text), 0, text);
+        for (const text of ["X=Y.5", "X=Y."]) assert.strictEqual(invalidTokens(text), 1, text);
+    });
+});
+
 describe("Bracket matching of raw token characters", () => {
     registerBbcBasicLanguage();
     const invalidBrackets = text => {

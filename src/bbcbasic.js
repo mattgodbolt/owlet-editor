@@ -276,6 +276,7 @@ export function registerBbcBasicLanguage() {
                     },
                 ],
                 // numbers
+                [/(\d+\.?\d*|\.\d+)E(?=\.)/, "number.float"], // an empty exponent: the next item is ".5" or ".X"
                 [/\d*\.\d*(E[-+\d]\d*)?/, "number.float"],
                 [/\d+E[-+\d]\d*/, "number.float"],
                 [/\d+/, "number"],
