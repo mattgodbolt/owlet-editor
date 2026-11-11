@@ -195,17 +195,14 @@ function selectOccurrences(codeEditor) {
     );
 }
 
-// Monaco's own "Change All Occurrences" finds the word's text wherever it appears, so Owlet has this one instead.
-export function addChangeAllOccurrences(codeEditor) {
-    codeEditor.addAction({
+export function registerOccurrences() {
+    languages.registerDocumentHighlightProvider(LanguageId, highlightProvider);
+    languages.registerRenameProvider(LanguageId, renameProvider);
+    // Monaco's own "Change All Occurrences" finds the word's text wherever it appears, so Owlet has this one instead.
+    editor.addEditorAction({
         id: "change-all-occurrences",
         label: "Change All Occurrences",
         keybindings: [KeyMod.CtrlCmd | KeyCode.F2],
         run: selectOccurrences,
     });
-}
-
-export function registerOccurrences() {
-    languages.registerDocumentHighlightProvider(LanguageId, highlightProvider);
-    languages.registerRenameProvider(LanguageId, renameProvider);
 }

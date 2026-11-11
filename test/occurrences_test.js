@@ -1,10 +1,11 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
-import {addChangeAllOccurrences, occurrencesAt, renameProvider} from "../src/occurrences";
+import {occurrencesAt, registerOccurrences, renameProvider} from "../src/occurrences";
 import {describe, it, vi, afterEach} from "vitest";
 import assert from "assert";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
 registerBbcBasicLanguage();
+registerOccurrences();
 
 const Cursor = "‸";
 
@@ -147,7 +148,6 @@ describe("Change All Occurrences", () => {
             occurrencesHighlight: "off",
         });
         try {
-            addChangeAllOccurrences(codeEditor);
             codeEditor.setPosition({lineNumber: 1, column: 9});
             codeEditor.trigger("test", "change-all-occurrences");
             const selections = codeEditor
