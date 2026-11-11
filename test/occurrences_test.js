@@ -145,6 +145,8 @@ describe("Rename", () => {
             ["‸F=1", "A B", "A B is not a valid name for F"],
             ["‸F=1", "", " is not a valid name for F"],
             ["‸F=1", "F$", "Renaming F to F$ would change its type"],
+            ["‸F%=1", "@%", "Renaming F% to @% would change how numbers are printed"],
+            ["‸@%=1", "F%", "Renaming @% to F% would change how numbers are printed"],
             ["‸A=1:B=2", "B", "B is already used in this program"],
             ["DIM ‸A(1):B=2:DIM C(1)", "C", "C( is already used in this program"],
             ["PROC‸a:PROCb:b=FNa", "b", "PROCb is already used in this program"],

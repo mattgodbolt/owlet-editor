@@ -131,6 +131,9 @@ function renameError(model, target, newName) {
     if (probe.length !== 1 || !sameSymbol(probe[0], renamed)) {
         return `${newName} is not a valid name for ${displayName(target)}`;
     }
+    if ([target.name, newName].includes("@%")) {
+        return `Renaming ${target.name} to ${newName} would change how numbers are printed`;
+    }
     if (typeSuffix(newName) !== typeSuffix(target.name)) {
         return `Renaming ${target.name} to ${newName} would change its type`;
     }
