@@ -182,7 +182,8 @@ export function registerBbcBasicLanguage() {
                 [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|\u018c|\u018b/, "keyword", "@pop"], // THEN and ELSE end a statement
                 // A number after ERROR is not a line number, but a * command may follow ON ERROR.
                 [/(ERROR|ERRO\.|ERR\.|\u0185)(?=[ \t]*\*)/, "keyword", "@pop"],
-                [/(STR\$|STR\.|\xc3)([ \t]*)(~)/, ["keyword", "white", "operator"]],
+                // STR$ takes one ~, though a PRINT item can start with any number.
+                [/(STR\$|STR\.|\xc3)([ \t]*)(~)((?:[ \t]*~)*)/, ["keyword", "white", "operator", "invalid"]],
                 [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.

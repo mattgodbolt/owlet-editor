@@ -547,6 +547,9 @@ describe("Tokenisation", () => {
             ["\xf1\xc3~255", 1],
             ["A$=\xc3~255", 1],
             ["PRINT ~TOP-TOP", 1],
+            ["P.~~42", 2],
+            ["P.~~~42", 3],
+            ["P.STR$~42", 1],
         ];
         for (const [text, count] of valid) {
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
@@ -569,6 +572,10 @@ describe("Tokenisation", () => {
             "PRINT A AND ~B",
             "PRINT A MOD~B",
             "~",
+            // See #152: STR$ takes one ~, though PRINT takes any number.
+            "P.STR$~~42",
+            "A$=STR$~~42",
+            "P.STR.~~42",
         ];
         for (const text of invalid) {
             assert.deepStrictEqual(spans(text, "invalid"), ["~"], text);
