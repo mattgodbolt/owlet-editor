@@ -16,7 +16,7 @@ const AccumulatorModeRegex = /^(?:ASL|LSR|ROL|ROR)$/;
 const MessageControllerId = "editor.contrib.messageController";
 const NotANameReason = "Only variables, arrays, FNs and PROCs can be renamed";
 
-const Kind = {Variable: "", Array: "(", Fn: "FN", Proc: "PROC"};
+export const Kind = {Variable: "", Array: "(", Fn: "FN", Proc: "PROC"};
 
 function symbol(kind, name, lineNumber, offset) {
     return {kind, name, lineNumber, startColumn: offset + 1, endColumn: offset + name.length + 1};

@@ -53,9 +53,9 @@ export class OwletEditor {
             minimap: {
                 enabled: false,
             },
-            suggest: {
-                showValues: false, // Prevents hex constants from trying to autocomplete
-            },
+            // Enter would replace a name that begins a keyword, as A at the end of PRINT A becomes ABS; Tab accepts.
+            acceptSuggestionOnEnter: "off",
+            wordBasedSuggestions: "off",
             lineNumbers: defaultLineNumber,
             language: "BBCBASIC",
             theme: "bbcbasicTheme",
