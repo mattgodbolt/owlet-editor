@@ -35,7 +35,7 @@ export default [
         },
     },
     {
-        files: ["**/webpack.config.js", "**/vite.config.js", "**/test/setup.js", "**/vitest.config.mjs"],
+        files: ["**/webpack.config.js", "**/vite.config.js", "**/test/setup.js", "**/vitest.config.mjs", "tools/**"],
 
         languageOptions: {
             globals: {
