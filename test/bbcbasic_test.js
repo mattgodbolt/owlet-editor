@@ -1206,6 +1206,16 @@ describe("Quick fixes", () => {
     });
 });
 
+describe("Abbreviated $ tokens", () => {
+    registerBbcBasicLanguage();
+    it("need a literal dot", () => {
+        for (const text of ["A$=LEFT$A$", "A$=MID$X"]) {
+            const types = editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
+            assert.ok(!types.includes("keyword"), `${text}: ${types}`);
+        }
+    });
+});
+
 describe("Bracket matching of raw token characters", () => {
     registerBbcBasicLanguage();
     const invalidBrackets = text => {
@@ -1232,6 +1242,12 @@ describe("Bracket matching of raw token characters", () => {
             for (const text of [char, `PRINT ${char}`, `IFX ${char}`, `A=1:${char}:B=2`, `[\n${char}\n]`])
                 assert.strictEqual(invalidBrackets(text), 0, `U+${char.codePointAt(0).toString(16)} in ${text}`);
         }
+    });
+    it("has a known limit: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
+        // Monaco merges neighbouring same-coloured tokens, so its \b-guarded opener match fails in "PRINTLE.".
+        assert.strictEqual(invalidBrackets("PRINTLE.A$,1)"), 1);
+        assert.strictEqual(invalidBrackets("PRINT LE.A$,1)"), 0);
+        assert.strictEqual(invalidBrackets("PRINTLEFT$(A$,1)"), 0);
     });
     it("keeps the raw END token invalid in the assembler", () => {
         const types = editor.tokenize("[\nLDA #\u00e0\n]", "BBCBASIC")[1].map(t => t.type.replace(".BBCBASIC", ""));
