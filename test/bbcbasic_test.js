@@ -124,22 +124,13 @@ describe("Tokenisation", () => {
         it("should not read a conditional keyword, or its abbreviation, before a letter or digit", () => {
             assert.deepStrictEqual(tokens("TIMER"), ["0:variable"]);
             // See #36. An abbreviation stands for the first keyword in the table with that prefix (B. is BGET, R. is
-            // RETURN), so it is conditional if that keyword is, whatever later keywords share the prefix.
-            const names = [
-                "H.TO",
-                "B.X",
-                "BG.X",
-                "BP.X",
-                "CLO.X",
-                "EO.X",
-                "PT.X",
-                "E.X",
-                "EN.X",
-                "ER.X",
-                "O.X",
-            ];
-            for (const text of [...names, "R.X", "RE.X"])
-                assert.deepStrictEqual(spans(text, "invalid"), [text], text);
+            // RETURN), so it is conditional if that keyword is, whatever later keywords share the prefix. BASIC reads
+            // _ as a letter here.
+            const names =
+                "H.TO H._ TI._X B.X BG.X BP.X CLO.X EO.X PT.X E.X EN.X ER.X O.X R.X RE.X".split(
+                    " ",
+                );
+            for (const text of names) assert.deepStrictEqual(spans(text, "invalid"), [text], text);
             for (const text of ["A=B. #X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
         });

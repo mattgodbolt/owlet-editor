@@ -67,7 +67,7 @@ const TopRegex = "TOP|\\xb8P";
 // "No such variable" if "H" isn't a variable or "No TO" if it is.
 const invalidAbbreviatedTokensRegex = abbreviations
     .filter(abbreviation => abbreviatedKeyword(abbreviation).flags & Flags.Conditional)
-    .map(abbreviation => escape(abbreviation) + "[a-zA-Z0-9]+")
+    .map(abbreviation => escape(abbreviation) + "\\w+")
     .join("|");
 
 const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
@@ -106,7 +106,7 @@ const notStatementRegex = (() => {
             abbreviation =>
                 escape(abbreviation) +
                 (abbreviatedKeyword(abbreviation).flags & Flags.Conditional
-                    ? "(?![a-zA-Z0-9])"
+                    ? "(?!\\w)"
                     : ""),
         );
     return new RegExp(
