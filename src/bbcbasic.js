@@ -88,7 +88,7 @@ const abbreviatedDollarTokensRegex = (() => {
         .filter(kw => kw.keyword.endsWith("$("))
         .map(kw => kw.keyword.slice(0, -2))
         .join("|");
-    return "(" + orRegex + ")\\$.";
+    return "(" + orRegex + ")\\$\\.";
 })();
 
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
