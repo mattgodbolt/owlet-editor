@@ -27,7 +27,7 @@ function tokensRegex(kws) {
         .join("|");
 }
 
-const allTokensRegex = tokensRegex(keywords);
+export const allTokensRegex = tokensRegex(keywords);
 
 function keywordsRegex(kws) {
     return kws
@@ -37,7 +37,7 @@ function keywordsRegex(kws) {
         .join("|");
 }
 
-function tokenChar(kw) {
+export function tokenChar(kw) {
     return String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token);
 }
 
@@ -66,7 +66,7 @@ function allAbbreviations(tokens) {
 }
 
 // BASIC expands an abbreviation to the first keyword in the table with its prefix.
-function abbreviatedKeyword(abbreviation) {
+export function abbreviatedKeyword(abbreviation) {
     return keywords.find(kw => kw.keyword.startsWith(abbreviation.slice(0, -1)));
 }
 
@@ -95,8 +95,8 @@ const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDoll
 
 // BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
 // LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
-const FirstStatementToken = 0xc6;
-const statementKeywords = new Set([
+export const FirstStatementToken = 0xc6;
+export const statementKeywords = new Set([
     "ELSE",
     ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),
 ]);
@@ -339,28 +339,6 @@ export function registerBbcBasicLanguage() {
                 {include: "@whitespace"},
                 [/[XY]/, {token: "keyword", switchTo: "@asm"}],
             ],
-        },
-    });
-
-    // Register a completion item provider for the new language
-    // Filter out immediate tokens which aren't valid in a program
-    const uniqueTokens = [
-        ...new Set(keywords.filter(kw => kw.token < 0xc6 || kw.token > 0xcd).map(kw => kw.keyword)),
-    ];
-    languages.registerCompletionItemProvider("BBCBASIC", {
-        provideCompletionItems: (model, position) => {
-            const linePrefix = model.getLineContent(position.lineNumber).substr(0, position.column);
-            // Does it look like a hex constant? If so, don't try to autocomplete
-            if (linePrefix.match(/&[0-9A-F]*$/)) {
-                return null;
-            }
-            return {
-                suggestions: uniqueTokens.map(token => ({
-                    label: token,
-                    kind: languages.CompletionItemKind.Keyword,
-                    insertText: token,
-                })),
-            };
         },
     });
 
