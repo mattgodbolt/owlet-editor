@@ -1275,6 +1275,26 @@ describe("Assembler comments and expressions", () => {
     });
 });
 
+describe("A * command after REPEAT", () => {
+    registerBbcBasicLanguage();
+    const types = text => editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
+    it("is a command, whatever it says", () => {
+        for (const text of [
+            "REPEAT *|",
+            "REPEAT **",
+            "REPEAT *FX 0",
+            "REP. *|",
+            "\xf5 *|",
+        ])
+            assert.ok(types(text).includes("keyword.oscli.string"), text);
+        for (const text of ["REPEAT *|", "REP. *|", "\xf5 *|"])
+            assert.ok(!types(text).some(type => type.startsWith("invalid")), text);
+    });
+    it("leaves the neighbouring cases alone", () => {
+        assert.ok(!types("REPEAT X=X+1").some(type => type.startsWith("invalid")));
+    });
+});
+
 describe("Bracket matching of raw token characters", () => {
     registerBbcBasicLanguage();
     const invalidBrackets = text => {
