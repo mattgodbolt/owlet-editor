@@ -1206,6 +1206,75 @@ describe("Quick fixes", () => {
     });
 });
 
+describe("Numbers with an empty exponent", () => {
+    registerBbcBasicLanguage();
+    const invalidTokens = text =>
+        editor
+            .tokenize(text, "BBCBASIC")
+            .flat()
+            .filter(t => t.type.startsWith("invalid")).length;
+    it("are numbers followed by a new list item, not an abbreviation", () => {
+        // The ROM reads "1E" as a number and ".5" or ".X" as the next item.
+        for (const text of ["PRINT 1E.5", "VDU 1E.5", "P.1E.X", "PRINT 1.5E.5 +1", "PRINT 5.E.5:", "PRINT 1E.5ERL"])
+            assert.strictEqual(invalidTokens(text), 0, text);
+    });
+    it("leave the neighbouring cases as they were", () => {
+        for (const text of ["PRINT 1E+.5", "PRINT 1E .5", "PRINT 1E5", "P.X.", "PRINT X."])
+            assert.strictEqual(invalidTokens(text), 0, text);
+        for (const text of ["X=Y.5", "X=Y."]) assert.strictEqual(invalidTokens(text), 1, text);
+    });
+});
+
+describe("Abbreviated $ tokens", () => {
+    registerBbcBasicLanguage();
+    it("need a literal dot", () => {
+        for (const text of ["A$=LEFT$A$", "A$=MID$X"]) {
+            const types = editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
+            assert.ok(!types.includes("keyword"), `${text}: ${types}`);
+        }
+    });
+});
+
+describe("Assembler comments and expressions", () => {
+    registerBbcBasicLanguage();
+    const invalidTokens = text =>
+        editor
+            .tokenize(text, "BBCBASIC")
+            .flat()
+            .filter(t => t.type.startsWith("invalid")).length;
+    it("treat a ; comment as text up to the next colon, whatever it says", () => {
+        for (const comment of ["LOAD THE ACCUMULATOR", "END OF LOOP", "the FOR loop", "IF EQUAL THEN BRANCH", '"x', "]"])
+            assert.strictEqual(invalidTokens(`[OPT3:LDA #1 ; ${comment}:]`), 0, comment);
+    });
+    it("find the comment after an index, a label or on a later line", () => {
+        for (const text of ["[LDA &70,X ; LOAD THE", "[.l LDA #1 ; if x", "[NOP\nRTS ; END OF LOOP", "[EQUB 1 ; FOR"])
+            assert.strictEqual(invalidTokens(text), 0, text);
+    });
+    it("start each line as a new statement, where ; is not a comment", () => {
+        checkTokens(
+            ["[NOP ; a", ";notacomment"],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "keyword"},
+                {offset: 4, type: "white"},
+                {offset: 5, type: "comment"},
+            ],
+            [
+                {offset: 0, type: "operator"},
+                {offset: 1, type: "variable"},
+            ],
+        );
+    });
+    it("end a comment at the colon", () => {
+        assert.strictEqual(invalidTokens("[OPT3:LDA #1 ; fine:FOR:]"), 1);
+    });
+    it("allow STR$~ in an expression", () => {
+        for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
+            assert.strictEqual(invalidTokens(text), 0, text);
+        assert.strictEqual(invalidTokens("[OPT3:EQUS STR$~~(255):]"), 1);
+    });
+});
+
 describe("A * command after REPEAT", () => {
     registerBbcBasicLanguage();
     const types = text => editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
@@ -1252,6 +1321,16 @@ describe("Bracket matching of raw token characters", () => {
             for (const text of [char, `PRINT ${char}`, `IFX ${char}`, `A=1:${char}:B=2`, `[\n${char}\n]`])
                 assert.strictEqual(invalidBrackets(text), 0, `U+${char.codePointAt(0).toString(16)} in ${text}`);
         }
+    });
+    it("has a known limitation: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
+        // Monaco merges neighbouring same-coloured tokens, so its \b-guarded opener match fails in "PRINTLE.".
+        assert.strictEqual(invalidBrackets("PRINTLE.A$,1)"), 1);
+        assert.strictEqual(invalidBrackets("PRINT LE.A$,1)"), 0);
+        assert.strictEqual(invalidBrackets("PRINTLEFT$(A$,1)"), 0);
+        // A dot before the opener is a word boundary, so fully abbreviated code is fine, unless a keyword with no
+        // abbreviation (LEN) comes first.
+        assert.strictEqual(invalidBrackets("P.LE.A$,1)"), 0);
+        assert.strictEqual(invalidBrackets("P.LENMI.A$,2)"), 1);
     });
     it("keeps the raw END token invalid in the assembler", () => {
         const types = editor.tokenize("[\nLDA #\u00e0\n]", "BBCBASIC")[1].map(t => t.type.replace(".BBCBASIC", ""));

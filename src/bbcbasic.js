@@ -27,7 +27,7 @@ function tokensRegex(kws) {
         .join("|");
 }
 
-const allTokensRegex = tokensRegex(keywords);
+export const allTokensRegex = tokensRegex(keywords);
 
 function keywordsRegex(kws) {
     return kws
@@ -37,7 +37,7 @@ function keywordsRegex(kws) {
         .join("|");
 }
 
-function tokenChar(kw) {
+export function tokenChar(kw) {
     return String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token);
 }
 
@@ -66,7 +66,7 @@ function allAbbreviations(tokens) {
 }
 
 // BASIC expands an abbreviation to the first keyword in the table with its prefix.
-function abbreviatedKeyword(abbreviation) {
+export function abbreviatedKeyword(abbreviation) {
     return keywords.find(kw => kw.keyword.startsWith(abbreviation.slice(0, -1)));
 }
 
@@ -88,15 +88,18 @@ const abbreviatedDollarTokensRegex = (() => {
         .filter(kw => kw.keyword.endsWith("$("))
         .map(kw => kw.keyword.slice(0, -2))
         .join("|");
-    return "(" + orRegex + ")\\$.";
+    return "(" + orRegex + ")\\$\\.";
 })();
+
+const AsmMnemonic = /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/;
+const AsmDirective = /OPT|EQU[BDSW]/;
 
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
 
 // BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
 // LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
-const FirstStatementToken = 0xc6;
-const statementKeywords = new Set([
+export const FirstStatementToken = 0xc6;
+export const statementKeywords = new Set([
     "ELSE",
     ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),
 ]);
@@ -276,6 +279,7 @@ export function registerBbcBasicLanguage() {
                     },
                 ],
                 // numbers
+                [/(\d+\.?\d*|\.\d+)E(?=\.)/, "number.float"], // an empty exponent: the next item is ".5" or ".X"
                 [/\d*\.\d*(E[-+\d]\d*)?/, "number.float"],
                 [/\d+E[-+\d]\d*/, "number.float"],
                 [/\d+/, "number"],
@@ -317,13 +321,23 @@ export function registerBbcBasicLanguage() {
                 ['"', {token: "string.quote", next: "@string"}],
                 [/[^,\n]*[^,\n ]/, "string.unquoted"],
             ],
+            // After a mnemonic or directive the rest of the statement is ignored by the ROM, so a ; comment can say anything.
             asm: [
-                [
-                    /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/,
-                    "keyword",
-                ],
-                [/OPT|EQU[BDSW]/, "keyword.directive"],
+                [AsmMnemonic, {token: "keyword", switchTo: "@asmBody"}],
+                [AsmDirective, {token: "keyword.directive", switchTo: "@asmBody"}],
+                {include: "@asmCommon"},
+            ],
+            asmBody: [
+                [/^/, {token: "", switchTo: "@asm"}],
+                [/;[^:]*/, "comment"],
+                [":", {token: "symbol", switchTo: "@asm"}],
+                [AsmMnemonic, "keyword"],
+                [AsmDirective, "keyword.directive"],
+                {include: "@asmCommon"},
+            ],
+            asmCommon: [
                 [/\\[^:]*/, "comment"],
+                [/(STR\$|STR\.|\xc3)([ \t]*)(~)((?:[ \t]*~)*)/, ["keyword", "white", "operator", "invalid"]],
                 [/,(?= *[XY]\b)/, {token: "symbol", switchTo: "@asmIndex"}],
                 ["#", "symbol"], // Immediate addressing
                 // labels
@@ -337,30 +351,8 @@ export function registerBbcBasicLanguage() {
             ],
             asmIndex: [
                 {include: "@whitespace"},
-                [/[XY]/, {token: "keyword", switchTo: "@asm"}],
+                [/[XY]/, {token: "keyword", switchTo: "@asmBody"}],
             ],
-        },
-    });
-
-    // Register a completion item provider for the new language
-    // Filter out immediate tokens which aren't valid in a program
-    const uniqueTokens = [
-        ...new Set(keywords.filter(kw => kw.token < 0xc6 || kw.token > 0xcd).map(kw => kw.keyword)),
-    ];
-    languages.registerCompletionItemProvider("BBCBASIC", {
-        provideCompletionItems: (model, position) => {
-            const linePrefix = model.getLineContent(position.lineNumber).substr(0, position.column);
-            // Does it look like a hex constant? If so, don't try to autocomplete
-            if (linePrefix.match(/&[0-9A-F]*$/)) {
-                return null;
-            }
-            return {
-                suggestions: uniqueTokens.map(token => ({
-                    label: token,
-                    kind: languages.CompletionItemKind.Keyword,
-                    insertText: token,
-                })),
-            };
         },
     });
 
@@ -386,7 +378,7 @@ export function registerBbcBasicLanguage() {
         wordPattern: new RegExp(
             allTokensRegex +
                 "|" +
-                /(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g.source,
+                /(@%)|(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+%?)/g.source,
         ),
     });
 

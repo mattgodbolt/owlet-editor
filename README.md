@@ -48,4 +48,5 @@ Owlet Editor uses Vite as its build system. The project was migrated from webpac
 
 ## Known Issues
 
+- An abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.
 - When running tests, you may see warnings about missing source maps for Monaco Editor. This is a [known issue with Monaco Editor 0.52.0+](https://github.com/microsoft/monaco-editor/issues/4712) and doesn't affect functionality.
