@@ -735,7 +735,7 @@ describe("Line warnings", () => {
         ];
         for (const [text, fixed, startColumn] of cases) {
             checkWarnings(text, {
-                message: `H. is not read as an abbreviation when followed directly by letters or digits, did you mean "${fixed}"?`,
+                message: `H. is not read as an abbreviation when followed directly by letters, digits or underscores, did you mean "${fixed}"?`,
                 code: "space-after-abbreviation",
                 startColumn,
                 endColumn: startColumn + fixed.length - 1,

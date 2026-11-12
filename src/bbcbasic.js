@@ -425,7 +425,7 @@ function lineWarnings(lineNum, line, lineTokens) {
         if (abbreviated) {
             const abbreviation = abbreviated[0].slice(0, abbreviated[0].indexOf(".") + 1);
             warn(token.offset, abbreviated[0].length, {
-                message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
+                message: `${abbreviation} is not read as an abbreviation when followed directly by letters, digits or underscores, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
                 code: SpaceAfterAbbreviationCode,
             });
             continue;
