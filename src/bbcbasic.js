@@ -99,15 +99,13 @@ const notStatementRegex = (() => {
                 kw => statement.keyword !== kw.keyword && statement.keyword.startsWith(kw.keyword),
             ),
     );
-    // A conditional keyword's abbreviation followed by a letter or digit is a name.
+    // A conditional keyword's abbreviation followed by a letter, digit or _ is a name.
     const notStatementAbbreviations = abbreviations
         .filter(abbreviation => notStatementKeywords.includes(abbreviatedKeyword(abbreviation)))
         .map(
             abbreviation =>
                 escape(abbreviation) +
-                (abbreviatedKeyword(abbreviation).flags & Flags.Conditional
-                    ? "(?!\\w)"
-                    : ""),
+                (abbreviatedKeyword(abbreviation).flags & Flags.Conditional ? "(?!\\w)" : ""),
         );
     return new RegExp(
         `(?!${tokensRegex(begunStatements)})` +
@@ -151,25 +149,7 @@ export function registerBbcBasicLanguage() {
         defaultToken: "invalid",
         includeLF: true,
         brackets: [["(", ")", "delimiter.parenthesis"]],
-        operators: [
-            "+",
-            "-",
-            "*",
-            "/",
-            "^",
-            "=",
-            "<>",
-            "<",
-            ">",
-            "<=",
-            ">=",
-            "$",
-            "?",
-            ";",
-            ",",
-            "!",
-            "'",
-        ],
+        operators: "+ - * / ^ = <> < > <= >= $ ? ; , ! '".split(" "),
         tokenPrefix: abbreviations,
         symbols: /[-+=><!*/:?$;,^']+/,
         tokenizer: {
@@ -184,20 +164,22 @@ export function registerBbcBasicLanguage() {
                 ["\n", "", "@pop"],
                 [":", "symbol", "@pop"],
                 [new RegExp(`(${forms("REM")})(.*)`), ["keyword", "comment"]],
-                [new RegExp(forms("FN", "PROC")), {token: "keyword", next: "@fnProcName"}],
+                // FN and PROC names can start with a digit.
+                [new RegExp(`(${forms("FN", "PROC")})(\\w*)`), ["keyword", "variable"]],
                 [new RegExp(forms("DATA")), {token: "keyword", switchTo: "@dataStatement"}],
                 [
-                    new RegExp(`(?:${forms("PRINT", "INPUT")})(?=[ \\t]*#)`),
-                    "keyword",
-                    "@optionalHash",
+                    new RegExp(`(${forms("PRINT", "INPUT")})([ \\t]*)(#)`),
+                    ["keyword", "white", "symbol"],
                 ],
                 // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
                 [new RegExp(forms("PRINT")), {token: "keyword", switchTo: "@printStatement.list"}],
                 [new RegExp(forms("VDU")), {token: "keyword", switchTo: "@statement.list"}],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [
-                    new RegExp(forms("BGET", "BPUT", "CLOSE", "EOF", "EXT", "PTR")),
-                    {token: "keyword", next: "@optionalHash"},
+                    new RegExp(
+                        `(${forms("BGET", "BPUT", "CLOSE", "EOF", "EXT", "PTR")})([ \\t]*)(#?)`,
+                    ),
+                    ["keyword", "white", "symbol"],
                 ],
                 [new RegExp(forms("THEN", "ELSE", "REPEAT")), "keyword", "@pop"],
                 // A number after ERROR is not a line number, but a * command may follow ON ERROR.
@@ -246,9 +228,7 @@ export function registerBbcBasicLanguage() {
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
                 [
-                    new RegExp(
-                        `(?:${allTokensRegex}|${allByteTokensRegex}|[A-Z]+\\.)(?=[ \\t]*(${TopRegex}))`,
-                    ),
+                    new RegExp(`(?:${anyTokenRegex}|[A-Z]+\\.)(?=[ \\t]*(${TopRegex}))`),
                     {
                         cases: {
                             "@tokenPrefix": {token: "keyword", next: "@forOperand"},
@@ -277,13 +257,7 @@ export function registerBbcBasicLanguage() {
                 // We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
             ],
-            // FN and PROC names can start with a digit.
-            fnProcName: [
-                [/[a-zA-Z0-9_]+/, "variable", "@pop"],
-                ["", "", "@pop"],
-            ],
             strayDot: [[/\.\d*/, "invalid", "@pop"]],
-            optionalHash: [{include: "@whitespace"}, ["#", "symbol", "@pop"], ["", "", "@pop"]],
             // Not the newline, which would carry a state such as this statement's on to the next line.
             whitespace: [[/[ \t\r]+/, "white"]],
             string: [
