@@ -588,6 +588,8 @@ describe("Tokenisation", () => {
             ])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
             assert.deepStrictEqual(spans("[OPT3:LDA #1 ; fine:FOR:]", "invalid"), ["FOR"]);
+            // BASIC ignores the rest of a complete instruction, but anything there but a comment is a mistake.
+            assert.deepStrictEqual(spans("[NOP PRINT", "invalid"), ["PRINT"]);
         });
         it("should read letters in the case BASIC takes them", () => {
             // Mnemonics, OPT and EQU in any case; the accumulator, an index register and EQU's size only in upper
