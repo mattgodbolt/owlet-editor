@@ -589,6 +589,34 @@ describe("Tokenisation", () => {
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
             assert.deepStrictEqual(spans("[OPT3:LDA #1 ; fine:FOR:]", "invalid"), ["FOR"]);
         });
+        it("should read letters in the case BASIC takes them", () => {
+            // Mnemonics, OPT and EQU in any case; the accumulator, an index register and EQU's size only in upper
+            // case, except that LDX and STX take y and LDY and STY take x.
+            const cases = [
+                ["[lda42,X", ["lda", "X"], []],
+                ["[.l Lda #1", ["Lda"], []],
+                ["[ldax", ["lda"], []],
+                ["[ASL A", ["ASL", "A"], []],
+                ["[asl a", ["asl"], []],
+                ["[LDA 42,x", ["LDA"], ["x"]],
+                ["[lda (&70,x)", ["lda"], ["x"]],
+                ["[LDA (&70), y", ["LDA"], ["y"]],
+                ["[LDX &70,x", ["LDX"], ["x"]],
+                ["[LDX &70,y", ["LDX", "y"], []],
+                ["[sty &70,x", ["sty", "x"], []],
+                // BASIC reads no index after these.
+                ["[LDA #1,x", ["LDA"], []],
+                ["[JSR &70,x", ["JSR"], []],
+                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$("], []],
+                ["[equb 1", [], ["equb"]],
+                ["[EQUw 1", [], ["EQUw"]],
+            ];
+            for (const [text, keywords, invalid] of cases) {
+                assert.deepStrictEqual(spans(text, "keyword"), keywords, text);
+                assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+            }
+            assert.deepStrictEqual(spans("[opt 3:eqUW 1", "keyword.directive"), ["opt", "eqUW"]);
+        });
         it("should allow STR$~ in an expression", () => {
             for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
