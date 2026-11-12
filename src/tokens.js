@@ -208,8 +208,14 @@ export function debbreviate(text) {
     let withinString = false;
     let starCommand = false;
     let start = true;
-    const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
-    for (const charCode of codePoints) {
+    for (const char of text) {
+        const charCode = char.charCodeAt(0) & 0xff;
+        if (charCode === Chars.NewLine && char !== "\n") {
+            // U+010A stands for the byte &0A (data), and only a real newline ends a line.
+            output += buffer + char;
+            buffer = "";
+            continue;
+        }
         if (starCommand) {
             if (charCode !== Chars.NewLine) {
                 output += String.fromCodePoint(charCode);
@@ -295,9 +301,15 @@ function detokeniseInternal(text, handler) {
     let leaveRestOfLine = false;
     let afterConditionalToken = false;
     let lineNumberBuffer = null;
-    const codePoints = [...text].map(char => char.charCodeAt(0) & 0xff);
-    for (const charCode of codePoints) {
+    for (const char of text) {
+        const codeUnit = char.charCodeAt(0);
+        const charCode = codeUnit & 0xff;
         let ch = String.fromCodePoint(charCode);
+        if (charCode === Chars.NewLine && codeUnit !== Chars.NewLine && lineNumberBuffer === null) {
+            // U+010A stands for the byte &0A (data), and only a real newline ends a line.
+            handler.onCharacter(char);
+            continue;
+        }
         if (charCode === 10) {
             // Newline.
             withinString = false;
@@ -448,7 +460,10 @@ function addLineNo(lineno, x) {
 function decode2048(input) {
     try {
         let code = input.match(/🗜(\S*)/);
-        code = code === null ? input : code[1]; // if no clamp emoji, try the decoding the whole lot
+        // Without the clamp emoji, try decoding the whole lot, unless it is plain ASCII: "END" and "RUN" are
+        // valid base2048, and real payloads are not ASCII.
+        if (code === null && [...input].every(char => char.charCodeAt(0) < 0x80)) return input;
+        code = code === null ? input : code[1];
         return String.fromCharCode.apply(null, decode(code.trim()));
     } catch (e) {
         return input;
