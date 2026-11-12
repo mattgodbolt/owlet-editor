@@ -105,7 +105,9 @@ function plotGroupRow(group, extended) {
     for (const column of PlotColumns) {
         const k = group.base + column.offset;
         const cell = entry(plotInsertText(k), [["vdu-num", k]]);
-        cell.title = `PLOT ${k}: ${group.name}, ${column.name.toLowerCase()}`;
+        cell.title = extended
+            ? `PLOT ${k}: ${group.name}`
+            : `PLOT ${k}: ${group.name}, ${column.name.toLowerCase()}`;
         cells.append(cell);
     }
     row.append(cells);
@@ -114,20 +116,24 @@ function plotGroupRow(group, extended) {
 
 function plotEntries(query) {
     const number = Number(query);
+    const hasNumber = group =>
+        query.trim() !== "" && Number.isInteger(number) && plotGroupHasNumber(group, number);
     const wanted = group =>
         matches(query, group.name) ||
-        (query.trim() !== "" && Number.isInteger(number) && plotGroupHasNumber(group, number));
+        hasNumber(group) ||
+        PlotColumns.some(column => matches(query, column.name));
+    const wantedExtended = group => matches(query, group.name) || hasNumber(group);
     const header = el("div", "plot-legend");
     header.append(
         el(
             "span",
             "",
-            "Each group: +0 to +3 relative (move, fg, inverse, bg), +4 to +7 the same, absolute",
+            "Codes 0-127: +0 to +3 relative (move, fg, inverse, bg), +4 to +7 the same, absolute. 128 and up (GXR / Master): see its manual for the columns.",
         ),
     );
     const rows = [
         ...PlotGroups.filter(wanted).map(g => plotGroupRow(g, false)),
-        ...PlotExtendedGroups.filter(wanted).map(g => plotGroupRow(g, true)),
+        ...PlotExtendedGroups.filter(wantedExtended).map(g => plotGroupRow(g, true)),
     ];
     return rows.length ? [header, ...rows] : [];
 }
@@ -159,7 +165,7 @@ export function createVduReference(container, onInsert) {
     const search = el("input", "vdu-search");
     search.type = "search";
     search.placeholder = "Search code or name";
-    search.setAttribute("aria-label", "Search VDU and PLOT codes");
+    search.setAttribute("aria-label", "Search VDU, ASCII, MODE 7 and PLOT codes");
     bar.append(search);
     const body = el("div", "vdu-body");
     root.append(bar, body);

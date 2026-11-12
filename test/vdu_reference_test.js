@@ -121,6 +121,15 @@ describe("the panel", () => {
         expect(entries()).toHaveLength((PlotGroups.length + PlotExtendedGroups.length) * 8);
     });
 
+    it("finds PLOT groups by column name, but only for the groups whose columns are known", () => {
+        const {search, entries} = setup();
+        search("inverse");
+        expect(entries()).toContain("PLOT 6,");
+        expect(entries()).not.toContain("PLOT 134,");
+        search("absolute");
+        expect(entries()).toContain("PLOT 125,");
+    });
+
     it("searches every table at once", () => {
         const {search, entries} = setup();
         search("85");
