@@ -1,4 +1,4 @@
-import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 import {Flags, keywords, immediateCommands} from "./tokens";
 
 export const LanguageId = "BBCBASIC";
@@ -415,7 +415,15 @@ const InvalidOperatorMap = new Map([
     ["=>", ">="],
 ]);
 
-export function getWarnings(lineNum, line, lineTokens) {
+// The warnings for each line of the program.
+export function getWarnings(text) {
+    const lines = text.split(/\r?\n/);
+    return editor
+        .tokenize(text, LanguageId)
+        .flatMap((lineTokens, i) => lineWarnings(i + 1, lines[i], lineTokens));
+}
+
+function lineWarnings(lineNum, line, lineTokens) {
     const warnings = [];
     const warn = (offset, length, details) =>
         warnings.push({

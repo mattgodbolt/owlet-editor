@@ -60,7 +60,7 @@ const openers = keywords.filter(kw => kw.keyword.endsWith("(")).map(tokenChar);
 
 function checkWarnings(text, ...expected) {
     assert.deepStrictEqual(
-        getWarnings(1, text, editor.tokenize(text, LanguageId)[0]),
+        getWarnings(text),
         expected.map(x => ({
             severity: MarkerSeverity.Warning,
             ...x,
@@ -709,6 +709,15 @@ describe("Line warnings", () => {
             checkWarnings(`print${follower}`, caseWarning("PRINT", 1));
         // Both GET and GET$ are tokens - check that doesn't trip us up.
         checkWarnings("A$=get$", caseWarning("GET$", 4));
+        // Each line of a program, wherever its text starts.
+        const where = getWarnings("  colour\nX=1:chr$").map(w => [
+            w.startLineNumber,
+            w.startColumn,
+        ]);
+        assert.deepStrictEqual(where, [
+            [1, 3],
+            [2, 5],
+        ]);
     });
     it("should warn on invalid operators from other languages", () => {
         const cases = [
@@ -749,7 +758,7 @@ describe("Quick fixes", () => {
     function applyQuickFix(text) {
         const model = editor.createModel(text, LanguageId);
         try {
-            const markers = getWarnings(1, text, editor.tokenize(text, LanguageId)[0]);
+            const markers = getWarnings(text);
             const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
             const {title, edit} = actions[0];
             const {range, text: inserted} = edit.edits[0].textEdit;
