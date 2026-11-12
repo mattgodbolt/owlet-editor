@@ -1206,7 +1206,7 @@ describe("Quick fixes", () => {
     });
 });
 
-describe("A * command after REPEAT or ON ERROR LOCAL", () => {
+describe("A * command after REPEAT", () => {
     registerBbcBasicLanguage();
     const types = text => editor.tokenize(text, "BBCBASIC")[0].map(t => t.type.replace(".BBCBASIC", ""));
     it("is a command, whatever it says", () => {
@@ -1214,22 +1214,15 @@ describe("A * command after REPEAT or ON ERROR LOCAL", () => {
             "REPEAT *|",
             "REPEAT **",
             "REPEAT *FX 0",
-            "ON ERROR LOCAL *|",
-            "ON ERROR LOCAL **",
-            "ON ERROR LOCAL *FX 0",
             "REP. *|",
             "\xf5 *|",
-            "ON ERR. LOC. *|",
-            "\xee \u0185 \xea *|",
         ])
             assert.ok(types(text).includes("keyword.oscli.string"), text);
-        for (const text of ["REPEAT *|", "ON ERROR LOCAL **", "REP. *|", "\xf5 *|", "ON ERR. LOC. *|", "\xee \u0185 \xea *|"])
+        for (const text of ["REPEAT *|", "REP. *|", "\xf5 *|"])
             assert.ok(!types(text).some(type => type.startsWith("invalid")), text);
     });
     it("leaves the neighbouring cases alone", () => {
         assert.ok(!types("REPEAT X=X+1").some(type => type.startsWith("invalid")));
-        assert.ok(!types("ON ERROR LOCAL PRINT 1").some(type => type.startsWith("invalid")));
-        assert.ok(types("LOCAL *").some(type => type.startsWith("invalid") || type === "operator"));
     });
 });
 

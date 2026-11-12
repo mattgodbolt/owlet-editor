@@ -192,8 +192,8 @@ export function registerBbcBasicLanguage() {
                     {token: "keyword", next: "@optionalHash"},
                 ],
                 [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|REPEAT|REP\.|\u018c|\u018b|\xf5/, "keyword", "@pop"], // THEN, ELSE and REPEAT end a statement
-                // A number after ERROR is not a line number, but a * command may follow ON ERROR (LOCAL).
-                [/(ERROR|ERRO\.|ERR\.|\u0185)([ \t]*(LOCAL|LOC\.|\xea))?(?=[ \t]*\*)/, "keyword", "@pop"],
+                // A number after ERROR is not a line number, but a * command may follow ON ERROR.
+                [/(ERROR|ERRO\.|ERR\.|\u0185)(?=[ \t]*\*)/, "keyword", "@pop"],
                 // STR$ takes one ~, though a PRINT item can start with any number.
                 [/(STR\$|STR\.|\xc3)([ \t]*)(~)((?:[ \t]*~)*)/, ["keyword", "white", "operator", "invalid"]],
                 [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
