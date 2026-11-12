@@ -603,6 +603,20 @@ describe("Tokenisation", () => {
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
             assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), ["~"]);
         });
+        it("should read an operand's names and keywords as BASIC reads them", () => {
+            // A mnemonic is only a mnemonic where a statement starts, and BASIC reads PIX and TIMER as names.
+            const cases = [
+                ["[LDA TAXRATE", ["TAXRATE"]],
+                ["[EQUB 1 LDA 2", ["LDA"]],
+                ["[LDA #PIX", ["PIX"]],
+                ["[LDA #TIMER", ["TIMER"]],
+                ["[LDA #PI", []],
+            ];
+            for (const [text, variables] of cases)
+                assert.deepStrictEqual(spans(text, "variable"), variables, text);
+            // LEFT$. is LEFT$( abbreviated, which an operand can use.
+            assert.deepStrictEqual(spans("[LDA LEFT$.A$,1)", "invalid"), []);
+        });
     });
 });
 

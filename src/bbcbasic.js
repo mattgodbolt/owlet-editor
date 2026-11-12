@@ -7,18 +7,14 @@ function escape(token) {
     return token.replace("$", "\\$").replace("(", "\\(").replace(".", "\\.");
 }
 
-const byLength = names => [...names].sort((x, y) => y.length - x.length);
-
-function keywordsRegex(names) {
-    return byLength(names).map(escape).join("|");
-}
-
 const conditionalTokens = new Set(
     keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword),
 );
 
 function tokensRegex(kws) {
-    return byLength(kws.map(kw => kw.keyword))
+    return kws
+        .map(kw => kw.keyword)
+        .sort((x, y) => y.length - x.length)
         .map(kw => {
             // A keyword that begins an earlier one in the table is not read before a dot: "END." is ENDPROC.
             const beforeDot = abbreviatedKeyword(`${kw}.`).keyword === kw ? "" : "(?!\\.)";
@@ -62,7 +58,6 @@ function forms(...names) {
 
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
 const expressionKeywords = keywords.filter(kw => kw.flags & Flags.Expr);
-const allTokensForAsmRegex = keywordsRegex(expressionKeywords.map(kw => kw.keyword));
 const logicalOperatorsRegex = "AND|OR|EOR|MOD|DIV|NOT|[\\u0180-\\u0184\\xac]";
 const allByteTokensRegex = byteTokensRegex(keywords);
 const TopRegex = "TOP|\\xb8P";
@@ -77,17 +72,11 @@ const invalidAbbreviatedTokensRegex = abbreviations
 
 const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
 
-// The abbreviations of LEFT$(, MID$(, RIGHT$( and STRING$( that keep their "$".
-const abbreviatedDollarTokensRegex = `(${openParenKeywords
-    .filter(kw => kw.keyword.endsWith("$("))
-    .map(kw => kw.keyword.slice(0, -2))
-    .join("|")})\\$\\.`;
-
 const AsmMnemonic =
     /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/;
 const AsmDirective = /OPT|EQU[BDSW]/;
 
-const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
+const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}`;
 
 // BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
 // LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
@@ -103,10 +92,12 @@ const notStatementTokens = keywords.filter(
 );
 const notStatementRegex = (() => {
     // MOD begins MODE.
-    const begunStatements = [...statementKeywords].filter(statement =>
-        notStatementKeywords.some(
-            kw => statement !== kw.keyword && statement.startsWith(kw.keyword),
-        ),
+    const begunStatements = keywords.filter(
+        statement =>
+            statementKeywords.has(statement.keyword) &&
+            notStatementKeywords.some(
+                kw => statement.keyword !== kw.keyword && statement.keyword.startsWith(kw.keyword),
+            ),
     );
     // A conditional keyword's abbreviation followed by a letter or digit is a name.
     const notStatementAbbreviations = abbreviations
@@ -119,7 +110,7 @@ const notStatementRegex = (() => {
                     : ""),
         );
     return new RegExp(
-        `(?!${keywordsRegex(begunStatements)})` +
+        `(?!${tokensRegex(begunStatements)})` +
             `(?:${[...notStatementAbbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementTokens)].join("|")})`,
     );
 })();
@@ -237,7 +228,7 @@ export function registerBbcBasicLanguage() {
                 [/([-+=<>*/^!?$]+|\()([ \t]*)(~)/, [BeforeOperand, "white", "invalid"]],
                 [
                     new RegExp(
-                        `(${logicalOperatorsRegex}|${keywordsRegex(openParenKeywords.map(kw => kw.keyword))})([ \\t]*)(~)`,
+                        `(${logicalOperatorsRegex}|${tokensRegex(openParenKeywords)})([ \\t]*)(~)`,
                     ),
                     ["keyword", "white", "invalid"],
                 ],
@@ -317,8 +308,6 @@ export function registerBbcBasicLanguage() {
                 [/^/, {token: "", switchTo: "@asm"}],
                 [/;[^:]*/, "comment"],
                 [":", {token: "symbol", switchTo: "@asm"}],
-                [AsmMnemonic, "keyword"],
-                [AsmDirective, "keyword.directive"],
                 {include: "@asmCommon"},
             ],
             asmCommon: [
@@ -330,7 +319,7 @@ export function registerBbcBasicLanguage() {
                 [bracketCollisionRegex, "invalid.string"],
                 [
                     new RegExp(
-                        `${TopRegex}|${allTokensForAsmRegex}|${byteTokensRegex(expressionKeywords)}`,
+                        `${TopRegex}|${tokensRegex(expressionKeywords)}|${byteTokensRegex(expressionKeywords)}`,
                     ),
                     "keyword",
                 ],
