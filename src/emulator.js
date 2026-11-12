@@ -14,6 +14,7 @@ import {AudioHandler} from "jsbeeb/src/web/audio-handler";
 import {chipBindings, restoreChipBindings} from "./chip-bindings";
 import {Sound, soundRequested} from "./sound";
 import {DefaultMachine, Machines} from "./machines";
+import {oneAtATime} from "./one-at-a-time";
 
 const MaxSecondsPerFrame = 0.1;
 const urlParams = new URLSearchParams(window.location.search);
@@ -109,6 +110,9 @@ export class Emulator {
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
         this.rebuilding = false;
+        // Builds that overlapped would hand the sound chip back and forth and could finish out of order, so each
+        // waits for the one before; each builds the machine chosen when it starts, so the last chosen is the last built.
+        this.initialise = oneAtATime(() => this.build());
     }
 
     /**
@@ -153,7 +157,7 @@ export class Emulator {
         });
     }
 
-    async initialise() {
+    async build() {
         // The ROMs a machine is fitted with are fixed when it is built, so each initialise builds afresh.
         // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
         // Building it hands the one sound chip to its scheduler, so the old CPU must not run in the meantime.
@@ -265,6 +269,8 @@ export class Emulator {
         this.cpu.reset(true);
         const processor = this.cpu;
         await processor.execute(this.cpuMachine.startCycles);
+        // The machine may have been replaced meanwhile, and the program is not the new one's to run.
+        if (processor !== this.cpu) return;
         const page = processor.readmem(0x18) << 8;
         for (let i = 0; i < tokenised.length; ++i) {
             processor.writemem(page + i, tokenised.charCodeAt(i));
