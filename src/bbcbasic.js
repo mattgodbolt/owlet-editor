@@ -97,7 +97,7 @@ const AsmDirective = /OPT|EQU[BDSW]/;
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
 
 // BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
+// LOMEM and HIMEM) or ELSE, which skips the rest of the line.
 export const FirstStatementToken = 0xc6;
 export const statementKeywords = new Set([
     "ELSE",
@@ -122,6 +122,8 @@ const notStatementRegex = (() => {
             `(?:${[...abbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementTokens)].join("|")})`,
     );
 })();
+// BASIC IV, the Master's, also starts a statement with EXT#, which sets the length of a file.
+const notStatementRegexIV = new RegExp(`(?!(?:EXT|\\xa2)[ \\t]*#)${notStatementRegex.source}`);
 
 // Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
@@ -144,7 +146,16 @@ const bracketCollisionRegex = (() => {
 
 export function registerBbcBasicLanguage() {
     languages.register({id: "BBCBASIC"});
+    useBasicIV(false);
+    configureBbcBasicLanguage();
+}
 
+let basicIV = null;
+
+/** Highlights for the Master's BASIC IV rather than BASIC II, where the two differ. */
+export function useBasicIV(enabled) {
+    if (enabled === basicIV) return;
+    basicIV = enabled;
     // Register a tokens provider for the language
     languages.setMonarchTokensProvider("BBCBASIC", {
         defaultToken: "invalid",
@@ -175,7 +186,7 @@ export function registerBbcBasicLanguage() {
             root: [
                 {include: "@whitespace"},
                 [/\d+/, "constant.linenum"], // line numbers
-                [notStatementRegex, "invalid", "@statement"],
+                [basicIV ? notStatementRegexIV : notStatementRegex, "invalid", "@statement"],
                 [/(?=[^*])/, "", "@statement"], // As soon as we know this statement doesn't start with * we can process it with statement
                 [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
             ],
@@ -203,7 +214,8 @@ export function registerBbcBasicLanguage() {
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
                 [bracketCollisionRegex, "keyword.string"],
-                [new RegExp(`TOP|\\xb8P|${anyTokenRegex}`), "keyword"],
+                // BASIC IV's tokeniser (Owlet's on either machine) reads COLOR as COLOUR.
+                [new RegExp(`${basicIV ? "COLOR|" : ""}TOP|\\xb8P|${anyTokenRegex}`), "keyword"],
                 // Not an abbreviation, so a name then a dot: the number "." in a list (P.X. prints X then 0), and
                 // otherwise a syntax error.
                 [
@@ -355,7 +367,9 @@ export function registerBbcBasicLanguage() {
             ],
         },
     });
+}
 
+function configureBbcBasicLanguage() {
     languages.setLanguageConfiguration("BBCBASIC", {
         comments: {
             lineComment: "REM",

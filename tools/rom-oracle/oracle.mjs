@@ -2,7 +2,7 @@
 // jsbeeb, from the jsbeeb dependency's ROMs) and highlighted by src/bbcbasic.js, and the statements where the two
 // disagree about whether there is a syntax error are reported, grouped by the shape of statement they came from.
 //
-//   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json]
+//   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json] [--master]
 //
 // --count is the number of random statements on top of the fixed set (every keyword at the start of a statement,
 // abbreviated, misspelt...). --input adds statements from a JSON list of {shape, text}. --summary prints only the
@@ -15,6 +15,8 @@
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. The ROM cannot judge
 // what it skips (the rest of a line after REM, DATA, DEF, ELSE or a false IF), so the generator leaves those out, along
 // with * commands and the assembler. A disagreement is per statement: it does not say where the error is.
+// --master runs them on the Master's BASIC IV instead, and highlights them as for the Master (the generator's statements
+// are still BASIC II's, so --input is where BASIC IV's own go); its results are in .cache/rom-oracle/master/.
 // Not run by npm test.
 import {spawnSync} from "child_process";
 import fs from "fs";
@@ -24,7 +26,8 @@ import {generate} from "./generate.mjs";
 import {createRom, SyntaxErrors} from "./rom.mjs";
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const OutDir = path.join(Root, ".cache/rom-oracle");
+const Master = option("master", false);
+const OutDir = path.join(Root, ".cache/rom-oracle", Master ? "master" : "");
 
 function option(name, fallback) {
     const index = process.argv.indexOf(`--${name}`);
@@ -45,7 +48,7 @@ async function romVerdicts(texts) {
     const cache = readJson(cacheFile, {});
     const missing = [...new Set(texts.filter(text => !(text in cache)))];
     if (missing.length) {
-        const rom = await createRom();
+        const rom = await createRom(Master ? "Master" : "B-DFS1.2");
         const start = Date.now();
         for (const text of missing) cache[text] = await rom.run(text);
         rom.destroy();
@@ -66,7 +69,12 @@ function highlighterVerdicts(texts) {
     const config = path.join(Root, "tools/rom-oracle/vitest.config.mjs");
     const result = spawnSync(process.execPath, [vitest, "run", "--config", config], {
         cwd: Root,
-        env: {...process.env, ORACLE_IN: input, ORACLE_OUT: output},
+        env: {
+            ...process.env,
+            ORACLE_IN: input,
+            ORACLE_OUT: output,
+            ORACLE_BASIC_IV: Master ? "1" : "",
+        },
         encoding: "utf8",
     });
     if (result.status !== 0)

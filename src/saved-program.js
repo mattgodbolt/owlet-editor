@@ -1,18 +1,35 @@
-const Key = "program";
+const ProgramKey = "program";
+const MachineKey = "machine";
 
 /**
- * The program is kept per tab (sessionStorage, which survives a reload and a reopened closed tab) and also as the most
- * recent edit anywhere (localStorage), which is what a brand new tab starts from. Without the per-tab copy, the last
- * keystroke in any tab was what every tab came back with.
+ * The program, and the machine it runs on, are kept per tab (sessionStorage, which survives a reload and a reopened
+ * closed tab) and also as the most recent edit anywhere (localStorage), which is what a brand new tab starts from.
+ * Without the per-tab copy, the last keystroke in any tab was what every tab came back with.
  */
+function save(key, value) {
+    // Nothing has been edited when a tab loads its own back, so that must not become the latest edit.
+    if (sessionStorage.getItem(key) === value) return;
+    localStorage.setItem(key, value);
+    sessionStorage.setItem(key, value);
+}
+
+function saved(key) {
+    const thisTabs = sessionStorage.getItem(key);
+    return thisTabs !== null ? thisTabs : localStorage.getItem(key);
+}
+
 export function saveProgram(text) {
-    // Nothing has been edited when a tab loads its own program back, so that must not become the latest edit.
-    if (sessionStorage.getItem(Key) === text) return;
-    localStorage.setItem(Key, text);
-    sessionStorage.setItem(Key, text);
+    save(ProgramKey, text);
 }
 
 export function savedProgram() {
-    const thisTabs = sessionStorage.getItem(Key);
-    return thisTabs !== null ? thisTabs : localStorage.getItem(Key);
+    return saved(ProgramKey);
+}
+
+export function saveMachine(machine) {
+    save(MachineKey, machine);
+}
+
+export function savedMachine() {
+    return saved(MachineKey);
 }

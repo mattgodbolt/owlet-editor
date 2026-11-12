@@ -1,12 +1,13 @@
 // Run by oracle.mjs through vitest, which gives Monaco the DOM it needs: tokenises each statement in ORACLE_IN and
 // writes, for each, the text of its first invalid token (or null) to ORACLE_OUT.
-import {registerBbcBasicLanguage} from "../../src/bbcbasic";
+import {registerBbcBasicLanguage, useBasicIV} from "../../src/bbcbasic";
 import {it} from "vitest";
 import fs from "fs";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
 it("highlights the oracle's statements", () => {
     registerBbcBasicLanguage();
+    useBasicIV(process.env.ORACLE_BASIC_IV === "1");
     const texts = JSON.parse(fs.readFileSync(process.env.ORACLE_IN, "utf8"));
     const verdicts = texts.map(text => {
         const tokens = editor.tokenize(text, "BBCBASIC")[0];
