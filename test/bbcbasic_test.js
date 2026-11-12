@@ -1235,6 +1235,46 @@ describe("Abbreviated $ tokens", () => {
     });
 });
 
+describe("Assembler comments and expressions", () => {
+    registerBbcBasicLanguage();
+    const invalidTokens = text =>
+        editor
+            .tokenize(text, "BBCBASIC")
+            .flat()
+            .filter(t => t.type.startsWith("invalid")).length;
+    it("treat a ; comment as text up to the next colon, whatever it says", () => {
+        for (const comment of ["LOAD THE ACCUMULATOR", "END OF LOOP", "the FOR loop", "IF EQUAL THEN BRANCH", '"x', "]"])
+            assert.strictEqual(invalidTokens(`[OPT3:LDA #1 ; ${comment}:]`), 0, comment);
+    });
+    it("find the comment after an index, a label or on a later line", () => {
+        for (const text of ["[LDA &70,X ; LOAD THE", "[.l LDA #1 ; if x", "[NOP\nRTS ; END OF LOOP", "[EQUB 1 ; FOR"])
+            assert.strictEqual(invalidTokens(text), 0, text);
+    });
+    it("start each line as a new statement, where ; is not a comment", () => {
+        checkTokens(
+            ["[NOP ; a", ";notacomment"],
+            [
+                {offset: 0, type: "delimiter.square"},
+                {offset: 1, type: "keyword"},
+                {offset: 4, type: "white"},
+                {offset: 5, type: "comment"},
+            ],
+            [
+                {offset: 0, type: "operator"},
+                {offset: 1, type: "variable"},
+            ],
+        );
+    });
+    it("end a comment at the colon", () => {
+        assert.strictEqual(invalidTokens("[OPT3:LDA #1 ; fine:FOR:]"), 1);
+    });
+    it("allow STR$~ in an expression", () => {
+        for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
+            assert.strictEqual(invalidTokens(text), 0, text);
+        assert.strictEqual(invalidTokens("[OPT3:EQUS STR$~~(255):]"), 1);
+    });
+});
+
 describe("Bracket matching of raw token characters", () => {
     registerBbcBasicLanguage();
     const invalidBrackets = text => {

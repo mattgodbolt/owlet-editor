@@ -91,6 +91,9 @@ const abbreviatedDollarTokensRegex = (() => {
     return "(" + orRegex + ")\\$\\.";
 })();
 
+const AsmMnemonic = /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/;
+const AsmDirective = /OPT|EQU[BDSW]/;
+
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}|${abbreviatedDollarTokensRegex}`;
 
 // BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
@@ -318,13 +321,23 @@ export function registerBbcBasicLanguage() {
                 ['"', {token: "string.quote", next: "@string"}],
                 [/[^,\n]*[^,\n ]/, "string.unquoted"],
             ],
+            // After a mnemonic or directive the rest of the statement is ignored by the ROM, so a ; comment can say anything.
             asm: [
-                [
-                    /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/,
-                    "keyword",
-                ],
-                [/OPT|EQU[BDSW]/, "keyword.directive"],
+                [AsmMnemonic, {token: "keyword", switchTo: "@asmBody"}],
+                [AsmDirective, {token: "keyword.directive", switchTo: "@asmBody"}],
+                {include: "@asmCommon"},
+            ],
+            asmBody: [
+                [/^/, {token: "", switchTo: "@asm"}],
+                [/;[^:]*/, "comment"],
+                [":", {token: "symbol", switchTo: "@asm"}],
+                [AsmMnemonic, "keyword"],
+                [AsmDirective, "keyword.directive"],
+                {include: "@asmCommon"},
+            ],
+            asmCommon: [
                 [/\\[^:]*/, "comment"],
+                [/(STR\$|STR\.|\xc3)([ \t]*)(~)((?:[ \t]*~)*)/, ["keyword", "white", "operator", "invalid"]],
                 [/,(?= *[XY]\b)/, {token: "symbol", switchTo: "@asmIndex"}],
                 ["#", "symbol"], // Immediate addressing
                 // labels
@@ -338,7 +351,7 @@ export function registerBbcBasicLanguage() {
             ],
             asmIndex: [
                 {include: "@whitespace"},
-                [/[XY]/, {token: "keyword", switchTo: "@asm"}],
+                [/[XY]/, {token: "keyword", switchTo: "@asmBody"}],
             ],
         },
     });
