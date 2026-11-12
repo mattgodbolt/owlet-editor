@@ -5,17 +5,14 @@ import globals from "globals";
 
 export default [
     {
-        ignores: ["**/dist", "test/_polyfills.js"],
+        ignores: ["**/dist"],
     },
     js.configs.recommended,
     eslintConfigPrettier,
     {
         plugins: {prettier},
         languageOptions: {
-            globals: {
-                ...globals.browser,
-                ...globals.mocha,
-            },
+            globals: globals.browser,
 
             ecmaVersion: 2020,
             sourceType: "module",
@@ -35,7 +32,7 @@ export default [
         },
     },
     {
-        files: ["**/webpack.config.js", "**/vite.config.js", "**/test/setup.js", "**/vitest.config.mjs", "tools/**"],
+        files: ["**/vite.config.js", "**/test/setup.js", "**/vitest.config.mjs", "tools/**"],
 
         languageOptions: {
             globals: {
