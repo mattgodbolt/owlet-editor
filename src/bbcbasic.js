@@ -129,6 +129,16 @@ const hiddenOpenParens = [
     ),
 ];
 
+// Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
+// its lower-case form (END, U+00E0). Those are tagged "string", which keeps them out of bracket matching.
+const bracketCollisionRegex = (() => {
+    const tokenChars = new Set(keywords.map(tokenChar));
+    const collisions = openParenKeywords
+        .map(kw => tokenChar(kw).toLowerCase())
+        .filter(lower => tokenChars.has(lower) && !openParenKeywords.some(kw => tokenChar(kw) === lower));
+    return new RegExp(`[${collisions.join("")}]`);
+})();
+
 export function registerBbcBasicLanguage() {
     languages.register({id: "BBCBASIC"});
 
@@ -189,6 +199,7 @@ export function registerBbcBasicLanguage() {
                 [/(FOR|FO\.|F\.|\xe3)/, {token: "keyword", switchTo: "@forStatement"}],
                 // This is slower than using the "tokens" built in to monarch but
                 // doesn't require whitespace delimited tokens.
+                [bracketCollisionRegex, "keyword.string"],
                 [new RegExp(`TOP|\\xb8P|${anyTokenRegex}`), "keyword"],
                 // Not an abbreviation, so a name then a dot: the number "." in a list (P.X. prints X then 0), and
                 // otherwise a syntax error.
@@ -317,6 +328,7 @@ export function registerBbcBasicLanguage() {
                 ["#", "symbol"], // Immediate addressing
                 // labels
                 [/\.([a-zA-Z_][\w]*%?|@%)/, "type.identifier"],
+                [bracketCollisionRegex, "invalid.string"],
                 [new RegExp(`TOP|\\xb8P|${allTokensForAsmRegex}|${allByteTokensForAsmRegex}`), "keyword"],
                 [new RegExp(`${anyTokenRegex}|${invalidAbbreviatedTokensRegex}`), "invalid"],
                 [/^\d+/, "constant.linenum"], // line numbers

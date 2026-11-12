@@ -1,4 +1,5 @@
 import {getWarnings, registerBbcBasicLanguage} from "../src/bbcbasic";
+import {keywords} from "../src/tokens";
 import {describe, it, vi, afterEach} from "vitest";
 import assert from "assert";
 import {editor, languages, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
@@ -1202,5 +1203,38 @@ describe("Quick fixes", () => {
     });
     it("should still offer the upper-case fix for keywords typed in lower case", () => {
         assert.deepStrictEqual(applyQuickFix("colour"), {title: "Replace with COLOUR", result: "COLOUR"});
+    });
+});
+
+describe("Bracket matching of raw token characters", () => {
+    registerBbcBasicLanguage();
+    const invalidBrackets = text => {
+        const model = editor.createModel(text, "BBCBASIC");
+        try {
+            model.tokenization.forceTokenization(model.getLineCount());
+            return model.bracketPairs
+                .getBracketsInRange(model.getFullModelRange())
+                .toArray()
+                .filter(bracket => bracket.isInvalid).length;
+        } finally {
+            model.dispose();
+        }
+    };
+    // The editor shows tokens below &A0 as U+0100 and up, and the rest as themselves.
+    const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
+    const openers = keywords.filter(kw => kw.keyword.endsWith("(")).map(tokenChar);
+    const tokenChars = keywords.map(tokenChar);
+    it("pairs a raw LEFT$( with its close", () => {
+        for (const opener of openers) assert.strictEqual(invalidBrackets(`A$=${opener}A$,1)`), 0, opener);
+    });
+    it("never treats a raw token that is not an opener as a bracket", () => {
+        for (const char of tokenChars.filter(char => !openers.includes(char))) {
+            for (const text of [char, `PRINT ${char}`, `IFX ${char}`, `A=1:${char}:B=2`, `[\n${char}\n]`])
+                assert.strictEqual(invalidBrackets(text), 0, `U+${char.codePointAt(0).toString(16)} in ${text}`);
+        }
+    });
+    it("keeps the raw END token invalid in the assembler", () => {
+        const types = editor.tokenize("[\nLDA #\u00e0\n]", "BBCBASIC")[1].map(t => t.type.replace(".BBCBASIC", ""));
+        assert.strictEqual(types.at(-1), "invalid.string");
     });
 });
