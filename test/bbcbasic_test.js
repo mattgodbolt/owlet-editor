@@ -1284,10 +1284,11 @@ describe("A * command after REPEAT", () => {
             "REPEAT **",
             "REPEAT *FX 0",
             "REP. *|",
+            "REPEA.*|",
             "\xf5 *|",
         ])
             assert.ok(types(text).includes("keyword.oscli.string"), text);
-        for (const text of ["REPEAT *|", "REP. *|", "\xf5 *|"])
+        for (const text of ["REPEAT *|", "REP. *|", "REPEA.*|", "\xf5 *|"])
             assert.ok(!types(text).some(type => type.startsWith("invalid")), text);
     });
     it("leaves the neighbouring cases alone", () => {
