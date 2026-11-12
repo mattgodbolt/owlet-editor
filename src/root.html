@@ -13,6 +13,7 @@
                 <button class="save" data-action="save" title="Save memory from the emulator" data-toggle="tooltip" data-placement="top" title="Save memory from the emulator"><i class="fa-solid fa-memory" style="pointer-events: none;"></i></button>
         <button data-action="share" title="Share your code as a URL, disc or tape image"><i class="fa-solid fa-share-square" style="pointer-events: none;"></i></button>
 
+        <button data-action="reference" id="reference-button" title="VDU and PLOT code reference: click a code to insert it"><i class="fa-solid fa-table-list" style="pointer-events: none;"></i> VDU</button>
     </div>
     <div class="toolbar" id="editor_toolbar">
         <button data-action="emulator" id="screen-button" title="View emulator (ctrl-enter)">
@@ -39,6 +40,7 @@
             <p><img alt="BBC Micro bot logo" src="/assets/images/monster.png" width="16px"/> Check out the <a href="https://www.bbcmicrobot.com">BBC Micro Bot gallery </a></p>
 
         </div>
+        <div id="reference"></div>
         <div id="examples">
             <div class="template example" style="cursor: pointer;">
                 <img class="thumb" height="100%"
