@@ -296,6 +296,8 @@ export function registerBbcBasicLanguage() {
                     ["keyword", "white", {token: "keyword", switchTo: "@asmBody"}],
                 ],
                 // A state's suffix is the index register, if any, that BASIC takes in lower case after the mnemonic.
+                // BASIC reads ORA as the OR token then A, which it takes only in upper case.
+                [/ORa/, "invalid"],
                 [AsmIndexed, {token: "keyword", switchTo: "@asmIndexed.none"}],
                 [AsmIndexedByY, {token: "keyword", switchTo: "@asmIndexed.y"}],
                 [AsmIndexedByX, {token: "keyword", switchTo: "@asmIndexed.x"}],

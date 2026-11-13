@@ -612,6 +612,8 @@ describe("Tokenisation", () => {
                 ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$("], []],
                 ["[equb 1", [], ["equb"]],
                 ["[EQUw 1", [], ["EQUw"]],
+                ["[Ora 1:orA 1:oRA 1", ["Ora", "orA", "oRA"], []],
+                ["[ORa 1", [], ["ORa"]],
             ];
             for (const [text, keywords, invalid] of cases) {
                 assert.deepStrictEqual(spans(text, "keyword"), keywords, text);
