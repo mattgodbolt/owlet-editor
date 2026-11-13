@@ -199,7 +199,9 @@ export function useBasicIV(enabled) {
                 [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1|INPUT|INPU\.|INP\.|IN\.|I\.|\xe8)(?=[ \t]*#)/, "keyword", "@optionalHash"],
                 // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
                 [/(PRINT|PRIN\.|PRI\.|PR\.|P\.|\xf1)/, {token: "keyword", switchTo: "@printStatement.list"}],
-                [/(VDU|VD\.|V\.|\xef)/, {token: "keyword", switchTo: "@statement.list"}],
+                basicIV
+                    ? [/(VDU|VD\.|V\.|\xef)(?![ \t]*\|)/, {token: "keyword", switchTo: "@vduStatement.list"}]
+                    : [/(VDU|VD\.|V\.|\xef)/, {token: "keyword", switchTo: "@statement.list"}],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
@@ -239,6 +241,14 @@ export function useBasicIV(enabled) {
                 [new RegExp(`(${logicalOperatorsRegex}|${parenTokensRegex})([ \\t]*)(~)`), ["keyword", "white", "invalid"]],
                 [/(\()([ \t]*)(~)/, ["@brackets", "white", "invalid"]],
                 [/~/, "operator"],
+                {include: "@statement"},
+            ],
+            // BASIC IV's | ends a VDU item, as , and ; do, and sends nine zeros. A VDU with nothing before its first |
+            // never gets here.
+            vduStatement: [
+                [/([,;])([ \t]*)(\|)/, ["operator", "white", "invalid"]],
+                [/(\|)([ \t]*)([,;|])/, ["operator", "white", "invalid"]],
+                [/\|/, "operator"],
                 {include: "@statement"},
             ],
             // In a FOR statement TO ends the loop's start expression, except where an operand is expected:

@@ -14,9 +14,28 @@ const BasicIVOnly = [
     "\xa2#0=0",
     "COLOR.",
     "COLOR 1:COLOR.",
+    "VDU 23,255,255|",
+    "V.7 |:PRINT",
+    "VD.7|7|",
+    "VDU 7;7|X",
+    "\xef7|",
 ];
 // Syntax errors on both.
-const NeitherBasic = ["EXT X=0", "EXT=0", "EX.#0=0", 'ERROR 3,"x"'];
+const NeitherBasic = [
+    "EXT X=0",
+    "EXT=0",
+    "EX.#0=0",
+    'ERROR 3,"x"',
+    "VDU|",
+    "VDU |",
+    "VDU 7,|",
+    "VDU 7; |",
+    "VDU 7||",
+    "VDU 7|,7",
+    "VDU 7|;",
+    "PRINT 7|",
+    "X=7|",
+];
 // Fine on both.
 const BothBasics = ["EXTX=0", "PRINT EXT#0", "COLOUR.", "COLO.1"];
 
