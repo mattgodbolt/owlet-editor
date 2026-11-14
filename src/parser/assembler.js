@@ -2,8 +2,11 @@
 // directive, then its operand. A "\" comment can start a statement, and a ";" comment can follow a complete
 // instruction; either runs to the next colon.
 //
-// Stricter than the ROM, on purpose: BASIC ignores the rest of a statement after a complete instruction, but a keyword
-// there that an expression cannot use is marked, since it is almost always a mistake (NOP PRINT).
+// Stricter than the ROM, on purpose (the problems that say so have `stricter` set):
+// - BASIC ignores the rest of a statement after a complete instruction, but a keyword there that an expression cannot
+//   use is marked, since it is almost always a mistake (NOP PRINT);
+// - BASIC compares only the low five bits of each character of a mnemonic, so it reads 8 as X and ! as A, but a
+//   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9.
 
 import {Flags} from "../tokens.js";
 import {Failure} from "./recogniser.js";
@@ -84,7 +87,10 @@ export class Assembler {
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (token.kind === "keyword" && !(token.kw.flags & Flags.Expr || token.top))
-                token.invalid = true;
+                this.stricter(
+                    token,
+                    "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
+                );
         }
     }
 
@@ -131,27 +137,54 @@ export class Assembler {
         // BASIC compares the low five bits of each character, so it takes a mnemonic in either case, and ST8 as STX;
         // only the size of an EQU must be an upper-case letter.
         const {text} = r.lexer;
-        const word = [...text.slice(token.start, token.start + 3)]
-            .map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40))
-            .join("");
+        const chars = [...text.slice(token.start, token.start + 3)];
+        const word = chars.map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40)).join("");
         const size = word === "EQU" ? text[token.start + 3] : "";
         if (word === "EQU" && !/[BDSW]/.test(size)) r.fail("Syntax error");
         const directive = word === "OPT" || word === "EQU";
         if (!directive && ![Implied, Shifts, Addressed, Address].some(set => set.has(word)))
             r.fail("Syntax error");
-        this.take(token.start + 3 + size.length, directive ? "keyword.directive" : "keyword");
+        const aliased = chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [token.start + i]));
+        this.take(
+            token.start + 3 + size.length,
+            directive ? "keyword.directive" : "keyword",
+            aliased,
+        );
         return word + size;
     }
 
-    // The tokens up to the end given, splitting the last, as one of the given type.
-    take(end, type) {
+    // The tokens up to the end given, splitting the last, as one of the given type. Each character at an offset in
+    // `aliased` is a token of its own and is marked.
+    take(end, type, aliased = []) {
         const r = this.recogniser;
         while (r.peek().start < end) {
             const token = r.peek();
             if (!["name", "number", "punct"].includes(token.kind)) r.fail(null);
-            r.lexer.split(token, end - token.start);
+            const alias = aliased.includes(token.start);
+            const cut = alias
+                ? token.start + 1
+                : Math.min(end, ...aliased.filter(at => at > token.start));
+            r.lexer.split(token, cut - token.start);
             r.next().type = type;
+            if (!alias) continue;
+            const letter = String.fromCharCode((token.text.charCodeAt(0) & 0x1f) | 0x40);
+            this.stricter(
+                token,
+                `BASIC reads ${token.text} as ${letter} here (it compares only part of each character); probably a typo`,
+            );
         }
+    }
+
+    // Marks a token that BASIC accepts but that is almost certainly a mistake.
+    stricter(token, message) {
+        token.invalid = true;
+        this.recogniser.problems.push({
+            message,
+            token,
+            unfinished: false,
+            hole: false,
+            stricter: true,
+        });
     }
 
     operand(mnemonic) {

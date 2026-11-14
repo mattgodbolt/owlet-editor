@@ -1281,6 +1281,11 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Warning, Unfinished("Missing ,"), 1, 10, 12],
         ]);
     });
+    it("should say plainly what BASIC does where a marker is stricter than the ROM, as an error", () => {
+        const reads =
+            "BASIC reads 8 as X here (it compares only part of each character); probably a typo";
+        assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 4, 5]]);
+    });
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
         assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [

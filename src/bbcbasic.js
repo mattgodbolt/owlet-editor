@@ -507,7 +507,7 @@ export function getSyntaxMarkers(text, cursorLine = 0) {
     if (!newParser) return [];
     const warnings = getWarnings(text);
     return programProblems(text).flatMap(
-        ({line, start, end, message, unfinished, hole, unclosed}) => {
+        ({line, start, end, message, unfinished, hole, unclosed, stricter}) => {
             const covered = warnings.some(
                 warning =>
                     warning.startLineNumber === line &&
@@ -518,11 +518,13 @@ export function getSyntaxMarkers(text, cursorLine = 0) {
             const rom = message ? ` with "${message}"` : "";
             const text = unclosed
                 ? "Assembler block not closed: there is no ] after this ["
-                : unfinished
-                  ? hole
-                      ? `Unfinished statement: BASIC would stop${rom} here`
-                      : `Unfinished line${message ? `: BASIC would stop${rom} if it ended here` : ""}`
-                  : `${message || "Error"}: BASIC would stop at this statement`;
+                : stricter
+                  ? message
+                  : unfinished
+                    ? hole
+                        ? `Unfinished statement: BASIC would stop${rom} here`
+                        : `Unfinished line${message ? `: BASIC would stop${rom} if it ended here` : ""}`
+                    : `${message || "Error"}: BASIC would stop at this statement`;
             return [
                 {
                     severity: unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error,

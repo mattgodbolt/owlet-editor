@@ -99,8 +99,20 @@ of the line could change that. The colours are a function of the text alone, whe
   any such statement that the ROM accepts (there must be none), outside the text BASIC skips. Where a statement is
   unfinished at a `)`, some insertion there should make the ROM accept it; the oracle does not check that, so
   check it by hand with the ROM when the fillers in `src/parser/recogniser.js` change.
-- **Stricter than the ROM only on purpose.** Each other deliberate exception, such as text after a complete assembler
-  instruction, is a row of the recorded table listed as stricter than the ROM in its test.
+- **Stricter than the ROM only on purpose.** The exceptions are the list below; each is a row of the recorded table
+  listed as stricter than the ROM in its test, and the oracle reports them as STRICTER, apart from the false-invalids.
+
+### Deliberate deviations from the ROM
+
+Text the ROM runs without error that is red on purpose, because it is almost always a mistake. Each has a hover
+message that says what BASIC does, and shows as an error.
+
+- **A keyword after a complete assembler instruction** (`NOP PRINT`, `LDA #1 FOR`). BASIC ignores the rest of the
+  statement; text there that is not a `;` or `\` comment is probably a comment missing its `;`.
+- **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`), suggested by Olly
+  Betts on #174. BASIC compares only the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A`
+  and so on (`LD89` is `LDX 9`, but is an easy typo for `LDA89`, `LDX89` or `LDY89`). The character is red and the hover
+  says what BASIC reads it as. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89).
 
 Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
 `src/bbcbasic.js`: a port of the ROM's tokeniser, a recogniser that marks the token at which BASIC would stop with an

@@ -28,8 +28,32 @@ describe("Lexer", () => {
 // A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
 const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
 
-// Lines BASIC II runs that are marked on purpose (see the README): a keyword after a complete assembler instruction.
-const StricterThanRom = ["[OPT0:NOP PRINT:]", "[OPT0:LDA #1 FOR:]"];
+// Lines BASIC II runs that are marked on purpose (see the README): a keyword after a complete assembler instruction,
+// and a character in a mnemonic that is not a letter but that BASIC reads as one.
+const StricterThanRom = [
+    "[OPT0:NOP PRINT:]",
+    "[OPT0:LDA #1 FOR:]",
+    "[ST89:]",
+    "[OPT0:ST89:]",
+    "[OPT0:LDA 1:LD! 1:]",
+    "[OPT0:LD89:]",
+    "[OPT0:LD99:]",
+    "[OPT0:LD89 &70:]",
+    "[OPT0:LD!5:]",
+    "[OPT0:CP8 5:]",
+    "[OPT0:CP9 5:]",
+    "[OPT0:J-P &70:]",
+    "[OPT0:3EC:]",
+    "[OPT0:B2K:]",
+    "[OPT0:O2A 5:]",
+    "[OPT0:/RA 5:]",
+    "[OPT0:EO2 5:]",
+    "[OPT0:E/R 5:]",
+    "[OPT0:AN$ 5:]",
+    "[OPT0:!ND 5:]",
+    "[OPT0:OP4 0:]",
+    "[OPT0:O0T 0:]",
+];
 
 const invalid = text => {
     const {tokens} = highlightLine(text);
@@ -53,7 +77,13 @@ describe("Recogniser", () => {
                 // Text BASIC skips can be unfinished, as it can be wrong (see the README).
                 const unfinished = problems.filter(problem => problem.unfinished);
                 const ends = unfinished.map(({start, end}) => [start, end]);
+                // What is red on purpose says so, with a message.
+                const onPurpose = problems.filter(problem => problem.stricter);
+                const unexplained = marked.filter(
+                    ([start, end]) => !onPurpose.some(p => p.start <= start && end <= p.end),
+                );
                 return falseInvalid(text, marked).length > 0 === stricter &&
+                    falseInvalid(text, unexplained).length === 0 &&
                     falseInvalid(text, ends).length === 0
                     ? []
                     : [[text, verdict]];
@@ -233,5 +263,55 @@ describe("A keyword that is the start of a longer one", () => {
     );
     it.each([["MODX", ["MOD"]]])("%s should be red", (text, expected) => {
         assert.deepStrictEqual(red(text), expected);
+    });
+});
+
+const AliasMessage = (char, letter) =>
+    `BASIC reads ${char} as ${letter} here (it compares only part of each character); probably a typo`;
+
+// BASIC compares only the low five bits of each character of a mnemonic (the ROM rows in test/rom-verdicts.json), so
+// it reads a non-letter as a letter, which is marked on purpose: [start, end, char, letter] of each.
+describe("A character in a mnemonic that BASIC reads as a letter", () => {
+    it.each([
+        ["[LD89", [[3, 4, "8", "X"]]],
+        ["[OPT0:LD89:]", [[8, 9, "8", "X"]]],
+        ["[OPT0:ST89:]", [[8, 9, "8", "X"]]],
+        ["[OPT0:LD99:]", [[8, 9, "9", "Y"]]],
+        ["[LD! 5", [[3, 4, "!", "A"]]],
+        ["[CP9 5", [[3, 4, "9", "Y"]]],
+        ["[J-P &70", [[2, 3, "-", "M"]]],
+        ["[3EC", [[1, 2, "3", "S"]]],
+        ["[/RA 5", [[1, 2, "/", "O"]]],
+        ["[O2A 5", [[2, 3, "2", "R"]]],
+        ["[OP4 0", [[3, 4, "4", "T"]]],
+    ])("%s should be red on the character, with what BASIC reads it as", (text, expected) => {
+        assert.deepStrictEqual(
+            programProblems(text)
+                .filter(problem => problem.stricter)
+                .map(({start, end, message}) => [start, end, message]),
+            expected.map(([start, end, char, letter]) => [start, end, AliasMessage(char, letter)]),
+        );
+        assert.deepStrictEqual(
+            red(text).slice(0, expected.length),
+            expected.map(([start, end]) => text.slice(start, end)),
+        );
+    });
+    it.each([
+        "[LDX 9",
+        "[ldx 9",
+        "[LDA89",
+        "[Ldx &70,y",
+        "[OPT0:ora 5:]",
+        "[oRA 5",
+        "[ORA 5",
+        "[AND 5",
+        "[AN. 5",
+        "[EOR 5",
+        "[eOr 5",
+        "[opt0",
+        "[EQUB 1",
+        "[.LD89 LDA 1",
+    ])("%s should not be red", text => {
+        assert.deepStrictEqual(red(text), []);
     });
 });

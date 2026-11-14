@@ -18,6 +18,8 @@
 // disagreement is per statement: it does not say where the error is. With --parser new a statement can also be
 // UNFINISHED: the only fault is that the line ends too soon (GOTO, FOR I=1 TO), which is not shown as invalid. If the
 // ROM rejects it, that counts as agreement and is listed on its own; it is neither a FALSE-VALID nor a FALSE-INVALID.
+// A statement the ROM accepts can also be STRICTER: it is marked invalid on purpose (the README lists these), only
+// through marks the new parser says are deliberate, and it is reported on its own, not as a FALSE-INVALID.
 // Not run by npm test.
 import {spawnSync} from "child_process";
 import fs from "fs";
@@ -46,6 +48,11 @@ function readJson(file, fallback) {
 
 // A line number would make BASIC store the line rather than run it.
 const runnable = text => text.length <= MaxLineLength && !/^\s*\d/.test(text);
+
+const isCovered = (spans, [start, end]) =>
+    Array.from({length: end - start}, (_, i) => start + i).every(at =>
+        spans.some(([from, to]) => from <= at && at < to),
+    );
 
 // For each text, the ROM's verdict and its tokenisation (null if it cannot be run).
 async function romVerdicts(texts) {
@@ -103,8 +110,8 @@ function readMarks(text, invalid, tokens) {
 
 // Where the ROM ran a statement that is still marked invalid, the ROM is asked whether it reads the mark at all: the
 // statement is cut there and "}", which BASIC never accepts, put in its place. If BASIC still runs it, the mark is
-// in text BASIC never reads, and the next one is tried.
-async function dropMarksNeverRead(results, marks) {
+// in text BASIC never reads, and the next one is tried. The first mark left is kept as `field` of the result.
+async function dropMarksNeverRead(results, marks, field) {
     let pending = results.flatMap((r, i) => (r.rom === "valid" && marks[i].length ? [i] : []));
     while (pending.length) {
         const cut = await romVerdicts(
@@ -116,7 +123,7 @@ async function dropMarksNeverRead(results, marks) {
             return marks[i].length > 0;
         });
     }
-    results.forEach((r, i) => (r.invalid = marks[i].length ? r.text.slice(...marks[i][0]) : null));
+    results.forEach((r, i) => (r[field] = marks[i].length ? r.text.slice(...marks[i][0]) : null));
 }
 
 function romClass(verdict) {
@@ -152,6 +159,10 @@ function report(results, examples) {
             r => r.rom === "valid" && r.invalid,
         ],
         [
+            "STRICTER (the ROM accepts it, highlighted invalid on purpose; see the README)",
+            r => r.rom === "valid" && r.stricter,
+        ],
+        [
             "UNFINISHED-BUT-VALID (the ROM accepts it, shown as ending too soon)",
             r => r.rom === "valid" && r.unfinished,
         ],
@@ -173,9 +184,11 @@ function report(results, examples) {
             for (const r of rs.slice(0, examples)) {
                 const why = r.invalid
                     ? `invalid: ${JSON.stringify(r.invalid)}`
-                    : r.unfinished && r.rom === "valid"
-                      ? "unfinished"
-                      : r.message;
+                    : r.stricter
+                      ? `on purpose: ${JSON.stringify(r.stricter)}`
+                      : r.unfinished && r.rom === "valid"
+                        ? "unfinished"
+                        : r.message;
                 console.log(`          ${r.text.padEnd(32)} ${why}`);
             }
         }
@@ -200,7 +213,13 @@ async function main() {
     }));
     const romTokens = i => (results[i].rom === "valid" ? rom[i].tokens : null);
     const marks = results.map((r, i) => readMarks(r.text, highlighted[i].invalid, romTokens(i)));
-    await dropMarksNeverRead(results, marks);
+    // Where the ROM runs a statement, the marks that are deliberate are kept apart from the others.
+    const onPurpose = results.map((r, i) =>
+        r.rom === "valid" ? marks[i].filter(mark => isCovered(highlighted[i].stricter, mark)) : [],
+    );
+    marks.forEach((list, i) => (marks[i] = list.filter(mark => !onPurpose[i].includes(mark))));
+    await dropMarksNeverRead(results, marks, "invalid");
+    await dropMarksNeverRead(results, onPurpose, "stricter");
     results.forEach((r, i) => {
         r.unfinished =
             !r.invalid && readMarks(r.text, highlighted[i].unfinished, romTokens(i)).length > 0;

@@ -1,6 +1,6 @@
 // Run by oracle.mjs through vitest, which gives Monaco the DOM it needs: tokenises each statement in ORACLE_IN and
-// writes, for each, {invalid, unfinished} to ORACLE_OUT: its invalid tokens as [start, end], and the ends of the lines the
-// new tokenizer takes to be unfinished.
+// writes, for each, {invalid, unfinished, stricter} to ORACLE_OUT: its invalid tokens as [start, end], the ends of the lines the
+// new tokenizer takes to be unfinished, and the spans it marks on purpose where the ROM would run the text.
 import {registerBbcBasicLanguage} from "../../src/bbcbasic";
 import {programProblems} from "../../src/parser/highlight";
 import {it} from "vitest";
@@ -21,7 +21,10 @@ it("highlights the oracle's statements", () => {
         const unfinished = newParser
             ? programProblems(text).flatMap(p => (p.unfinished ? [[p.start, p.end]] : []))
             : [];
-        return {invalid, unfinished};
+        const stricter = newParser
+            ? programProblems(text).flatMap(p => (p.stricter ? [[p.start, p.end]] : []))
+            : [];
+        return {invalid, unfinished, stricter};
     });
     fs.writeFileSync(process.env.ORACLE_OUT, JSON.stringify(verdicts));
 });

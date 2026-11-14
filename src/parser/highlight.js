@@ -119,7 +119,7 @@ export function highlightLine(text, inAssembler = false) {
     return {tokens: joined, inAssembler: open};
 }
 
-// What each line's errors are, for editor markers: {line, start, end, message, unfinished, hole}. An unfinished line is
+// What each line's errors are, for editor markers: {line, start, end, message, unfinished, hole, stricter}. An unfinished line is
 // shown at its last token and on to the end of the line, and one that something is missing from (a `hole`) at the token
 // where it stops; `message` is the error BASIC would give, or null where the recogniser does not know it. A block
 // that is never closed is one problem at its "[" ({unclosed: true}) in place of those of the lines after it, if it has any.
@@ -131,13 +131,14 @@ export function programProblems(text) {
         inAssembler = recogniser.line();
         if (recogniser.opener) block = {line: i + 1, token: recogniser.opener};
         const last = recogniser.tokens.findLast(token => token.kind !== "white");
-        return recogniser.problems.map(({message, token, unfinished, hole}) => ({
+        return recogniser.problems.map(({message, token, unfinished, hole, stricter}) => ({
             line: i + 1,
             start: unfinished && !hole ? last.start : token.start,
             end: unfinished && !hole ? lineText.length : token.end,
             message,
             unfinished,
             hole,
+            stricter: Boolean(stricter),
         }));
     });
     if (!inAssembler || !block) return problems;
