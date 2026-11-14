@@ -361,7 +361,8 @@ export function registerBbcBasicLanguage() {
         brackets: [
             ["[", "]"],
             ["(", ")"],
-            ...hiddenOpenParens.map(open => [open.toLowerCase(), ")"]),
+            // A spelling that ends in "(" is opened by that "(", which leaves the keyword before it uncoloured as a bracket.
+            ...hiddenOpenParens.filter(open => !open.endsWith("(")).map(open => [open.toLowerCase(), ")"]),
         ],
         autoClosingPairs: [
             {open: "(", close: ")"},
