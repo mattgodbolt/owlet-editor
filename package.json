@@ -62,6 +62,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "lint-fix": "eslint --fix .",
+    "format:check": "prettier --check .",
     "test": "vitest",
     "prepare": "husky"
   },

@@ -1,4 +1,10 @@
-import {debbreviate, detokenise, expandCode, forEachBasicLine, partialDetokenise} from "../src/tokens";
+import {
+    debbreviate,
+    detokenise,
+    expandCode,
+    forEachBasicLine,
+    partialDetokenise,
+} from "../src/tokens";
 import {describe, it} from "vitest";
 import assert from "assert";
 
@@ -59,9 +65,32 @@ VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
         assert.strictEqual(detokenise("\xf1X\x84Y"), "PRINTX ORY");
     });
     it("shouldn't expand tokens after DATA or REM, tokenised, typed or abbreviated", () => {
-        const cases = [["\xdc", "DATA"], ["DATA"], ["DAT."], ["DA."], ["D."], ["\xf4", "REM"], ["REM"]];
+        const cases = [
+            ["\xdc", "DATA"],
+            ["DATA"],
+            ["DAT."],
+            ["DA."],
+            ["D."],
+            ["\xf4", "REM"],
+            ["REM"],
+        ];
         for (const [keyword, expanded = keyword] of cases)
             assert.strictEqual(detokenise(`${keyword}X\x84Y`), `${expanded}X\u0184Y`, keyword);
+    });
+});
+
+describe("Expanding a token byte straight after DATA or REM", () => {
+    it("should leave it raw, as the tokeniser does, however DATA or REM was written", () => {
+        const cases = [
+            ["D.", "DATA"],
+            ["DAT.", "DATA"],
+            ["DATA"],
+            ["\xdc", "DATA"],
+            ["REM"],
+            ["\xf4", "REM"],
+        ];
+        for (const [keyword, expanded = keyword] of cases)
+            assert.strictEqual(expandCode(`${keyword}\xf1A`), `${expanded}\xf1A`, keyword);
     });
 });
 
@@ -85,10 +114,11 @@ describe("Debbreviation", () => {
         assert.strictEqual(debbreviate("*H."), "*H.");
         assert.strictEqual(debbreviate("10*H."), "10*H.");
         assert.strictEqual(debbreviate("IF1*H.:*H."), "IF1*HIMEM:*H.");
-        assert.strictEqual(debbreviate("ONERR.*K.0PA.=4608|MO.|MRU.|M"),
-                           "ONERROR*K.0PA.=4608|MO.|MRU.|M");
-        assert.strictEqual(debbreviate("IFCOU.TH.*LO. P.DATA"),
-                           "IFCOUNTTHEN*LO. P.DATA");
+        assert.strictEqual(
+            debbreviate("ONERR.*K.0PA.=4608|MO.|MRU.|M"),
+            "ONERROR*K.0PA.=4608|MO.|MRU.|M",
+        );
+        assert.strictEqual(debbreviate("IFCOU.TH.*LO. P.DATA"), "IFCOUNTTHEN*LO. P.DATA");
         assert.strictEqual(debbreviate("P.\n*H.\nP."), "PRINT\n*H.\nPRINT");
     });
 });
@@ -154,10 +184,14 @@ describe("Expanding code", () => {
         assert.strictEqual(expandCode(`${tokens}\n\xf1A`, fits), `${tokens}\nPRINTA`);
     });
     it("leaves lines that are not tokens alone", () => {
-        assert.strictEqual(expandCode("P.A", () => false), "P.A");
+        assert.strictEqual(
+            expandCode("P.A", () => false),
+            "P.A",
+        );
     });
     it("does not mistake a short ASCII program for base2048", () => {
-        for (const program of ["END", "RUN", "GOTO10"]) assert.strictEqual(expandCode(program), program);
+        for (const program of ["END", "RUN", "GOTO10"])
+            assert.strictEqual(expandCode(program), program);
     });
     it("still decodes base2048, with or without the clamp emoji", () => {
         assert.strictEqual(expandCode("🗜༤ı3"), "\xf1A\r");
