@@ -1283,9 +1283,6 @@ describe("Syntax markers", () => {
     });
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
-        assert.deepStrictEqual(markers("FOR I=1:NEXT"), [
-            [MarkerSeverity.Warning, Hole("No TO"), 1, 7, 8],
-        ]);
         assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
             [MarkerSeverity.Warning, Hole("Missing ,"), 1, 12, 13],
         ]);
@@ -1336,6 +1333,7 @@ describe("Syntax markers", () => {
             ["GOTO 20 30", "Syntax error", 9, 11],
             ["PRINT )", "No such variable", 7, 8],
             ["X=1+*", "No such variable", 5, 6],
+            ["FOR I=1:NEXT", "No TO", 7, 8],
             ["A$=LEFT$(X$,1,2)", "Missing )", 16, 17],
             ["A=1'", "Syntax error", 4, 5],
         ])

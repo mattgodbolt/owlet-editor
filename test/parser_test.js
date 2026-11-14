@@ -144,6 +144,8 @@ describe("Text that is wrong, not unfinished", () => {
         ["PRINT (1+2))", [")"]],
         ["A$=LEFT$(X$,1,", [","]],
         ["X=RND(1,", [","]],
+        ["GOTO:PRINT", ["GOTO"]],
+        ["FOR I=1 TO:NEXT", ["TO"]],
     ])("%s should be red", (text, expected) => {
         assert.deepStrictEqual(red(text), expected);
     });
@@ -162,43 +164,63 @@ function keysTyped(typed, after = "") {
     });
 }
 
-describe("A line typed in an editor that closes brackets, or in front of existing text", () => {
+describe("A line typed in an editor that closes brackets", () => {
     it.each([
-        ["PRINT (1+2)*3", ""],
-        ["A$=LEFT$(B$,2)", ""],
-        ['PRINT TAB(1,2);"x"', ""],
-        ["PROCbox(1,2)", ""],
-        ["DIM a(10)", ""],
-        ["FOR I=1 TO 10", ":PRINT I:NEXT"],
-        ["GOTO 100", ":REM x"],
-        ["IF A=1 THEN ", " PRINT 2"],
-        ["X=1+2", ":PRINT X"],
-        ["IF A THEN GOTO", " ELSE PRINT 1"],
-    ])("%s typed before %j should be red on no key", (typed, after) => {
+        ["PRINT (1+2)*3"],
+        ["A$=LEFT$(B$,2)"],
+        ['PRINT TAB(1,2);"x"'],
+        ["PROCbox(1,2)"],
+        ["DIM a(10)"],
+        ["PRINT LEFT$(A$,LEN(B$))"],
+    ])("%s should be red on no key", typed => {
         assert.deepStrictEqual(
-            keysTyped(typed, after).filter(text => invalid(text).length),
+            keysTyped(typed).filter(text => invalid(text).length),
             [],
         );
     });
-    it("should be red only where a word typed in front of another is one with it", () => {
-        const text = keysTyped("IF A=1 THEN ", "PRINT 2").filter(key => invalid(key).length);
-        assert.deepStrictEqual(text, [
-            "IPRINT 2",
-            "IF APRINT 2",
-            "IF A=1 TPRINT 2",
-            "IF A=1 THPRINT 2",
-            "IF A=1 THEPRINT 2",
-        ]);
-    });
-    it.each([
-        ["GOTO:PRINT", "GOTO"],
-        ["FOR I=1 TO:NEXT", "TO"],
-        ["A$=LEFT$(B$)", ")"],
-    ])("%s should be unfinished at its hole, not red", (text, at) => {
-        assert.deepStrictEqual(invalid(text), []);
-        const [problem] = programProblems(text);
+    it("should be unfinished at the ) with the last argument missing, and red with one too many", () => {
+        const [problem] = programProblems("A$=LEFT$(B$)");
+        assert.deepStrictEqual(invalid("A$=LEFT$(B$)"), []);
         assert.strictEqual(problem.unfinished, true);
-        assert.strictEqual(text.slice(problem.start, problem.end), at);
+        assert.strictEqual("A$=LEFT$(B$)".slice(problem.start, problem.end), ")");
+        assert.deepStrictEqual(red("A$=LEFT$(B$,1,2)"), [")"]);
+    });
+});
+
+// Text typed in front of existing text is red where BASIC stops at a colon, ELSE or keyword that follows a statement
+// still to be finished: no typing at the end of the line mends that.
+describe("A line typed in front of existing text", () => {
+    it.each([
+        [
+            "FOR I=1 TO 10",
+            ":PRINT I:NEXT",
+            [
+                "F",
+                "FO",
+                "FOR",
+                "FOR ",
+                "FOR I",
+                "FOR I=",
+                "FOR I=1",
+                "FOR I=1 ",
+                "FOR I=1 T",
+                "FOR I=1 TO",
+                "FOR I=1 TO ",
+            ],
+        ],
+        ["GOTO 100", ":REM x", ["G", "GO", "GOT", "GOTO", "GOTO "]],
+        [
+            "IF A=1 THEN ",
+            " PRINT 2",
+            ["I", "IF", "IF ", "IF A=", "IF A=1 T", "IF A=1 TH", "IF A=1 THE"],
+        ],
+        ["X=1+2", ":PRINT X", ["X", "X=", "X=1+"]],
+    ])("%s typed before %j should be red only on %j", (typed, after, prefixes) => {
+        const reds = keysTyped(typed, after)
+            .map((text, i) => [text, typed.slice(0, i + 1)])
+            .filter(([text]) => invalid(text).length)
+            .map(([, prefix]) => prefix);
+        assert.deepStrictEqual(reds, prefixes);
     });
 });
 

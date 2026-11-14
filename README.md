@@ -60,18 +60,21 @@ of the line could change that. The colours are a function of the text alone, whe
   its ordinary colours, so a line can be typed a key at a time. Something is still to be typed where the line ends:
   `G`, `GOTO`, `GOTO `, `FOR I=1 TO`, `PRINT (1+`, `PRINT "HI` (a string with no closing quote yet) and `[LDA` are
   unfinished, including a name or keyword that could grow into a longer keyword (`FOR I=1 T`, `X=1 AN`, `ENDP`, `MOD`
-  for `MODE`, `A=TO` for `TOP`) or a mnemonic (`[LD`). It is also still to be typed where the statement stops at a `)`,
-  `,`, `:` or `ELSE` (or at a statement keyword where a value was wanted, if text follows it), when some text typed
-  there would make the statement valid: an editor that closes brackets leaves `LEFT$(B$)` and `PRINT ()` while the
-  arguments are typed, and text typed in front of what is already there leaves `FOR I=1 TO:PRINT I`, `GOTO:REM x` and
-  `IF PRINT 2`. The recogniser tries a short list of fillers (a value, `,1`, ` TO 1`, `1 THEN `, `#1`...) at that
-  point, and a completion of the word before it, and asks whether the statement is then valid. The colour cannot know
-  the cursor, so a line that stays like that in a finished program is shown by a marker instead, below. A rejected
-  statement of that kind that the ROM also rejects (`GOTO:PRINT`, `A$=LEFT$(B$)`) is therefore not red either; the
-  oracle counts it as agreement and lists it apart. What is red is text that no typing at the end, or at a closer or
-  keyword where the statement stopped, could repair: `GOTO 20 30`, `PRINT )`, `A=1'`, `X=1+*`, `PRINT (1+2))`. Words
-  typed straight against the word after them with no space (`IF A=1 TPRINT 2`, which is a name, `TPRINT`, and a
-  number) are red until the space is typed; the recogniser does not look for a hole inside a word.
+  for `MODE`, `A=TO` for `TOP`) or a mnemonic (`[LD`). One more shape is unfinished: a statement that stops at a `)`
+  when something typed just before it would make the statement valid (a missing operand, argument or trailing `,`, or
+  the rest of a word before it). That is what an editor that closes brackets shows while a call is typed:
+  `A$=LEFT$()`, `A$=LEFT$(B)`, `A$=LEFT$(B$,)`, `PRINT (1+)`, `PRINT TAB(1,)` and `DIM a()`. Monaco closes only `(` and `"`, and
+  an open `"` is unfinished already. The recogniser tries a short list of fillers (a value, `,1`, `1,1`...) at the `)`,
+  and the completion of the word before it, and asks whether the statement is then valid. `A$=LEFT$(X$)` is also
+  unfinished, though it is one argument short as written, because it is what the editor shows at `LEFT$(X$|)` and
+  cannot be told apart from the finished text. The colour cannot know the cursor, so a line that stays like that in a
+  finished program is shown by a marker instead, below. Everything else that stops short is red, with no allowance
+  for text typed in front of what is already there: no typing at the end of the text mends it, and the ROM rejects it
+  as written. `GOTO:PRINT`, `FOR I=1 TO:NEXT`, `IF PRINT 2` and `X=1+:PRINT X` are red, and so are `GOTO 20 30`, `PRINT )`,
+  `A=1'`, `X=1+*` and `PRINT (1+2))`. A line typed in front of existing text is therefore red at the keys where the
+  statement is not yet finished (`FOR I=1 TO 10` in front of `:PRINT I:NEXT` is red from `F` to `FOR I=1 TO `, and not
+  red once the `10` is there). Words typed straight against the word after them with no space (`IF A=1 TPRINT 2`,
+  which is a name, `TPRINT`, and a number) are red until the space is typed.
 - **Markers** (`?parser=new`): about half a second after the last edit (the old markers stay, and move with the text,
   until then), a statement BASIC would stop at gets an error squiggle, and a line that is unfinished gets a warning
   squiggle: at its end, or at the token where the statement stopped when something is missing from the middle. Both
@@ -94,7 +97,7 @@ of the line could change that. The colours are a function of the text alone, whe
 - **Unfinished is a third answer in the oracle.** A statement the ROM rejects and the recogniser calls unfinished is
   neither a false-valid nor a false-invalid; the oracle counts it as agreement and lists it apart, and also lists
   any such statement that the ROM accepts (there must be none), outside the text BASIC skips. Where a statement is
-  unfinished at a hole, some insertion there should make the ROM accept it; the oracle does not check that, so
+  unfinished at a `)`, some insertion there should make the ROM accept it; the oracle does not check that, so
   check it by hand with the ROM when the fillers in `src/parser/recogniser.js` change.
 - **Stricter than the ROM only on purpose.** Each other deliberate exception, such as text after a complete assembler
   instruction, is a row of the recorded table listed as stricter than the ROM in its test.

@@ -55,35 +55,16 @@ const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 // TOP is not in the table: BASIC reads it as TO and a P.
 const Completions = [...new Set([...keywords.map(kw => kw.keyword), ...Mnemonics, "TOP"])];
 
-// What might be typed at a point where something is missing, to see whether anything could make the statement valid
-// there: an operand, more arguments, the rest of a FOR, THEN, or a channel.
-const Fillers = [
-    "",
-    "1",
-    "A",
-    ",1",
-    "1,1",
-    ",1,1",
-    "=1",
-    "=1 TO 1",
-    "I=1 TO 1",
-    "1 TO 1",
-    "TO 1",
-    "1 THEN ",
-    "1:",
-    "#1",
-    "#1,1",
-];
-const HoleAtPunct = new Set([")", ",", ":"]);
+// What might be typed before a ) to supply what is missing: an operand, or more arguments.
+const Fillers = ["", "1", "A", ",1", "1,1", ",1,1"];
 
-// `at` is the token that was next when BASIC stopped, and `operand` says that a value was wanted there.
+// `at` is the token that was next when BASIC stopped.
 export class Failure {
-    constructor(message, token, unfinished, at, operand) {
+    constructor(message, token, unfinished, at) {
         this.message = message;
         this.token = token;
         this.unfinished = unfinished;
         this.at = at;
-        this.operand = operand;
     }
 }
 
@@ -136,8 +117,8 @@ export class Recogniser {
     }
 
     // `message` is the ROM's error. The error is unfinished if the line ends where the text is wrong.
-    fail(message, token = this.peek(), unfinished = token.kind === "end", operand = false) {
-        throw new Failure(message, token, unfinished, operand ? token : this.peek(), operand);
+    fail(message, token = this.peek(), unfinished = token.kind === "end") {
+        throw new Failure(message, token, unfinished, this.peek());
     }
 
     expectPunct(text, message = ExpectedPunct[text]) {
@@ -251,57 +232,44 @@ export class Recogniser {
         );
     }
 
-    // Whether something typed where the statement stopped, or after a name just before it that begins a keyword, would
-    // make the statement valid: text typed in front of what is already there (FOR I=1 TO 10 in front of :PRINT) and an
-    // argument between the brackets the editor has closed already are missing until they are typed.
-    repairable({token, at, operand}, statementStart) {
-        if (this.probing) return false;
+    // Whether the statement stopped at a ) with something missing before it: the argument an editor that closes
+    // brackets has not been given yet (LEFT$(B$)), or the rest of a name or keyword just before it. Text typed in front of
+    // existing text is not one: GOTO:PRINT is red, as BASIC stops there, and no typing at the end of the line mends it.
+    repairable({at}, statementStart) {
+        if (this.probing || at.kind !== "punct" || at.text !== ")") return false;
         const {text} = this.lexer;
-        const tokens = this.lexer.tokens;
-        const inStatement = tokens.filter(
+        const inStatement = this.lexer.tokens.filter(
             t => t.kind !== "white" && t.start >= statementStart.start,
         );
-        const closes =
-            (at.kind === "punct" && HoleAtPunct.has(at.text)) || at.kw?.keyword === "ELSE";
-        // A keyword where a value is wanted is the start of what follows if something has been typed in front of it.
-        const before = operand && at.kind === "keyword" && text.slice(at.end).trim();
-        const positions = new Set(closes || before ? [at.start] : []);
-        // A name that BASIC stopped at, or that stands apart before a statement keyword or a closer it stopped at, may be
-        // the start of a keyword.
-        const previous = at.spaced && inStatement.findLast(t => t.start < at.start);
-        const names = [token];
-        if (closes || at.kind === "keyword") names.push(previous);
-        for (const name of names) if (name?.kind === "name") positions.add(name.end);
-        for (const pos of positions) {
-            const starts = [];
-            const name = inStatement.find(t => t.kind === "name" && t.end === pos);
-            if (name) {
-                starts.push(name.start);
-                const word = inStatement.find(t => t.kind === "keyword" && t.end === name.start);
-                if (word) starts.push(word.start);
-            }
-            for (const start of [null, ...starts]) {
-                const typed = start === null ? "" : text.slice(start, pos).toUpperCase();
-                const words =
-                    start === null
-                        ? [null]
-                        : Completions.filter(
-                              word => word.length > typed.length && word.startsWith(typed),
-                          );
-                for (const word of words) {
-                    const head = start === null ? text.slice(0, pos) : text.slice(0, start) + word;
-                    const tail = text.slice(pos);
-                    for (const filler of Fillers) {
-                        if (word === null && !filler) continue;
-                        const candidate =
-                            head +
-                            (filler && /[\w`$%]$/.test(head) && /^[\w`]/.test(filler) ? " " : "") +
-                            filler +
-                            (/[\w`]$/.test(filler) && /^[\w`]/.test(tail) ? " " : "") +
-                            tail;
-                        const from = candidate.length - tail.length;
-                        if (this.valid(candidate, statementStart, from)) return true;
-                    }
+        // Where to try, and the start of the word there that might grow, or null to insert at the bracket.
+        const attempts = [[at.start, null]];
+        const name = inStatement.findLast(t => t.start < at.start);
+        if (name?.kind === "name" && name.end === at.start) {
+            attempts.push([name.end, name.start]);
+            const word = inStatement.find(t => t.kind === "keyword" && t.end === name.start);
+            if (word) attempts.push([name.end, word.start]);
+        }
+        for (const [pos, start] of attempts) {
+            const typed = start === null ? "" : text.slice(start, pos).toUpperCase();
+            const words =
+                start === null
+                    ? [null]
+                    : Completions.filter(
+                          word => word.length > typed.length && word.startsWith(typed),
+                      );
+            for (const word of words) {
+                const head = start === null ? text.slice(0, pos) : text.slice(0, start) + word;
+                const tail = text.slice(pos);
+                for (const filler of Fillers) {
+                    if (word === null && !filler) continue;
+                    const candidate =
+                        head +
+                        (filler && /[\w`$%]$/.test(head) && /^[\w`]/.test(filler) ? " " : "") +
+                        filler +
+                        (/[\w`]$/.test(filler) && /^[\w`]/.test(tail) ? " " : "") +
+                        tail;
+                    const from = candidate.length - tail.length;
+                    if (this.valid(candidate, statementStart, from)) return true;
                 }
             }
         }
@@ -512,7 +480,7 @@ export class Recogniser {
         }
         if (keyword === "FN") return this.call();
         if (keyword === "TO" && this.top()) return;
-        this.fail("No such variable", token, false, true);
+        this.fail("No such variable", token);
     }
 
     // The end of the line, or text that can still be finished: a string with no end yet, or a & with no digits.
