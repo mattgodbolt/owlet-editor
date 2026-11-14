@@ -24,7 +24,10 @@
   ["A$=LEFT$A$", "41 24 3d 4c 45 46 54 24 41 24"],
   ["BG=1", "42 47 3d 31"],
   ["A=BG.#1", "41 3d 9a 23 31"],
-  ["DEFFN3D PROC1to1:PRO.2too:=FN42", "dd a4 33 44 20 f2 31 74 6f 31 3a f2 32 74 6f 6f 3a 3d a4 34 32"],
+  [
+    "DEFFN3D PROC1to1:PRO.2too:=FN42",
+    "dd a4 33 44 20 f2 31 74 6f 31 3a f2 32 74 6f 6f 3a 3d a4 34 32"
+  ],
   ["DEFFNs($@%,H)", "dd a4 73 28 24 40 25 2c 48 29"],
   ["TOOMUCH=1", "b8 4f 4d 55 43 48 3d 31"],
   ["X=TOP", "58 3d b8 50"],
@@ -44,7 +47,10 @@
   ["IFX THEN200ELSE210", "e7 58 20 8c 8d 64 48 40 8b 8d 64 52 40"],
   ["ON ERROR 30", "ee 20 85 20 33 30"],
   ["RESTORE 60:TRACE 130", "f7 20 8d 54 7c 40 3a fc 20 8d 74 42 40"],
-  ["LIST 230:AUTO 240:DELETE 10,20:RENUMBER 10,20", "c9 20 8d 64 66 40 3a c6 20 8d 64 70 40 3a c7 20 8d 54 4a 40 2c 8d 54 54 40 3a cc 20 8d 54 4a 40 2c 8d 54 54 40"],
+  [
+    "LIST 230:AUTO 240:DELETE 10,20:RENUMBER 10,20",
+    "c9 20 8d 64 66 40 3a c6 20 8d 64 70 40 3a c7 20 8d 54 4a 40 2c 8d 54 54 40 3a cc 20 8d 54 4a 40 2c 8d 54 54 40"
+  ],
   ["TAB(10", "8a 8d 54 4a 40"],
   ["REPORT 10", "f6 20 8d 54 4a 40"],
   ["ERROR 10", "85 20 31 30"],

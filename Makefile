@@ -52,6 +52,10 @@ lint: prereqs  ## Checks if the source currently matches code conventions
 lint-fix: prereqs  ## Checks if everything matches code conventions & fixes those which are trivial to do so
 	$(NPM) run lint-fix
 
+.PHONY: format-check
+format-check: prereqs  ## Checks that Prettier would not change any file
+	$(NPM) run format:check
+
 .PHONY: test
 test: prereqs  ## Runs the tests
 	$(NPM) run test
@@ -59,6 +63,9 @@ test: prereqs  ## Runs the tests
 
 .PHONY: check
 check: test lint-fix  ## Runs all checks required before committing (fixing trivial things automatically)
+
+.PHONY: ci-check
+ci-check: test lint format-check  ## What CI runs: the same checks as the pre-commit hook, but failing instead of fixing
 
 .PHONY: clean
 clean:  ## Cleans up everything

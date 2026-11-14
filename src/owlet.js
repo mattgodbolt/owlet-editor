@@ -18,6 +18,7 @@ import {colourBrackets, getWarnings, LanguageId} from "./bbcbasic";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
+import {createVduReference} from "./vdu-reference";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
@@ -291,7 +292,7 @@ export class OwletEditor {
             $play.html("&#10074;&#10074;");
         }
 
-        for (const element of ["screen", "about", "examples"]) {
+        for (const element of ["screen", "about", "examples", "reference"]) {
             $(`#${element}`).toggle(element === selected);
             $(`#${element}-button`).toggleClass("selected", element === selected);
         }
@@ -474,6 +475,10 @@ export class OwletEditor {
             emulator: () => this.selectView("screen"),
             examples: () => this.selectView("examples"),
             about: () => this.selectView("about"),
+            reference: () =>
+                this.selectView(
+                    $("#reference-button").hasClass("selected") ? "screen" : "reference",
+                ),
 
             virtualbeeb: () => {
                 const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";
@@ -554,6 +559,8 @@ export class OwletEditor {
             closeModal: () => this.closeModal(),
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
+
+        createVduReference($("#reference")[0]);
 
         this.setState(initialState);
     }
