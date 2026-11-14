@@ -52,7 +52,7 @@ function codeColumn(code) {
 
 function vduRows(query) {
     return VduCodes.filter(c =>
-        matchesCode(query, c.code, c.syntax, c.name, c.example?.join(" ") ?? ""),
+        matchesCode(query, c.code, c.syntax, c.name, c.example?.join(" ") ?? "", c.note ?? ""),
     ).map(c => {
         const row = el("div", "vdu-row");
         const text = el("div", "vdu-text");
@@ -62,6 +62,7 @@ function vduRows(query) {
             example.append(el("code", "", c.example[0]), ` ${c.example[1]}`);
             text.append(example);
         }
+        if (c.note) text.append(el("span", "vdu-example", c.note));
         row.append(codeColumn(c.code), text);
         return row;
     });

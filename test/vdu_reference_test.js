@@ -142,6 +142,20 @@ describe("the panel", () => {
         expect(text()).toContain("e.g. VDU 31,10,5 is PRINT TAB(10,5);");
     });
 
+    it.each([
+        [22, "VDU 22 does not"],
+        [23, "6845"],
+        [26, "graphics origin"],
+        [30, "VDU 5 in effect"],
+    ])("explains VDU %i beyond its name", (code, phrase) => {
+        const {container, search, text} = setup();
+        const note = VduCodes.find(c => c.code === code).note;
+        expect(note).toContain(phrase);
+        search(`&${code.toString(16)}`);
+        expect(text()).toContain(note);
+        expect(container.querySelectorAll(".vdu-row")).toHaveLength(1);
+    });
+
     it("shows all the PLOT codes on the PLOT tab", () => {
         const {container, count} = setup();
         container.querySelector('[data-tab="plot"]').click();
