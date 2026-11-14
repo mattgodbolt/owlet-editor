@@ -58,6 +58,10 @@ Red means that BBC BASIC II would stop with an error at that statement if it ran
 - **Stricter than the ROM only on purpose.** Each deliberate exception, such as text after a complete assembler
   instruction, is a row of the recorded table listed as stricter than the ROM in its test.
 
+Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
+`src/bbcbasic.js`: a port of the ROM's tokeniser, a recogniser that marks the token at which BASIC would stop with an
+error, and the assembler. The default is still the Monarch grammar.
+
 Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
 statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
 `--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict. Before a change

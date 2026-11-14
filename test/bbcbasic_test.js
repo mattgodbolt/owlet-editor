@@ -7,9 +7,10 @@ import {
 } from "../src/bbcbasic";
 import {keywords} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
+import RomTokens from "./rom-tokens.json";
 import {beforeAll, describe, it} from "vitest";
 import assert from "assert";
-import {editor, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
 registerBbcBasicLanguage();
 
@@ -89,6 +90,8 @@ function checkWarnings(text, ...expected) {
 // error at each, or never reads what is marked (ON ERROR 30 reads the 30 only after an error), as test/rom-verdicts.json
 // records. The new tokenizer marks the token where BASIC stops, so it shows an error where the grammar shows none
 // (TIME r), or at a different token (H.TO), or only the first in a statement.
+const romTokens = new Map(RomTokens);
+
 const NewTokenizerDifferences = {
     CALL: ["0:invalid"],
     "C.": ["0:invalid"],
@@ -134,6 +137,36 @@ const NewTokenizerDifferences = {
     "REP.X": ["0:keyword 4:invalid"],
     "END.X": ["0:invalid 3:number.float 4:variable"],
     "DEFFNmain:{=0}": ["0:keyword 5:variable 9:symbol 10:invalid 11:operator 12:number 13:symbol"],
+    // The tokeniser makes no keyword inside a name, so FN is not one here.
+    "[\nEQUSFNx": {
+        tokens: ["0:delimiter.square", "0:keyword.directive 4:variable"],
+        rows: ["EQUSFNx"],
+    },
+    "[LDA CLEAR+CLG+CLS+DEF+ENDPROC+END+LINE+NEW+OLD+OFF\nSTA RETURN+REPEAT+REPORT+RUN+STEP+SPC+STOP+TO+TAB(1):]":
+        {
+            tokens: [
+                "0:delimiter.square 1:keyword 4:white 5:invalid 10:operator 11:keyword 14:operator 15:keyword 18:operator 19:keyword 22:operator 23:keyword 30:operator 31:keyword 34:operator 35:keyword 39:operator 40:keyword 43:operator 44:keyword 47:operator 48:keyword",
+                "0:keyword 3:white 4:invalid 10:operator 11:keyword 17:operator 18:keyword 24:operator 25:keyword 28:operator 29:keyword 33:operator 34:keyword 37:operator 38:keyword 42:operator 43:keyword 45:operator 46:keyword 50:number 51:delimiter.parenthesis 52:symbol 53:delimiter.square",
+            ],
+            rows: ["[OPT0:LDA CLEAR:]"],
+        },
+    "[\nLDA #\u00e0\n]": {
+        tokens: [
+            "0:delimiter.square",
+            "0:keyword 3:white 4:symbol 5:invalid",
+            "0:delimiter.square",
+        ],
+        rows: ["[OPT0:LDA #END:]"],
+    },
+    // A ; comment needs an instruction before it.
+    "[;notacomment": {
+        tokens: ["0:delimiter.square 1:invalid 2:variable"],
+        rows: ["[OPT0:;notacomment:]"],
+    },
+    "[NOP ; a\n;notacomment": {
+        tokens: ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid 1:variable"],
+        rows: ["[OPT0:;notacomment:]"],
+    },
     "!": ["0:invalid"],
     // BASIC stops with No FN, which is not a syntax error, so this one has no verdict in the table.
     "=": ["0:invalid"],
@@ -150,13 +183,17 @@ const NewTokenizerDifferences = {
     ],
 };
 
-// Whether the tests run on the new tokenizer and the text is one it reads differently, having checked its tokens.
+// Whether the tests run on the new tokenizer and the text is one it reads differently, having checked its tokens and
+// that the ROM agrees: the text has a verdict, or for one that cannot be a row of the table, the rows given do.
 function differs(parser, text) {
     if (parser !== "new" || !(text in NewTokenizerDifferences)) return false;
-    assert.deepStrictEqual(tokens(text), NewTokenizerDifferences[text], text);
-    if (text !== "=") assert.ok(verdicts.has(text), `${text} has no verdict`);
-    const invalid = spanRanges(text, "invalid");
-    assert.deepStrictEqual(falseInvalid(text, invalid), [], text);
+    const entry = NewTokenizerDifferences[text];
+    const {tokens: expected, rows = [text]} = Array.isArray(entry) ? {tokens: entry} : entry;
+    assert.deepStrictEqual(tokens(text), expected, text);
+    for (const row of rows.filter(row => row !== "="))
+        assert.ok(verdicts.has(row) || romTokens.has(row), `${row} is not a recorded row`);
+    if (verdicts.has(text))
+        assert.deepStrictEqual(falseInvalid(text, spanRanges(text, "invalid")), [], text);
     return true;
 }
 
@@ -366,14 +403,8 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
             assert.deepStrictEqual(spans("PRINT TOP", "variable"), []);
             assert.deepStrictEqual(spans("A=TOP+1", "keyword"), ["TOP"]);
             assert.deepStrictEqual(spans("X=TOP-PAGE", "keyword"), ["TOP", "PAGE"]);
-            if (parser === "monarch") {
-                assert.deepStrictEqual(spans("[LDA #TOP MOD 256", "keyword"), [
-                    "LDA",
-                    "TOP",
-                    "MOD",
-                ]);
-                assert.deepStrictEqual(spans("[LDA #TOP MOD 256", "invalid"), []);
-            }
+            assert.deepStrictEqual(spans("[LDA #TOP MOD 256", "keyword"), ["LDA", "TOP", "MOD"]);
+            assert.deepStrictEqual(spans("[LDA #TOP MOD 256", "invalid"), []);
         });
         it("should read TO P in a FOR statement as the loop's TO unless an operand is expected", () => {
             // Each case's variables, then its keywords if they are not just FOR, TOP and TO.
@@ -646,8 +677,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
         });
     });
 
-    // The new tokenizer reads the assembler from the next commit.
-    (parser === "new" ? describe.skip : describe)("assembler", () => {
+    describe("assembler", () => {
         it("should recognise 6502 inside []", () => {
             const cases = [
                 [
@@ -690,21 +720,23 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ],
             ];
             for (const [text, expected] of cases)
-                assert.deepStrictEqual(tokens(text), expected, text);
+                if (!differs(parser, text)) assert.deepStrictEqual(tokens(text), expected, text);
         });
         it("should highlight tokens invalid in assembler", () => {
             const text = [
                 "[LDA CLEAR+CLG+CLS+DEF+ENDPROC+END+LINE+NEW+OLD+OFF",
                 "STA RETURN+REPEAT+REPORT+RUN+STEP+SPC+STOP+TO+TAB(1):]",
             ].join("\n");
-            assert.deepStrictEqual(
-                spans(text, "invalid"),
-                "CLEAR CLG CLS DEF ENDPROC END LINE NEW OLD OFF RETURN REPEAT REPORT RUN STEP SPC STOP TO TAB(".split(
-                    " ",
-                ),
-            );
+            if (!differs(parser, text))
+                assert.deepStrictEqual(
+                    spans(text, "invalid"),
+                    "CLEAR CLG CLS DEF ENDPROC END LINE NEW OLD OFF RETURN REPEAT REPORT RUN STEP SPC STOP TO TAB(".split(
+                        " ",
+                    ),
+                );
             // The raw END token is tagged as a string too, which keeps it out of bracket matching.
-            assert.deepStrictEqual(spans("[\nLDA #\u00e0\n]", "invalid.string"), ["\u00e0"]);
+            if (!differs(parser, "[\nLDA #\u00e0\n]"))
+                assert.deepStrictEqual(spans("[\nLDA #\u00e0\n]", "invalid.string"), ["\u00e0"]);
         });
         it("should treat a ; comment as text up to the next colon, whatever it says", () => {
             for (const comment of [
@@ -877,6 +909,38 @@ describe("The new tokenizer in Monaco", () => {
         assert.deepStrictEqual(spans("X=(1))", "invalid"), [")"]);
         for (const text of ["PRINTLE.A$,1)", "P.MID$(A$,2)", "P.LE.A$,1)", "P.LENMI.A$,2)"])
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
+    });
+});
+
+describe("The new tokenizer's state in a Monaco model", () => {
+    beforeAll(() => registerBbcBasicLanguage("new"));
+
+    it("should carry an open assembler block from line to line, through edits, undo and redo", () => {
+        const model = editor.createModel("[OPT 3\nLDA #1\n]\nLDA=1", LanguageId);
+        // The colour of the first token of each line, from the model's own incremental tokenization.
+        const firstColours = () => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            return Array.from({length: model.getLineCount()}, (_, i) =>
+                model.tokenization.getLineTokens(i + 1).getForeground(0),
+            );
+        };
+        try {
+            const [, mnemonic, , name] = firstColours();
+            assert.notStrictEqual(mnemonic, name);
+            // Without the "]", the last line is in the block, where LDA is a mnemonic.
+            model.pushEditOperations([], [{range: new Range(3, 1, 4, 1), text: ""}], () => null);
+            assert.deepStrictEqual(firstColours().slice(1), [mnemonic, mnemonic]);
+            model.undo();
+            const undone = firstColours();
+            assert.deepStrictEqual([undone[1], undone[3]], [mnemonic, name]);
+            model.redo();
+            assert.deepStrictEqual(firstColours().slice(1), [mnemonic, mnemonic]);
+            // Typing the "]" back at the end of the second line closes the block there.
+            model.pushEditOperations([], [{range: new Range(2, 7, 2, 7), text: ":]"}], () => null);
+            assert.deepStrictEqual(firstColours().slice(1), [mnemonic, name]);
+        } finally {
+            model.dispose();
+        }
     });
 });
 

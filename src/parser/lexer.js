@@ -94,7 +94,7 @@ export class Lexer {
     rawTo(kind) {
         if (this.queue.length) {
             this.pos = this.queue[0].start;
-            this.tokens.splice(this.tokens.indexOf(this.queue[0]));
+            this.tokens.splice(this.tokens.lastIndexOf(this.queue[0]));
             this.queue = [];
         }
         const colon = this.text.indexOf(":", this.pos);

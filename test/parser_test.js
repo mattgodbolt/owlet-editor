@@ -28,6 +28,9 @@ describe("Lexer", () => {
 // A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
 const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
 
+// Lines BASIC II runs that are marked on purpose (see the README): a keyword after a complete assembler instruction.
+const StricterThanRom = ["[OPT0:NOP PRINT:]", "[OPT0:LDA #1 FOR:]"];
+
 describe("Recogniser", () => {
     it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
         const invalid = text => {
@@ -38,15 +41,14 @@ describe("Recogniser", () => {
                     : [],
             );
         };
-        // The assembler is read from the next commit.
-        const wrong = RomVerdicts.filter(([text]) => !text.startsWith("[")).flatMap(
-            ([text, verdict]) => {
-                const marked = invalid(text);
-                if (verdict === "ok")
-                    return falseInvalid(text, marked).length ? [[text, verdict]] : [];
-                return marked.length || KnownGaps.includes(text) ? [] : [[text, verdict]];
-            },
-        );
+        const wrong = RomVerdicts.flatMap(([text, verdict]) => {
+            const marked = invalid(text);
+            if (verdict === "ok") {
+                const stricter = StricterThanRom.includes(text);
+                return falseInvalid(text, marked).length > 0 === stricter ? [] : [[text, verdict]];
+            }
+            return marked.length || KnownGaps.includes(text) ? [] : [[text, verdict]];
+        });
         assert.deepStrictEqual(wrong, []);
     });
     it("should still miss the known gaps, which come out of the list when they are fixed", () => {

@@ -558,5 +558,16 @@
   ["[OPT0:.@%:]", "ok", ""],
   ["[OPT0:LDA #1;x:]", "ok", "a9 01"],
   ["[OPT0:LDA 1,X;x:]", "ok", "b5 01"],
-  ["[OPT0:LDA (1),Y\\x:]", "ok", "b1 01"]
+  ["[OPT0:LDA (1),Y\\x:]", "ok", "b1 01"],
+  ["[OPT0:LDA #END:]", "No such variable"],
+  ["print \"mom, I need tendies!\"", "Mistake"],
+  ["goto 10", "Mistake"],
+  ["FOR x=1 to 10", "No TO"],
+  ["MODE 2:CIRCLE 640,512,200", "Mistake"],
+  ["IFB. N.", "Missing #"],
+  ["IF (X% AND A%)=0 PLOT X%*2,A%*2", "ok"],
+  ["Z", "Mistake"],
+  ["X=1:,23", "Syntax error"],
+  ["PLOT X%*2,A%*2", "Missing ,"],
+  ["IF 1 PLOT X%*2,A%*2", "Missing ,"]
 ]

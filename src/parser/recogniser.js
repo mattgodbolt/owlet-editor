@@ -1,6 +1,7 @@
 // Reads a line of BBC BASIC II as the interpreter does, by recursive descent over the lexer's tokens, and marks the
 // token at which BASIC would stop with an error: one per statement, then on to the next colon, as BASIC reports only
 // the first. Where there is no rule for a statement, anything is accepted.
+import {Flags} from "../tokens.js";
 import {Assembler} from "./assembler.js";
 import {Lexer} from "./lexer.js";
 
@@ -93,6 +94,15 @@ export class Recogniser {
     // Whether the next token follows the last with no space between.
     adjacent() {
         return !this.peek().spaced;
+    }
+
+    isFailure(e) {
+        return e instanceof Failure;
+    }
+
+    // Whether an expression can use the keyword.
+    isExpressionKeyword(token) {
+        return Boolean(token.kw.flags & Flags.Expr) || token.top;
     }
 
     fail(token = this.peek()) {

@@ -34,7 +34,7 @@ const tableFile = path.join(Root, "test", tokens ? "rom-tokens.json" : "rom-verd
 
 async function record(rom, text) {
     if (tokens) return [text, hex(await rom.tokenise(text))];
-    if (/^\d/.test(text)) return null;
+    if (/^\s*\d/.test(text)) return null;
     const verdict = await (text.startsWith("[") ? rom.assemble(text) : rom.run(text));
     if (verdict.timeout) return null;
     if (verdict.error === null)
