@@ -15,6 +15,9 @@ const StatementFormOffset = 0x40;
 // The character Owlet uses for a raw token byte.
 export const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
 const byChar = new Map(keywords.map(kw => [tokenChar(kw), kw]));
+const LineNumberToken = 0x8d;
+// A line number BASIC has already encoded: its token, as Owlet shows that byte, then three bytes.
+const EncodedLineNumber = /\u018d[\s\S]{3}/y;
 
 const Pattern = {
     white: /[ \t\r]+/y,
@@ -173,6 +176,7 @@ export class Lexer {
         if (c === ",") return this.push("punct", pos + 1);
         if (c === "*" && this.start) return this.push("oscli", text.length);
         if (this.lineNumber && (end = this.match(Pattern.digits))) return this.push("linenum", end);
+        if ((end = this.match(EncodedLineNumber))) return this.push("linenum", end, {raw: true});
         if ((end = this.match(Pattern.mantissa))) {
             // An E is an exponent unless it begins a keyword (1EOR2). The tokeniser skips the whole run of name
             // characters from the E, so what the exponent leaves of it is a name: 1E0TO2 is 1E0, then TO2.
@@ -211,14 +215,12 @@ export function lexLine(text) {
     return lexer.tokens;
 }
 
-const LineNumberToken = 0x8d;
-
 // The bytes BASIC stores for the line's tokens after its own number: what the ROM's tokeniser makes of it.
 export function romBytes(tokens) {
     return tokens.flatMap(token => {
         if (token.kind === "linenum" && token.own) return [];
         if (token.kind === "keyword" && !token.raw) return [token.kw.token];
-        if (token.kind === "linenum") {
+        if (token.kind === "linenum" && !token.raw) {
             const n = Number(token.text);
             const high = n >> 8;
             return [

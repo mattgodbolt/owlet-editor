@@ -684,6 +684,7 @@
   ["òp", "ok", "#156"],
   ["ä10:ô wrongly highlighted as invalid", "ok", "#156"],
   ["â2,3,2,-4,4,50,50,50,127,0,0,0,126,0:ô wrongly highlighted as invalid", "ok", "#156"],
+  ["åƍTJ@", "ok", "#161"],
   ["ON ERROR LOCAL", "ok", "#164"],
   ["V.23,255,255|", "No such variable", "#166"],
   ["[OPT0:LDA (&70),y:]", "Index", "#167"],

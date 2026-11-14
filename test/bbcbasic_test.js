@@ -182,6 +182,11 @@ const NewTokenizerDifferences = {
     "A=B<<C OR D>>E": [
         "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:operator 13:variable",
     ],
+    // A line number BASIC has already encoded (#161, #74).
+    "\xe5\u018dTJ@": ["0:keyword 1:constant.linenum"],
+    "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK": [
+        "0:keyword 1:constant.linenum 5:symbol 6:keyword 7:constant.linenum 11:symbol 12:keyword 13:comment",
+    ],
 };
 
 // Whether the tests run on the new tokenizer and the text is one it reads differently, having checked its tokens and
@@ -567,6 +572,12 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ],
                 ["#156", "\xf2p", "0:keyword 1:variable"],
                 ["#156", "\xdd\xf2x", "0:keyword 2:variable"],
+                ["#161", "\xe5\u018dTJ@", "0:keyword 1:invalid 2:variable 4:invalid"],
+                [
+                    "#74",
+                    "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK",
+                    "0:keyword.string 1:invalid 2:variable 4:invalid 5:symbol 6:keyword 7:invalid 8:variable 10:invalid 11:symbol 12:keyword 13:comment",
+                ],
                 ["#167", "[lda42,X", "0:delimiter.square 1:keyword 4:number 6:symbol 7:keyword"],
                 [
                     "#170",
