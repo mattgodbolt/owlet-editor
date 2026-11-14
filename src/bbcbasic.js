@@ -123,6 +123,21 @@ const notStatementRegex = (() => {
     );
 })();
 
+// The tokeniser reads the numbers after these as line numbers (THEN and ELSE also end their statement, so they have
+// their own rule).
+const lineNumberKeywords = keywords.filter(
+    kw => kw.flags & Flags.LineNumber && !["THEN", "ELSE"].includes(kw.keyword),
+);
+const lineNumberKeywordRegex = new RegExp(
+    [
+        tokensRegex(lineNumberKeywords),
+        ...allAbbreviations(lineNumberKeywords.map(kw => kw.keyword))
+            .filter(abbreviation => lineNumberKeywords.includes(abbreviatedKeyword(abbreviation)))
+            .map(escape),
+        byteTokensRegex(lineNumberKeywords),
+    ].join("|"),
+);
+
 // Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
 const hiddenOpenParens = [
@@ -173,8 +188,8 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+=><!*/:?$;,^']+/,
         tokenizer: {
             root: [
+                [/^[ \t]*\d+/, "constant.linenum"], // the line's own number
                 {include: "@whitespace"},
-                [/\d+/, "constant.linenum"], // line numbers
                 [notStatementRegex, "invalid", "@statement"],
                 [/(?=[^*])/, "", "@statement"], // As soon as we know this statement doesn't start with * we can process it with statement
                 [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
@@ -194,7 +209,18 @@ export function registerBbcBasicLanguage() {
                     /((BGET|BPUT|CLOSE|EOF|EXT|PTR)\b|B\.|BG\.|BGE\.|BP\.|BPU\.|CLO\.|CLOS\.|EO\.|PT\.|\u019a|\xd5|\xd9|\xc5|\xa2|\u018f|\xcf)/,
                     {token: "keyword", next: "@optionalHash"},
                 ],
-                [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|REPEAT|REP\.|\u018c|\u018b|\xf5/, "keyword", "@pop"], // THEN, ELSE and REPEAT end a statement
+                // THEN, ELSE and REPEAT end a statement.
+                [/THEN|THE\.|TH\.|ELSE|ELS\.|EL\.|\u018c|\u018b/, {token: "keyword", switchTo: "@lineNumbers"}],
+                [/REPEAT|REP\.|\xf5/, "keyword", "@pop"],
+                [
+                    lineNumberKeywordRegex,
+                    {
+                        cases: {
+                            [bracketCollisionRegex.source]: {token: "keyword.string", next: "@lineNumbers"},
+                            "@default": {token: "keyword", next: "@lineNumbers"},
+                        },
+                    },
+                ],
                 // A number after ERROR is not a line number, but a * command may follow ON ERROR.
                 [/(ERROR|ERRO\.|ERR\.|\u0185)(?=[ \t]*\*)/, "keyword", "@pop"],
                 // STR$ takes one ~, though a PRINT item can start with any number.
@@ -301,6 +327,14 @@ export function registerBbcBasicLanguage() {
                 ["", "", "@pop"],
             ],
             strayDot: [[/\.\d*/, "invalid", "@pop"]],
+            // As in the tokeniser, a space or comma does not end the list but anything else does: GOTO 10*2 is to line 10.
+            lineNumbers: [
+                {include: "@whitespace"},
+                [/\d+/, "constant.linenum"],
+                [/&[0-9A-F]+/, "number.hex"],
+                [",", "operator"],
+                ["", "", "@pop"],
+            ],
             optionalHash: [
                 [/[ \t\r]+/, "white"],
                 ["#", "symbol", "@pop"],

@@ -93,6 +93,7 @@ describe("Completions", () => {
             ["ON ERROR PRI‸", ["PRINT"]],
             ["ON ERROR OF‸", ["OFF"]],
             ["ON X GOS‸", ["GOSUB"]],
+            ["GOTO 10 A‸", ["AND", "ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
             ["TRACE O‸", ["OFF", "ON", "OPENIN", "OPENOUT", "OPENUP", "OR", "OSCLI"]],
             ["DEF PR‸", ["PRINT", "PROC"]],
             ["FORI=1T‸", ["TAN", "THEN", "TO", "TAB(", "TIME", "TRUE"]],

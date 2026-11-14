@@ -65,8 +65,9 @@ export function lineItems(line, lineTokens) {
 const nameKind = item => item && item.kw && NameKinds.get(item.kw.keyword);
 
 // A label starts an assembler statement as a colon does. The tokeniser joins a colon to the symbols before it (";:").
+// Only the line's own number starts one; the others are the targets of GOTO, THEN and the like.
 const startsStatement = item =>
-    item.type === `constant.linenum.${LanguageId}` ||
+    (item.type === `constant.linenum.${LanguageId}` && item.offset === 0) ||
     item.type === `type.identifier.${LanguageId}` ||
     (/^(symbol|operator)\./.test(item.type) && item.text.endsWith(":")) ||
     (item.kw && (item.kw.flags & Flags.Start || item.kw.keyword === "REPEAT"));
