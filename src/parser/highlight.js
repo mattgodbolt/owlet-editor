@@ -31,7 +31,7 @@ function stringParts(offset, text) {
 
 function dataParts(offset, text) {
     const parts = [];
-    for (DataPart.lastIndex = 0; DataPart.lastIndex < text.length; ) {
+    for (DataPart.lastIndex = 0; DataPart.lastIndex < text.length;) {
         const at = offset + DataPart.lastIndex;
         const [match, white, comma, unterminated, quoted] = DataPart.exec(text);
         if (white) parts.push([at, "white"]);
