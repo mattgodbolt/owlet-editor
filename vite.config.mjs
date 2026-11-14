@@ -1,11 +1,14 @@
 import {defineConfig} from "vite";
 import {resolve} from "path";
 import {fileURLToPath} from "url";
-import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import monacoEditorPluginModule from "vite-plugin-monaco-editor";
 import {viteStaticCopy} from "vite-plugin-static-copy";
 import yaml from "@rollup/plugin-yaml";
 import {nodePolyfills} from "vite-plugin-node-polyfills";
 import {createHtmlPlugin} from "vite-plugin-html";
+
+// vite-plugin-monaco-editor is CommonJS, so Node's ESM loader hands back module.exports rather than its default
+const monacoEditorPlugin = monacoEditorPluginModule.default ?? monacoEditorPluginModule;
 
 // Get the directory name equivalent in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -47,10 +50,12 @@ export default defineConfig({
         rollupOptions: {
             external: ["electron"],
             output: {
-                manualChunks: {
-                    vendor: ["jquery", "underscore"],
-                    monaco: ["monaco-editor"],
-                    jsbeeb: ["jsbeeb"],
+                codeSplitting: {
+                    groups: [
+                        {name: "vendor", test: /node_modules[\\/](jquery|underscore)[\\/]/},
+                        {name: "monaco", test: /node_modules[\\/]monaco-editor[\\/]/},
+                        {name: "jsbeeb", test: /node_modules[\\/]jsbeeb[\\/]/},
+                    ],
                 },
             },
         },
