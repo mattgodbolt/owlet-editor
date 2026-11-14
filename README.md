@@ -46,6 +46,24 @@ Then visit http://localhost:8080
 
 Owlet Editor uses Vite as its build system. The project was migrated from webpack to Vite to align with the jsbeeb dependency, which also uses Vite.
 
+## Highlighting: what red means
+
+Red means that BBC BASIC II would stop with an error at that statement if it ran it.
+
+- **Never red on code the ROM accepts.** The number of false-invalids (the ROM runs a statement, the editor shows it
+  red) must be 0 on the recorded tables, the ROM oracle and the saved programs. Text the ROM never reads, such as the
+  rest of a line after a statement-start `ELSE`, `REM`, `DATA` or `DEF`, is not red.
+- **False-valids are measured, not gated.** Where the ROM rejects a statement and nothing is red, that is reported by
+  the oracle, but it is never a reason to fail a change.
+- **Stricter than the ROM only on purpose.** Each deliberate exception, such as text after a complete assembler
+  instruction, is a row of the recorded table listed as stricter than the ROM in its test.
+
+Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
+statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
+`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict. Before a change
+to highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on generated statements
+(see the comment at its top).
+
 ## Known Issues
 
 - An abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.

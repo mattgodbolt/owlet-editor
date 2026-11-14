@@ -13,15 +13,16 @@
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. The ROM cannot judge
-// what it skips (the rest of a line after REM, DATA, DEF, ELSE or a false IF), so the generator leaves those out, along
-// with * commands and the assembler. A disagreement is per statement: it does not say where the error is.
+// what it skips (see unread.mjs), so invalid tokens there are left out of the comparison, and the generator leaves out
+// * commands and the assembler. A disagreement is per statement: it does not say where the error is.
 // Not run by npm test.
 import {spawnSync} from "child_process";
 import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
 import {generate} from "./generate.mjs";
-import {createRom, SyntaxErrors} from "./rom.mjs";
+import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
+import {isUnread, unreadRanges} from "./unread.mjs";
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const OutDir = path.join(Root, ".cache/rom-oracle");
@@ -40,6 +41,10 @@ function readJson(file, fallback) {
     }
 }
 
+// A line number would make BASIC store the line rather than run it.
+const runnable = text => text.length <= MaxLineLength && !/^\d/.test(text);
+
+// For each text, the ROM's verdict and its tokenisation (null if it cannot be run).
 async function romVerdicts(texts) {
     const cacheFile = path.join(OutDir, "rom.json");
     const cache = readJson(cacheFile, {});
@@ -47,7 +52,11 @@ async function romVerdicts(texts) {
     if (missing.length) {
         const rom = await createRom();
         const start = Date.now();
-        for (const text of missing) cache[text] = await rom.run(text);
+        for (const text of missing) {
+            cache[text] = runnable(text)
+                ? {...(await rom.run(text)), tokens: await rom.tokenise(text)}
+                : {timeout: true, tokens: null};
+        }
         rom.destroy();
         const seconds = (Date.now() - start) / 1000;
         console.log(
@@ -72,6 +81,13 @@ function highlighterVerdicts(texts) {
     if (result.status !== 0)
         throw new Error(`Highlighting failed:\n${result.stdout}${result.stderr}`);
     return JSON.parse(fs.readFileSync(output, "utf8"));
+}
+
+// The first invalid token in text BASIC reads.
+function firstRead(text, invalid, tokens) {
+    const ranges = tokens && unreadRanges(text, tokens);
+    const [start, end] = invalid.find(([start, end]) => !isUnread(ranges, start, end)) || [];
+    return start === undefined ? null : text.slice(start, end);
 }
 
 function romClass(verdict) {
@@ -138,7 +154,7 @@ async function main() {
         ...s,
         rom: romClass(rom[i]),
         message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
-        invalid: highlighted[i],
+        invalid: firstRead(s.text, highlighted[i], rom[i].tokens),
     }));
     fs.writeFileSync(path.join(OutDir, "results.json"), JSON.stringify(results, null, 1));
     report(results, option("summary", false) ? 0 : Number(option("examples", 3)));

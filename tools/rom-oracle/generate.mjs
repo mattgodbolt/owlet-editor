@@ -1,6 +1,7 @@
 // Generates BBC BASIC statements for the oracle, each tagged with the shape it was built from. Every name a
 // statement uses is defined by rom.mjs's prelude, so a ROM error means the statement, not a missing variable.
 import {Flags, keywords} from "../../src/tokens.js";
+import {MaxLineLength} from "./rom.mjs";
 
 const Names = [...new Set(keywords.map(kw => kw.keyword))];
 // Statements the ROM cannot judge in immediate mode, or that leave nothing to compare: REM and DATA skip the line,
@@ -171,9 +172,12 @@ export function generate({seed = 1, count = 3000} = {}) {
     const out = [...exhaustive()];
     const names = Object.keys(templates);
     for (let i = 0; i < count; ++i) {
-        adjacent = null;
-        const shape = pick(names);
-        const text = templates[shape]();
+        let shape, text;
+        do {
+            adjacent = null;
+            shape = pick(names);
+            text = templates[shape]();
+        } while (text.length > MaxLineLength);
         out.push({shape: adjacent ? `${shape}, one value directly after another` : shape, text});
     }
     return out;
