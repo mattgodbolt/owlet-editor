@@ -28,6 +28,13 @@ const IndexRegisters = {
 };
 // BASIC takes the index register in lower case only after these.
 const LowerCaseIndex = {LDX: "y", STX: "y", LDY: "x", STY: "x"};
+export const Mnemonics = [
+    ...Implied,
+    ...Shifts,
+    ...Addressed,
+    ...Address,
+    ..."OPT EQUB EQUD EQUS EQUW".split(" "),
+];
 const Label = /\.(?:[A-Za-z_`][\w`]*%?|@%)/y;
 const Comment = /[;\\][^:]*/y;
 
@@ -55,7 +62,7 @@ export class Assembler {
                 this.statement();
             } catch (e) {
                 if (!(e instanceof Failure)) throw e;
-                r.mark(e.token, start);
+                r.mark(e, start);
                 while (!r.is("end") && !r.isPunct(":", "]")) r.next();
             }
         }
@@ -89,9 +96,10 @@ export class Assembler {
         const r = this.recogniser;
         while (r.peek().kind === "number" && r.peek().text[0] === ".") {
             const after = r.peek(1);
-            if (after.kind === "keyword" && !after.spaced) r.fail();
+            if (after.kind === "keyword" && !after.spaced) r.fail("Syntax error");
             const label = r.lexer.raw(Label, "label");
-            if (!label) r.fail();
+            if (!label)
+                r.fail("Syntax error", undefined, r.peek().text === "." && after.kind === "end");
             label.type = "type.identifier";
         }
     }
@@ -106,7 +114,7 @@ export class Assembler {
             const after = r.peek(1);
             if (after.kind !== "name" || after.spaced || after.text[0] !== "A") {
                 if (after.kind === "name" && !after.spaced) after.invalid = true;
-                r.fail(token);
+                r.fail("Syntax error", token, after.kind === "end");
             }
             r.next();
             r.lexer.split(after, 1);
@@ -120,10 +128,10 @@ export class Assembler {
             .map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40))
             .join("");
         const size = word === "EQU" ? text[token.start + 3] : "";
-        if (word === "EQU" && !/[BDSW]/.test(size)) r.fail();
+        if (word === "EQU" && !/[BDSW]/.test(size)) r.fail("Syntax error");
         const directive = word === "OPT" || word === "EQU";
         if (!directive && ![Implied, Shifts, Addressed, Address].some(set => set.has(word)))
-            r.fail();
+            r.fail("Syntax error");
         this.take(token.start + 3 + size.length, directive ? "keyword.directive" : "keyword");
         return word + size;
     }
@@ -133,7 +141,7 @@ export class Assembler {
         const r = this.recogniser;
         while (r.peek().start < end) {
             const token = r.peek();
-            if (!["name", "number", "punct"].includes(token.kind)) r.fail();
+            if (!["name", "number", "punct"].includes(token.kind)) r.fail(null);
             r.lexer.split(token, end - token.start);
             r.next().type = type;
         }
@@ -145,7 +153,7 @@ export class Assembler {
         if (Shifts.has(mnemonic) && r.is("name", "A")) return void (r.next().type = "keyword");
         if (!Addressed.has(mnemonic) && !Shifts.has(mnemonic)) return r.expression();
         if (r.isPunct("#")) {
-            if (NoImmediate.has(mnemonic)) r.fail();
+            if (NoImmediate.has(mnemonic)) r.fail("No such variable");
             r.next().type = "symbol";
             return r.expression();
         }
@@ -154,12 +162,11 @@ export class Assembler {
             r.expression();
             if (r.isPunct(",")) {
                 this.index(mnemonic, "X");
-                if (!r.isPunct(")")) r.fail();
+                if (!r.isPunct(")")) r.fail("Index");
                 return void r.next();
             }
-            if (!r.isPunct(")")) r.fail(r.atEnd() ? opener : r.peek());
-            const close = r.next();
-            if (!r.isPunct(",")) r.fail(close);
+            r.close(opener, "Index");
+            if (!r.isPunct(",")) r.fail("Index", r.last, r.is("end"));
             return this.index(mnemonic, "Y");
         }
         r.expression();
@@ -176,7 +183,7 @@ export class Assembler {
             !r.is("name") ||
             !(registers.includes(register) || register === LowerCaseIndex[mnemonic])
         )
-            r.fail();
+            r.fail("Index");
         r.next().type = "keyword";
     }
 }

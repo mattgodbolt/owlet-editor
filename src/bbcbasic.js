@@ -3,7 +3,7 @@ import {Flags, keywords, immediateCommands} from "./tokens";
 import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
 import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
 import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
-import {tokensProvider} from "./parser/highlight";
+import {programProblems, tokensProvider} from "./parser/highlight";
 import {BracketCollisions} from "./parser/lexer";
 
 export const LanguageId = "BBCBASIC";
@@ -489,6 +489,21 @@ export function getWarnings(text) {
     return editor
         .tokenize(text, LanguageId)
         .flatMap((lineTokens, i) => lineWarnings(i + 1, lines[i], lineTokens));
+}
+
+// The markers for the lines BASIC would stop at, and for those that end too soon; only the new tokenizer knows either.
+export function getSyntaxMarkers(text) {
+    if (!newParser) return [];
+    return programProblems(text).map(({line, start, end, message, unfinished}) => ({
+        severity: unfinished ? MarkerSeverity.Info : MarkerSeverity.Error,
+        message: unfinished
+            ? `Unfinished line${message ? `: BASIC would stop with "${message}" if it ended here` : ""}`
+            : `${message || "Error"}: BASIC would stop at this statement`,
+        startLineNumber: line,
+        startColumn: start + 1,
+        endLineNumber: line,
+        endColumn: end + 1,
+    }));
 }
 
 function lineWarnings(lineNum, line, lineTokens) {

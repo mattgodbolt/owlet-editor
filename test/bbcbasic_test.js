@@ -1,5 +1,6 @@
 import {
     codeActionProvider,
+    getSyntaxMarkers,
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
@@ -97,15 +98,6 @@ function checkWarnings(text, ...expected) {
 const romTokens = new Map(RomTokens);
 
 const NewTokenizerDifferences = {
-    CALL: ["0:invalid"],
-    "C.": ["0:invalid"],
-    TIME: ["0:invalid"],
-    "A%": ["0:invalid"],
-    "X%": ["0:invalid"],
-    "LONGVAR%": ["0:invalid"],
-    "@%": ["0:invalid"],
-    LDA: ["0:invalid"],
-    TIMER: ["0:invalid"],
     "TIME r": ["0:keyword 4:white 5:invalid"],
     "H.TO": ["0:invalid 1:number.float 2:keyword"],
     "H._": ["0:invalid 1:number.float 2:variable"],
@@ -135,10 +127,6 @@ const NewTokenizerDifferences = {
     'ERROR 5,"x"': [
         "0:invalid 5:white 6:number 7:operator 8:string.quote 9:string 10:string.quote",
     ],
-    PRINTLEN: ["0:keyword 5:invalid"],
-    "P.LEN": ["0:keyword 2:invalid"],
-    "F.X": ["0:keyword 2:invalid"],
-    "REP.X": ["0:keyword 4:invalid"],
     "END.X": ["0:invalid 3:number.float 4:variable"],
     "DEFFNmain:{=0}": ["0:keyword 5:variable 9:symbol 10:invalid 11:operator 12:number 13:symbol"],
     // The tokeniser makes no keyword inside a name, so FN is not one here.
@@ -171,9 +159,6 @@ const NewTokenizerDifferences = {
         tokens: ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid 1:variable"],
         rows: ["[OPT0:;notacomment:]"],
     },
-    "!": ["0:invalid"],
-    // BASIC stops with No FN, which is not a syntax error, so this one has no verdict in the table.
-    "=": ["0:invalid"],
     "^": ["0:invalid"],
     "'": ["0:invalid"],
     "INVALID=1==2OR8!=2**3": [
@@ -783,12 +768,18 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
             for (const [text, expected] of cases)
                 assert.deepStrictEqual(tokens(text), [expected], text);
         });
-        it("should read strings, and an unterminated one as invalid", () => {
+        it("should read strings, and an unterminated one as invalid (the new tokenizer: as unfinished)", () => {
             assert.deepStrictEqual(tokens('P.""C1'), ["0:keyword 2:string.quote 4:variable"]);
+            const unterminated =
+                parser === "new"
+                    ? [
+                          "0:keyword 2:string.quote",
+                          "0:keyword 2:string.quote 3:string",
+                          "0:keyword 2:string.quote 3:string 6:string.quote 8:string",
+                      ]
+                    : Array(3).fill("0:keyword 2:invalid.string");
             assert.deepStrictEqual(tokens('P."\nP."TEST\nP."ESC""APE\nP."OK"'), [
-                "0:keyword 2:invalid.string",
-                "0:keyword 2:invalid.string",
-                "0:keyword 2:invalid.string",
+                ...unterminated,
                 "0:keyword 2:string.quote 3:string 5:string.quote",
             ]);
         });
@@ -1240,5 +1231,60 @@ describe.each(Parsers)("Quick fixes (%s)", parser => {
             result: "COLOUR",
         });
         assert.deepStrictEqual(applyQuickFix("A=2**3"), {title: "Replace with ^", result: "A=2^3"});
+    });
+});
+
+describe("Syntax markers", () => {
+    const Unfinished = rom => `Unfinished line: BASIC would stop with "${rom}" if it ended here`;
+    const markers = text =>
+        getSyntaxMarkers(text).map(m => [
+            m.severity,
+            m.message,
+            m.startLineNumber,
+            m.startColumn,
+            m.endColumn,
+        ]);
+    beforeAll(() => registerBbcBasicLanguage("new"));
+    it("should show a line that ends too soon as information at its end", () => {
+        assert.deepStrictEqual(markers("GOTO"), [
+            [MarkerSeverity.Info, Unfinished("No such variable"), 1, 1, 5],
+        ]);
+        assert.deepStrictEqual(markers("10 FOR I=1 TO "), [
+            [MarkerSeverity.Info, Unfinished("No such variable"), 1, 12, 15],
+        ]);
+        assert.deepStrictEqual(markers('X=1\nPRINT "HI'), [
+            [MarkerSeverity.Info, Unfinished('Missing "'), 2, 7, 10],
+        ]);
+        assert.deepStrictEqual(markers("A$=LEFT$(X$"), [
+            [MarkerSeverity.Info, Unfinished("Missing ,"), 1, 10, 12],
+        ]);
+    });
+    it("should show a statement BASIC stops at with the error BASIC gives", () => {
+        const stop = rom => `${rom}: BASIC would stop at this statement`;
+        for (const [text, rom, start, end] of [
+            ["GOTO 20 30", "Syntax error", 9, 11],
+            ["PRINT )", "No such variable", 7, 8],
+            ["X=1+*", "No such variable", 5, 6],
+            ["FOR I=1:NEXT", "No TO", 7, 8],
+            ["A$=LEFT$(X$)", "Missing ,", 12, 13],
+            ["A=1'", "Syntax error", 4, 5],
+        ])
+            assert.deepStrictEqual(
+                markers(text),
+                [[MarkerSeverity.Error, stop(rom), 1, start, end]],
+                text,
+            );
+    });
+    it("should show nothing for a line that is complete, and in the grammar", () => {
+        for (const text of ["GOTO 20", "FOR I=1 TO 10", "IF A=1 THEN PRINT 2", "REM GOTO 20 30"])
+            assert.deepStrictEqual(markers(text), [], text);
+        registerBbcBasicLanguage("monarch");
+        assert.deepStrictEqual(markers("GOTO\nGOTO 20 30"), []);
+        registerBbcBasicLanguage("new");
+    });
+    it("should follow an assembler block over the lines", () => {
+        assert.deepStrictEqual(markers("[\nLDA #\n]"), [
+            [MarkerSeverity.Info, Unfinished("No such variable"), 2, 5, 6],
+        ]);
     });
 });

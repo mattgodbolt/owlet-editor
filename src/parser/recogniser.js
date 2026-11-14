@@ -1,7 +1,8 @@
 // Reads a line of BBC BASIC II as the interpreter does, by recursive descent over the lexer's tokens, and marks the
 // token at which BASIC would stop with an error: one per statement, then on to the next colon, as BASIC reports only
 // the first. Where there is no rule for a statement, anything is accepted.
-import {Assembler} from "./assembler.js";
+import {Assembler, Mnemonics} from "./assembler.js";
+import {keywords} from "../tokens.js";
 import {Lexer} from "./lexer.js";
 
 const FirstStatementToken = 0xc6;
@@ -44,19 +45,34 @@ const ForeignOperator = /^(?:[=!]=|\*\*|><|=[<>]|[-+/*^]=|<<|>>)$/;
 const Relations = names("= < > <= >= <>");
 const Arithmetic = names("+ - * / ^");
 
+// `unfinished` is an error only because the line ends: more text could still make it valid.
+// What the ROM says when it does not find the punctuation, and when what should be an operand is a & with no digits or
+// a string with no end.
+const ExpectedPunct = {",": "Missing ,", "=": "Mistake", "#": "Missing #"};
+const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
+
+// The words a name at the end of a line might be the start of.
+const Completions = [...new Set([...keywords.map(kw => kw.keyword), ...Mnemonics])];
+
 export class Failure {
-    constructor(token) {
+    constructor(message, token, unfinished) {
+        this.message = message;
         this.token = token;
+        this.unfinished = unfinished;
     }
 }
 
 export class Recogniser {
-    constructor(text, inAssembler) {
+    constructor(text, inAssembler, probing = false) {
         this.lexer = new Lexer(text);
         this.assembler = new Assembler(this);
         this.inAssembler = inAssembler;
+        this.startsInAssembler = inAssembler;
+        this.probing = probing;
         this.depth = 0;
         this.last = null;
+        // Each statement's error: {message, token, unfinished}, in the order of the line.
+        this.problems = [];
     }
 
     get tokens() {
@@ -92,12 +108,13 @@ export class Recogniser {
         return !this.peek().spaced;
     }
 
-    fail(token = this.peek()) {
-        throw new Failure(token);
+    // `message` is the ROM's error. The error is unfinished if the line ends where the text is wrong.
+    fail(message, token = this.peek(), unfinished = token.kind === "end") {
+        throw new Failure(message, token, unfinished);
     }
 
-    expectPunct(text) {
-        if (!this.isPunct(text)) this.fail();
+    expectPunct(text, message = ExpectedPunct[text]) {
+        if (!this.isPunct(text)) this.fail(message);
         return this.next();
     }
 
@@ -122,10 +139,10 @@ export class Recogniser {
                     if (this.is("linenum")) this.next();
                     continue;
                 }
-                if (!this.atEnd()) this.fail();
+                if (!this.atEnd()) this.fail("Syntax error");
             } catch (e) {
                 if (!(e instanceof Failure)) throw e;
-                this.mark(e.token, statementStart);
+                this.mark(e, statementStart);
                 while (!this.atEnd()) this.next();
             }
             if (this.isPunct(":")) this.next();
@@ -140,14 +157,20 @@ export class Recogniser {
 
     // An error at the end of a statement is shown on its last token, and one straight after a name that BASIC did not
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
-    mark(token, statementStart) {
+    mark(failure, statementStart) {
+        let {token} = failure;
+        const {message} = failure;
+        const unfinished = failure.unfinished || this.completable(token, statementStart);
         const atEnd = token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE";
         if (atEnd && this.last && this.last.start >= statementStart.start) token = this.last;
         const tokens = this.lexer.tokens;
         const before = tokens[tokens.lastIndexOf(token) - 1];
         const after = token === this.peek() ? this.peek(1) : null;
         const adjacent = (first, second) => first && second && first.end === second.start;
-        (before && before.abbreviation && adjacent(before, token) ? before : token).invalid = true;
+        const marked = before && before.abbreviation && adjacent(before, token) ? before : token;
+        this.problems.push({message, token: marked, unfinished});
+        if (unfinished) return;
+        marked.invalid = true;
         // Both halves of an operator from another language, such as == or **.
         for (const [first, second] of [
             [before, token],
@@ -158,8 +181,45 @@ export class Recogniser {
         }
     }
 
+    // Whether the name at the end of the line, or the keyword before it that it follows with no space (END, P), starts a
+    // keyword or mnemonic that makes the statement valid.
+    completable(token, statementStart) {
+        const {text} = this.lexer;
+        if (this.probing || token.kind !== "name" || text.slice(token.end).trim()) return false;
+        const tokens = this.lexer.tokens;
+        const before = tokens[tokens.indexOf(token) - 1];
+        const starts = [token.start];
+        if (before?.kind === "keyword" && before.end === token.start) starts.push(before.start);
+        return starts.some(start => {
+            const typed = text.slice(start).toUpperCase();
+            return Completions.some(word => {
+                if (word.length <= typed.length || !word.startsWith(typed)) return false;
+                const probe = new Recogniser(
+                    text.slice(0, start) + word,
+                    this.startsInAssembler,
+                    true,
+                );
+                probe.line();
+                return probe.problems.every(
+                    p => p.unfinished || p.token.start < statementStart.start,
+                );
+            });
+        });
+    }
+
+    // Reads what the ROM words differently from the same text elsewhere (the arguments of a call, whose DEF may take
+    // none; the operand after a ? or !, which a number cannot have), so an error in it has no message.
+    unworded(read) {
+        try {
+            read();
+        } catch (e) {
+            if (e instanceof Failure) e.message = null;
+            throw e;
+        }
+    }
+
     nested(read) {
-        if (++this.depth > MaxDepth) this.fail();
+        if (++this.depth > MaxDepth) this.fail(null, this.peek(), false);
         try {
             read();
         } finally {
@@ -190,7 +250,7 @@ export class Recogniser {
         }
         if (token.kind !== "keyword") return this.assignment();
         const {keyword} = token.kw;
-        if (token.kw.token < FirstStatementToken) this.fail();
+        if (token.kw.token < FirstStatementToken) this.fail("Syntax error");
         this.next();
         // The lexer has made these the statement forms of the pseudo-variables.
         if (PseudoVariables.has(keyword)) return this.pseudoVariable(keyword);
@@ -226,24 +286,33 @@ export class Recogniser {
         let count = 1;
         this.expression();
         while (this.isPunct(",")) {
-            this.next();
+            const comma = this.next();
+            // RND(1, is wrong however it goes on.
+            if (count >= most && this.is("end")) this.fail("Missing )", comma, false);
             this.expression();
             count++;
         }
-        if (count < fewest || count > most) this.fail();
-        if (!this.isPunct(")")) this.fail(this.atEnd() ? opener : this.peek());
+        if (count < fewest) this.fail("Missing ,");
+        if (count > most) this.fail("Missing )", this.peek(), false);
+        this.close(opener, count === most || most === Infinity ? "Missing )" : null);
+    }
+
+    // The ")" of a bracket; an unclosed one is shown at its "(".
+    close(opener, message = "Missing )") {
+        if (!this.isPunct(")"))
+            this.fail(message, this.atEnd() ? opener : this.peek(), this.is("end"));
         this.next();
     }
 
-    name() {
-        if (!this.is("name")) this.fail();
+    name(message = "Syntax error") {
+        if (!this.is("name")) this.fail(message);
         this.next();
         if (this.isPunct("(") && this.adjacent()) this.bracket(this.next());
     }
 
     // Something that can be assigned to: X, X(1), $X, ?X, X?1, ?X!1. Only one ? or ! follows the first (X?1?2=3 is a
     // Mistake).
-    variable() {
+    variable(message) {
         if (this.isPunct("$")) {
             this.next();
             return this.primary();
@@ -251,10 +320,10 @@ export class Recogniser {
         if (this.isPunct("?", "!")) {
             this.next();
             this.primary();
-        } else this.name();
+        } else this.name(message);
         if (this.isPunct("?", "!") && this.adjacent()) {
             this.next();
-            this.primary();
+            this.unworded(() => this.primary());
         }
     }
 
@@ -291,7 +360,7 @@ export class Recogniser {
         this.primary();
         while (this.isPunct("?", "!") && this.adjacent()) {
             this.next();
-            this.primary();
+            this.unworded(() => this.primary());
         }
     }
 
@@ -308,7 +377,7 @@ export class Recogniser {
         // One sign only: BASIC rejects --1 and -+1.
         if (this.isPunct("-", "+")) {
             this.next();
-            if (this.isPunct("-", "+")) this.fail();
+            if (this.isPunct("-", "+")) this.fail("No such variable");
             return this.primary();
         }
         if (this.isPunct("(")) return this.bracket(this.next(), 1, 1);
@@ -316,7 +385,12 @@ export class Recogniser {
             return void this.next();
         if (token.kind === "hex" && token.text.length > 1) return void this.next();
         if (token.kind === "name") return this.name();
-        if (token.kind !== "keyword" || token.kw.token >= FirstStatementToken) this.fail();
+        if (token.kind !== "keyword" || token.kw.token >= FirstStatementToken)
+            this.fail(
+                OperandErrors[token.kind] || "No such variable",
+                token,
+                this.unfinishedOperand(token),
+            );
         this.next();
         const {keyword} = token.kw;
         if (NoArgument.has(keyword)) return;
@@ -336,7 +410,15 @@ export class Recogniser {
         }
         if (keyword === "FN") return this.call();
         if (keyword === "TO" && this.top()) return;
-        this.fail(token);
+        this.fail("No such variable", token, false);
+    }
+
+    // The end of the line, or text that can still be finished: a string with no end yet, or a & with no digits.
+    unfinishedOperand(token) {
+        return (
+            token.kind === "end" ||
+            (token.end === this.lexer.text.length && ["string", "hex"].includes(token.kind))
+        );
     }
 
     // TO followed by P is TOP where a value is expected.
@@ -352,7 +434,7 @@ export class Recogniser {
     // Whether "(" after a space is the call's depends on the DEF: FNg (1) is fine if FNg has a parameter.
     call() {
         if (this.is("fnname")) this.next();
-        if (this.isPunct("(")) this.bracket(this.next());
+        if (this.isPunct("(")) this.unworded(() => this.bracket(this.next()));
     }
 
     // TAB( and SPC, which only PRINT and INPUT take.
@@ -397,8 +479,10 @@ export class Recogniser {
         if (this.isKeyword("LINE")) this.next();
         while (!this.atEnd()) {
             if (this.separator("'", ",", ";") || this.printItem()) continue;
-            if (this.is("string") && this.peek().closed) this.next();
-            else this.variable();
+            const prompt = this.peek();
+            if (prompt.kind !== "string") this.variable();
+            else if (prompt.closed) this.next();
+            else this.fail('Missing "', prompt, true);
         }
     }
 
@@ -432,7 +516,7 @@ export class Recogniser {
             return this.statement();
         }
         this.expression();
-        if (!this.isKeyword("GOTO", "GOSUB")) this.fail();
+        if (!this.isKeyword("GOTO", "GOSUB")) this.fail("ON syntax");
         this.next();
         this.GOTO();
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
@@ -451,10 +535,10 @@ export class Recogniser {
     }
 
     FOR() {
-        this.variable();
+        this.variable(null);
         this.expectPunct("=");
         this.expression();
-        if (!this.isKeyword("TO")) this.fail();
+        if (!this.isKeyword("TO")) this.fail("No TO");
         this.next();
         this.expression();
         if (this.isKeyword("STEP")) {
@@ -474,7 +558,7 @@ export class Recogniser {
     DIM() {
         do {
             if (this.isPunct(",")) this.next();
-            if (!this.is("name")) this.fail();
+            if (!this.is("name")) this.fail(null);
             this.next();
             if (this.isPunct("(") && this.adjacent()) this.bracket(this.next());
             else this.expression();
@@ -489,8 +573,7 @@ export class Recogniser {
         if (this.isPunct("(")) {
             const opener = this.next();
             this.variables();
-            if (!this.isPunct(")")) this.fail(this.atEnd() ? opener : this.peek());
-            this.next();
+            this.close(opener);
         }
         this.statement();
     }
@@ -500,10 +583,10 @@ export class Recogniser {
     }
 
     variables() {
-        this.variable();
+        this.variable(null);
         while (this.isPunct(",")) {
             this.next();
-            this.variable();
+            this.variable(null);
         }
     }
 
@@ -514,8 +597,8 @@ export class Recogniser {
     // READ takes empty items (READ A,,B) and none at all.
     READ() {
         while (!this.atEnd()) {
-            if (!this.isPunct(",")) this.variable();
-            if (!this.atEnd()) this.expectPunct(",");
+            if (!this.isPunct(",")) this.variable(null);
+            if (!this.atEnd()) this.expectPunct(",", "Syntax error");
         }
     }
 
@@ -523,7 +606,7 @@ export class Recogniser {
         this.expression();
         while (this.isPunct(",")) {
             this.next();
-            this.variable();
+            this.variable("No such variable");
         }
     }
 

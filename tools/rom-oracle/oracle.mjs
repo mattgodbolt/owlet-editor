@@ -15,7 +15,9 @@
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
 // nothing about what BASIC skips (see unread.mjs and dropMarksNeverRead), so invalid tokens there are left out. A
-// disagreement is per statement: it does not say where the error is.
+// disagreement is per statement: it does not say where the error is. With --parser new a statement can also be
+// UNFINISHED: the only fault is that the line ends too soon (GOTO, FOR I=1 TO), which is not shown as invalid. If the
+// ROM rejects it, that counts as agreement and is listed on its own; it is neither a FALSE-VALID nor a FALSE-INVALID.
 // Not run by npm test.
 import {spawnSync} from "child_process";
 import fs from "fs";
@@ -127,7 +129,9 @@ function report(results, examples) {
     const count = filter => results.filter(filter).length;
     const conclusive = results.filter(r => r.rom !== "inconclusive");
     const agree = count(
-        r => r.rom !== "inconclusive" && (r.rom === "valid") === (r.invalid === null),
+        r =>
+            r.rom !== "inconclusive" &&
+            (r.rom === "valid" ? r.invalid === null && !r.unfinished : r.invalid || r.unfinished),
     );
     console.log(
         `${results.length} statements: ${conclusive.length} conclusive on the ROM ` +
@@ -141,11 +145,19 @@ function report(results, examples) {
     const kinds = [
         [
             "FALSE-VALID (the ROM rejects it, nothing highlighted invalid)",
-            r => r.rom === "syntax error" && !r.invalid,
+            r => r.rom === "syntax error" && !r.invalid && !r.unfinished,
         ],
         [
             "FALSE-INVALID (the ROM accepts it, highlighted invalid)",
             r => r.rom === "valid" && r.invalid,
+        ],
+        [
+            "UNFINISHED-BUT-VALID (the ROM accepts it, shown as ending too soon)",
+            r => r.rom === "valid" && r.unfinished,
+        ],
+        [
+            "UNFINISHED (the ROM rejects it, only because the line ends too soon; agreed)",
+            r => r.rom === "syntax error" && !r.invalid && r.unfinished,
         ],
     ];
     for (const [title, test] of kinds) {
@@ -159,7 +171,11 @@ function report(results, examples) {
                 `  ${String(rs.length).padStart(5)} of ${String(total).padEnd(5)} ${shape}`,
             );
             for (const r of rs.slice(0, examples)) {
-                const why = r.invalid ? `invalid: ${JSON.stringify(r.invalid)}` : r.message;
+                const why = r.invalid
+                    ? `invalid: ${JSON.stringify(r.invalid)}`
+                    : r.unfinished && r.rom === "valid"
+                      ? "unfinished"
+                      : r.message;
                 console.log(`          ${r.text.padEnd(32)} ${why}`);
             }
         }
@@ -182,10 +198,13 @@ async function main() {
         rom: runnable(s.text) ? romClass(rom[i]) : "inconclusive",
         message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
     }));
-    const marks = results.map((r, i) =>
-        readMarks(r.text, highlighted[i], r.rom === "valid" ? rom[i].tokens : null),
-    );
+    const romTokens = i => (results[i].rom === "valid" ? rom[i].tokens : null);
+    const marks = results.map((r, i) => readMarks(r.text, highlighted[i].invalid, romTokens(i)));
     await dropMarksNeverRead(results, marks);
+    results.forEach((r, i) => {
+        r.unfinished =
+            !r.invalid && readMarks(r.text, highlighted[i].unfinished, romTokens(i)).length > 0;
+    });
     fs.writeFileSync(path.join(OutDir, "results.json"), JSON.stringify(results, null, 1));
     report(results, option("summary", false) ? 0 : Number(option("examples", 3)));
 }

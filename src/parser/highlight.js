@@ -72,9 +72,9 @@ function parts(token) {
         case "number":
             return [[start, /^\d+$/.test(text) ? "number" : "number.float"]];
         case "hex":
-            return [[start, text.length > 1 ? "number.hex" : "invalid"]];
+            return [[start, "number.hex"]];
         case "string":
-            return token.closed ? stringParts(start, text) : [[start, "invalid.string"]];
+            return stringParts(start, text);
         case "comment":
             return [[start, "comment"]];
         case "oscli":
@@ -117,6 +117,25 @@ export function highlightLine(text, inAssembler = false) {
             i === 0 || part.type !== tokens[i - 1].type || part.bracket !== tokens[i - 1].bracket,
     );
     return {tokens: joined, inAssembler: open};
+}
+
+// What each line's errors are, for editor markers: {line, start, end, message, unfinished}. An unfinished line is shown
+// at its last token and on to the end of the line; `message` is the error BASIC would give, or null where the
+// recogniser does not know it.
+export function programProblems(text) {
+    let inAssembler = false;
+    return text.split(/\r?\n/).flatMap((lineText, i) => {
+        const recogniser = new Recogniser(lineText, inAssembler);
+        inAssembler = recogniser.line();
+        const last = recogniser.tokens.findLast(token => token.kind !== "white");
+        return recogniser.problems.map(({message, token, unfinished}) => ({
+            line: i + 1,
+            start: unfinished ? last.start : token.start,
+            end: unfinished ? lineText.length : token.end,
+            message,
+            unfinished,
+        }));
+    });
 }
 
 // A Monaco tokens provider: the state between lines is whether an assembler block is open.

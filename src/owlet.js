@@ -14,7 +14,7 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getWarnings, LanguageId} from "./bbcbasic";
+import {getSyntaxMarkers, getWarnings, LanguageId} from "./bbcbasic";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -22,6 +22,7 @@ import {createVduReference} from "./vdu-reference";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
+const SyntaxMarkerDelayMs = 500;
 
 function defaultLineNumber(line) {
     return line * 10;
@@ -95,6 +96,7 @@ export class OwletEditor {
             this.lineNumberDetect(basicText);
             this.updateStatus(basicText);
             this.updateWarnings();
+            this.updateSyntaxMarkers();
         });
 
         this.emulator = new Emulator($("#emulator"));
@@ -137,6 +139,18 @@ export class OwletEditor {
     updateWarnings() {
         const model = this.editor.getModel();
         monacoEditor.setModelMarkers(model, "warnings", getWarnings(model.getValue()));
+    }
+
+    // The markers for lines that end too soon would be wrong while the line is still being typed, so they come only
+    // after the typing stops.
+    updateSyntaxMarkers() {
+        const model = this.editor.getModel();
+        monacoEditor.setModelMarkers(model, "syntax", []);
+        clearTimeout(this.syntaxTimer);
+        this.syntaxTimer = setTimeout(
+            () => monacoEditor.setModelMarkers(model, "syntax", getSyntaxMarkers(model.getValue())),
+            SyntaxMarkerDelayMs,
+        );
     }
 
     updateEditorText(newText, updateType) {
