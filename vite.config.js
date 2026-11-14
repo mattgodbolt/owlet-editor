@@ -30,6 +30,7 @@ export default defineConfig({
                 {
                     src: "node_modules/jsbeeb/public/roms/**/*",
                     dest: "roms",
+                    rename: {stripBase: 4},
                     globOptions: {
                         ignore: ["**/*.txt", "**/*README*"],
                     },
