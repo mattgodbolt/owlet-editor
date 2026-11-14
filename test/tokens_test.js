@@ -14,6 +14,9 @@ describe("Detokenisation", () => {
         assert.strictEqual(detokenise("\xf1"), "PRINT");
         assert.strictEqual(detokenise("\xff"), "OSCLI");
     });
+    it("should leave a byte that is not a token as it is", () => {
+        assert.strictEqual(detokenise("\xf1\xce1"), "PRINT\xce1");
+    });
     it("should detokenise a simple example", () => {
         assert.strictEqual(detokenise('\xf1 "HELLO"'), 'PRINT "HELLO"');
     });
@@ -55,26 +58,10 @@ VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
     it("should add spaces before tokens which follow an identifier", () => {
         assert.strictEqual(detokenise("\xf1X\x84Y"), "PRINTX ORY");
     });
-    it("shouldn't expand tokens after DATA", () => {
-        assert.strictEqual(detokenise("\xDCX\x84Y"), "DATAX\u0184Y");
-    });
-    it("shouldn't expand tokens after untokenised DATA", () => {
-        assert.strictEqual(detokenise("DATAX\x84Y"), "DATAX\u0184Y");
-    });
-    it("shouldn't expand tokens after DAT.", () => {
-        assert.strictEqual(detokenise("DAT.X\x84Y"), "DAT.X\u0184Y");
-    });
-    it("shouldn't expand tokens after DA.", () => {
-        assert.strictEqual(detokenise("DA.X\x84Y"), "DA.X\u0184Y");
-    });
-    it("shouldn't expand tokens after D.", () => {
-        assert.strictEqual(detokenise("D.X\x84Y"), "D.X\u0184Y");
-    });
-    it("shouldn't expand tokens after REM", () => {
-        assert.strictEqual(detokenise("\xf4X\x84Y"), "REMX\u0184Y");
-    });
-    it("shouldn't expand tokens after untokenised REM", () => {
-        assert.strictEqual(detokenise("REMX\x84Y"), "REMX\u0184Y");
+    it("shouldn't expand tokens after DATA or REM, tokenised, typed or abbreviated", () => {
+        const cases = [["\xdc", "DATA"], ["DATA"], ["DAT."], ["DA."], ["D."], ["\xf4", "REM"], ["REM"]];
+        for (const [keyword, expanded = keyword] of cases)
+            assert.strictEqual(detokenise(`${keyword}X\x84Y`), `${expanded}X\u0184Y`, keyword);
     });
 });
 

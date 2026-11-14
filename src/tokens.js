@@ -25,159 +25,140 @@ export const Flags = {
 };
 
 // Extract tokens, keywords and flags from BASIC ROM.
-export const keywords = (() => {
-    const keywords = [
-        {keyword: "AND", token: 128, flags: 0 | Flags.Expr},
-        {keyword: "ABS", token: 148, flags: 0 | Flags.Expr},
-        {keyword: "ACS", token: 149, flags: 0 | Flags.Expr},
-        {keyword: "ADVAL", token: 150, flags: 0 | Flags.Expr},
-        {keyword: "ASC", token: 151, flags: 0 | Flags.Expr},
-        {keyword: "ASN", token: 152, flags: 0 | Flags.Expr},
-        {keyword: "ATN", token: 153, flags: 0 | Flags.Expr},
-        {keyword: "AUTO", token: 198, flags: 16},
-        {keyword: "BGET", token: 154, flags: 1 | Flags.Expr},
-        {keyword: "BPUT", token: 213, flags: 3},
-        {keyword: "COLOUR", token: 251, flags: 2},
-        {keyword: "CALL", token: 214, flags: 2},
-        {keyword: "CHAIN", token: 215, flags: 2},
-        {keyword: "CHR$", token: 189, flags: 0 | Flags.Expr},
-        {keyword: "CLEAR", token: 216, flags: 1},
-        {keyword: "CLOSE", token: 217, flags: 3},
-        {keyword: "CLG", token: 218, flags: 1},
-        {keyword: "CLS", token: 219, flags: 1},
-        {keyword: "COS", token: 155, flags: 0 | Flags.Expr},
-        {keyword: "COUNT", token: 156, flags: 1 | Flags.Expr},
-        {keyword: "DATA", token: 220, flags: 32},
-        {keyword: "DEG", token: 157, flags: 0 | Flags.Expr},
-        {keyword: "DEF", token: 221, flags: 0},
-        {keyword: "DELETE", token: 199, flags: 16},
-        {keyword: "DIV", token: 129, flags: 0 | Flags.Expr},
-        {keyword: "DIM", token: 222, flags: 2},
-        {keyword: "DRAW", token: 223, flags: 2},
-        {keyword: "ENDPROC", token: 225, flags: 1},
-        {keyword: "END", token: 224, flags: 1},
-        {keyword: "ENVELOPE", token: 226, flags: 2},
-        {keyword: "ELSE", token: 139, flags: 20},
-        {keyword: "EVAL", token: 160, flags: 0 | Flags.Expr},
-        {keyword: "ERL", token: 158, flags: 1 | Flags.Expr},
-        {keyword: "ERROR", token: 133, flags: 4},
-        {keyword: "EOF", token: 197, flags: 1 | Flags.Expr},
-        {keyword: "EOR", token: 130, flags: 0 | Flags.Expr},
-        {keyword: "ERR", token: 159, flags: 1 | Flags.Expr},
-        {keyword: "EXP", token: 161, flags: 0 | Flags.Expr},
-        {keyword: "EXT", token: 162, flags: 1 | Flags.Expr},
-        {keyword: "FOR", token: 227, flags: 2},
-        {keyword: "FALSE", token: 163, flags: 1 | Flags.Expr},
-        {keyword: "FN", token: 164, flags: 8 | Flags.Expr},
-        {keyword: "GOTO", token: 229, flags: 18},
-        {keyword: "GET$", token: 190, flags: 0 | Flags.Expr},
-        {keyword: "GET", token: 165, flags: 0 | Flags.Expr},
-        {keyword: "GOSUB", token: 228, flags: 18},
-        {keyword: "GCOL", token: 230, flags: 2},
-        {keyword: "HIMEM", token: 147, flags: 67 | Flags.Expr},
-        {keyword: "INPUT", token: 232, flags: 2},
-        {keyword: "IF", token: 231, flags: 2},
-        {keyword: "INKEY$", token: 191, flags: 0 | Flags.Expr},
-        {keyword: "INKEY", token: 166, flags: 0 | Flags.Expr},
-        {keyword: "INT", token: 168, flags: 0 | Flags.Expr},
-        {keyword: "INSTR(", token: 167, flags: 0 | Flags.Expr},
-        {keyword: "LIST", token: 201, flags: 16},
-        {keyword: "LINE", token: 134, flags: 0},
-        {keyword: "LOAD", token: 200, flags: 2},
-        {keyword: "LOMEM", token: 146, flags: 67 | Flags.Expr},
-        {keyword: "LOCAL", token: 234, flags: 2},
-        {keyword: "LEFT$(", token: 192, flags: 0 | Flags.Expr},
-        {keyword: "LEN", token: 169, flags: 0 | Flags.Expr},
-        {keyword: "LET", token: 233, flags: 4},
-        {keyword: "LOG", token: 171, flags: 0 | Flags.Expr},
-        {keyword: "LN", token: 170, flags: 0 | Flags.Expr},
-        {keyword: "MID$(", token: 193, flags: 0 | Flags.Expr},
-        {keyword: "MODE", token: 235, flags: 2},
-        {keyword: "MOD", token: 131, flags: 0 | Flags.Expr},
-        {keyword: "MOVE", token: 236, flags: 2},
-        {keyword: "NEXT", token: 237, flags: 2},
-        {keyword: "NEW", token: 202, flags: 1},
-        {keyword: "NOT", token: 172, flags: 0 | Flags.Expr},
-        {keyword: "OLD", token: 203, flags: 1},
-        {keyword: "ON", token: 238, flags: 2},
-        {keyword: "OFF", token: 135, flags: 0},
-        {keyword: "OR", token: 132, flags: 0 | Flags.Expr},
-        {keyword: "OPENIN", token: 142, flags: 0 | Flags.Expr},
-        {keyword: "OPENOUT", token: 174, flags: 0 | Flags.Expr},
-        {keyword: "OPENUP", token: 173, flags: 0 | Flags.Expr},
-        {keyword: "OSCLI", token: 255, flags: 2},
-        {keyword: "PRINT", token: 241, flags: 2},
-        {keyword: "PAGE", token: 144, flags: 67 | Flags.Expr},
-        {keyword: "PTR", token: 143, flags: 67 | Flags.Expr},
-        {keyword: "PI", token: 175, flags: 1 | Flags.Expr},
-        {keyword: "PLOT", token: 240, flags: 2},
-        {keyword: "POINT(", token: 176, flags: 0 | Flags.Expr},
-        {keyword: "PROC", token: 242, flags: 10},
-        {keyword: "POS", token: 177, flags: 1 | Flags.Expr},
-        {keyword: "RETURN", token: 248, flags: 1},
-        {keyword: "REPEAT", token: 245, flags: 0},
-        {keyword: "REPORT", token: 246, flags: 1},
-        {keyword: "READ", token: 243, flags: 2},
-        {keyword: "REM", token: 244, flags: 32},
-        {keyword: "RUN", token: 249, flags: 1},
-        {keyword: "RAD", token: 178, flags: 0 | Flags.Expr},
-        {keyword: "RESTORE", token: 247, flags: 18},
-        {keyword: "RIGHT$(", token: 194, flags: 0 | Flags.Expr},
-        {keyword: "RND", token: 179, flags: 1 | Flags.Expr},
-        {keyword: "RENUMBER", token: 204, flags: 16},
-        {keyword: "STEP", token: 136, flags: 0},
-        {keyword: "SAVE", token: 205, flags: 2},
-        {keyword: "SGN", token: 180, flags: 0 | Flags.Expr},
-        {keyword: "SIN", token: 181, flags: 0 | Flags.Expr},
-        {keyword: "SQR", token: 182, flags: 0 | Flags.Expr},
-        {keyword: "SPC", token: 137, flags: 0},
-        {keyword: "STR$", token: 195, flags: 0 | Flags.Expr},
-        {keyword: "STRING$(", token: 196, flags: 0 | Flags.Expr},
-        {keyword: "SOUND", token: 212, flags: 2},
-        {keyword: "STOP", token: 250, flags: 1},
-        {keyword: "TAN", token: 183, flags: 0 | Flags.Expr},
-        {keyword: "THEN", token: 140, flags: 20},
-        {keyword: "TO", token: 184, flags: 0},
-        {keyword: "TAB(", token: 138, flags: 0},
-        {keyword: "TRACE", token: 252, flags: 18},
-        {keyword: "TIME", token: 145, flags: 67 | Flags.Expr},
-        {keyword: "TRUE", token: 185, flags: 1 | Flags.Expr},
-        {keyword: "UNTIL", token: 253, flags: 2},
-        {keyword: "USR", token: 186, flags: 0 | Flags.Expr},
-        {keyword: "VDU", token: 239, flags: 2},
-        {keyword: "VAL", token: 187, flags: 0 | Flags.Expr},
-        {keyword: "VPOS", token: 188, flags: 1 | Flags.Expr},
-        {keyword: "WIDTH", token: 254, flags: 2},
-        {keyword: "PAGE", token: 208, flags: 0},
-        {keyword: "PTR", token: 207, flags: 0},
-        {keyword: "TIME", token: 209, flags: 0},
-        {keyword: "LOMEM", token: 210, flags: 0},
-        {keyword: "HIMEM", token: 211, flags: 0},
-    ];
-    return keywords;
-})();
+export const keywords = [
+    {keyword: "AND", token: 128, flags: Flags.Expr},
+    {keyword: "ABS", token: 148, flags: Flags.Expr},
+    {keyword: "ACS", token: 149, flags: Flags.Expr},
+    {keyword: "ADVAL", token: 150, flags: Flags.Expr},
+    {keyword: "ASC", token: 151, flags: Flags.Expr},
+    {keyword: "ASN", token: 152, flags: Flags.Expr},
+    {keyword: "ATN", token: 153, flags: Flags.Expr},
+    {keyword: "AUTO", token: 198, flags: 16},
+    {keyword: "BGET", token: 154, flags: 1 | Flags.Expr},
+    {keyword: "BPUT", token: 213, flags: 3},
+    {keyword: "COLOUR", token: 251, flags: 2},
+    {keyword: "CALL", token: 214, flags: 2},
+    {keyword: "CHAIN", token: 215, flags: 2},
+    {keyword: "CHR$", token: 189, flags: Flags.Expr},
+    {keyword: "CLEAR", token: 216, flags: 1},
+    {keyword: "CLOSE", token: 217, flags: 3},
+    {keyword: "CLG", token: 218, flags: 1},
+    {keyword: "CLS", token: 219, flags: 1},
+    {keyword: "COS", token: 155, flags: Flags.Expr},
+    {keyword: "COUNT", token: 156, flags: 1 | Flags.Expr},
+    {keyword: "DATA", token: 220, flags: 32},
+    {keyword: "DEG", token: 157, flags: Flags.Expr},
+    {keyword: "DEF", token: 221, flags: 0},
+    {keyword: "DELETE", token: 199, flags: 16},
+    {keyword: "DIV", token: 129, flags: Flags.Expr},
+    {keyword: "DIM", token: 222, flags: 2},
+    {keyword: "DRAW", token: 223, flags: 2},
+    {keyword: "ENDPROC", token: 225, flags: 1},
+    {keyword: "END", token: 224, flags: 1},
+    {keyword: "ENVELOPE", token: 226, flags: 2},
+    {keyword: "ELSE", token: 139, flags: 20},
+    {keyword: "EVAL", token: 160, flags: Flags.Expr},
+    {keyword: "ERL", token: 158, flags: 1 | Flags.Expr},
+    {keyword: "ERROR", token: 133, flags: 4},
+    {keyword: "EOF", token: 197, flags: 1 | Flags.Expr},
+    {keyword: "EOR", token: 130, flags: Flags.Expr},
+    {keyword: "ERR", token: 159, flags: 1 | Flags.Expr},
+    {keyword: "EXP", token: 161, flags: Flags.Expr},
+    {keyword: "EXT", token: 162, flags: 1 | Flags.Expr},
+    {keyword: "FOR", token: 227, flags: 2},
+    {keyword: "FALSE", token: 163, flags: 1 | Flags.Expr},
+    {keyword: "FN", token: 164, flags: 8 | Flags.Expr},
+    {keyword: "GOTO", token: 229, flags: 18},
+    {keyword: "GET$", token: 190, flags: Flags.Expr},
+    {keyword: "GET", token: 165, flags: Flags.Expr},
+    {keyword: "GOSUB", token: 228, flags: 18},
+    {keyword: "GCOL", token: 230, flags: 2},
+    {keyword: "HIMEM", token: 147, flags: 67 | Flags.Expr},
+    {keyword: "INPUT", token: 232, flags: 2},
+    {keyword: "IF", token: 231, flags: 2},
+    {keyword: "INKEY$", token: 191, flags: Flags.Expr},
+    {keyword: "INKEY", token: 166, flags: Flags.Expr},
+    {keyword: "INT", token: 168, flags: Flags.Expr},
+    {keyword: "INSTR(", token: 167, flags: Flags.Expr},
+    {keyword: "LIST", token: 201, flags: 16},
+    {keyword: "LINE", token: 134, flags: 0},
+    {keyword: "LOAD", token: 200, flags: 2},
+    {keyword: "LOMEM", token: 146, flags: 67 | Flags.Expr},
+    {keyword: "LOCAL", token: 234, flags: 2},
+    {keyword: "LEFT$(", token: 192, flags: Flags.Expr},
+    {keyword: "LEN", token: 169, flags: Flags.Expr},
+    {keyword: "LET", token: 233, flags: 4},
+    {keyword: "LOG", token: 171, flags: Flags.Expr},
+    {keyword: "LN", token: 170, flags: Flags.Expr},
+    {keyword: "MID$(", token: 193, flags: Flags.Expr},
+    {keyword: "MODE", token: 235, flags: 2},
+    {keyword: "MOD", token: 131, flags: Flags.Expr},
+    {keyword: "MOVE", token: 236, flags: 2},
+    {keyword: "NEXT", token: 237, flags: 2},
+    {keyword: "NEW", token: 202, flags: 1},
+    {keyword: "NOT", token: 172, flags: Flags.Expr},
+    {keyword: "OLD", token: 203, flags: 1},
+    {keyword: "ON", token: 238, flags: 2},
+    {keyword: "OFF", token: 135, flags: 0},
+    {keyword: "OR", token: 132, flags: Flags.Expr},
+    {keyword: "OPENIN", token: 142, flags: Flags.Expr},
+    {keyword: "OPENOUT", token: 174, flags: Flags.Expr},
+    {keyword: "OPENUP", token: 173, flags: Flags.Expr},
+    {keyword: "OSCLI", token: 255, flags: 2},
+    {keyword: "PRINT", token: 241, flags: 2},
+    {keyword: "PAGE", token: 144, flags: 67 | Flags.Expr},
+    {keyword: "PTR", token: 143, flags: 67 | Flags.Expr},
+    {keyword: "PI", token: 175, flags: 1 | Flags.Expr},
+    {keyword: "PLOT", token: 240, flags: 2},
+    {keyword: "POINT(", token: 176, flags: Flags.Expr},
+    {keyword: "PROC", token: 242, flags: 10},
+    {keyword: "POS", token: 177, flags: 1 | Flags.Expr},
+    {keyword: "RETURN", token: 248, flags: 1},
+    {keyword: "REPEAT", token: 245, flags: 0},
+    {keyword: "REPORT", token: 246, flags: 1},
+    {keyword: "READ", token: 243, flags: 2},
+    {keyword: "REM", token: 244, flags: 32},
+    {keyword: "RUN", token: 249, flags: 1},
+    {keyword: "RAD", token: 178, flags: Flags.Expr},
+    {keyword: "RESTORE", token: 247, flags: 18},
+    {keyword: "RIGHT$(", token: 194, flags: Flags.Expr},
+    {keyword: "RND", token: 179, flags: 1 | Flags.Expr},
+    {keyword: "RENUMBER", token: 204, flags: 16},
+    {keyword: "STEP", token: 136, flags: 0},
+    {keyword: "SAVE", token: 205, flags: 2},
+    {keyword: "SGN", token: 180, flags: Flags.Expr},
+    {keyword: "SIN", token: 181, flags: Flags.Expr},
+    {keyword: "SQR", token: 182, flags: Flags.Expr},
+    {keyword: "SPC", token: 137, flags: 0},
+    {keyword: "STR$", token: 195, flags: Flags.Expr},
+    {keyword: "STRING$(", token: 196, flags: Flags.Expr},
+    {keyword: "SOUND", token: 212, flags: 2},
+    {keyword: "STOP", token: 250, flags: 1},
+    {keyword: "TAN", token: 183, flags: Flags.Expr},
+    {keyword: "THEN", token: 140, flags: 20},
+    {keyword: "TO", token: 184, flags: 0},
+    {keyword: "TAB(", token: 138, flags: 0},
+    {keyword: "TRACE", token: 252, flags: 18},
+    {keyword: "TIME", token: 145, flags: 67 | Flags.Expr},
+    {keyword: "TRUE", token: 185, flags: 1 | Flags.Expr},
+    {keyword: "UNTIL", token: 253, flags: 2},
+    {keyword: "USR", token: 186, flags: Flags.Expr},
+    {keyword: "VDU", token: 239, flags: 2},
+    {keyword: "VAL", token: 187, flags: Flags.Expr},
+    {keyword: "VPOS", token: 188, flags: 1 | Flags.Expr},
+    {keyword: "WIDTH", token: 254, flags: 2},
+    {keyword: "PAGE", token: 208, flags: 0},
+    {keyword: "PTR", token: 207, flags: 0},
+    {keyword: "TIME", token: 209, flags: 0},
+    {keyword: "LOMEM", token: 210, flags: 0},
+    {keyword: "HIMEM", token: 211, flags: 0},
+];
 
-export const tokens = (() => {
-    const result = new Array(0x80).fill(null);
-    for (const keyword of keywords) result[keyword.token - 0x80] = keyword.keyword;
-    return result;
-})();
+const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
 
-export const flags = (() => {
-    const result = new Array(0x80).fill(0);
-    for (const keyword of keywords) result[keyword.token - 0x80] = keyword.flags;
-    return result;
-})();
-
-export const immediateCommands = (() => {
-    const result = new Array(0xcd - 0xc6 + 1).fill(null);
-    for (const keyword of keywords) {
-        if (keyword.token >= 0xc6 && keyword.token <= 0xcd) {
-            result[keyword.token - 0xc6] = keyword.keyword;
-        }
-    }
-    return result;
-})();
+export const immediateCommands = keywords
+    .filter(kw => kw.token >= 0xc6 && kw.token <= 0xcd)
+    .map(kw => kw.keyword);
 
 const Chars = {
     Colon: ":".charCodeAt(0),
@@ -291,7 +272,9 @@ class StringHandler {
     }
 
     onToken(token) {
-        this.output += tokens[token - Chars.FirstToken];
+        const kw = keywordByToken.get(token);
+        if (kw) this.output += kw.keyword;
+        else this.onCharCode(token);
     }
 }
 
@@ -362,7 +345,7 @@ function detokeniseInternal(text, handler) {
                 identifier = undefined;
             }
             handler.onToken(charCode);
-            let tokenFlags = flags[charCode - Chars.FirstToken];
+            const tokenFlags = keywordByToken.get(charCode)?.flags ?? 0;
             if (tokenFlags & Flags.Conditional) {
                 afterConditionalToken = true;
             }
@@ -424,10 +407,6 @@ export function forEachBasicLine(tokenised, lineHandler) {
 }
 
 class PartialHandler extends StringHandler {
-    constructor() {
-        super();
-    }
-
     onSpace() {}
 
     onToken(token) {
@@ -486,8 +465,6 @@ export function backwardCompat(text) {
         let newCode = charCode & 0xff;
         // U+0090-U+009A. U+00A0-U+00AA map to byte 16 lower
         let ranges16 = (newCode >= 0x90 && newCode <= 0x9a) || (newCode >= 0xa0 && newCode <= 0xaa);
-        // U+00D0-U+00DA, U+00E0-U+00EA, U+00F0-U+00FA
-        //let rangesOK = ((newCode>=0xD0 && newCode <=0xDA) || (newCode>=0xE0 && newCode<=0xEA) || (newCode>=0xF0 && newCode<=0xFA))
         if (ranges16) {
             newCode = newCode - 16;
         }
