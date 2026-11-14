@@ -90,6 +90,12 @@ export class OwletEditor {
         });
 
         followImplicitLineNumbers(this.editor);
+        // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
+        // markers about to be made anyway.
+        this.editor.onDidChangeCursorPosition(({position}) => {
+            if (!this.syntaxTimer && position.lineNumber !== this.syntaxCursorLine)
+                this.showSyntaxMarkers();
+        });
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);
@@ -142,14 +148,21 @@ export class OwletEditor {
     }
 
     // The markers for lines that end too soon would be wrong while the line is still being typed, so they come only
-    // after the typing stops.
+    // after the typing stops. The old ones stay until then; Monaco moves them along with the text.
     updateSyntaxMarkers() {
-        const model = this.editor.getModel();
-        monacoEditor.setModelMarkers(model, "syntax", []);
         clearTimeout(this.syntaxTimer);
-        this.syntaxTimer = setTimeout(
-            () => monacoEditor.setModelMarkers(model, "syntax", getSyntaxMarkers(model.getValue())),
-            SyntaxMarkerDelayMs,
+        this.syntaxTimer = setTimeout(() => this.showSyntaxMarkers(), SyntaxMarkerDelayMs);
+    }
+
+    showSyntaxMarkers() {
+        clearTimeout(this.syntaxTimer);
+        this.syntaxTimer = null;
+        const model = this.editor.getModel();
+        this.syntaxCursorLine = this.editor.getPosition().lineNumber;
+        monacoEditor.setModelMarkers(
+            model,
+            "syntax",
+            getSyntaxMarkers(model.getValue(), this.syntaxCursorLine),
         );
     }
 

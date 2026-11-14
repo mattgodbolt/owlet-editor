@@ -119,23 +119,43 @@ export function highlightLine(text, inAssembler = false) {
     return {tokens: joined, inAssembler: open};
 }
 
-// What each line's errors are, for editor markers: {line, start, end, message, unfinished}. An unfinished line is shown
-// at its last token and on to the end of the line; `message` is the error BASIC would give, or null where the
-// recogniser does not know it.
+// What each line's errors are, for editor markers: {line, start, end, message, unfinished, hole}. An unfinished line is
+// shown at its last token and on to the end of the line, and one that something is missing from (a `hole`) at the token
+// where it stops; `message` is the error BASIC would give, or null where the recogniser does not know it. A block
+// that is never closed is one problem at its "[" ({unclosed: true}) in place of those of the lines after it, if it has any.
 export function programProblems(text) {
     let inAssembler = false;
-    return text.split(/\r?\n/).flatMap((lineText, i) => {
+    let block = null;
+    const problems = text.split(/\r?\n/).flatMap((lineText, i) => {
         const recogniser = new Recogniser(lineText, inAssembler);
         inAssembler = recogniser.line();
+        if (recogniser.opener) block = {line: i + 1, token: recogniser.opener};
         const last = recogniser.tokens.findLast(token => token.kind !== "white");
-        return recogniser.problems.map(({message, token, unfinished}) => ({
+        return recogniser.problems.map(({message, token, unfinished, hole}) => ({
             line: i + 1,
-            start: unfinished ? last.start : token.start,
-            end: unfinished ? lineText.length : token.end,
+            start: unfinished && !hole ? last.start : token.start,
+            end: unfinished && !hole ? lineText.length : token.end,
             message,
             unfinished,
+            hole,
         }));
     });
+    if (!inAssembler || !block) return problems;
+    const {line, token} = block;
+    const before = problems.filter(problem => problem.line <= line);
+    if (before.length === problems.length) return problems;
+    return [
+        ...before,
+        {
+            line,
+            start: token.start,
+            end: token.end,
+            message: null,
+            unfinished: false,
+            hole: false,
+            unclosed: true,
+        },
+    ];
 }
 
 // A Monaco tokens provider: the state between lines is whether an assembler block is open.

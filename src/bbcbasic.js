@@ -435,7 +435,9 @@ export function registerBbcBasicLanguage(
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
 export const codeActionProvider = {
     provideCodeActions(model, range, context) {
-        const actions = context.markers.map(marker => {
+        // Only the warnings above come with a fix; the text under any other marker is not to be rewritten.
+        const fixable = context.markers.filter(marker => QuickFixCodes.has(marker.code));
+        const actions = fixable.map(marker => {
             const text = model.getValueInRange(marker);
             if (marker.code === SpaceAfterAbbreviationCode) {
                 const abbreviation = text.slice(0, text.indexOf(".") + 1);
@@ -473,6 +475,13 @@ const LowerCaseTokenRegex = new RegExp(
 );
 
 const SpaceAfterAbbreviationCode = "space-after-abbreviation";
+const LowerCaseKeywordCode = "lowercase-keyword";
+const ForeignOperatorCode = "foreign-operator";
+const QuickFixCodes = new Set([
+    SpaceAfterAbbreviationCode,
+    LowerCaseKeywordCode,
+    ForeignOperatorCode,
+]);
 
 const InvalidOperatorMap = new Map([
     ["==", "="],
@@ -491,19 +500,41 @@ export function getWarnings(text) {
         .flatMap((lineTokens, i) => lineWarnings(i + 1, lines[i], lineTokens));
 }
 
-// The markers for the lines BASIC would stop at, and for those that end too soon; only the new tokenizer knows either.
-export function getSyntaxMarkers(text) {
+// The markers for the lines BASIC would stop at, and for those that end too soon or have something missing; only the
+// new tokenizer knows either. A line is unfinished while the cursor is on it (`cursorLine`) and so is not marked then,
+// and a warning that covers the same text says enough.
+export function getSyntaxMarkers(text, cursorLine = 0) {
     if (!newParser) return [];
-    return programProblems(text).map(({line, start, end, message, unfinished}) => ({
-        severity: unfinished ? MarkerSeverity.Info : MarkerSeverity.Error,
-        message: unfinished
-            ? `Unfinished line${message ? `: BASIC would stop with "${message}" if it ended here` : ""}`
-            : `${message || "Error"}: BASIC would stop at this statement`,
-        startLineNumber: line,
-        startColumn: start + 1,
-        endLineNumber: line,
-        endColumn: end + 1,
-    }));
+    const warnings = getWarnings(text);
+    return programProblems(text).flatMap(
+        ({line, start, end, message, unfinished, hole, unclosed}) => {
+            const covered = warnings.some(
+                warning =>
+                    warning.startLineNumber === line &&
+                    warning.startColumn <= end &&
+                    start + 1 < warning.endColumn,
+            );
+            if (covered || (unfinished && line === cursorLine)) return [];
+            const rom = message ? ` with "${message}"` : "";
+            const text = unclosed
+                ? "Assembler block not closed: there is no ] after this ["
+                : unfinished
+                  ? hole
+                      ? `Unfinished statement: BASIC would stop${rom} here`
+                      : `Unfinished line${message ? `: BASIC would stop${rom} if it ended here` : ""}`
+                  : `${message || "Error"}: BASIC would stop at this statement`;
+            return [
+                {
+                    severity: unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error,
+                    message: text,
+                    startLineNumber: line,
+                    startColumn: start + 1,
+                    endLineNumber: line,
+                    endColumn: end + 1,
+                },
+            ];
+        },
+    );
 }
 
 function lineWarnings(lineNum, line, lineTokens) {
@@ -528,6 +559,7 @@ function lineWarnings(lineNum, line, lineTokens) {
             if (immediateCommands.includes(upper)) continue;
             warn(token.offset, match[0].length, {
                 message: `BASIC keywords should be upper case, did you mean ${upper}?`,
+                code: LowerCaseKeywordCode,
             });
         }
     }
@@ -546,6 +578,7 @@ function lineWarnings(lineNum, line, lineTokens) {
         if (InvalidOperatorMap.has(badOperator)) {
             warn(token.offset, 2, {
                 message: `${badOperator} is not a BBC BASIC operator, did you mean ${InvalidOperatorMap.get(badOperator)}?`,
+                code: ForeignOperatorCode,
             });
         }
     }

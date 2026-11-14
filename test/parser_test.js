@@ -143,10 +143,73 @@ describe("Text that is wrong, not unfinished", () => {
         ["END 1", ["1"]],
         ["PRINT (1+2))", [")"]],
         ["A$=LEFT$(X$,1,", [","]],
-        ["GOTO:PRINT", ["GOTO"]],
-        ["FOR I=1 TO:NEXT", ["TO"]],
         ["X=RND(1,", [","]],
     ])("%s should be red", (text, expected) => {
+        assert.deepStrictEqual(red(text), expected);
+    });
+});
+
+// The text at each key of a line typed in front of `after`, with Monaco's auto-closing "(": a typed ")" goes over the
+// one it inserted.
+function keysTyped(typed, after = "") {
+    let before = "";
+    let closing = "";
+    return [...typed].map(key => {
+        if (key === ")" && closing.startsWith(")")) closing = closing.slice(1);
+        else if (key === "(") closing = `)${closing}`;
+        before += key;
+        return before + closing + after;
+    });
+}
+
+describe("A line typed in an editor that closes brackets, or in front of existing text", () => {
+    it.each([
+        ["PRINT (1+2)*3", ""],
+        ["A$=LEFT$(B$,2)", ""],
+        ['PRINT TAB(1,2);"x"', ""],
+        ["PROCbox(1,2)", ""],
+        ["DIM a(10)", ""],
+        ["FOR I=1 TO 10", ":PRINT I:NEXT"],
+        ["GOTO 100", ":REM x"],
+        ["IF A=1 THEN ", " PRINT 2"],
+        ["X=1+2", ":PRINT X"],
+        ["IF A THEN GOTO", " ELSE PRINT 1"],
+    ])("%s typed before %j should be red on no key", (typed, after) => {
+        assert.deepStrictEqual(
+            keysTyped(typed, after).filter(text => invalid(text).length),
+            [],
+        );
+    });
+    it("should be red only where a word typed in front of another is one with it", () => {
+        const text = keysTyped("IF A=1 THEN ", "PRINT 2").filter(key => invalid(key).length);
+        assert.deepStrictEqual(text, [
+            "IPRINT 2",
+            "IF APRINT 2",
+            "IF A=1 TPRINT 2",
+            "IF A=1 THPRINT 2",
+            "IF A=1 THEPRINT 2",
+        ]);
+    });
+    it.each([
+        ["GOTO:PRINT", "GOTO"],
+        ["FOR I=1 TO:NEXT", "TO"],
+        ["A$=LEFT$(B$)", ")"],
+    ])("%s should be unfinished at its hole, not red", (text, at) => {
+        assert.deepStrictEqual(invalid(text), []);
+        const [problem] = programProblems(text);
+        assert.strictEqual(problem.unfinished, true);
+        assert.strictEqual(text.slice(problem.start, problem.end), at);
+    });
+});
+
+describe("A keyword that is the start of a longer one", () => {
+    it.each(["MOD", "IF A THEN MOD", "A=TO", "X=1:A=TO", "A=INKEY", "[OR"])(
+        "%s should not be red while it could grow",
+        text => {
+            assert.deepStrictEqual(red(text), []);
+        },
+    );
+    it.each([["MODX", ["MOD"]]])("%s should be red", (text, expected) => {
         assert.deepStrictEqual(red(text), expected);
     });
 });

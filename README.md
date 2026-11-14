@@ -56,18 +56,33 @@ of the line could change that. The colours are a function of the text alone, whe
 - **Text that is not code is never red:** a comment after `REM`, the items after `DATA`, a `*` command, and the rest
   of a line after an `ELSE` that starts a statement or a `DEF` that is not `DEF FN` or `DEF PROC`, and an `ON ... GOTO`
   list after its first target, all of which BASIC skips.
-- **Unfinished is not red** (`?parser=new`): a line that BASIC rejects only because the line ends too soon keeps its
-  ordinary colours, so a line can be typed a key at a time. `G`, `GOTO`, `GOTO `, `FOR I=1 TO`, `PRINT (1+`,
-  `PRINT "HI` (a string with no closing quote yet) and `[LDA` are unfinished: some text after them would make the
-  line valid, including a name that could grow into a keyword (`FOR I=1 T`, `X=1 AN`, `ENDP`) or a mnemonic (`[LD`).
-  Only the end of the line counts. A statement that is cut short by a `:` or `ELSE` (`GOTO:PRINT`), and anything
-  present that cannot be accepted (`GOTO 20 30`, `PRINT )`, `A=1'`, `X=1+*`), is red as before. A line stays
-  unfinished in a finished program (the colour cannot know), so it is shown by a marker instead, below.
-- **Markers** (`?parser=new`): about half a second after the last edit, an unfinished line gets an information
-  squiggle at its end, and a statement BASIC would stop at gets an error squiggle, both from the recogniser that
-  colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`, `No TO`, `Missing ,`, `Missing "`
-  and so on) where the recogniser knows it; the recorded rows in `test/rom-verdicts.json` are checked against it, and
-  where a site is worded differently by context (a call's arguments) there is no text rather than a guess.
+- **Unfinished is not red** (`?parser=new`): a line that BASIC rejects only because something is still to be typed keeps
+  its ordinary colours, so a line can be typed a key at a time. Something is still to be typed where the line ends:
+  `G`, `GOTO`, `GOTO `, `FOR I=1 TO`, `PRINT (1+`, `PRINT "HI` (a string with no closing quote yet) and `[LDA` are
+  unfinished, including a name or keyword that could grow into a longer keyword (`FOR I=1 T`, `X=1 AN`, `ENDP`, `MOD`
+  for `MODE`, `A=TO` for `TOP`) or a mnemonic (`[LD`). It is also still to be typed where the statement stops at a `)`,
+  `,`, `:` or `ELSE` (or at a statement keyword where a value was wanted, if text follows it), when some text typed
+  there would make the statement valid: an editor that closes brackets leaves `LEFT$(B$)` and `PRINT ()` while the
+  arguments are typed, and text typed in front of what is already there leaves `FOR I=1 TO:PRINT I`, `GOTO:REM x` and
+  `IF PRINT 2`. The recogniser tries a short list of fillers (a value, `,1`, ` TO 1`, `1 THEN `, `#1`...) at that
+  point, and a completion of the word before it, and asks whether the statement is then valid. The colour cannot know
+  the cursor, so a line that stays like that in a finished program is shown by a marker instead, below. A rejected
+  statement of that kind that the ROM also rejects (`GOTO:PRINT`, `A$=LEFT$(B$)`) is therefore not red either; the
+  oracle counts it as agreement and lists it apart. What is red is text that no typing at the end, or at a closer or
+  keyword where the statement stopped, could repair: `GOTO 20 30`, `PRINT )`, `A=1'`, `X=1+*`, `PRINT (1+2))`. Words
+  typed straight against the word after them with no space (`IF A=1 TPRINT 2`, which is a name, `TPRINT`, and a
+  number) are red until the space is typed; the recogniser does not look for a hole inside a word.
+- **Markers** (`?parser=new`): about half a second after the last edit (the old markers stay, and move with the text,
+  until then), a statement BASIC would stop at gets an error squiggle, and a line that is unfinished gets a warning
+  squiggle: at its end, or at the token where the statement stopped when something is missing from the middle. Both
+  come from the recogniser that colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`,
+  `No TO`, `Missing ,`, `Missing "` and so on) where the recogniser knows it; the recorded rows in
+  `test/rom-verdicts.json` are checked against it, and where a site is worded differently by context (a call's
+  arguments) there is no text rather than a guess. Markers may depend on the cursor, unlike the colours: the line the
+  cursor is on is not marked as unfinished (it would blink with every key), and is marked as soon as the cursor
+  leaves it. An assembler block that is never closed is one error on its `[` in place of one per later line (the
+  later lines are coloured as before). A syntax marker is left out where a warning already covers the same text
+  (`x == 3` has the warning about `==`), and quick fixes are offered only for the warnings, never for a syntax marker.
 - **Code is red if it would stop BASIC when run, even where it cannot run** (on purpose):
   - the branch of an `IF` whose condition is false, which BASIC skips;
   - the body of a `DEF FN` or `DEF PROC`, which BASIC skips on its way through the program and runs only when called;
@@ -78,7 +93,9 @@ of the line could change that. The colours are a function of the text alone, whe
   the oracle, but it is never a reason to fail a change.
 - **Unfinished is a third answer in the oracle.** A statement the ROM rejects and the recogniser calls unfinished is
   neither a false-valid nor a false-invalid; the oracle counts it as agreement and lists it apart, and also lists
-  any such statement that the ROM accepts (there must be none), outside the text BASIC skips.
+  any such statement that the ROM accepts (there must be none), outside the text BASIC skips. Where a statement is
+  unfinished at a hole, some insertion there should make the ROM accept it; the oracle does not check that, so
+  check it by hand with the ROM when the fillers in `src/parser/recogniser.js` change.
 - **Stricter than the ROM only on purpose.** Each other deliberate exception, such as text after a complete assembler
   instruction, is a row of the recorded table listed as stricter than the ROM in its test.
 

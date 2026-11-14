@@ -200,6 +200,7 @@ function differs(parser, text) {
 
 const caseWarning = (keyword, startColumn) => ({
     message: `BASIC keywords should be upper case, did you mean ${keyword}?`,
+    code: "lowercase-keyword",
     startColumn,
     endColumn: startColumn + keyword.length,
 });
@@ -1077,7 +1078,7 @@ describe("Bracket matching that only the new tokenizer does", () => {
             ["PRINT A.B)", ""],
             ["P.X.7", ""],
             // A bracket BASIC rejects stays in the colour of an error, and so its partner is not one of a pair.
-            ["PRINT LEFT$(A$)", ""],
+            ["PRINT LEFT$(A$,1,2)", ""],
             ["P.(1+2))", "1:3=0 1:7=0"],
             // An assembler block is the pair that spans lines.
             ["[\nLDA (&70),Y\n]\nPRINT (1)", "1:1=0 2:5=1 2:9=1 3:1=0 4:7=0 4:9=0"],
@@ -1176,6 +1177,7 @@ describe.each(Parsers)("Line warnings (%s)", parser => {
             const operator = text.slice(startColumn - 1, startColumn + 1);
             checkWarnings(text, {
                 message: `${operator} is not a BBC BASIC operator, did you mean ${replacement}?`,
+                code: "foreign-operator",
                 startColumn,
                 endColumn: startColumn + 2,
             });
@@ -1234,6 +1236,26 @@ describe.each(Parsers)("Quick fixes (%s)", parser => {
     });
 });
 
+describe("Quick fixes and syntax markers", () => {
+    beforeAll(() => registerBbcBasicLanguage("new"));
+    // The titles of the quick fixes offered for every marker the editor has on the text.
+    function offered(text) {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const markers = [...getWarnings(text), ...getSyntaxMarkers(text)];
+            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            return actions.map(action => action.title);
+        } finally {
+            model.dispose();
+        }
+    }
+    it("should offer fixes only for the warnings, and never rewrite the text of a syntax marker", () => {
+        assert.deepStrictEqual(offered('print "lower"'), ["Replace with PRINT"]);
+        assert.deepStrictEqual(offered("GOTO 20 30"), []);
+        assert.deepStrictEqual(offered("x == 3"), ["Replace with ="]);
+    });
+});
+
 describe("Syntax markers", () => {
     const Unfinished = rom => `Unfinished line: BASIC would stop with "${rom}" if it ended here`;
     const markers = text =>
@@ -1247,17 +1269,66 @@ describe("Syntax markers", () => {
     beforeAll(() => registerBbcBasicLanguage("new"));
     it("should show a line that ends too soon as information at its end", () => {
         assert.deepStrictEqual(markers("GOTO"), [
-            [MarkerSeverity.Info, Unfinished("No such variable"), 1, 1, 5],
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 1, 5],
         ]);
         assert.deepStrictEqual(markers("10 FOR I=1 TO "), [
-            [MarkerSeverity.Info, Unfinished("No such variable"), 1, 12, 15],
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 12, 15],
         ]);
         assert.deepStrictEqual(markers('X=1\nPRINT "HI'), [
-            [MarkerSeverity.Info, Unfinished('Missing "'), 2, 7, 10],
+            [MarkerSeverity.Warning, Unfinished('Missing "'), 2, 7, 10],
         ]);
         assert.deepStrictEqual(markers("A$=LEFT$(X$"), [
-            [MarkerSeverity.Info, Unfinished("Missing ,"), 1, 10, 12],
+            [MarkerSeverity.Warning, Unfinished("Missing ,"), 1, 10, 12],
         ]);
+    });
+    it("should show something missing from the middle of a statement at the token where it stops", () => {
+        const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
+        assert.deepStrictEqual(markers("FOR I=1:NEXT"), [
+            [MarkerSeverity.Warning, Hole("No TO"), 1, 7, 8],
+        ]);
+        assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
+            [MarkerSeverity.Warning, Hole("Missing ,"), 1, 12, 13],
+        ]);
+    });
+    it("should not mark the line the cursor is on as unfinished, only the others", () => {
+        const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";
+        const at = line => getSyntaxMarkers(text, line).map(m => [m.severity, m.startLineNumber]);
+        const error = [MarkerSeverity.Error, 2];
+        assert.deepStrictEqual(at(0), [
+            [MarkerSeverity.Warning, 1],
+            error,
+            [MarkerSeverity.Warning, 3],
+        ]);
+        assert.deepStrictEqual(at(1), [error, [MarkerSeverity.Warning, 3]]);
+        assert.deepStrictEqual(at(2), [
+            [MarkerSeverity.Warning, 1],
+            error,
+            [MarkerSeverity.Warning, 3],
+        ]);
+        assert.deepStrictEqual(at(3), [[MarkerSeverity.Warning, 1], error]);
+    });
+    it("should leave a warning to say what it says about the same text", () => {
+        assert.deepStrictEqual(markers("x == 3"), []);
+        assert.deepStrictEqual(markers("A=2**3"), []);
+        assert.deepStrictEqual(markers("colour"), []);
+    });
+    it("should mark a block that is never closed once, at its [", () => {
+        const program = ["MODE 7", "[OPT 0", "LDA #", "STA &70 FOR", "RTS", "PRINT )", "END"].join(
+            "\n",
+        );
+        assert.deepStrictEqual(markers(program), [
+            [
+                MarkerSeverity.Error,
+                "Assembler block not closed: there is no ] after this [",
+                2,
+                1,
+                2,
+            ],
+        ]);
+        const closed = markers(`${program}\n]`);
+        assert.ok(
+            closed.length > 1 && closed.every(([, message]) => !message.startsWith("Assembler")),
+        );
     });
     it("should show a statement BASIC stops at with the error BASIC gives", () => {
         const stop = rom => `${rom}: BASIC would stop at this statement`;
@@ -1265,8 +1336,7 @@ describe("Syntax markers", () => {
             ["GOTO 20 30", "Syntax error", 9, 11],
             ["PRINT )", "No such variable", 7, 8],
             ["X=1+*", "No such variable", 5, 6],
-            ["FOR I=1:NEXT", "No TO", 7, 8],
-            ["A$=LEFT$(X$)", "Missing ,", 12, 13],
+            ["A$=LEFT$(X$,1,2)", "Missing )", 16, 17],
             ["A=1'", "Syntax error", 4, 5],
         ])
             assert.deepStrictEqual(
@@ -1284,7 +1354,7 @@ describe("Syntax markers", () => {
     });
     it("should follow an assembler block over the lines", () => {
         assert.deepStrictEqual(markers("[\nLDA #\n]"), [
-            [MarkerSeverity.Info, Unfinished("No such variable"), 2, 5, 6],
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 2, 5, 6],
         ]);
     });
 });
