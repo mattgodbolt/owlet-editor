@@ -477,25 +477,52 @@ input {
     font-size: inherit;
   }
 
-  .vdu-entry {
+  .vdu-row {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    width: 100%;
-    margin-bottom: 2px;
-    text-align: left;
-
-    &:hover,
-    &:focus-visible {
-      background: var(--color-highlight);
-      color: #fff;
-    }
+    gap: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--color-toolbar);
   }
 
   .vdu-num {
-    min-width: 3ch;
+    display: flex;
+    flex-direction: column;
+    min-width: 4ch;
     color: #eee;
     font-weight: bold;
+  }
+
+  .vdu-hex {
+    color: #999;
+    font-size: smaller;
+    font-weight: normal;
+  }
+
+  .vdu-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .vdu-line {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .vdu-syntax {
+    color: #eee;
+  }
+
+  .vdu-example,
+  .vdu-hint {
+    color: #999;
+  }
+
+  .vdu-example code {
+    color: var(--font-color);
   }
 
   .vdu-char {
@@ -503,20 +530,16 @@ input {
     color: #eee;
   }
 
-  .vdu-name {
-    flex: 1;
-    min-width: 0;
+  .vdu-hint {
+    margin: 4px 0;
   }
 
-  .vdu-args {
-    color: #999;
-    font-size: smaller;
-    text-align: right;
-  }
-
-  .plot-legend {
-    margin-bottom: 4px;
-    color: #999;
+  .plot-decode {
+    margin: 8px 0 4px;
+    padding: 8px;
+    background: var(--color-highlight);
+    color: #fff;
+    font-weight: bold;
   }
 
   .plot-group {
@@ -533,11 +556,17 @@ input {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     gap: 2px;
+  }
 
-    .vdu-entry {
-      justify-content: center;
-      margin: 0;
-      padding: 6px 0;
+  .plot-cell {
+    padding: 6px 0;
+    background: var(--color-buttons);
+    text-align: center;
+
+    &.match {
+      background: var(--color-highlight);
+      color: #fff;
+      font-weight: bold;
     }
   }
 

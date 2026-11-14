@@ -6,18 +6,28 @@ import {
     PlotGroups,
     TeletextCodes,
     VduCodes,
+    decodePlot,
+    hex,
 } from "../src/vdu-data";
-import {
-    charInsertText,
-    createVduReference,
-    insertAtCursor,
-    plotInsertText,
-    vduInsertText,
-} from "../src/vdu-reference";
+import {createVduReference, describePlot, parseNumber} from "../src/vdu-reference";
+
+// The bytes a syntax sends after the code: a name followed by ; is two bytes, any other item one.
+const bytesIn = syntax =>
+    (syntax.replace(/^VDU \d+,?/, "").match(/[^,;]+;?/g) ?? []).reduce(
+        (total, item) => total + (item.endsWith(";") ? 2 : 1),
+        0,
+    );
 
 describe("VDU data", () => {
     it("has every control code once, plus delete", () => {
         expect(VduCodes.map(c => c.code)).toEqual([...Array(32).keys(), 127]);
+    });
+
+    it("has a syntax whose code and byte count agree with the entry", () => {
+        for (const c of VduCodes) {
+            expect(c.syntax, `VDU ${c.code}`).toMatch(new RegExp(`^VDU ${c.code}(,|$)`));
+            expect(bytesIn(c.syntax), c.syntax).toBe(c.params);
+        }
     });
 
     it.each([
@@ -38,16 +48,31 @@ describe("VDU data", () => {
         expect(VduCodes.find(c => c.code === code).params).toBe(params);
     });
 
-    it("describes the arguments of every code that takes any", () => {
-        for (const c of VduCodes) expect(Boolean(c.args), `VDU ${c.code}`).toBe(c.params > 0);
+    it.each([
+        [22, "VDU 22,mode", "VDU 22,7"],
+        [31, "VDU 31,x,y", "VDU 31,10,5"],
+        [25, "VDU 25,k,x;y;", "VDU 25,4,640;512;"],
+    ])("VDU %i is written %s, for example %s", (code, syntax, example) => {
+        const entry = VduCodes.find(c => c.code === code);
+        expect(entry.syntax).toBe(syntax);
+        expect(entry.example[0]).toBe(example);
     });
 
-    it("covers printable ASCII with the BBC pound sign at 96", () => {
+    it("gives every example the same code as its syntax and the right byte count", () => {
+        for (const c of VduCodes.filter(c => c.example)) {
+            const [example] = c.example;
+            expect(example, c.syntax).toMatch(new RegExp(`^VDU ${c.code},`));
+            expect(bytesIn(example), example).toBe(c.params);
+        }
+    });
+
+    it("covers printable ASCII with the BBC pound sign at 96, and writes hex the BBC way", () => {
         expect(AsciiChars).toHaveLength(95);
         expect(AsciiChars[0]).toEqual({code: 32, char: " "});
         expect(AsciiChars.find(c => c.code === 65).char).toBe("A");
         expect(AsciiChars.find(c => c.code === 96).char).toBe("£");
         expect(AsciiChars.at(-1).code).toBe(126);
+        expect([hex(65), hex(10), hex(159)]).toEqual(["&41", "&0A", "&9F"]);
     });
 
     it("keeps teletext codes in 129-159", () => {
@@ -65,102 +90,106 @@ describe("PLOT data", () => {
     });
 
     it.each([
-        [4, "Solid line, both ends included", "Move absolute"],
-        [5, "Solid line, both ends included", "Draw absolute, foreground"],
-        [69, "Plot a point", "Draw absolute, foreground"],
-        [85, "Fill triangle", "Draw absolute, foreground"],
-        [101, "Fill rectangle", "Draw absolute, foreground"],
-        [117, "Fill parallelogram", "Draw absolute, foreground"],
-    ])("PLOT %i is %s, %s", (k, groupName, columnName) => {
-        const group = PlotGroups.findLast(g => g.base <= k);
-        expect(group.name).toBe(groupName);
-        expect(PlotColumns[k - group.base].name).toBe(columnName);
+        [4, "PLOT 4 = Solid line, both ends included, absolute, move (nothing is drawn)"],
+        [5, "PLOT 5 = Solid line, both ends included, absolute, foreground colour"],
+        [69, "PLOT 69 = Plot a point, absolute, foreground colour"],
+        [85, "PLOT 85 = Fill triangle, absolute, foreground colour"],
+        [101, "PLOT 101 = Fill rectangle, absolute, foreground colour"],
+        [117, "PLOT 117 = Fill parallelogram, absolute, foreground colour"],
+        [81, "PLOT 81 = Fill triangle, relative, foreground colour"],
+        [150, "PLOT 150 = Circle outline (GXR / Master; the columns are not labelled here)"],
+    ])("decodes PLOT %i", (k, text) => {
+        expect(describePlot(k)).toBe(text);
+    });
+
+    it("decodes nothing beyond the known groups", () => {
+        expect(decodePlot(255)).toBeNull();
+        expect(decodePlot(150).column).toBeNull();
     });
 });
 
-describe("inserted text", () => {
+describe("number searches", () => {
     it.each([
-        [{code: 31, params: 2}, "VDU 31,"],
-        [{code: 12, params: 0}, "VDU 12"],
-        [{code: 23, params: 9}, "VDU 23,"],
-    ])("VDU entry %j inserts %s", (entry, text) => {
-        expect(vduInsertText(entry)).toBe(text);
-    });
-
-    it("inserts CHR$ for characters and PLOT with a comma", () => {
-        expect(charInsertText({code: 65})).toBe("CHR$(65)");
-        expect(plotInsertText(85)).toBe("PLOT 85,");
+        ["65", 65],
+        ["&41", 65],
+        ["&4a", 74],
+        [" 7 ", 7],
+        ["triangle", null],
+        ["&", null],
+    ])("reads %j as %j", (query, expected) => {
+        expect(parseNumber(query)).toBe(expected);
     });
 });
 
 describe("the panel", () => {
     function setup() {
         const container = document.createElement("div");
-        const inserted = [];
-        createVduReference(container, text => inserted.push(text));
+        createVduReference(container);
         const search = text => {
             const input = container.querySelector(".vdu-search");
             input.value = text;
             input.dispatchEvent(new Event("input"));
         };
-        const entries = () =>
-            [...container.querySelectorAll("[data-insert]")].map(b => b.dataset.insert);
-        return {container, inserted, search, entries};
+        const text = () => container.querySelector(".vdu-body").textContent;
+        const count = selector => container.querySelectorAll(selector).length;
+        return {container, search, text, count};
     }
 
-    it("lists the VDU codes first and inserts what is clicked", () => {
-        const {container, inserted, entries} = setup();
-        expect(entries()).toHaveLength(VduCodes.length);
-        container.querySelector('[data-insert="VDU 31,"]').click();
-        expect(inserted).toEqual(["VDU 31,"]);
+    it("lists the VDU codes first, with syntax and examples", () => {
+        const {text, count} = setup();
+        expect(count(".vdu-row")).toBe(VduCodes.length);
+        expect(text()).toContain("VDU 31,x,y");
+        expect(text()).toContain("e.g. VDU 31,10,5 is PRINT TAB(10,5);");
     });
 
-    it("shows all 128 basic PLOT codes plus the extended ones on the PLOT tab", () => {
-        const {container, entries} = setup();
+    it("shows all the PLOT codes on the PLOT tab", () => {
+        const {container, count} = setup();
         container.querySelector('[data-tab="plot"]').click();
-        expect(entries()).toHaveLength((PlotGroups.length + PlotExtendedGroups.length) * 8);
+        expect(count(".plot-cell")).toBe((PlotGroups.length + PlotExtendedGroups.length) * 8);
+        expect(count(".plot-decode")).toBe(0);
     });
 
-    it("finds PLOT groups by column name, but only for the groups whose columns are known", () => {
-        const {search, entries} = setup();
-        search("inverse");
-        expect(entries()).toContain("PLOT 6,");
-        expect(entries()).not.toContain("PLOT 134,");
-        search("absolute");
-        expect(entries()).toContain("PLOT 125,");
-    });
-
-    it("searches every table at once", () => {
-        const {search, entries} = setup();
+    it("decodes a number typed in the search and highlights it in the grid", () => {
+        const {container, search, text} = setup();
         search("85");
-        expect(entries()).toEqual(expect.arrayContaining(["CHR$(85)", "PLOT 85,"]));
-        search("triangle");
-        expect(entries()).toHaveLength(8);
-        search("zzz");
-        expect(entries()).toEqual([]);
+        expect(container.querySelector(".plot-decode").textContent).toBe(
+            "PLOT 85 = Fill triangle, absolute, foreground colour",
+        );
+        expect(container.querySelector(".plot-cell.match").textContent).toBe("85");
+        expect(text()).toContain("Use it as PLOT 85,x,y");
     });
-});
 
-describe("insertAtCursor", () => {
-    it("replaces the selections, leaves the caret after the text, and refocuses the editor", () => {
-        const calls = [];
-        const selection = {startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1};
-        const editor = {
-            getSelections: () => [selection],
-            pushUndoStop: () => calls.push("undo-stop"),
-            executeEdits: (source, edits) => calls.push(["edit", source, edits]),
-            focus: () => calls.push("focus"),
-        };
-        insertAtCursor(editor, "VDU 17,");
-        expect(calls).toEqual([
-            "undo-stop",
-            [
-                "edit",
-                "vdu-reference",
-                [{range: selection, text: "VDU 17,", forceMoveMarkers: true}],
-            ],
-            "undo-stop",
-            "focus",
+    it("shows ASCII and MODE 7 codes in decimal and hex, found by number, hex or character", () => {
+        const {container, search, text, count} = setup();
+        container.querySelector('[data-tab="ascii"]').click();
+        expect(count(".vdu-row")).toBe(AsciiChars.length);
+        search("&41");
+        expect(text()).toContain("65&41");
+        expect(text()).toContain("CHR$(65)");
+        search("a");
+        expect([...container.querySelectorAll(".vdu-char")].map(e => e.textContent)).toEqual([
+            "A",
+            "a",
         ]);
+        search("&8D");
+        expect(text()).toContain("Double height");
+        expect(text()).toContain("CHR$(141)");
+    });
+
+    it("searches every table at once by name", () => {
+        const {search, count} = setup();
+        search("triangle");
+        expect(count(".plot-group")).toBe(1);
+        search("zzz");
+        expect(count(".vdu-row")).toBe(0);
+        expect(count(".plot-group")).toBe(0);
+    });
+
+    it("finds PLOT groups by column text, but only for the groups whose columns are known", () => {
+        const {container, search} = setup();
+        search("absolute inverse");
+        const cells = [...container.querySelectorAll(".plot-cell")].map(e => e.textContent);
+        expect(cells).toContain("6");
+        expect(cells).not.toContain("134");
     });
 });

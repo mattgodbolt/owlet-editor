@@ -18,7 +18,7 @@ import {getWarnings, LanguageId} from "./bbcbasic";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
-import {createVduReference, insertAtCursor} from "./vdu-reference";
+import {createVduReference} from "./vdu-reference";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
@@ -557,7 +557,7 @@ export class OwletEditor {
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
 
-        createVduReference($("#reference")[0], text => insertAtCursor(this.editor, text));
+        createVduReference($("#reference")[0]);
 
         this.setState(initialState);
     }
