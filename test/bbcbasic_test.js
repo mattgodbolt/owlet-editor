@@ -1292,8 +1292,8 @@ describe("Syntax markers", () => {
     });
     it("should say plainly what BASIC does where a marker is stricter than the ROM, as an error", () => {
         const reads =
-            "BASIC reads 8 as X here (it compares only part of each character); probably a typo";
-        assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 4, 5]]);
+            "LD is not an instruction: the register letter is missing. BASIC reads the 8 as X (LDX), so what follows is the address; probably LDA, LDX or LDY was meant";
+        assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 2, 4]]);
     });
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;

@@ -6,7 +6,8 @@
 // - BASIC ignores the rest of a statement after a complete instruction, but a keyword there that an expression cannot
 //   use is marked, since it is almost always a mistake (NOP PRINT);
 // - BASIC compares only the low five bits of each character of a mnemonic, so it reads 8 as X and ! as A, but a
-//   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9.
+//   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9. Where
+//   it is the third character, the two letters before it are marked instead (LD is not an instruction).
 
 import {Flags} from "../tokens.js";
 
@@ -37,6 +38,7 @@ export const Mnemonics = [
     ...Address,
     ..."OPT EQUB EQUD EQUS EQUW".split(" "),
 ];
+const ThirdCharacter = 2;
 const Label = /\. *(?:[A-Za-z_`][\w`]*%?|@%)/y;
 const Comment = /[;\\][^:]*/y;
 
@@ -142,34 +144,57 @@ export class Assembler {
         const directive = word === "OPT" || word === "EQU";
         if (!directive && ![Implied, Shifts, Addressed, Address].some(set => set.has(word)))
             r.fail("Syntax error");
-        const aliased = chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [token.start + i]));
+        const aliased = chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [i]));
+        const marks =
+            aliased.length === 1 && aliased[0] === ThirdCharacter
+                ? [this.prefixMark(token.start, word, chars[ThirdCharacter])]
+                : aliased.map(i => ({
+                      start: token.start + i,
+                      end: token.start + i + 1,
+                      message: `BASIC reads ${chars[i]} as ${word[i]} here (it compares only part of each character); probably a typo`,
+                  }));
         this.take(
             token.start + 3 + size.length,
             directive ? "keyword.directive" : "keyword",
-            aliased,
+            marks,
         );
         return word + size;
     }
 
-    // The tokens up to the end given, splitting the last, as one of the given type. Each character at an offset in
-    // `aliased` is a token of its own and is marked.
-    take(end, type, aliased = []) {
+    // The mark for a mnemonic whose third character is not a letter: the two letters before it, which are not an
+    // instruction on their own, with the third letters that would make one.
+    prefixMark(start, word, char) {
+        const prefix = word.slice(0, ThirdCharacter);
+        const meant = [
+            ...new Set(Mnemonics.filter(m => m.startsWith(prefix)).map(m => m.slice(0, 3))),
+        ];
+        const kind = meant.every(m => "AXY".includes(m[ThirdCharacter])) ? "register" : "last";
+        const follows = Implied.has(word)
+            ? ""
+            : `, so what follows is the ${word === "OPT" || word === "EQU" ? "operand" : "address"}`;
+        const list = `${meant.slice(0, -1).join(", ")}${meant.length > 1 ? " or " : ""}${meant.at(-1)}`;
+        return {
+            start,
+            end: start + ThirdCharacter,
+            message: `${prefix} is not an instruction: the ${kind} letter is missing. BASIC reads the ${char} as ${word[ThirdCharacter]} (${word})${follows}; probably ${list} was meant`,
+        };
+    }
+
+    // The tokens up to the end given, splitting the last, as one of the given type. Each span in `marks` is a token of
+    // its own and is marked, with its message.
+    take(end, type, marks = []) {
         const r = this.recogniser;
+        const cuts = marks.flatMap(mark => [mark.start, mark.end]);
         while (r.peek().start < end) {
             const token = r.peek();
             if (!["name", "number", "punct"].includes(token.kind)) r.fail(null);
-            const alias = aliased.includes(token.start);
-            const cut = alias
-                ? token.start + 1
-                : Math.min(end, ...aliased.filter(at => at > token.start));
-            r.lexer.split(token, cut - token.start);
-            r.next().type = type;
-            if (!alias) continue;
-            const letter = String.fromCharCode((token.text.charCodeAt(0) & 0x1f) | 0x40);
-            this.stricter(
+            const mark = marks.find(m => m.start === token.start);
+            r.lexer.split(
                 token,
-                `BASIC reads ${token.text} as ${letter} here (it compares only part of each character); probably a typo`,
+                Math.min(end, ...cuts.filter(at => at > token.start)) - token.start,
             );
+            r.next().type = type;
+            if (mark) this.stricter(token, mark.message);
         }
     }
 

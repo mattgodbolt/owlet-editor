@@ -40,6 +40,11 @@ const StricterThanRom = [
     "[OPT0:LD99:]",
     "[OPT0:LD89 &70:]",
     "[OPT0:LD!5:]",
+    "[OPT0:ST!76:]",
+    "[OPT0:LD90:]",
+    "[OPT0:ST\u0001 9:]",
+    "[OPT0:TA8:]",
+    "[OPT0:IN9:]",
     "[OPT0:CP8 5:]",
     "[OPT0:CP9 5:]",
     "[OPT0:J-P &70:]",
@@ -96,7 +101,7 @@ describe("Recogniser", () => {
     });
     it("should give the error BASIC II gives, or none where it does not know it", () => {
         const wrong = RomVerdicts.flatMap(([text, verdict]) => {
-            const {message} = programProblems(text)[0] || {};
+            const {message} = programProblems(text).find(problem => !problem.stricter) || {};
             return verdict === "ok" ||
                 !message ||
                 message === verdict ||
@@ -316,22 +321,75 @@ describe("A keyword that is the start of a longer one", () => {
 
 const AliasMessage = (char, letter) =>
     `BASIC reads ${char} as ${letter} here (it compares only part of each character); probably a typo`;
+const PrefixMessage = (prefix, kind, char, word, tail, meant) =>
+    `${prefix} is not an instruction: the ${kind} letter is missing. BASIC reads the ${char} as ${word[2]} (${word})${tail}; probably ${meant} was meant`;
+const Address = ", so what follows is the address";
 
 // BASIC compares only the low five bits of each character of a mnemonic (the ROM rows in test/rom-verdicts.json), so
-// it reads a non-letter as a letter, which is marked on purpose: [start, end, char, letter] of each.
+// it reads a non-letter as a letter, which is marked on purpose. Where that is the third character, the two letters
+// before it are marked, as they are not an instruction on their own (Olly Betts, #174).
 describe("A character in a mnemonic that BASIC reads as a letter", () => {
     it.each([
-        ["[LD89", [[3, 4, "8", "X"]]],
-        ["[OPT0:LD89:]", [[8, 9, "8", "X"]]],
-        ["[OPT0:ST89:]", [[8, 9, "8", "X"]]],
-        ["[OPT0:LD99:]", [[8, 9, "9", "Y"]]],
-        ["[LD! 5", [[3, 4, "!", "A"]]],
-        ["[CP9 5", [[3, 4, "9", "Y"]]],
+        ["[LD89", "LD", PrefixMessage("LD", "register", "8", "LDX", Address, "LDA, LDX or LDY")],
+        ["[ST89", "ST", PrefixMessage("ST", "register", "8", "STX", Address, "STA, STX or STY")],
+        [
+            "[OPT0:ST89:]",
+            "ST",
+            PrefixMessage("ST", "register", "8", "STX", Address, "STA, STX or STY"),
+        ],
+        [
+            "[OPT0:ST!76:]",
+            "ST",
+            PrefixMessage("ST", "register", "!", "STA", Address, "STA, STX or STY"),
+        ],
+        [
+            "[OPT0:LD90:]",
+            "LD",
+            PrefixMessage("LD", "register", "9", "LDY", Address, "LDA, LDX or LDY"),
+        ],
+        [
+            "[OPT0:LD99:]",
+            "LD",
+            PrefixMessage("LD", "register", "9", "LDY", Address, "LDA, LDX or LDY"),
+        ],
+        ["[LD! 5", "LD", PrefixMessage("LD", "register", "!", "LDA", Address, "LDA, LDX or LDY")],
+        ["[CP8 5", "CP", PrefixMessage("CP", "register", "8", "CPX", Address, "CPX or CPY")],
+        ["[CP9 5", "CP", PrefixMessage("CP", "register", "9", "CPY", Address, "CPX or CPY")],
+        ["[TA8", "TA", PrefixMessage("TA", "register", "8", "TAX", "", "TAX or TAY")],
+        ["[IN9", "IN", PrefixMessage("IN", "last", "9", "INY", "", "INX, INY or INC")],
+        [
+            "[OP4 0",
+            "OP",
+            PrefixMessage("OP", "last", "4", "OPT", ", so what follows is the operand", "OPT"),
+        ],
+        ["[OPT0:AN$ 5:]", "AN", PrefixMessage("AN", "last", "$", "AND", Address, "AND")],
+        ["[BE1 5", "BE", PrefixMessage("BE", "last", "1", "BEQ", Address, "BEQ")],
+        [
+            "[OPT0:ST\u0001 9:]",
+            "ST",
+            PrefixMessage("ST", "register", "\u0001", "STA", Address, "STA, STX or STY"),
+        ],
+    ])(
+        "%s should be red on the letters before it, saying what is missing",
+        (text, prefix, message) => {
+            assert.deepStrictEqual(red(text), [prefix]);
+            assert.deepStrictEqual(
+                programProblems(text)
+                    .filter(problem => problem.stricter)
+                    .map(({start, end, message}) => [text.slice(start, end), message]),
+                [[prefix, message]],
+            );
+        },
+    );
+    // With the character before the third there is no prefix to blame, so just that character is red.
+    it.each([
         ["[J-P &70", [[2, 3, "-", "M"]]],
         ["[3EC", [[1, 2, "3", "S"]]],
         ["[/RA 5", [[1, 2, "/", "O"]]],
         ["[O2A 5", [[2, 3, "2", "R"]]],
-        ["[OP4 0", [[3, 4, "4", "T"]]],
+        ["[OPT0:!ND 5:]", [[6, 7, "!", "A"]]],
+        ["[OPT0:E/R 5:]", [[7, 8, "/", "O"]]],
+        ["[OPT0:B2K:]", [[7, 8, "2", "R"]]],
     ])("%s should be red on the character, with what BASIC reads it as", (text, expected) => {
         assert.deepStrictEqual(
             programProblems(text)
@@ -340,7 +398,7 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
             expected.map(([start, end, char, letter]) => [start, end, AliasMessage(char, letter)]),
         );
         assert.deepStrictEqual(
-            red(text).slice(0, expected.length),
+            red(text),
             expected.map(([start, end]) => text.slice(start, end)),
         );
     });
@@ -348,6 +406,7 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
         "[LDX 9",
         "[ldx 9",
         "[LDA89",
+        "[OPT0:LDA 1:]",
         "[Ldx &70,y",
         "[OPT0:ora 5:]",
         "[oRA 5",
@@ -361,5 +420,40 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
         "[.LD89 LDA 1",
     ])("%s should not be red", text => {
         assert.deepStrictEqual(red(text), []);
+    });
+});
+
+// Keys typed one at a time: the letters of an instruction that is still being typed are not red, and a digit or
+// symbol straight after LD or ST is, as no letter of a register follows it.
+describe("An instruction typed one key at a time", () => {
+    it.each([["[LDA 1"], ["[STA &70"], ["[LDX #5,"], ["[TAX"], ["[INY"], ["[OPT0:CPX 1:]"]])(
+        "%s typed one key at a time should never be red",
+        text => {
+            for (let n = 1; n <= text.length; ++n) {
+                const typed = text.slice(0, n);
+                assert.deepStrictEqual(
+                    programProblems(typed).filter(problem => problem.stricter),
+                    [],
+                    typed,
+                );
+                assert.deepStrictEqual(red(typed), [], typed);
+            }
+        },
+    );
+    it.each([["[L", "[LD", "[S", "[ST"]])(
+        "%s, %s, %s and %s should be unfinished, not red",
+        (...texts) => {
+            for (const text of texts) {
+                assert.deepStrictEqual(red(text), [], text);
+                assert.deepStrictEqual(
+                    programProblems(text).map(problem => [problem.unfinished, problem.stricter]),
+                    [[true, false]],
+                    text,
+                );
+            }
+        },
+    );
+    it("should mark LD as soon as a digit follows it, since no letter of a register can come after", () => {
+        assert.deepStrictEqual(red("[LD8"), ["LD"]);
     });
 });

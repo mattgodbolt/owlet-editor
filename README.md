@@ -118,10 +118,13 @@ message that says what BASIC does, and shows as an error.
 
 - **A keyword after a complete assembler instruction** (`NOP PRINT`, `LDA #1 FOR`). BASIC ignores the rest of the
   statement; text there that is not a `;` or `\` comment is probably a comment missing its `;`.
-- **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`), suggested by Olly
-  Betts on #174. BASIC compares only the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A`
-  and so on (`LD89` is `LDX 9`, but is an easy typo for `LDA89`, `LDX89` or `LDY89`). The character is red and the hover
-  says what BASIC reads it as. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89).
+- **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`). BASIC compares only
+  the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A` and so on: `LD89` is `LDX 9`, but
+  is an easy typo for `LDA89`, `LDX89` or `LDY89`. Olly Betts suggested on #174 marking this, and marking the `LD` (in
+  `LD89`, `ST!76`, `CP8 5`) rather than the character, since `LD` on its own is not an instruction and the register
+  letter was probably left out; the hover says what BASIC reads the character as and which letters were probably
+  meant. Where the character is not the third (`J-P`, `3EC`, `O2A`), no prefix is to blame, so just that character
+  is red. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89).
 
 Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
 `src/bbcbasic.js`: a port of the ROM's tokeniser, a recogniser that marks the token at which BASIC would stop with an
