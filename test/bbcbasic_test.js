@@ -69,7 +69,11 @@ function brackets(text) {
     }
 }
 
-const unmatched = text => brackets(text).flatMap(([column, invalid]) => (invalid ? [column] : []));
+// The columns of each ) shown as having no (: by Monaco, or by the new tokenizer as an invalid token.
+const unmatched = text => [
+    ...brackets(text).flatMap(([column, invalid]) => (invalid ? [column] : [])),
+    ...spanRanges(text, "invalid").flatMap(([start]) => (text[start] === ")" ? [start + 1] : [])),
+];
 
 const openers = keywords.filter(kw => kw.keyword.endsWith("(")).map(tokenChar);
 
@@ -1011,7 +1015,11 @@ describe.each(Parsers)("Bracket matching (%s)", parser => {
             [8, 0, false],
             [15, 0, false],
         ]);
-        assert.deepStrictEqual(levels("P.(1+2))").at(-1), [8, -1, true]);
+        // The new tokenizer marks it invalid itself, and keeps it from Monaco.
+        assert.deepStrictEqual(
+            levels("P.(1+2))").at(-1),
+            parser === "new" ? [7, 0, false] : [8, -1, true],
+        );
     });
     it("should ignore brackets in strings, comments and * commands", () => {
         for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("])
@@ -1033,15 +1041,57 @@ describe.each(Parsers)("Bracket matching (%s)", parser => {
                 );
         }
     });
-    it("has a known limitation: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
+    it("has a known limitation in Monarch: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
         // Monaco merges neighbouring same-coloured tokens, so its \b-guarded opener match fails in "PRINTLE.".
-        assert.deepStrictEqual(unmatched("PRINTLE.A$,1)"), [13]);
+        const limited = parser === "new" ? [] : [13];
+        assert.deepStrictEqual(unmatched("PRINTLE.A$,1)"), limited);
         assert.deepStrictEqual(unmatched("PRINT LE.A$,1)"), []);
         assert.deepStrictEqual(unmatched("PRINTLEFT$(A$,1)"), []);
         // A dot before the opener is a word boundary, so fully abbreviated code is fine, unless a keyword with no
         // abbreviation (LEN) comes first.
         assert.deepStrictEqual(unmatched("P.LE.A$,1)"), []);
-        assert.deepStrictEqual(unmatched("P.LENMI.A$,2)"), [13]);
+        assert.deepStrictEqual(unmatched("P.LENMI.A$,2)"), limited);
+    });
+});
+
+describe("Bracket matching that only the new tokenizer does", () => {
+    beforeAll(() => registerBbcBasicLanguage("new"));
+    // Each bracket Monaco pairs, as line:column and nesting level.
+    const paired = text => {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            model.tokenization.forceTokenization(model.getLineCount());
+            return model.bracketPairs
+                .getBracketsInRange(model.getFullModelRange())
+                .toArray()
+                .map(b => {
+                    assert.ok(!b.isInvalid, text);
+                    return `${b.range.startLineNumber}:${b.range.startColumn}=${b.nestingLevel}`;
+                })
+                .join(" ");
+        } finally {
+            model.dispose();
+        }
+    };
+    it("should give Monaco only the brackets that pair on their line and that BASIC accepts", () => {
+        for (const [text, expected] of [
+            ["PRINTLE.A$,1)", "1:8=0 1:13=0"],
+            ["P.LENMI.A$,2)", "1:8=0 1:13=0"],
+            ["PRINTLEFT$.RI.A$,2),1)", "1:11=0 1:14=1 1:19=1 1:22=0"],
+            // A ( with no ) does not pair with a ) on a later line or in a later statement, nor nest what follows.
+            ["PRINT (1+2\nPRINT 3)\nPRINT (4)", "3:7=0 3:9=0"],
+            ["PRINT (1:PRINT 2)", ""],
+            // A dot that is not an opener is not a bracket.
+            ["A=.5+(1.5)", "1:6=0 1:10=0"],
+            ["PRINT A.B)", ""],
+            ["P.X.7", ""],
+            // A bracket BASIC rejects stays in the colour of an error, and so its partner is not one of a pair.
+            ["PRINT LEFT$(A$)", ""],
+            ["P.(1+2))", "1:3=0 1:7=0"],
+            // An assembler block is the pair that spans lines.
+            ["[\nLDA (&70),Y\n]\nPRINT (1)", "1:1=0 2:5=1 2:9=1 3:1=0 4:7=0 4:9=0"],
+        ])
+            assert.strictEqual(paired(text), expected, text);
     });
 });
 

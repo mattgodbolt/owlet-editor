@@ -1,5 +1,8 @@
 import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 import {Flags, keywords, immediateCommands} from "./tokens";
+import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
+import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
+import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
 import {tokensProvider} from "./parser/highlight";
 import {BracketCollisions} from "./parser/lexer";
 
@@ -154,6 +157,17 @@ const StrTilde = [
 ];
 // An operator, separator or "(" after which an operand is expected.
 const BeforeOperand = {cases: {"\\(": "@brackets", "@operators": "operator", "@default": "symbol"}};
+
+// Monaco's MetadataConsts.BALANCED_BRACKETS_MASK: it looks for brackets only in the text of tokens that have it, and
+// keeps neighbours that differ in it apart, so an opener such as LE. is found though the keyword before it touches it.
+const BalancedBrackets = 1024;
+
+function tokenMetadata(scopes, bracket) {
+    const theme = StandaloneServices.get(IStandaloneThemeService).getColorTheme().tokenTheme;
+    const language =
+        StandaloneServices.get(ILanguageService).languageIdCodec.encodeLanguageId(LanguageId);
+    return (theme.match(language, scopes) | (bracket ? BalancedBrackets : 0)) >>> 0;
+}
 
 // ?parser=new in the URL picks the tokenizer in src/parser over the Monarch grammar below, for the same language.
 let newParser = false;
@@ -387,7 +401,8 @@ export function registerBbcBasicLanguage(
             ["[", "]"],
             ["(", ")"],
             // A spelling that ends in "(" is opened by that "(", which leaves the keyword before it uncoloured as a bracket.
-            ...hiddenOpenParens
+            // The new tokenizer sets the bracket bit on the "." of an abbreviation, and on a raw token.
+            ...(newParser ? [".", ...openParenKeywords.map(tokenChar)] : hiddenOpenParens)
                 .filter(open => !open.endsWith("("))
                 .map(open => [open.toLowerCase(), ")"]),
         ],
@@ -410,7 +425,7 @@ export function registerBbcBasicLanguage(
 
     registrations = [
         newParser
-            ? languages.setTokensProvider(LanguageId, tokensProvider(LanguageId))
+            ? languages.setTokensProvider(LanguageId, tokensProvider(LanguageId, tokenMetadata))
             : languages.setMonarchTokensProvider(LanguageId, grammar),
         configuration,
         languages.registerCodeActionProvider(LanguageId, codeActionProvider),

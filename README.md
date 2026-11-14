@@ -79,6 +79,6 @@ generated statements (see the comment at its top).
 
 ## Known Issues
 
-- An abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.
+- With the default tokenizer (not `?parser=new`), an abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.
 - In assembler, a statement keyword after a complete instruction, as in `LDA #1 FOR` or `NOP PRINT`, is highlighted as invalid on purpose. BBC BASIC ignores the rest of the statement, but text there that is not a `;` or `\` comment is almost always a mistake, such as a comment missing its `;`.
 - When running tests, you may see warnings about missing source maps for Monaco Editor. This is a [known issue with Monaco Editor 0.52.0+](https://github.com/microsoft/monaco-editor/issues/4712) and doesn't affect functionality.
