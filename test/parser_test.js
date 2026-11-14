@@ -124,6 +124,16 @@ describe("Recogniser", () => {
     });
 });
 
+// The text of each run of tokens marked invalid.
+const redRuns = text => {
+    const runs = [];
+    for (const [start, end] of invalid(text)) {
+        if (runs.length && runs[runs.length - 1][1] === start) runs[runs.length - 1][1] = end;
+        else runs.push([start, end]);
+    }
+    return runs.map(([start, end]) => text.slice(start, end));
+};
+
 // The text of each token marked invalid.
 const red = text => invalid(text).map(([start, end]) => text.slice(start, end));
 
@@ -161,6 +171,42 @@ describe("A line typed a key at a time", () => {
             );
         },
     );
+});
+
+// BASIC stops at the first token that cannot continue the statement and never reads the rest of it, up to the next
+// colon, ELSE, or the ] that ends an assembler block: all of that is red, and it is what the marker covers.
+describe("A statement BASIC stops at", () => {
+    it.each([
+        ["I am a badger", ["am a badger"]],
+        ["X Y Z", ["Y Z"]],
+        ["PRINT 1 2 3", []],
+        ["GOTO 20 30:PRINT 5", ["30"]],
+        ["GOTO 20 30 40:PRINT 5 6", ["30 40"]],
+        ["PRINT 1: I am a badger:PRINT 2", ["am a badger"]],
+        ["IF A=1 THEN PRINT ) ELSE PRINT 2", [")"]],
+        ["IF A=1 THEN PRINT ) 1 ELSE PRINT 2 3", [") 1"]],
+        ["PRINT (1 2 3):PRINT 4 5", ["2 3)"]],
+        ['I am "a:b" badger:X Y', ['am "a:b" badger', "Y"]],
+        ["X Y REM hi", ["Y"]],
+        ["[LDA CLEAR 1 2:NOP]", ["CLEAR 1 2"]],
+        ["IF A THEN [LDA CLEAR 1 ELSE PRINT 2", ["CLEAR 1"]],
+    ])("%s should be red on %j", (text, expected) => {
+        assert.deepStrictEqual(redRuns(text), expected);
+        const {tokens} = highlightLine(text);
+        assert.ok(tokens.every(token => !token.type.startsWith("invalid") || !token.bracket));
+        const marked = programProblems(text).filter(problem => !problem.unfinished);
+        assert.deepStrictEqual(
+            marked.map(({start, end}) => text.slice(start, end)),
+            expected,
+        );
+    });
+    it("should leave the marker at the single [ of a block that is never closed", () => {
+        const problems = programProblems("[NOP\nLDA CLEAR 1 2");
+        assert.deepStrictEqual(
+            problems.map(({line, start, end, unclosed}) => [line, start, end, unclosed]),
+            [[1, 0, 1, true]],
+        );
+    });
 });
 
 describe("Text that is wrong, not unfinished", () => {
@@ -261,7 +307,7 @@ describe("A keyword that is the start of a longer one", () => {
             assert.deepStrictEqual(red(text), []);
         },
     );
-    it.each([["MODX", ["MOD"]]])("%s should be red", (text, expected) => {
+    it.each([["MODX", ["MODX"]]])("%s should be red", (text, expected) => {
         assert.deepStrictEqual(red(text), expected);
     });
 });

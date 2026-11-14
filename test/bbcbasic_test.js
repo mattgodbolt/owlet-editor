@@ -99,36 +99,34 @@ const romTokens = new Map(RomTokens);
 
 const NewTokenizerDifferences = {
     "TIME r": ["0:keyword 4:white 5:invalid"],
-    "H.TO": ["0:invalid 1:number.float 2:keyword"],
-    "H._": ["0:invalid 1:number.float 2:variable"],
-    "TI._X": ["0:invalid 2:number.float 3:variable"],
-    "B.X": ["0:invalid 1:number.float 2:variable"],
-    "BG.X": ["0:invalid 2:number.float 3:variable"],
-    "BP.X": ["0:invalid 2:number.float 3:variable"],
-    "CLO.X": ["0:invalid 3:number.float 4:variable"],
-    "EO.X": ["0:invalid 2:number.float 3:variable"],
-    "PT.X": ["0:invalid 2:number.float 3:variable"],
-    "E.X": ["0:invalid 1:number.float 2:variable"],
-    "EN.X": ["0:invalid 2:number.float 3:variable"],
-    "ER.X": ["0:invalid 2:number.float 3:variable"],
-    "O.X": ["0:invalid 1:number.float 2:variable"],
-    "R.X": ["0:invalid 1:number.float 2:variable"],
-    "RE.X": ["0:invalid 2:number.float 3:variable"],
-    "A=8MOD.3": ["0:variable 1:operator 2:number 3:invalid 7:number"],
-    "\u018f#0=1": ["0:invalid 1:symbol 2:number 3:operator 4:number"],
+    "H.TO": ["0:invalid"],
+    "H._": ["0:invalid"],
+    "TI._X": ["0:invalid"],
+    "B.X": ["0:invalid"],
+    "BG.X": ["0:invalid"],
+    "BP.X": ["0:invalid"],
+    "CLO.X": ["0:invalid"],
+    "EO.X": ["0:invalid"],
+    "PT.X": ["0:invalid"],
+    "E.X": ["0:invalid"],
+    "EN.X": ["0:invalid"],
+    "ER.X": ["0:invalid"],
+    "O.X": ["0:invalid"],
+    "R.X": ["0:invalid"],
+    "RE.X": ["0:invalid"],
+    "A=8MOD.3": ["0:variable 1:operator 2:number 3:invalid"],
+    "\u018f#0=1": ["0:invalid"],
     // The tokeniser reads E4TO22400STEP100 as a name, so BASIC finds no TO.
     "FORJ%=2E4TO22400STEP100": ["0:keyword 3:variable 5:operator 6:number.float 9:invalid"],
     "GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20": [
-        "0:keyword 4:white 5:constant.linenum 7:invalid 8:number 9:symbol 10:keyword 14:white 15:constant.linenum 18:invalid 19:number 21:symbol 22:keyword 26:white 27:constant.linenum 30:white 31:invalid 33:symbol 34:keyword 38:white 39:constant.linenum 41:white 42:invalid 43:operator 44:white 45:constant.linenum",
+        "0:keyword 4:white 5:constant.linenum 7:invalid 9:symbol 10:keyword 14:white 15:constant.linenum 18:invalid 21:symbol 22:keyword 26:white 27:constant.linenum 30:white 31:invalid 33:symbol 34:keyword 38:white 39:constant.linenum 41:white 42:invalid",
     ],
     "ON ERROR 30": ["0:keyword 2:white 3:keyword 8:white 9:invalid"],
     "ON ERR. 30": ["0:keyword 2:white 3:keyword 7:white 8:invalid"],
     "\xee\u0185 30": ["0:keyword 2:white 3:invalid"],
-    'ERROR 5,"x"': [
-        "0:invalid 5:white 6:number 7:operator 8:string.quote 9:string 10:string.quote",
-    ],
-    "END.X": ["0:invalid 3:number.float 4:variable"],
-    "DEFFNmain:{=0}": ["0:keyword 5:variable 9:symbol 10:invalid 11:operator 12:number 13:symbol"],
+    'ERROR 5,"x"': ["0:invalid 8:invalid.string"],
+    "END.X": ["0:invalid"],
+    "DEFFNmain:{=0}": ["0:keyword 5:variable 9:symbol 10:invalid"],
     // The tokeniser makes no keyword inside a name, so FN is not one here.
     "[\nEQUSFNx": {
         tokens: ["0:delimiter.square", "0:keyword.directive 4:variable"],
@@ -137,8 +135,8 @@ const NewTokenizerDifferences = {
     "[LDA CLEAR+CLG+CLS+DEF+ENDPROC+END+LINE+NEW+OLD+OFF\nSTA RETURN+REPEAT+REPORT+RUN+STEP+SPC+STOP+TO+TAB(1):]":
         {
             tokens: [
-                "0:delimiter.square 1:keyword 4:white 5:invalid 10:operator 11:keyword 14:operator 15:keyword 18:operator 19:keyword 22:operator 23:keyword 30:operator 31:keyword 34:operator 35:keyword 39:operator 40:keyword 43:operator 44:keyword 47:operator 48:keyword",
-                "0:keyword 3:white 4:invalid 10:operator 11:keyword 17:operator 18:keyword 24:operator 25:keyword 28:operator 29:keyword 33:operator 34:keyword 37:operator 38:keyword 42:operator 43:keyword 45:operator 46:keyword 49:delimiter.parenthesis 50:number 51:delimiter.parenthesis 52:symbol 53:delimiter.square",
+                "0:delimiter.square 1:keyword 4:white 5:invalid",
+                "0:keyword 3:white 4:invalid 52:symbol 53:delimiter.square",
             ],
             rows: ["[OPT0:LDA CLEAR:]"],
         },
@@ -152,24 +150,18 @@ const NewTokenizerDifferences = {
     },
     // A ; comment needs an instruction before it.
     "[;notacomment": {
-        tokens: ["0:delimiter.square 1:invalid 2:variable"],
+        tokens: ["0:delimiter.square 1:invalid"],
         rows: ["[OPT0:;notacomment:]"],
     },
     "[NOP ; a\n;notacomment": {
-        tokens: ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid 1:variable"],
+        tokens: ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid"],
         rows: ["[OPT0:;notacomment:]"],
     },
     "^": ["0:invalid"],
     "'": ["0:invalid"],
-    "INVALID=1==2OR8!=2**3": [
-        "0:variable 7:operator 8:number 9:invalid 11:number 12:keyword 14:number 15:operator 17:number 18:operator 20:number",
-    ],
-    "IFA><1ORB=<2ORB=>6GOTO10": [
-        "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:operator 11:number 12:keyword 14:variable 15:operator 17:number 18:keyword 22:constant.linenum",
-    ],
-    "A=B<<C OR D>>E": [
-        "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:operator 13:variable",
-    ],
+    "INVALID=1==2OR8!=2**3": ["0:variable 7:operator 8:number 9:invalid"],
+    "IFA><1ORB=<2ORB=>6GOTO10": ["0:keyword 2:variable 3:invalid"],
+    "A=B<<C OR D>>E": ["0:variable 1:operator 2:variable 3:invalid"],
     // A line number BASIC has already encoded (#161, #74).
     "\xe5\u018dTJ@": ["0:keyword 1:constant.linenum"],
     "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK": [
@@ -290,20 +282,20 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
         it("should highlight a keyword that cannot start a statement", () => {
             // See #151, checked on the ROM, where each invalid case is a syntax error.
             const cases = [
-                ['ERROR5,"x"', ["ERROR"]],
-                ["RND(-TIME)", ["RND"]],
-                ["STEP1", ["STEP"]],
-                ["TOOMUCH=1", ["TO"]],
-                ["A=1:ABS A", ["ABS"]],
+                ['ERROR5,"x"', parser === "new" ? ["ERROR5,"] : ["ERROR"]],
+                ["RND(-TIME)", parser === "new" ? ["RND(-TIME)"] : ["RND"]],
+                ["STEP1", parser === "new" ? ["STEP1"] : ["STEP"]],
+                ["TOOMUCH=1", parser === "new" ? ["TOOMUCH=1"] : ["TO"]],
+                ["A=1:ABS A", parser === "new" ? ["ABS A"] : ["ABS"]],
                 ["IF A THEN TO", ["TO"]],
-                ["IF 0 THEN 10 ELSE FNf", ["FN"]],
+                ["IF 0 THEN 10 ELSE FNf", parser === "new" ? ["FNf"] : ["FN"]],
                 ["A.", ["A."]],
                 ["10 THEN", ["THEN"]],
                 ["\u0185", ["\u0185"]],
                 // PTR, PAGE and TIME as functions (tokens &8F, &90, &91) cannot start a statement, their statement
                 // forms can.
                 ["\u018f#0=1", ["\u018f#"]],
-                ["\u0190=1", ["\u0190"]],
+                ["\u0190=1", parser === "new" ? ["\u0190=1"] : ["\u0190"]],
                 ["\xcf#0=1", []],
                 ["\xd0=1", []],
                 ["ON ERROR OFF", []],
@@ -368,7 +360,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["VDU X.7,1", []],
                 ["INPUT X.", ["."]],
                 ["I.X.7", [".7"]],
-                ["A=BGET##1", ["#"]],
+                ["A=BGET##1", parser === "new" ? ["#1"] : ["#"]],
                 ['PRINT "a".5', []],
                 ["PRINT STR$(1);.5", []],
                 ["VDU1,2.5", []],
@@ -378,12 +370,12 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["X%=X%.5", [".5"]],
                 ["x=x.5", [".5"]],
                 ["FOR I=1 TO X.", ["."]],
-                ["FOR I=X. TOP", ["."]],
-                ["A=X. TO", ["."]],
-                ["IF X. THEN PRINT", ["."]],
+                ["FOR I=X. TOP", parser === "new" ? [". TOP"] : ["."]],
+                ["A=X. TO", parser === "new" ? [". TO"] : ["."]],
+                ["IF X. THEN PRINT", parser === "new" ? [". THEN PRINT"] : ["."]],
                 ["COLOUR X.", ["."]],
-                ["PRINT#X.,1", ["."]],
-                ["INPUT#X.,Y", ["."]],
+                ["PRINT#X.,1", parser === "new" ? [".,1"] : ["."]],
+                ["INPUT#X.,Y", parser === "new" ? [".,Y"] : ["."]],
                 ["P.X.:Y=X.", ["."]],
                 ["PRINT 1E.5", []],
                 ["VDU 1E.5", []],
@@ -423,7 +415,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["FOR I=ABS TOP TO TOP", ["I"], ["FOR", "ABS", "TOP", "TO", "TOP"]],
                 ["FOR I=AB. TOP TO TOP", ["I"], ["FOR", "AB.", "TOP", "TO", "TOP"]],
                 ["FOR I=AB.TOP TO TOP", ["I"]],
-                ["FOR I=XY.TOP", ["I", "XY", "P"]],
+                ["FOR I=XY.TOP", parser === "new" ? ["I", "XY"] : ["I", "XY", "P"]],
                 ["FOR I=1 AND TOP TO 2", ["I"], ["FOR", "AND", "TOP", "TO"]],
                 // Abbreviated and raw token forms, checked against the ROM by running them.
                 ["FO.I=TOP TO TOP+1", ["I"], ["FO.", "TOP", "TO", "TOP"]],
@@ -467,28 +459,33 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 );
             }
             const invalid = [
-                "A=~B",
-                "A$=STR$(~12)",
-                "A$=\xc3(~1)",
-                "PRINT#0,~A",
-                "INPUT ~A",
-                "VDU ~A",
-                "PRINT 1+~A",
-                "PRINT (~A)",
-                "PRINT TAB(~A)",
-                "PRINT ~A:B=~A",
-                "PRINT !~A",
-                "PRINT ?~A",
-                "PRINT ;-~B",
-                "PRINT A AND ~B",
-                "PRINT A MOD~B",
-                "~",
+                ["A=~B", "~B"],
+                ["A$=STR$(~12)", "~12)"],
+                ["A$=\xc3(~1)", "~1)"],
+                ["PRINT#0,~A", "~A"],
+                ["INPUT ~A", "~A"],
+                ["VDU ~A", "~A"],
+                ["PRINT 1+~A", "~A"],
+                ["PRINT (~A)", "~A)"],
+                ["PRINT TAB(~A)", "~A)"],
+                ["PRINT ~A:B=~A", "~A"],
+                ["PRINT !~A", "~A"],
+                ["PRINT ?~A", "~A"],
+                ["PRINT ;-~B", "~B"],
+                ["PRINT A AND ~B", "~B"],
+                ["PRINT A MOD~B", "~B"],
+                ["~", "~"],
                 // See #152: STR$ takes one ~, though PRINT takes any number.
-                "P.STR$~~42",
-                "A$=STR$~~42",
-                "P.STR.~~42",
+                ["P.STR$~~42", "~42"],
+                ["A$=STR$~~42", "~42"],
+                ["P.STR.~~42", "~42"],
             ];
-            for (const text of invalid) assert.deepStrictEqual(spans(text, "invalid"), ["~"], text);
+            for (const [text, red] of invalid)
+                assert.deepStrictEqual(
+                    spans(text, "invalid"),
+                    [parser === "new" ? red : "~"],
+                    text,
+                );
         });
     });
 
@@ -557,11 +554,19 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["#149", "Y=X.7", "0:variable 1:operator 2:variable 3:invalid"],
                 ["#150", "Z.", "0:variable 1:invalid"],
                 ["#150", "PRIT.", "0:variable 4:invalid"],
-                ["#152", "P.STR$~~42", "0:keyword 6:operator 7:invalid 8:number"],
+                [
+                    "#152",
+                    "P.STR$~~42",
+                    parser === "new"
+                        ? "0:keyword 6:operator 7:invalid"
+                        : "0:keyword 6:operator 7:invalid 8:number",
+                ],
                 [
                     "#152",
                     "A$=STR$~~42",
-                    "0:variable 2:operator 3:keyword 7:operator 8:invalid 9:number",
+                    parser === "new"
+                        ? "0:variable 2:operator 3:keyword 7:operator 8:invalid"
+                        : "0:variable 2:operator 3:keyword 7:operator 8:invalid 9:number",
                 ],
                 ["#156", "\xf2p", "0:keyword 1:variable"],
                 ["#156", "\xdd\xf2x", "0:keyword 2:variable"],
@@ -714,7 +719,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                     ["10", "150", "230", "10", "10", "20"],
                 ],
                 ["GOTO 10;20:GOTO 10.5,20:GOTO 10E2,20:GOTO -10,20", ["10", "10", "10"]],
-                ["GOTO &10,20", ["20"]],
+                ["GOTO &10,20", parser === "new" ? [] : ["20"]],
                 ["ON X GOTO 10,X,20:GOTO (220):GOTO A%*10", ["10"]],
                 ["X=1:250:REPEAT 20:PRINT 170", []],
                 ["ON X GOTO 240,250 ELSE PRINT 260", ["240", "250"]],
@@ -794,7 +799,10 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                     "IFA><1ORB=<2ORB=>6GOTO10",
                     "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:constant.linenum",
                 ],
-                ["A+=2", "0:variable 1:invalid 3:number"],
+                [
+                    "A+=2",
+                    parser === "new" ? "0:variable 1:invalid" : "0:variable 1:invalid 3:number",
+                ],
                 [
                     "A=B<<C OR D>>E",
                     "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:invalid 13:variable",
@@ -901,7 +909,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["[ASL A", ["ASL", "A"], []],
                 ["[asl a", ["asl"], []],
                 ["[LDA 42,x", ["LDA"], ["x"]],
-                ["[lda (&70,x)", ["lda"], ["x"]],
+                ["[lda (&70,x)", ["lda"], parser === "new" ? ["x)"] : ["x"]],
                 ["[LDA (&70), y", ["LDA"], ["y"]],
                 ["[LDX &70,x", ["LDX"], ["x"]],
                 ["[LDX &70,y", ["LDX", "y"], []],
@@ -910,10 +918,10 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["[LDA #1,x", ["LDA"], []],
                 ["[JSR &70,x", ["JSR"], []],
                 ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", parser === "new" ? "MID$" : "MID$("], []],
-                ["[equb 1", [], ["equb"]],
-                ["[EQUw 1", [], ["EQUw"]],
+                ["[equb 1", [], parser === "new" ? ["equb 1"] : ["equb"]],
+                ["[EQUw 1", [], parser === "new" ? ["EQUw 1"] : ["EQUw"]],
                 ["[Ora 1:orA 1:oRA 1", ["Ora", "orA", "oRA"], []],
-                ["[ORa 1", [], ["ORa"]],
+                ["[ORa 1", [], parser === "new" ? ["ORa 1"] : ["ORa"]],
             ];
             for (const [text, keywords, invalid] of cases) {
                 assert.deepStrictEqual(spans(text, "keyword"), keywords, text);
@@ -924,7 +932,9 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
         it("should allow STR$~ in an expression", () => {
             for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
-            assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), ["~"]);
+            assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), [
+                parser === "new" ? "~(255)" : "~",
+            ]);
         });
         it("should read an operand's names and keywords as BASIC reads them", () => {
             // A mnemonic is only a mnemonic where a statement starts, and BASIC reads PIX and TIMER as names.
