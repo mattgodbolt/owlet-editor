@@ -1,6 +1,7 @@
 // Generates BBC BASIC statements for the oracle, each tagged with the shape it was built from. Every name a
 // statement uses is defined by rom.mjs's prelude, so a ROM error means the statement, not a missing variable.
 import {Flags, keywords} from "../../src/tokens.js";
+import {MaxLineLength} from "./rom.mjs";
 
 const Names = [...new Set(keywords.map(kw => kw.keyword))];
 // Statements the ROM cannot judge in immediate mode, or that leave nothing to compare: REM and DATA skip the line,
@@ -30,11 +31,31 @@ const Merges = [
     [/"$/, /^"/],
 ];
 
+// Assembler statements and the operands to try with each, and labels to put before them.
+const AssemblerStatements = [
+    ["NOP", ""],
+    ["RTS", ""],
+    ["LDA", "#1|&70|&70,X|&70,x|&70,Y|(&70,X)|(&70),Y|(&70),y|#1,x"],
+    ["STA", "&70|&70,X|(&70),Y"],
+    ["LDX", "#1|&70,Y|&70,y|&70,x"],
+    ["STY", "&70,X|&70,x"],
+    ["ORA", "#1|&70"],
+    ["AND", "#1"],
+    ["ASL", "A|a|&70"],
+    ["JSR", "P%|&70,x"],
+    ["BNE", "P%"],
+    ["JMP", "(&70)|P%"],
+    ["EQUB", "1"],
+    ["EQUS", '"s"'],
+    ["equw", "1"],
+    ["ST8", "&70"],
+];
+const Labels = ["", ".L ", ".E1 ", ".Exit ", ".Q.R ", ".x`y ", ".L%:", ".END "];
 const ExprKeywords = new Set(keywords.filter(kw => kw.flags & Flags.Expr).map(kw => kw.keyword));
 const kind = keyword =>
     ExprKeywords.has(keyword) ? "function or operator keyword" : "other keyword";
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
     return () => {
         seed = (seed + 0x6d2b79f5) | 0;
         let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -157,6 +178,24 @@ export function generate({seed = 1, count = 3000} = {}) {
         "INPUT/READ": () =>
             `${pick(["INPUT ", "READ ", 'INPUT"?"', "INPUT LINE "])}${pick([...NumVars, ...StrVars])}`,
         "unterminated string": () => pick(['PRINT "abc', 'X$="abc', 'PRINT "a";"b', 'X$="a""b']),
+        // BASIC takes ` (a pound sign on the BBC) as a letter.
+        "name with `": () => {
+            const name = pick(["`A", "A`", "A`B", "`", "X`%", "`$"]);
+            return `${name}=${name.endsWith("$") ? '"s"' : expression()}:PRINT ${name}`;
+        },
+        // REPEAT leaves the tokeniser's start-of-statement flag as it found it, but starts a statement.
+        "after REPEAT": () =>
+            `${pick(["", "IF X ", "IF 1 THEN ", "X=1:"])}REPEAT${pick(["", " "])}${pick(["*FX0", "PRINT 1", "X=1", "*|"])}`,
+        assembler: () => {
+            const [mnemonic, operands] = pick(AssemblerStatements);
+            const cased = pick([
+                m => m,
+                m => m.toLowerCase(),
+                m => m[0] + m.slice(1).toLowerCase(),
+            ])(mnemonic);
+            const operand = pick(operands.split("|"));
+            return `DIM P% 99:[OPT0:${pick(Labels)}${cased}${operand && pick([" ", ""])}${operand}${pick(["", " ;c", "\\c"])}:]`;
+        },
     };
     const simple = [
         "assignment",
@@ -171,9 +210,12 @@ export function generate({seed = 1, count = 3000} = {}) {
     const out = [...exhaustive()];
     const names = Object.keys(templates);
     for (let i = 0; i < count; ++i) {
-        adjacent = null;
-        const shape = pick(names);
-        const text = templates[shape]();
+        let shape, text;
+        do {
+            adjacent = null;
+            shape = pick(names);
+            text = templates[shape]();
+        } while (text.length > MaxLineLength);
         out.push({shape: adjacent ? `${shape}, one value directly after another` : shape, text});
     }
     return out;

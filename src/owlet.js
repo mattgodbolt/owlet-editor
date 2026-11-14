@@ -14,7 +14,7 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getWarnings, LanguageId} from "./bbcbasic";
+import {colourBrackets, getWarnings, LanguageId} from "./bbcbasic";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -67,6 +67,7 @@ export class OwletEditor {
             lineDecorationsWidth: 0,
             automaticLayout: true,
         });
+        colourBrackets(this.editor);
 
         this.editor.addAction({
             id: "execute-basic",

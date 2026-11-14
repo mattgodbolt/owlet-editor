@@ -3,25 +3,27 @@
 // disagree about whether there is a syntax error are reported, grouped by the shape of statement they came from.
 //
 //   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json]
+//                                    [--parser new]
 //
 // --count is the number of random statements on top of the fixed set (every keyword at the start of a statement,
 // abbreviated, misspelt...). --input adds statements from a JSON list of {shape, text}. --summary prints only the
-// counts. Results go to .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a
-// grammar change only runs the highlighter (delete the directory after changing rom.mjs); results.json has every
-// statement's verdicts.
+// counts. --parser new tries the tokenizer in src/parser instead of the Monarch grammar. Results go to
+// .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a grammar change only runs the
+// highlighter (delete the directory after changing rom.mjs); results.json has every statement's verdicts.
 //
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
-// runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. The ROM cannot judge
-// what it skips (the rest of a line after REM, DATA, DEF, ELSE or a false IF), so the generator leaves those out, along
-// with * commands and the assembler. A disagreement is per statement: it does not say where the error is.
+// runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
+// nothing about what BASIC skips (see unread.mjs and dropMarksNeverRead), so invalid tokens there are left out. A
+// disagreement is per statement: it does not say where the error is.
 // Not run by npm test.
 import {spawnSync} from "child_process";
 import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
 import {generate} from "./generate.mjs";
-import {createRom, SyntaxErrors} from "./rom.mjs";
+import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
+import {isUnread, unreadRanges} from "./unread.mjs";
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const OutDir = path.join(Root, ".cache/rom-oracle");
@@ -40,6 +42,10 @@ function readJson(file, fallback) {
     }
 }
 
+// A line number would make BASIC store the line rather than run it.
+const runnable = text => text.length <= MaxLineLength && !/^\s*\d/.test(text);
+
+// For each text, the ROM's verdict and its tokenisation (null if it cannot be run).
 async function romVerdicts(texts) {
     const cacheFile = path.join(OutDir, "rom.json");
     const cache = readJson(cacheFile, {});
@@ -47,7 +53,11 @@ async function romVerdicts(texts) {
     if (missing.length) {
         const rom = await createRom();
         const start = Date.now();
-        for (const text of missing) cache[text] = await rom.run(text);
+        for (const text of missing) {
+            cache[text] = runnable(text)
+                ? {...(await rom.run(text)), tokens: await rom.tokenise(text)}
+                : {timeout: true, tokens: null};
+        }
         rom.destroy();
         const seconds = (Date.now() - start) / 1000;
         console.log(
@@ -64,14 +74,47 @@ function highlighterVerdicts(texts) {
     fs.writeFileSync(input, JSON.stringify(texts));
     const vitest = path.join(Root, "node_modules/vitest/vitest.mjs");
     const config = path.join(Root, "tools/rom-oracle/vitest.config.mjs");
-    const result = spawnSync(process.execPath, [vitest, "run", "--config", config], {
-        cwd: Root,
-        env: {...process.env, ORACLE_IN: input, ORACLE_OUT: output},
-        encoding: "utf8",
-    });
+    const result = spawnSync(
+        process.execPath,
+        [vitest, "run", "--config", config, "tools/rom-oracle/highlight.mjs"],
+        {
+            cwd: Root,
+            env: {
+                ...process.env,
+                ORACLE_IN: input,
+                ORACLE_OUT: output,
+                ORACLE_PARSER: option("parser", ""),
+            },
+            encoding: "utf8",
+        },
+    );
     if (result.status !== 0)
         throw new Error(`Highlighting failed:\n${result.stdout}${result.stderr}`);
     return JSON.parse(fs.readFileSync(output, "utf8"));
+}
+
+// The invalid tokens outside the text that BASIC skipped, if given its tokenisation.
+function readMarks(text, invalid, tokens) {
+    const ranges = tokens && unreadRanges(text, tokens);
+    return invalid.filter(([start, end]) => !isUnread(ranges, start, end));
+}
+
+// Where the ROM ran a statement that is still marked invalid, the ROM is asked whether it reads the mark at all: the
+// statement is cut there and "}", which BASIC never accepts, put in its place. If BASIC still runs it, the mark is
+// in text BASIC never reads, and the next one is tried.
+async function dropMarksNeverRead(results, marks) {
+    let pending = results.flatMap((r, i) => (r.rom === "valid" && marks[i].length ? [i] : []));
+    while (pending.length) {
+        const cut = await romVerdicts(
+            pending.map(i => `${results[i].text.slice(0, marks[i][0][0])}}`),
+        );
+        pending = pending.filter((i, n) => {
+            if (cut[n].timeout || cut[n].error !== null) return false;
+            marks[i].shift();
+            return marks[i].length > 0;
+        });
+    }
+    results.forEach((r, i) => (r.invalid = marks[i].length ? r.text.slice(...marks[i][0]) : null));
 }
 
 function romClass(verdict) {
@@ -136,10 +179,13 @@ async function main() {
     const highlighted = highlighterVerdicts(texts);
     const results = statements.map((s, i) => ({
         ...s,
-        rom: romClass(rom[i]),
+        rom: runnable(s.text) ? romClass(rom[i]) : "inconclusive",
         message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
-        invalid: highlighted[i],
     }));
+    const marks = results.map((r, i) =>
+        readMarks(r.text, highlighted[i], r.rom === "valid" ? rom[i].tokens : null),
+    );
+    await dropMarksNeverRead(results, marks);
     fs.writeFileSync(path.join(OutDir, "results.json"), JSON.stringify(results, null, 1));
     report(results, option("summary", false) ? 0 : Number(option("examples", 3)));
 }

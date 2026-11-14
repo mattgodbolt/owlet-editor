@@ -1,5 +1,6 @@
 import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 import {Flags, keywords, immediateCommands} from "./tokens";
+import {tokensProvider} from "./parser/highlight";
 
 export const LanguageId = "BBCBASIC";
 
@@ -164,10 +165,18 @@ const StrTilde = [
 // An operator, separator or "(" after which an operand is expected.
 const BeforeOperand = {cases: {"\\(": "@brackets", "@operators": "operator", "@default": "symbol"}};
 
-export function registerBbcBasicLanguage() {
-    languages.register({id: LanguageId});
+// ?parser=new in the URL picks the tokenizer in src/parser over the Monarch grammar below, for the same language.
+let newParser = false;
+let registrations = [];
 
-    languages.setMonarchTokensProvider(LanguageId, {
+export function registerBbcBasicLanguage(
+    parser = new URLSearchParams(window.location.search).get("parser"),
+) {
+    if (registrations.length === 0) languages.register({id: LanguageId});
+    for (const registration of registrations) registration.dispose();
+    newParser = parser === "new";
+
+    const grammar = {
         defaultToken: "invalid",
         includeLF: true,
         brackets: [["(", ")", "delimiter.parenthesis"]],
@@ -378,9 +387,9 @@ export function registerBbcBasicLanguage() {
                 ],
             ],
         },
-    });
+    };
 
-    languages.setLanguageConfiguration(LanguageId, {
+    const configuration = languages.setLanguageConfiguration(LanguageId, {
         comments: {
             lineComment: "REM",
         },
@@ -389,7 +398,7 @@ export function registerBbcBasicLanguage() {
             ["(", ")"],
             // A spelling that ends in "(" is opened by that "(", which leaves the keyword before it uncoloured as a bracket.
             ...hiddenOpenParens
-                .filter(open => !open.endsWith("("))
+                .filter(open => !newParser && !open.endsWith("("))
                 .map(open => [open.toLowerCase(), ")"]),
         ],
         autoClosingPairs: [
@@ -409,7 +418,27 @@ export function registerBbcBasicLanguage() {
         ),
     });
 
-    languages.registerCodeActionProvider(LanguageId, codeActionProvider);
+    registrations = [
+        newParser
+            ? languages.setTokensProvider(LanguageId, tokensProvider(LanguageId))
+            : languages.setMonarchTokensProvider(LanguageId, grammar),
+        configuration,
+        languages.registerCodeActionProvider(LanguageId, codeActionProvider),
+    ];
+}
+
+// Monaco colours brackets from the text, not the tokens, so with the new tokenizer, which marks unmatched brackets
+// itself, that is off. Monaco does not pass the editor's option on to the model, and resets the model's from its
+// configuration whenever an editor option changes, so the model is given it, and given it again.
+export function colourBrackets(codeEditor) {
+    const options = {enabled: !newParser, independentColorPoolPerBracketType: false};
+    codeEditor.updateOptions({bracketPairColorization: options});
+    const model = codeEditor.getModel();
+    const apply = () =>
+        model.getOptions().bracketPairColorizationOptions.enabled === options.enabled ||
+        model.updateOptions({bracketColorizationOptions: options});
+    apply();
+    return model.onDidChangeOptions(apply);
 }
 
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
@@ -483,7 +512,9 @@ function lineWarnings(lineNum, line, lineTokens) {
             endColumn: offset + length + 1,
         });
 
-    for (const token of lineTokens.filter(token => token.type === `variable.${LanguageId}`)) {
+    // The new tokenizer marks a statement that is only a name, such as "colour", invalid.
+    const nameTypes = [`variable.${LanguageId}`, `invalid.${LanguageId}`];
+    for (const token of lineTokens.filter(token => nameTypes.includes(token.type))) {
         const match = line.substr(token.offset).match(LowerCaseTokenRegex);
         if (match) {
             const upper = match[0].toUpperCase();
