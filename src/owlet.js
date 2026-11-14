@@ -14,7 +14,8 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getWarnings} from "./bbcbasic";
+import {getWarnings, LanguageId} from "./bbcbasic";
+import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 import {createVduReference, insertAtCursor} from "./vdu-reference";
@@ -57,7 +58,7 @@ export class OwletEditor {
             acceptSuggestionOnEnter: "off",
             wordBasedSuggestions: "off",
             lineNumbers: defaultLineNumber,
-            language: "BBCBASIC",
+            language: LanguageId,
             theme: "bbcbasicTheme",
             renderWhitespace: "none", // seems to fix odd space/font interaction
             fontSize: 16,
@@ -87,6 +88,7 @@ export class OwletEditor {
             run: () => this.expandCode(),
         });
 
+        followImplicitLineNumbers(this.editor);
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);
@@ -133,14 +135,8 @@ export class OwletEditor {
     }
 
     updateWarnings() {
-        const warnings = [];
         const model = this.editor.getModel();
-        const tokens = monacoEditor.tokenize(this.getBasicText(), "BBCBASIC");
-        let lineNum = 0;
-        for (const lineTokens of tokens) {
-            warnings.push(...getWarnings(++lineNum, model.getLineContent(lineNum), lineTokens));
-        }
-        monacoEditor.setModelMarkers(model, "warnings", warnings);
+        monacoEditor.setModelMarkers(model, "warnings", getWarnings(model.getValue()));
     }
 
     updateEditorText(newText, updateType) {
