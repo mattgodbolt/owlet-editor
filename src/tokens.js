@@ -340,6 +340,11 @@ function detokeniseInternal(text, handler) {
                 handler.onCharCode(charCode);
                 continue;
             }
+            if (identifier === "REM" || identifier === "DATA") {
+                leaveRestOfLine = true;
+                handler.onCharCode(charCode);
+                continue;
+            }
             if (identifier !== undefined) {
                 handler.onSpace();
                 identifier = undefined;

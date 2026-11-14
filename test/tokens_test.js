@@ -79,6 +79,21 @@ VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
     });
 });
 
+describe("Expanding a token byte straight after DATA or REM", () => {
+    it("should leave it raw, as the tokeniser does, however DATA or REM was written", () => {
+        const cases = [
+            ["D.", "DATA"],
+            ["DAT.", "DATA"],
+            ["DATA"],
+            ["\xdc", "DATA"],
+            ["REM"],
+            ["\xf4", "REM"],
+        ];
+        for (const [keyword, expanded = keyword] of cases)
+            assert.strictEqual(expandCode(`${keyword}\xf1A`), `${expanded}\xf1A`, keyword);
+    });
+});
+
 describe("Debbreviation", () => {
     it("should work with the empty string", () => {
         assert.strictEqual(debbreviate(""), "");
