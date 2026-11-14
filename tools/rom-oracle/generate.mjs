@@ -35,7 +35,7 @@ const ExprKeywords = new Set(keywords.filter(kw => kw.flags & Flags.Expr).map(kw
 const kind = keyword =>
     ExprKeywords.has(keyword) ? "function or operator keyword" : "other keyword";
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
     return () => {
         seed = (seed + 0x6d2b79f5) | 0;
         let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
