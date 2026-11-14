@@ -3,17 +3,18 @@
 // disagree about whether there is a syntax error are reported, grouped by the shape of statement they came from.
 //
 //   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json]
+//                                    [--parser new]
 //
 // --count is the number of random statements on top of the fixed set (every keyword at the start of a statement,
 // abbreviated, misspelt...). --input adds statements from a JSON list of {shape, text}. --summary prints only the
-// counts. Results go to .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a
-// grammar change only runs the highlighter (delete the directory after changing rom.mjs); results.json has every
-// statement's verdicts.
+// counts. --parser new tries the tokenizer in src/parser instead of the Monarch grammar. Results go to
+// .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a grammar change only runs the
+// highlighter (delete the directory after changing rom.mjs); results.json has every statement's verdicts.
 //
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
-// runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. The ROM cannot judge
-// what it skips (see unread.mjs), so invalid tokens there are left out of the comparison, and the generator leaves out
+// runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
+// nothing about what BASIC skips (see unread.mjs), so invalid tokens there are left out, and the generator leaves out
 // * commands and the assembler. A disagreement is per statement: it does not say where the error is.
 // Not run by npm test.
 import {spawnSync} from "child_process";
@@ -73,17 +74,26 @@ function highlighterVerdicts(texts) {
     fs.writeFileSync(input, JSON.stringify(texts));
     const vitest = path.join(Root, "node_modules/vitest/vitest.mjs");
     const config = path.join(Root, "tools/rom-oracle/vitest.config.mjs");
-    const result = spawnSync(process.execPath, [vitest, "run", "--config", config], {
-        cwd: Root,
-        env: {...process.env, ORACLE_IN: input, ORACLE_OUT: output},
-        encoding: "utf8",
-    });
+    const result = spawnSync(
+        process.execPath,
+        [vitest, "run", "--config", config, "tools/rom-oracle/highlight.mjs"],
+        {
+            cwd: Root,
+            env: {
+                ...process.env,
+                ORACLE_IN: input,
+                ORACLE_OUT: output,
+                ORACLE_PARSER: option("parser", ""),
+            },
+            encoding: "utf8",
+        },
+    );
     if (result.status !== 0)
         throw new Error(`Highlighting failed:\n${result.stdout}${result.stderr}`);
     return JSON.parse(fs.readFileSync(output, "utf8"));
 }
 
-// The first invalid token in text BASIC reads.
+// The first invalid token, outside the text that BASIC skipped if given its tokenisation.
 function firstRead(text, invalid, tokens) {
     const ranges = tokens && unreadRanges(text, tokens);
     const [start, end] = invalid.find(([start, end]) => !isUnread(ranges, start, end)) || [];
@@ -150,12 +160,16 @@ async function main() {
     const texts = statements.map(s => s.text);
     const rom = await romVerdicts(texts);
     const highlighted = highlighterVerdicts(texts);
-    const results = statements.map((s, i) => ({
-        ...s,
-        rom: romClass(rom[i]),
-        message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
-        invalid: firstRead(s.text, highlighted[i], rom[i].tokens),
-    }));
+    const results = statements.map((s, i) => {
+        const romSays = romClass(rom[i]);
+        const skipped = romSays === "valid" ? rom[i].tokens : null;
+        return {
+            ...s,
+            rom: romSays,
+            message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
+            invalid: firstRead(s.text, highlighted[i], skipped),
+        };
+    });
     fs.writeFileSync(path.join(OutDir, "results.json"), JSON.stringify(results, null, 1));
     report(results, option("summary", false) ? 0 : Number(option("examples", 3)));
 }

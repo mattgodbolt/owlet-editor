@@ -25,7 +25,8 @@ const Pattern = {
     nameRun: /\w+/y,
     name: /\w+[%$]?|@%/y,
     hex: /&[0-9A-F]*/y,
-    string: /"[^"]*"?/y,
+    // "" in a string is a quote.
+    string: /"(?:[^"]|"")*"?/y,
     relation: /<[=>]?|>=?/y,
 };
 const isNameChar = c => c !== undefined && /\w/.test(c);
@@ -57,6 +58,7 @@ export class Lexer {
         this.start = true;
         this.lineNumber = true;
         this.restOfLine = null;
+        this.nameEnd = 0;
         this.tokens = [];
         this.queue = [];
         const white = this.match(Pattern.white);
@@ -99,8 +101,25 @@ export class Lexer {
         return this.push(kind, colon < 0 ? this.text.length : colon);
     }
 
+    // Splits a token, which must be the next, that the interpreter reads as two: the P of TOP from the name it begins,
+    // a mnemonic from its operand. The interpreter reads digits after the split as a number.
+    split(token, at) {
+        if (at >= token.text.length) return;
+        const text = token.text.slice(at);
+        const rest = {
+            kind: /^\d/.test(text) ? "number" : token.kind,
+            start: token.start + at,
+            end: token.end,
+            text,
+        };
+        token.end = rest.start;
+        token.text = token.text.slice(0, at);
+        this.tokens.splice(this.tokens.lastIndexOf(token) + 1, 0, rest);
+        this.queue.splice(1, 0, rest);
+    }
+
     read() {
-        const spaced = this.match(Pattern.white);
+        const spaced = !this.restOfLine && this.match(Pattern.white);
         if (spaced) this.push("white", spaced);
         const token = this.readToken();
         if (spaced) token.spaced = true;
@@ -138,7 +157,9 @@ export class Lexer {
         if (this.restOfLine) return this.push(this.restOfLine, text.length);
         if (c === '"') {
             const close = this.match(Pattern.string);
-            return this.push("string", close, {closed: text[close - 1] === '"' && close > pos + 1});
+            return this.push("string", close, {
+                closed: /^"(?:[^"]|"")*"$/.test(text.slice(pos, close)),
+            });
         }
         if (c === "&") return this.push("hex", this.match(Pattern.hex));
         if (c === ":") {
@@ -157,17 +178,23 @@ export class Lexer {
                 const run = this.match(Pattern.nameRun);
                 token.end = this.pos = this.match(Pattern.exponent);
                 token.text = text.slice(pos, token.end);
-                if (run > token.end) this.push("name", this.match(Pattern.name));
+                this.nameEnd = run;
             }
             this.middle();
             return token;
         }
+        if (this.nameEnd > pos) return this.push("name", this.match(Pattern.name));
         if (byChar.has(c)) return this.keyword(byChar.get(c), pos + 1, true);
         const keyword = matchKeyword(text, pos);
         if (keyword) return this.keyword(keyword.kw, keyword.end);
         if ((end = this.match(Pattern.name))) {
             this.middle();
-            return this.push("name", end);
+            // A name and a dot that abbreviate a Conditional keyword were not read as one because a letter or digit
+            // followed.
+            const abbreviated = text[end] === "." && matchKeyword(`${text.slice(pos, end)}.`, 0);
+            return this.push("name", end, {
+                abbreviation: Boolean(abbreviated && abbreviated.kw.flags & Flags.Conditional),
+            });
         }
         this.middle();
         return this.push("punct", this.match(Pattern.relation) || pos + 1);

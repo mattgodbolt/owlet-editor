@@ -1,7 +1,10 @@
+import {highlightLine} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
+import {falseInvalid, verdicts} from "./rom-tables";
 import {describe, it} from "vitest";
 import assert from "assert";
 import RomTokens from "./rom-tokens.json";
+import RomVerdicts from "./rom-verdicts.json";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 
@@ -18,5 +21,41 @@ describe("Lexer", () => {
             disagreements(RomTokens, text => hex(romBytes(lexLine(text)))),
             [],
         );
+    });
+});
+
+// Lines BASIC II rejects that the recogniser does not mark: false-valids are measured, not gated (see the README).
+// A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
+const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
+
+describe("Recogniser", () => {
+    it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
+        const invalid = text => {
+            const {tokens} = highlightLine(text);
+            return tokens.flatMap((token, i) =>
+                token.type.startsWith("invalid")
+                    ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
+                    : [],
+            );
+        };
+        // The assembler is read from the next commit.
+        const wrong = RomVerdicts.filter(([text]) => !text.startsWith("[")).flatMap(
+            ([text, verdict]) => {
+                const marked = invalid(text);
+                if (verdict === "ok")
+                    return falseInvalid(text, marked).length ? [[text, verdict]] : [];
+                return marked.length || KnownGaps.includes(text) ? [] : [[text, verdict]];
+            },
+        );
+        assert.deepStrictEqual(wrong, []);
+    });
+    it("should still miss the known gaps, which come out of the list when they are fixed", () => {
+        for (const text of KnownGaps) {
+            assert.notStrictEqual(verdicts.get(text), "ok", text);
+            assert.ok(
+                highlightLine(text).tokens.every(token => !token.type.startsWith("invalid")),
+                text,
+            );
+        }
     });
 });

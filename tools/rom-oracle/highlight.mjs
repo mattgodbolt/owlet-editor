@@ -6,7 +6,7 @@ import fs from "fs";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
 it("highlights the oracle's statements", () => {
-    registerBbcBasicLanguage();
+    registerBbcBasicLanguage(process.env.ORACLE_PARSER);
     const texts = JSON.parse(fs.readFileSync(process.env.ORACLE_IN, "utf8"));
     const invalid = texts.map(text => {
         const tokens = editor.tokenize(text, "BBCBASIC")[0];
