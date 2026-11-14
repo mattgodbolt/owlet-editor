@@ -226,7 +226,7 @@ export function debbreviate(text) {
                 if (keyword.keyword === buffer && !(keyword.flags & Flags.Conditional)) {
                     output += buffer;
                     buffer = "";
-                    start = (keyword.flags & Flags.Start);
+                    start = keyword.flags & Flags.Start;
                     break;
                 }
             }
@@ -237,7 +237,7 @@ export function debbreviate(text) {
             }
             if (keyword !== null) {
                 output += keyword.keyword;
-                start = (keyword.flags & Flags.Start);
+                start = keyword.flags & Flags.Start;
             } else {
                 output += buffer + String.fromCodePoint(charCode);
             }
@@ -340,6 +340,11 @@ function detokeniseInternal(text, handler) {
                 handler.onCharCode(charCode);
                 continue;
             }
+            if (identifier === "REM" || identifier === "DATA") {
+                leaveRestOfLine = true;
+                handler.onCharCode(charCode);
+                continue;
+            }
             if (identifier !== undefined) {
                 handler.onSpace();
                 identifier = undefined;
@@ -422,7 +427,7 @@ export function partialDetokenise(rawText) {
         lines.push({num: lineNum, line: handler.output});
     });
     let lineno = 0;
-    return lines.map(x => addLineNo(lineno += 10, x)).join("\n");
+    return lines.map(x => addLineNo((lineno += 10), x)).join("\n");
 }
 
 function addLineNo(lineno, x) {
