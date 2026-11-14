@@ -35,7 +35,7 @@ export const Mnemonics = [
     ...Address,
     ..."OPT EQUB EQUD EQUS EQUW".split(" "),
 ];
-const Label = /\.(?:[A-Za-z_`][\w`]*%?|@%)/y;
+const Label = /\. *(?:[A-Za-z_`][\w`]*%?|@%)/y;
 const Comment = /[;\\][^:]*/y;
 
 export class Assembler {
@@ -49,6 +49,7 @@ export class Assembler {
         const r = this.recogniser;
         for (;;) {
             if (r.is("end")) return true;
+            if (this.isBranchElse()) return false;
             if (r.isPunct("]")) {
                 r.next();
                 return false;
@@ -68,6 +69,11 @@ export class Assembler {
         }
     }
 
+    // The ELSE of an IF, which BASIC takes wherever it is on the line: if the condition is false the block is never read.
+    isBranchElse() {
+        return this.recogniser.elseIsBranch && this.recogniser.isKeyword("ELSE");
+    }
+
     statement() {
         const r = this.recogniser;
         if (this.comment("\\")) return;
@@ -75,7 +81,7 @@ export class Assembler {
         if (r.is("end") || r.isPunct(":", "]") || this.comment("\\")) return;
         this.operand(this.mnemonic());
         if (this.comment(";", "\\")) return;
-        while (!r.is("end") && !r.isPunct(":", "]")) {
+        while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (token.kind === "keyword" && !(token.kw.flags & Flags.Expr || token.top))
                 token.invalid = true;
@@ -96,7 +102,8 @@ export class Assembler {
         const r = this.recogniser;
         while (r.peek().kind === "number" && r.peek().text[0] === ".") {
             const after = r.peek(1);
-            if (after.kind === "keyword" && !after.spaced) r.fail("Syntax error");
+            if (after.kind === "keyword" && (!after.spaced || r.peek().text === "."))
+                r.fail("Syntax error");
             const label = r.lexer.raw(Label, "label");
             if (!label)
                 r.fail("Syntax error", undefined, r.peek().text === "." && after.kind === "end");
@@ -178,12 +185,14 @@ export class Assembler {
     index(mnemonic, ...registers) {
         const r = this.recogniser;
         r.next().type = "symbol";
-        const register = r.peek().text;
+        const token = r.peek();
+        const register = token.text?.[0];
         if (
             !r.is("name") ||
             !(registers.includes(register) || register === LowerCaseIndex[mnemonic])
         )
             r.fail("Index");
+        r.lexer.split(token, 1);
         r.next().type = "keyword";
     }
 }

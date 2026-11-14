@@ -290,7 +290,7 @@ export class Recogniser {
     nested(read) {
         if (++this.depth > MaxDepth) this.fail(null, this.peek(), false);
         try {
-            read();
+            return read();
         } finally {
             this.depth--;
         }
@@ -379,8 +379,7 @@ export class Recogniser {
         if (this.isPunct("(") && this.adjacent()) this.bracket(this.next());
     }
 
-    // Something that can be assigned to: X, X(1), $X, ?X, X?1, ?X!1. Only one ? or ! follows the first (X?1?2=3 is a
-    // Mistake).
+    // Something that can be assigned to: X, X(1), $X, ?X, X?1, ?X!1, X?Y?Z (but X?1?2=3 is a Mistake).
     variable(message) {
         if (this.isPunct("$")) {
             this.next();
@@ -392,7 +391,7 @@ export class Recogniser {
         } else this.name(message);
         if (this.isPunct("?", "!") && this.adjacent()) {
             this.next();
-            this.unworded(() => this.primary());
+            this.unworded(() => this.operand());
         }
     }
 
@@ -424,24 +423,26 @@ export class Recogniser {
         }
     }
 
-    // A ? or ! between two values must touch the first: X=D ?1 is an error.
+    // A ? or ! between two values must touch the first, which must be a variable: X=D ?1 and X=1?D are errors. What
+    // follows is an operand in turn, so X?Y?Z is fine and X?1?Z is not. Returns whether a ? or ! can follow.
     operand() {
-        this.primary();
-        while (this.isPunct("?", "!") && this.adjacent()) {
-            this.next();
-            this.unworded(() => this.primary());
-        }
+        const variable = this.primary();
+        if (!variable || !this.isPunct("?", "!") || !this.adjacent()) return variable;
+        this.next();
+        this.unworded(() => this.operand());
+        return false;
     }
 
     primary() {
-        this.nested(() => this.unnestedPrimary());
+        return this.nested(() => this.unnestedPrimary());
     }
 
     unnestedPrimary() {
         const token = this.peek();
         if (this.isPunct("?", "!", "$")) {
             this.next();
-            return this.primary();
+            this.primary();
+            return token.text !== "$";
         }
         // One sign only: BASIC rejects --1 and -+1.
         if (this.isPunct("-", "+")) {
@@ -453,7 +454,7 @@ export class Recogniser {
         if (token.kind === "number" || (token.kind === "string" && token.closed))
             return void this.next();
         if (token.kind === "hex" && token.text.length > 1) return void this.next();
-        if (token.kind === "name") return this.name();
+        if (token.kind === "name") return (this.name(), true);
         if (token.kind !== "keyword" || token.kw.token >= FirstStatementToken)
             this.fail(
                 OperandErrors[token.kind] || "No such variable",
@@ -509,8 +510,8 @@ export class Recogniser {
 
     // TAB( and SPC, which only PRINT and INPUT take.
     printItem() {
-        if (this.isKeyword("TAB(")) return this.bracket(this.next(), 1, 2), true;
-        if (this.isKeyword("SPC")) return this.next(), this.operand(), true;
+        if (this.isKeyword("TAB(")) return (this.bracket(this.next(), 1, 2), true);
+        if (this.isKeyword("SPC")) return (this.next(), this.operand(), true);
         return false;
     }
 
