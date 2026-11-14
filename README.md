@@ -51,11 +51,19 @@ Owlet Editor uses Vite as its build system. The project was migrated from webpac
 Red means that BBC BASIC II would stop with an error at that statement if it ran it.
 
 - **Never red on code the ROM accepts.** The number of false-invalids (the ROM runs a statement, the editor shows it
-  red) must be 0 on the recorded tables, the ROM oracle and the saved programs. Text the ROM never reads, such as the
-  rest of a line after a statement-start `ELSE`, `REM`, `DATA` or `DEF`, is not red.
+  red) must be 0 on the recorded tables, the ROM oracle and the saved programs.
+- **Text that is not code is never red:** a comment after `REM`, the items after `DATA`, a `*` command, and the rest
+  of a line after an `ELSE` that starts a statement or a `DEF` that is not `DEF FN` or `DEF PROC`, and an `ON ... GOTO`
+  list after its first target, all of which BASIC skips.
+- **Code is red if it would stop BASIC when run, even where it cannot run** (on purpose):
+  - the branch of an `IF` whose condition is false, which BASIC skips;
+  - the body of a `DEF FN` or `DEF PROC`, which BASIC skips on its way through the program and runs only when called;
+  - statements after `GOTO`, `END`, `ENDPROC`, `RETURN`, `STOP` or a function's `=` on the same line, which can
+    never run. Acorn's Welcome disc has one: `IF CHAR=2 THEN=45:FORCE -` (line 7310 of `W.KEYBD`) is red, and its
+    `FORCE -` can never run.
 - **False-valids are measured, not gated.** Where the ROM rejects a statement and nothing is red, that is reported by
   the oracle, but it is never a reason to fail a change.
-- **Stricter than the ROM only on purpose.** Each deliberate exception, such as text after a complete assembler
+- **Stricter than the ROM only on purpose.** Each other deliberate exception, such as text after a complete assembler
   instruction, is a row of the recorded table listed as stricter than the ROM in its test.
 
 Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
