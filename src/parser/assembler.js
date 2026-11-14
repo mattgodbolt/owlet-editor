@@ -17,6 +17,15 @@ const Shifts = words("ASL LSR ROL ROR");
 const Addressed = words("ADC AND BIT CMP CPX CPY DEC EOR INC LDA LDX LDY ORA SBC STA STX STY");
 // And those whose operand is only an address, after which BASIC reads nothing.
 const Address = words("BCC BCS BEQ BMI BNE BPL BVC BVS JMP JSR");
+// Only these read a ( as indirect addressing; for the rest it starts an expression.
+const Indirect = words("ADC AND CMP EOR LDA ORA SBC STA");
+const NoImmediate = words("ASL BIT DEC INC LSR ROL ROR STA STX STY");
+// The index registers each takes, if not X and Y; BASIC reads none after BIT, CPX and CPY.
+const IndexRegisters = {
+    ...Object.fromEntries([...Shifts, "DEC", "INC", "LDY", "STY"].map(m => [m, ["X"]])),
+    ...Object.fromEntries(["LDX", "STX"].map(m => [m, ["Y"]])),
+    ...Object.fromEntries(["BIT", "CPX", "CPY"].map(m => [m, []])),
+};
 // BASIC takes the index register in lower case only after these.
 const LowerCaseIndex = {LDX: "y", STX: "y", LDY: "x", STY: "x"};
 const Label = /\.(?:[A-Za-z_`][\w`]*%?|@%)/y;
@@ -136,10 +145,11 @@ export class Assembler {
         if (Shifts.has(mnemonic) && r.is("name", "A")) return void (r.next().type = "keyword");
         if (!Addressed.has(mnemonic) && !Shifts.has(mnemonic)) return r.expression();
         if (r.isPunct("#")) {
+            if (NoImmediate.has(mnemonic)) r.fail();
             r.next().type = "symbol";
             return r.expression();
         }
-        if (r.isPunct("(")) {
+        if (Indirect.has(mnemonic) && r.isPunct("(")) {
             const opener = r.next();
             r.expression();
             if (r.isPunct(",")) {
@@ -148,12 +158,13 @@ export class Assembler {
                 return void r.next();
             }
             if (!r.isPunct(")")) r.fail(r.atEnd() ? opener : r.peek());
-            r.next();
-            if (r.isPunct(",")) this.index(mnemonic, "Y");
-            return;
+            const close = r.next();
+            if (!r.isPunct(",")) r.fail(close);
+            return this.index(mnemonic, "Y");
         }
         r.expression();
-        if (r.isPunct(",")) this.index(mnemonic, "X", "Y");
+        const registers = IndexRegisters[mnemonic] || ["X", "Y"];
+        if (registers.length && r.isPunct(",")) this.index(mnemonic, ...registers);
     }
 
     // A comma and an index register.
