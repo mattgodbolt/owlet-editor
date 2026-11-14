@@ -437,9 +437,33 @@ describe("Tokenisation", () => {
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
             }
         });
-        it("should read a number after THEN or ELSE as a line number, but not after ERROR", () => {
-            assert.deepStrictEqual(spans("IF A THEN 30 ELSE 40", "constant.linenum"), ["30", "40"]);
-            assert.deepStrictEqual(spans("IF A TH.30 EL.40", "constant.linenum"), ["30", "40"]);
+        it("should read as line numbers the numbers that BASIC's RENUMBER renumbers, but not after ERROR", () => {
+            // Each checked by RENUMBER on BBC BASIC II.
+            const cases = [
+                ["IF A THEN 30 ELSE 40", ["30", "40"]],
+                ["IF A TH.30 EL.40", ["30", "40"]],
+                ["IFX THEN200ELSE210", ["200", "210"]],
+                ["GOTO 20:GOSUB 30:G.40:GOS.50:\xe550", ["20", "30", "40", "50", "50"]],
+                ["ON X GOTO 10,20 , 30 ELSE 40", ["10", "20", "30", "40"]],
+                ["ON ERROR GOTO 70:RESTORE 60:TRACE 130", ["70", "60", "130"]],
+                [
+                    "LIST 230:AUTO 240:DELETE 10,20:RENUMBER 10,20",
+                    ["230", "240", "10", "20", "10", "20"],
+                ],
+                [
+                    "GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20",
+                    ["10", "150", "230", "10", "10", "20"],
+                ],
+                ["GOTO 10;20:GOTO 10.5,20:GOTO 10E2,20:GOTO -10,20", ["10", "10", "10"]],
+                ["GOTO &10,20", ["20"]],
+                ["ON X GOTO 10,X,20:GOTO (220):GOTO A%*10", ["10"]],
+                ["X=1:250:REPEAT 20:PRINT 170", []],
+                ["ON X GOTO 240,250 ELSE PRINT 260", ["240", "250"]],
+                ['PRINT "GOTO 80":REM GOTO 80\nDATA 90\n*FX 140', []],
+            ];
+            for (const [text, lineNumbers] of cases) {
+                assert.deepStrictEqual(spans(text, "constant.linenum"), lineNumbers, text);
+            }
             for (const text of ["ON ERROR 30", 'ERROR 5,"x"', "ON ERR. 30", "\xee\u0185 30"]) {
                 assert.deepStrictEqual(spans(text, "constant.linenum"), [], text);
                 assert.deepStrictEqual(spans(text, "number"), [text.match(/\d+/)[0]], text);
@@ -500,7 +524,7 @@ describe("Tokenisation", () => {
             ];
             assert.deepStrictEqual(tokens(lines.join("\n")), [
                 "0:variable 7:operator 8:number 9:invalid 11:number 12:keyword 14:number 15:invalid 17:number 18:invalid 20:number",
-                "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:number",
+                "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:constant.linenum",
                 "0:variable 1:invalid 3:number",
                 "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:invalid 13:variable",
             ]);

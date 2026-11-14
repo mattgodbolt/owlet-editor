@@ -15,6 +15,7 @@ import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings, LanguageId} from "./bbcbasic";
+import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 
@@ -86,6 +87,7 @@ export class OwletEditor {
             run: () => this.expandCode(),
         });
 
+        followImplicitLineNumbers(this.editor);
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);

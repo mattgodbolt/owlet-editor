@@ -65,21 +65,22 @@ export function lineItems(line, lineTokens) {
 const nameKind = item => item && item.kw && NameKinds.get(item.kw.keyword);
 
 // A label starts an assembler statement as a colon does. The tokeniser joins a colon to the symbols before it (";:").
-const startsStatement = item =>
-    item.type === `constant.linenum.${LanguageId}` ||
+// Only the line's own number starts one; the others are the targets of GOTO, THEN and the like.
+const startsStatement = (item, index) =>
+    (item.type === `constant.linenum.${LanguageId}` && index === 0) ||
     item.type === `type.identifier.${LanguageId}` ||
     (/^(symbol|operator)\./.test(item.type) && item.text.endsWith(":")) ||
     (item.kw && (item.kw.flags & Flags.Start || item.kw.keyword === "REPEAT"));
 
 function statementState(items, inAssembler) {
     const state = {inAssembler, atStart: true, statement: null, inText: false};
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
         if (item.type === SquareType) {
             state.inAssembler = item.text === "[";
             state.atStart = true;
         } else if (item.kw && item.kw.flags & Flags.REM && !state.inAssembler) {
             state.inText = true;
-        } else if (startsStatement(item)) {
+        } else if (startsStatement(item, index)) {
             state.atStart = true;
             // ON ERROR is followed by a statement or OFF.
             if (item.kw && item.kw.keyword === "ERROR") continue;

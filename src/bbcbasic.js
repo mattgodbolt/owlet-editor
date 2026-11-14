@@ -148,6 +148,11 @@ const bracketCollisionRegex = (() => {
     return new RegExp(`[${collisions.join("")}]`);
 })();
 
+// The tokeniser reads the numbers after these as line numbers. THEN and ELSE also end their statement.
+const lineNumberKeywords = keywords
+    .filter(kw => kw.flags & Flags.LineNumber && !["THEN", "ELSE"].includes(kw.keyword))
+    .map(kw => kw.keyword);
+
 const AsmOpener = [...hiddenOpenParens.map(escape), "[a-zA-Z_]\\w*[$%]?\\("].join("|");
 
 const UnterminatedString = /"([^"\n]|"")*(?=\n|$)/;
@@ -171,8 +176,8 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+=><!*/:?$;,^']+/,
         tokenizer: {
             root: [
+                [/^([ \t]*)(\d+)/, ["white", "constant.linenum"]], // the line's own number
                 {include: "@whitespace"},
-                [/\d+/, "constant.linenum"],
                 [notStatementRegex, "invalid", "@statement"],
                 [/(?=[^*])/, "", "@statement"],
                 [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
@@ -198,7 +203,20 @@ export function registerBbcBasicLanguage() {
                     ),
                     ["keyword", "white", "symbol"],
                 ],
-                [new RegExp(forms("THEN", "ELSE", "REPEAT")), "keyword", "@pop"],
+                [new RegExp(forms("THEN", "ELSE")), {token: "keyword", switchTo: "@lineNumbers"}],
+                [new RegExp(forms("REPEAT")), "keyword", "@pop"],
+                [
+                    new RegExp(forms(...lineNumberKeywords)),
+                    {
+                        cases: {
+                            [bracketCollisionRegex.source]: {
+                                token: "keyword.string",
+                                next: "@lineNumbers",
+                            },
+                            "@default": {token: "keyword", next: "@lineNumbers"},
+                        },
+                    },
+                ],
                 // A number after ERROR is not a line number, but a * command may follow ON ERROR.
                 [new RegExp(`(?:${forms("ERROR")})(?=[ \\t]*\\*)`), "keyword", "@pop"],
                 StrTilde,
@@ -273,6 +291,14 @@ export function registerBbcBasicLanguage() {
                 ['"', {token: "string.quote", next: "@string"}],
                 // We treat @% as a regular variable (see #28).
                 ["@%", "variable"],
+            ],
+            // As in the tokeniser, a space or comma does not end the list but anything else does: GOTO 10*2 is to line 10.
+            lineNumbers: [
+                {include: "@whitespace"},
+                [/\d+/, "constant.linenum"],
+                [/&[0-9A-F]+/, "number.hex"],
+                [",", "operator"],
+                ["", "", "@pop"],
             ],
             strayDot: [[/\.\d*/, "invalid", "@pop"]],
             // Not the newline, which would carry a state such as this statement's on to the next line.
