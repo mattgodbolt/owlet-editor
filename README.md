@@ -52,8 +52,8 @@ Red means that BBC BASIC II would stop with an error at that statement if it ran
 of the line could change that. The colours are a function of the text alone, wherever the cursor is.
 
 - **Red runs to the end of the statement** (`?parser=new`): BASIC stops at the first token that cannot continue a
-  statement and never reads the rest of it, so that token and everything after it up to the end of the statement is red,
-  where only the stop token used to be. `I am a badger` is `I` as a variable and `am a badger` red; `GOTO 20 30:PRINT 5`
+  statement and never reads the rest of it, so that token and everything after it up to the end of the statement is red.
+  `I am a badger` is `I` as a variable and `am a badger` red; `GOTO 20 30:PRINT 5`
   is red on `30` only, since the statement ends at the colon and `PRINT 5` is judged on its own. A statement ends at a
   colon or an `ELSE` outside a string, or at the end of the line, and in an assembler block also at the `]` that closes
   it. A `REM` or `DATA` after the stop point, its comment or items, and a `*` command are not code and keep their own
@@ -69,11 +69,9 @@ of the line could change that. The colours are a function of the text alone, whe
   `G`, `GOTO`, `GOTO `, `FOR I=1 TO`, `PRINT (1+`, `PRINT "HI` (a string with no closing quote yet) and `[LDA` are
   unfinished, including a name or keyword that could grow into a longer keyword (`FOR I=1 T`, `X=1 AN`, `ENDP`, `MOD`
   for `MODE`, `A=TO` for `TOP`) or a mnemonic (`[LD`). One more shape is unfinished: a statement that stops at a `)`
-  when something typed just before it would make the statement valid (a missing operand, argument or trailing `,`, or
-  the rest of a word before it). That is what an editor that closes brackets shows while a call is typed:
+  when something typed just before it would make the statement valid (a missing operand, argument or trailing `,`). That is what an editor that closes brackets shows while a call is typed:
   `A$=LEFT$()`, `A$=LEFT$(B)`, `A$=LEFT$(B$,)`, `PRINT (1+)`, `PRINT TAB(1,)` and `DIM a()`. Monaco closes only `(` and `"`, and
-  an open `"` is unfinished already. The recogniser tries a short list of fillers (a value, `,1`, `1,1`...) at the `)`,
-  and the completion of the word before it, and asks whether the statement is then valid. `A$=LEFT$(X$)` is also
+  an open `"` is unfinished already. The recogniser tries a short list of fillers (a value, `,1`, `1,1`...) at the `)` and asks whether the statement is then valid. `A$=LEFT$(X$)` is also
   unfinished, though it is one argument short as written, because it is what the editor shows at `LEFT$(X$|)` and
   cannot be told apart from the finished text. The colour cannot know the cursor, so a line that stays like that in a
   finished program is shown by a marker instead, below. Everything else that stops short is red, with no allowance
@@ -84,7 +82,7 @@ of the line could change that. The colours are a function of the text alone, whe
   red once the `10` is there). Words typed straight against the word after them with no space (`IF A=1 TPRINT 2`,
   which is a name, `TPRINT`, and a number) are red until the space is typed.
 - **Markers** (`?parser=new`): about half a second after the last edit (the old markers stay, and move with the text,
-  until then), a statement BASIC would stop at gets an error squiggle from the token where it stops to the end of the statement, and a line that is unfinished gets a warning
+  until then), a statement BASIC would stop at gets an error squiggle on its red text, and a line that is unfinished gets a warning
   squiggle: at its end, or at the token where the statement stopped when something is missing from the middle. Both
   come from the recogniser that colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`,
   `No TO`, `Missing ,`, `Missing "` and so on) where the recogniser knows it; the recorded rows in
