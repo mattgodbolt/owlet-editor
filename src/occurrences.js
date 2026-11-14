@@ -1,8 +1,8 @@
 import {editor, KeyCode, KeyMod, languages} from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/editor/contrib/rename/browser/rename";
 import "monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter";
+import {LanguageId} from "./bbcbasic";
 
-const LanguageId = "BBCBASIC";
 const VariableType = `variable.${LanguageId}`;
 const LabelType = `type.identifier.${LanguageId}`;
 const KeywordType = `keyword.${LanguageId}`;
