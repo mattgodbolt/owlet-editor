@@ -154,17 +154,23 @@ export const keywords = [
     {keyword: "HIMEM", token: 211, flags: 0},
 ];
 
-const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
+export const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
+
+// BASIC II starts a statement only with a token from here up (they include the statement forms of PTR, PAGE, TIME,
+// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
+export const FirstStatementToken = 0xc6;
+export const LineNumberToken = 0x8d;
+// The character Owlet uses for a raw token byte.
+export const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
 
 export const immediateCommands = keywords
-    .filter(kw => kw.token >= 0xc6 && kw.token <= 0xcd)
+    .filter(kw => kw.token >= FirstStatementToken && kw.token <= 0xcd)
     .map(kw => kw.keyword);
 
 const Chars = {
     Colon: ":".charCodeAt(0),
     Dot: ".".charCodeAt(0),
     FirstToken: 0x80,
-    LineNumberToken: 0x8d,
     NewLine: "\n".charCodeAt(0),
     Quote: '"'.charCodeAt(0),
     Star: "*".charCodeAt(0),
@@ -316,7 +322,7 @@ function detokeniseInternal(text, handler) {
             continue;
         }
         if (charCode === Chars.Quote) withinString = !withinString;
-        if (!withinString && charCode === Chars.LineNumberToken) {
+        if (!withinString && charCode === LineNumberToken) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];

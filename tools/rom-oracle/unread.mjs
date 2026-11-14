@@ -4,12 +4,9 @@
 // GOTO, GOSUB, END, STOP and THEN followed by a line number (the prelude's GOSUB target is END); and the branch of an IF that is not taken. An IF is
 // taken when its condition is 1, X or TRUE (all the generator writes), not when it is 0 or FALSE, and is otherwise
 // unknown, so then neither branch counts as read.
-import {keywords} from "../../src/tokens.js";
+import {FirstStatementToken, keywordByToken, keywords, LineNumberToken} from "../../src/tokens.js";
 
 const Token = Object.fromEntries(keywords.map(kw => [kw.keyword, kw.token]));
-const nameByToken = new Map(keywords.map(kw => [kw.token, kw.keyword]));
-const LineNumberToken = 0x8d;
-const FirstStatementToken = 0xc6;
 const Quote = 0x22;
 const Colon = 0x3a;
 const Comma = 0x2c;
@@ -35,7 +32,7 @@ function align(text, bytes) {
             i += 3;
             pos += text.slice(pos).match(/^\d*/)[0].length;
         } else {
-            const name = nameByToken.get(byte);
+            const name = keywordByToken.get(byte)?.keyword;
             if (!name) return null;
             let length = text.startsWith(name, pos) ? name.length : 0;
             for (let n = 1; !length && n < name.length; ++n) {
@@ -72,16 +69,16 @@ export function unreadRanges(text, bytes) {
         return bytes.length;
     };
     const textOf = (from, to) => text.slice(offsets[from], offsets[to]).trim();
-    for (let i = 0; i < bytes.length; ) {
+    for (let i = 0; i < bytes.length;) {
         i = skipSpaces(i);
         const first = bytes[i];
         const end = find(i, Colon, Token.ELSE);
-        if (RestOfLine.has(first) || first === Token.ELSE) return rest(i + 1), ranges;
-        if (EndsLine.has(first) || first === LineNumberToken) return rest(end), ranges;
+        if (RestOfLine.has(first) || first === Token.ELSE) return (rest(i + 1), ranges);
+        if (EndsLine.has(first) || first === LineNumberToken) return (rest(end), ranges);
         if (first === Token.ON) {
             const next = skipSpaces(i + 1);
             if (bytes[next] === Token.ERROR && bytes[skipSpaces(next + 1)] !== Token.OFF)
-                return rest(next + 1), ranges;
+                return (rest(next + 1), ranges);
             const jump = find(i, Token.GOTO, Token.GOSUB);
             if (jump < end) {
                 const index = textOf(i + 1, jump);
@@ -109,9 +106,9 @@ export function unreadRanges(text, bytes) {
                 i = elseAt + 1;
                 continue;
             }
-            return rest(branch), ranges;
+            return (rest(branch), ranges);
         }
-        if (bytes[end] === Token.ELSE) return rest(end + 1), ranges;
+        if (bytes[end] === Token.ELSE) return (rest(end + 1), ranges);
         i = end + 1;
     }
     return ranges;

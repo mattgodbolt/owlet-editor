@@ -14,7 +14,7 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {colourBrackets, getWarnings, LanguageId} from "./bbcbasic";
+import {getSyntaxMarkers, getWarnings, LanguageId} from "./bbcbasic";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -22,6 +22,7 @@ import {createVduReference} from "./vdu-reference";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
+const SyntaxMarkerDelayMs = 500;
 
 function defaultLineNumber(line) {
     return line * 10;
@@ -67,7 +68,6 @@ export class OwletEditor {
             lineDecorationsWidth: 0,
             automaticLayout: true,
         });
-        colourBrackets(this.editor);
 
         this.editor.addAction({
             id: "execute-basic",
@@ -90,12 +90,19 @@ export class OwletEditor {
         });
 
         followImplicitLineNumbers(this.editor);
+        // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
+        // markers about to be made anyway.
+        this.editor.onDidChangeCursorPosition(({position}) => {
+            if (!this.syntaxTimer && position.lineNumber !== this.syntaxCursorLine)
+                this.showSyntaxMarkers();
+        });
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);
             this.lineNumberDetect(basicText);
             this.updateStatus(basicText);
             this.updateWarnings();
+            this.updateSyntaxMarkers();
         });
 
         this.emulator = new Emulator($("#emulator"));
@@ -138,6 +145,25 @@ export class OwletEditor {
     updateWarnings() {
         const model = this.editor.getModel();
         monacoEditor.setModelMarkers(model, "warnings", getWarnings(model.getValue()));
+    }
+
+    // The markers for lines that end too soon would be wrong while the line is still being typed, so they come only
+    // after the typing stops. The old ones stay until then; Monaco moves them along with the text.
+    updateSyntaxMarkers() {
+        clearTimeout(this.syntaxTimer);
+        this.syntaxTimer = setTimeout(() => this.showSyntaxMarkers(), SyntaxMarkerDelayMs);
+    }
+
+    showSyntaxMarkers() {
+        clearTimeout(this.syntaxTimer);
+        this.syntaxTimer = null;
+        const model = this.editor.getModel();
+        this.syntaxCursorLine = this.editor.getPosition().lineNumber;
+        monacoEditor.setModelMarkers(
+            model,
+            "syntax",
+            getSyntaxMarkers(model.getValue(), this.syntaxCursorLine),
+        );
     }
 
     updateEditorText(newText, updateType) {

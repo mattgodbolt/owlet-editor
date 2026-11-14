@@ -1,14 +1,7 @@
 import {editor, languages} from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController";
-import {Flags, immediateCommands, keywords} from "./tokens";
-import {
-    abbreviatedKeyword,
-    allTokensRegex,
-    FirstStatementToken,
-    LanguageId,
-    statementKeywords,
-    tokenChar,
-} from "./bbcbasic";
+import {FirstStatementToken, Flags, immediateCommands, keywords, tokenChar} from "./tokens";
+import {abbreviatedKeyword, allTokensRegex, LanguageId, statementKeywords} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 
 const KeywordType = `keyword.${LanguageId}`;
