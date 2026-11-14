@@ -494,6 +494,115 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
         });
     });
 
+    describe("examples from the issues", () => {
+        // Each is a line someone reported (the number is the issue or pull request), with its tokens; the ROM's
+        // verdict on it, or on the statement it comes from, is a row of test/rom-verdicts.json with the same number.
+        it("should read each as reported", () => {
+            const cases = [
+                ["#26", "Z%=2E4", "0:variable 2:operator 3:number.float"],
+                [
+                    "#27",
+                    "P.1.,.5,.",
+                    "0:keyword 2:number.float 4:operator 5:number.float 7:operator 8:number.float",
+                ],
+                [
+                    "#28",
+                    "A%=@%:@%=A%",
+                    "0:variable 2:operator 3:variable 5:symbol 6:variable 8:operator 9:variable",
+                ],
+                ["#37", "*FX19:PRINT", "0:keyword.oscli.string"],
+                ["#37", "*.:0", "0:keyword.oscli.string"],
+                [
+                    "#41",
+                    "P.'\"a\"'@%''TIME'",
+                    "0:keyword 2:operator 3:string.quote 4:string 5:string.quote 6:operator 7:variable 9:operator 11:keyword 15:operator",
+                ],
+                ["#43", "D.http://bbcmic.ro", "0:keyword 2:string.unquoted"],
+                ["#45", "PRINT TOP", "0:keyword 5:white 6:keyword"],
+                [
+                    "#45",
+                    "F.P=TOP TOP:P.P:N.",
+                    "0:keyword 2:variable 3:operator 4:keyword 7:white 8:keyword 10:variable 11:symbol 12:keyword 14:variable 15:symbol 16:keyword",
+                ],
+                [
+                    "#45",
+                    "FORP=TOP-TOP TOP+TOP/TOP:N.",
+                    "0:keyword 3:variable 4:operator 5:keyword 8:operator 9:keyword 12:white 13:keyword 15:variable 16:operator 17:keyword 20:operator 21:keyword 24:symbol 25:keyword",
+                ],
+                ["#52", 'P."A"X', "0:keyword 2:string.quote 3:string 4:string.quote 5:variable"],
+                ["#62", "PRINTQ.1", "0:keyword 5:variable 6:number.float"],
+                ["#83", "*KEY0PAGE=4608|MO.|MRU.|M", "0:keyword.oscli.string"],
+                ["#83", "*LOAD P.DAT", "0:keyword.oscli.string"],
+                [
+                    "#85",
+                    "@%=0:X=1:P.X.",
+                    "0:variable 2:operator 3:number 4:symbol 5:variable 6:operator 7:number 8:symbol 9:keyword 11:variable 12:number.float",
+                ],
+                [
+                    "#85",
+                    "X=42:V.X.",
+                    "0:variable 1:operator 2:number 4:symbol 5:keyword 7:variable 8:number.float",
+                ],
+                ["#112", "ONERROR*HELP", "0:keyword 7:keyword.oscli.string"],
+                ["#112", "IF0EL.*H.", "0:keyword 2:number 3:keyword 6:keyword.oscli.string"],
+                ["#112", "ONERR.*HELP", "0:keyword 6:keyword.oscli.string"],
+                [
+                    "#140",
+                    "ri=42:P.ri.",
+                    "0:variable 2:operator 3:number 5:symbol 6:keyword 8:variable 10:number.float",
+                ],
+                [
+                    "#144",
+                    "FOR I=AB. TOP TO 9:N.",
+                    "0:keyword 3:white 4:variable 5:operator 6:keyword 9:white 10:keyword 13:white 14:keyword 16:white 17:number 18:symbol 19:keyword",
+                ],
+                ["#149", "Y=X.7", "0:variable 1:operator 2:variable 3:invalid"],
+                ["#150", "Z.", "0:variable 1:invalid"],
+                ["#150", "PRIT.", "0:variable 4:invalid"],
+                ["#152", "P.STR$~~42", "0:keyword 6:operator 7:invalid 8:number"],
+                [
+                    "#152",
+                    "A$=STR$~~42",
+                    "0:variable 2:operator 3:keyword 7:operator 8:invalid 9:number",
+                ],
+                ["#156", "\xf2p", "0:keyword 1:variable"],
+                ["#156", "\xdd\xf2x", "0:keyword 2:variable"],
+                ["#167", "[lda42,X", "0:delimiter.square 1:keyword 4:number 6:symbol 7:keyword"],
+                [
+                    "#170",
+                    "Q$=\xc1Q$,2)+\xc3(Q%)",
+                    "0:variable 2:operator 3:keyword 4:variable 6:operator 7:number 8:delimiter.parenthesis 9:operator 10:keyword 11:delimiter.parenthesis 12:variable 14:delimiter.parenthesis",
+                ],
+                [
+                    "#170",
+                    "Q$=MI.Q$,2)+STR.(Q%)",
+                    "0:variable 2:operator 3:keyword 6:variable 8:operator 9:number 10:delimiter.parenthesis 11:operator 12:keyword 16:delimiter.parenthesis 17:variable 19:delimiter.parenthesis",
+                ],
+            ];
+            for (const [source, text, expected] of cases)
+                if (!differs(parser, text))
+                    assert.deepStrictEqual(tokens(text), [expected], `${source} ${text}`);
+        });
+        it("should mark nothing in the lines reported as wrongly red", () => {
+            for (const text of [
+                "\xe440:\xf4 wrongly highlighted as invalid", // #156
+                "\xe0:\xf4 wrongly highlighted as invalid",
+                "\xf8",
+                "\xe22,3,2,-4,4,50,50,50,127,0,0,0,126,0:\xf4 wrongly highlighted as invalid",
+                "\xe1:\xf4 wrongly highlighted as invalid",
+                'MO.4:F.R=2TOLEN"\xff@W\u0197\u0187\xc3\xc3\xe1\xe1\xf0\xe0\xf0\xe0\xf0\u0180<lf\xba\u0199\xaaf\u0100B":?8=R?7180:?9=R:F.X=1TO9:MOVE(X*2OR1A.R)*40,R*40+?8MOD2*@%:P."\u0105\u0119\u0199\u0100\u0100\u011c\u0100":!6=!6/2:N.,:V.1', // #23
+                "F.A=H. TO8^5:?A=42:N.", // #30
+                'A$="OWLET":P.RI.A$,1)LE.A$,2)MI.A$,4,1)MI.A$,3,1)', // #114
+                "P.LE.A$,1)", // #160
+                "PRINTLE.A$,1)",
+                "P.LENMI.A$,2)",
+                "DIM tab(2):P.tab(1)", // #140
+                'READ A$:DATA "abc\nP.1', // #138
+            ])
+                assert.deepStrictEqual(spans(text, "invalid"), [], text);
+        });
+    });
+
     describe("statements", () => {
         it("should read the rest of the line after REM as a comment", () => {
             for (const text of [

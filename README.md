@@ -72,9 +72,10 @@ error, and the assembler. The default is still the Monarch grammar.
 
 Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
 statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
-`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict. Before a change
-to highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on generated statements
-(see the comment at its top).
+`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict.
+`--source '#149'` ends each row with the issue it comes from, so that a report seen before is one search of the tables
+away. Before a change to highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on
+generated statements (see the comment at its top).
 
 ## Known Issues
 
