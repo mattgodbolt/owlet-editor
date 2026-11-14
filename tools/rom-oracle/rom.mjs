@@ -19,6 +19,7 @@ const Prelude = 'X=1:Y=2:Z=3:A=1:I=1:X%=1:A%=1:X$="a":A$="a":DIM X(3),X%(3),X$(3
 // No such variable is here because the prelude defines every name the generator uses: BASIC reports it when what
 // should be a value is not one, as in PRINT STR$~~1, or for a name with nothing after it, as in CALL.
 export const SyntaxErrors = new Map([
+    [3, "Index"],
     [4, "Mistake"],
     [5, "Missing ,"],
     [9, 'Missing "'],

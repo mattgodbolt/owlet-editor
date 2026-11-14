@@ -16,8 +16,10 @@ import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getWarnings, LanguageId, useBasicIV} from "./bbcbasic";
 import {DefaultMachine, Machines, machineOf, withMachine} from "./machines";
+import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
+import {createVduReference} from "./vdu-reference";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
@@ -88,6 +90,7 @@ export class OwletEditor {
             run: () => this.expandCode(),
         });
 
+        followImplicitLineNumbers(this.editor);
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);
@@ -326,7 +329,7 @@ export class OwletEditor {
             $play.html("&#10074;&#10074;");
         }
 
-        for (const element of ["screen", "about", "examples"]) {
+        for (const element of ["screen", "about", "examples", "reference"]) {
             $(`#${element}`).toggle(element === selected);
             $(`#${element}-button`).toggleClass("selected", element === selected);
         }
@@ -505,6 +508,8 @@ export class OwletEditor {
             emulator: () => this.selectView("screen"),
             examples: () => this.selectView("examples"),
             about: () => this.selectView("about"),
+            reference: () =>
+                this.selectView($("#reference-button").hasClass("selected") ? "screen" : "reference"),
 
             virtualbeeb: () => {
                 const gxr = this.emulator.hasGxr ? "&rom=gxr.rom" : "";
@@ -593,6 +598,8 @@ export class OwletEditor {
         for (const [machine, {label}] of Object.entries(Machines))
             $("<option>").val(machine).text(label).appendTo($machine);
         $machine.change(() => this.chooseMachine($machine.val()));
+
+        createVduReference($("#reference")[0]);
 
         this.setState(initialState);
     }

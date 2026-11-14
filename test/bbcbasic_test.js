@@ -437,9 +437,33 @@ describe("Tokenisation", () => {
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
             }
         });
-        it("should read a number after THEN or ELSE as a line number, but not after ERROR", () => {
-            assert.deepStrictEqual(spans("IF A THEN 30 ELSE 40", "constant.linenum"), ["30", "40"]);
-            assert.deepStrictEqual(spans("IF A TH.30 EL.40", "constant.linenum"), ["30", "40"]);
+        it("should read as line numbers the numbers that BASIC's RENUMBER renumbers, but not after ERROR", () => {
+            // Each checked by RENUMBER on BBC BASIC II.
+            const cases = [
+                ["IF A THEN 30 ELSE 40", ["30", "40"]],
+                ["IF A TH.30 EL.40", ["30", "40"]],
+                ["IFX THEN200ELSE210", ["200", "210"]],
+                ["GOTO 20:GOSUB 30:G.40:GOS.50:\xe550", ["20", "30", "40", "50", "50"]],
+                ["ON X GOTO 10,20 , 30 ELSE 40", ["10", "20", "30", "40"]],
+                ["ON ERROR GOTO 70:RESTORE 60:TRACE 130", ["70", "60", "130"]],
+                [
+                    "LIST 230:AUTO 240:DELETE 10,20:RENUMBER 10,20",
+                    ["230", "240", "10", "20", "10", "20"],
+                ],
+                [
+                    "GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20",
+                    ["10", "150", "230", "10", "10", "20"],
+                ],
+                ["GOTO 10;20:GOTO 10.5,20:GOTO 10E2,20:GOTO -10,20", ["10", "10", "10"]],
+                ["GOTO &10,20", ["20"]],
+                ["ON X GOTO 10,X,20:GOTO (220):GOTO A%*10", ["10"]],
+                ["X=1:250:REPEAT 20:PRINT 170", []],
+                ["ON X GOTO 240,250 ELSE PRINT 260", ["240", "250"]],
+                ['PRINT "GOTO 80":REM GOTO 80\nDATA 90\n*FX 140', []],
+            ];
+            for (const [text, lineNumbers] of cases) {
+                assert.deepStrictEqual(spans(text, "constant.linenum"), lineNumbers, text);
+            }
             for (const text of ["ON ERROR 30", 'ERROR 5,"x"', "ON ERR. 30", "\xee\u0185 30"]) {
                 assert.deepStrictEqual(spans(text, "constant.linenum"), [], text);
                 assert.deepStrictEqual(spans(text, "number"), [text.match(/\d+/)[0]], text);
@@ -500,7 +524,7 @@ describe("Tokenisation", () => {
             ];
             assert.deepStrictEqual(tokens(lines.join("\n")), [
                 "0:variable 7:operator 8:number 9:invalid 11:number 12:keyword 14:number 15:invalid 17:number 18:invalid 20:number",
-                "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:number",
+                "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:constant.linenum",
                 "0:variable 1:invalid 3:number",
                 "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:invalid 13:variable",
             ]);
@@ -588,6 +612,38 @@ describe("Tokenisation", () => {
             ])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
             assert.deepStrictEqual(spans("[OPT3:LDA #1 ; fine:FOR:]", "invalid"), ["FOR"]);
+            // BASIC ignores the rest of a complete instruction, but anything there but a comment is a mistake.
+            assert.deepStrictEqual(spans("[NOP PRINT", "invalid"), ["PRINT"]);
+        });
+        it("should read letters in the case BASIC takes them", () => {
+            // Mnemonics, OPT and EQU in any case; the accumulator, an index register and EQU's size only in upper
+            // case, except that LDX and STX take y and LDY and STY take x.
+            const cases = [
+                ["[lda42,X", ["lda", "X"], []],
+                ["[.l Lda #1", ["Lda"], []],
+                ["[ldax", ["lda"], []],
+                ["[ASL A", ["ASL", "A"], []],
+                ["[asl a", ["asl"], []],
+                ["[LDA 42,x", ["LDA"], ["x"]],
+                ["[lda (&70,x)", ["lda"], ["x"]],
+                ["[LDA (&70), y", ["LDA"], ["y"]],
+                ["[LDX &70,x", ["LDX"], ["x"]],
+                ["[LDX &70,y", ["LDX", "y"], []],
+                ["[sty &70,x", ["sty", "x"], []],
+                // BASIC reads no index after these.
+                ["[LDA #1,x", ["LDA"], []],
+                ["[JSR &70,x", ["JSR"], []],
+                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$("], []],
+                ["[equb 1", [], ["equb"]],
+                ["[EQUw 1", [], ["EQUw"]],
+                ["[Ora 1:orA 1:oRA 1", ["Ora", "orA", "oRA"], []],
+                ["[ORa 1", [], ["ORa"]],
+            ];
+            for (const [text, keywords, invalid] of cases) {
+                assert.deepStrictEqual(spans(text, "keyword"), keywords, text);
+                assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+            }
+            assert.deepStrictEqual(spans("[opt 3:eqUW 1", "keyword.directive"), ["opt", "eqUW"]);
         });
         it("should allow STR$~ in an expression", () => {
             for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
@@ -633,6 +689,12 @@ describe("Bracket matching", () => {
             ["PRI.A$,1)", [9]], // PRI. is PRINT, not RIGHT$(
         ];
         for (const [text, columns] of cases) assert.deepStrictEqual(unmatched(text), columns, text);
+    });
+    it("should make only the ( of a keyword that ends in ( a bracket, so the keyword is coloured as one", () => {
+        // #170: Q$=MID$(Q$,2) must colour MID$ like STR$, with only the ( in the bracket colour.
+        for (const text of ["Q$=MID$(Q$,2)+STR$(Q%)", "P.RIGHT$(A$,1)", "P.TAB(3)", "X=POINT(1,2)", "A$=STRING$(2,A$)"])
+            assert.strictEqual(brackets(text)[0][0], text.indexOf("(") + 1, text);
+        assert.deepStrictEqual(brackets("Q$=MID$(Q$,2)").map(([start]) => start), [8, 13]);
     });
     it("should ignore brackets in strings, comments and * commands", () => {
         for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("])
@@ -735,7 +797,7 @@ describe("Line warnings", () => {
         ];
         for (const [text, fixed, startColumn] of cases) {
             checkWarnings(text, {
-                message: `H. is not read as an abbreviation when followed directly by letters, digits or underscores, did you mean "${fixed}"?`,
+                message: `H. is not read as an abbreviation when followed directly by letters or digits, did you mean "${fixed}"?`,
                 code: "space-after-abbreviation",
                 startColumn,
                 endColumn: startColumn + fixed.length - 1,
