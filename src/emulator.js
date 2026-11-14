@@ -13,14 +13,13 @@ import {setTotalCycles, totalCycles} from "./cycles";
 import {AudioHandler} from "jsbeeb/src/web/audio-handler";
 import {chipBindings, restoreChipBindings} from "./chip-bindings";
 import {Sound, soundRequested} from "./sound";
+import {DefaultMachine, Machines} from "./machines";
+import {oneAtATime} from "./one-at-a-time";
 
-const BotStartCycles = 725000; // bbcmicrobot start time
 const MaxSecondsPerFrame = 0.1;
 const urlParams = new URLSearchParams(window.location.search);
 
-let modelName = "BBC Micro Model B";
 let beebjitIncoming = false;
-const Model = models.findModel("B");
 
 // jsbeeb maps the keypad's Enter to the Master's keypad key, which a Model B lacks; Owlet has always made it Return.
 function keypadEnterAsReturn(event) {
@@ -82,19 +81,11 @@ export class Emulator {
         this.showCoords = false; // coordinate display mode
 
         window.theEmulator = this;
-        const emulator = this;
 
-        this.video = new Video(
-            Model.isMaster,
-            this.canvas.fb32.length,
-            // jsbeeb's video chip paints into a framebuffer of its own, so copy it over to the canvas's.
-            function (minx, miny, maxx, maxy) {
-                emulator.paint(this, minx, miny, maxx, maxy);
-            },
-        );
+        this.setMachine(DefaultMachine);
 
         this.audio = new AudioHandler({
-            cpuSpeed: Model.cyclesPerSecond,
+            cpuSpeed: this.model.cyclesPerSecond,
             isAtom: false,
             hasMusic5000: false,
             noSeek: true,
@@ -106,6 +97,7 @@ export class Emulator {
         this.sound.reconcile();
         this.useGxr = false;
         this.cpu = null;
+        this.cpuMachine = null;
         this.keyboard = null;
 
         screen.mousemove(event => this.mouseMove(event));
@@ -118,34 +110,66 @@ export class Emulator {
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
         this.rebuilding = false;
+        // Builds that overlapped would hand the sound chip back and forth and could finish out of order, so each
+        // waits for the one before; each builds the machine chosen when it starts, so the last chosen is the last built.
+        this.initialise = oneAtATime(() => this.build());
+    }
+
+    /**
+     * Chooses the machine the next initialise() builds; returns whether that is a change. Both run at 2MHz, so the
+     * audio, which is built for one speed, carries on.
+     */
+    setMachine(machine) {
+        if (machine === this.machine) return false;
+        this.machine = machine;
+        this.model = models.findModel(machine);
+        // A snapshot to loop back to is of the machine it was taken on.
+        this.state = null;
+        return true;
+    }
+
+    get hasGxr() {
+        // The GXR ROM is the Model B's; the Master's graphics extension is a different ROM, which Owlet does not have.
+        return this.useGxr && !this.model.isMaster;
     }
 
     buildCpu() {
-        return new Model.Cpu(Model, {
+        const emulator = this;
+        const video = new Video(
+            this.model.isMaster,
+            this.canvas.fb32.length,
+            // jsbeeb's video chip paints into a framebuffer of its own, so copy it over to the canvas's.
+            function (minx, miny, maxx, maxy) {
+                emulator.paint(this, minx, miny, maxx, maxy);
+            },
+        );
+        return new this.model.Cpu(this.model, {
             ...nullIo({
-                video: this.video,
+                video,
                 soundChip: this.audio.soundChip,
-                model: Model,
+                model: this.model,
             }),
             ddNoise: this.audio.ddNoise,
             config: machineSpec({
                 keyLayout: "natural",
-                extraRoms: this.useGxr ? ["gxr.rom"] : [],
+                extraRoms: this.hasGxr ? ["gxr.rom"] : [],
             }),
         });
     }
 
-    async initialise() {
+    async build() {
         // The ROMs a machine is fitted with are fixed when it is built, so each initialise builds afresh.
         // The new CPU is only swapped in once it is loaded and reset, so a frame never runs a half-built one.
         // Building it hands the one sound chip to its scheduler, so the old CPU must not run in the meantime.
         this.rebuilding = true;
         const bindings = chipBindings(this.audio.soundChip);
+        const machine = Machines[this.machine];
         try {
             const cpu = this.buildCpu();
             await Promise.all([cpu.initialise(), this.audio.ddNoise.initialise()]);
             this.clearKeys();
             this.cpu = cpu;
+            this.cpuMachine = machine;
             this.keyboard = new Keyboard({
                 processor: cpu,
                 inputEnabledFunction: () => false,
@@ -164,11 +188,6 @@ export class Emulator {
 
     gxr() {
         this.useGxr = true;
-        modelName = "BBC Micro Model B | GXR";
-    }
-
-    hasGxr() {
-        return modelName.indexOf("GXR") >= 0;
     }
 
     get cyclesPerSecond() {
@@ -185,7 +204,8 @@ export class Emulator {
 
     timer() {
         if (this.cpu && !beebjitIncoming && !this.showCoords) {
-            this.emuStatus.innerHTML = `${modelName} | ${Math.floor(
+            const gxr = this.hasGxr ? " | GXR" : "";
+            this.emuStatus.innerHTML = `${Machines[this.machine].name}${gxr} | ${Math.floor(
                 this.totalCycles / this.cyclesPerSecond,
             )} s`;
         }
@@ -248,7 +268,9 @@ export class Emulator {
         if (!this.ready || this.rebuilding) return;
         this.cpu.reset(true);
         const processor = this.cpu;
-        await processor.execute(BotStartCycles); // match bbcmicrobot
+        await processor.execute(this.cpuMachine.startCycles);
+        // The machine may have been replaced meanwhile, and the program is not the new one's to run.
+        if (processor !== this.cpu) return;
         const page = processor.readmem(0x18) << 8;
         for (let i = 0; i < tokenised.length; ++i) {
             processor.writemem(page + i, tokenised.charCodeAt(i));
@@ -268,7 +290,7 @@ export class Emulator {
     writeToKeyboardBuffer(text) {
         const processor = this.cpu;
         const keyboardBuffer = 0x0300; // BBC Micro OS 1.20
-        const IBPaddress = 0x02e1; // input buffer pointer
+        const IBPaddress = this.cpuMachine.keyboardWritePointer;
         let inputBufferPointer = processor.readmem(IBPaddress);
         for (let a = 0; a < text.length; a++) {
             processor.writemem(keyboardBuffer + inputBufferPointer, text.charCodeAt(a));
@@ -349,7 +371,7 @@ export class Emulator {
             event.preventDefault();
             return;
         }
-        this.keyboard.keyDown(keypadEnterAsReturn(event));
+        this.keyboard.keyDown(this.cpu.model.isMaster ? event : keypadEnterAsReturn(event));
     }
 
     clearKeys() {
@@ -424,7 +446,8 @@ export class Emulator {
     }
 
     keyUp(event) {
-        if (this.keyboard) this.keyboard.keyUp(keypadEnterAsReturn(event));
+        if (this.keyboard)
+            this.keyboard.keyUp(this.cpu.model.isMaster ? event : keypadEnterAsReturn(event));
     }
 
     readmem(address) {

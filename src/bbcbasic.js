@@ -94,7 +94,7 @@ const AsmBadDirective = new RegExp(`${anyCase("EQU")}[bdsw]`);
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}`;
 
 // BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
+// LOMEM and HIMEM) or ELSE, which skips the rest of the line.
 export const FirstStatementToken = 0xc6;
 export const statementKeywords = new Set([
     "ELSE",
@@ -127,6 +127,10 @@ const notStatementRegex = (() => {
             `(?:${[...notStatementAbbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementTokens)].join("|")})`,
     );
 })();
+// BASIC IV, the Master's, also starts a statement with EXT#, which sets the length of a file.
+const notStatementRegexIV = new RegExp(
+    `(?!(?:${forms("EXT")})[ \\t]*#)${notStatementRegex.source}`,
+);
 
 // Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
 // bracket matching scans the text, so it needs these as openers to pair them with their ")".
@@ -166,7 +170,16 @@ const BeforeOperand = {cases: {"\\(": "@brackets", "@operators": "operator", "@d
 
 export function registerBbcBasicLanguage() {
     languages.register({id: LanguageId});
+    useBasicIV(false);
+    configureBbcBasicLanguage();
+}
 
+let basicIV = null;
+
+/** Highlights for the Master's BASIC IV rather than BASIC II, where the two differ. */
+export function useBasicIV(enabled) {
+    if (enabled === basicIV) return;
+    basicIV = enabled;
     languages.setMonarchTokensProvider(LanguageId, {
         defaultToken: "invalid",
         includeLF: true,
@@ -178,7 +191,7 @@ export function registerBbcBasicLanguage() {
             root: [
                 [/^([ \t]*)(\d+)/, ["white", "constant.linenum"]], // the line's own number
                 {include: "@whitespace"},
-                [notStatementRegex, "invalid", "@statement"],
+                [basicIV ? notStatementRegexIV : notStatementRegex, "invalid", "@statement"],
                 [/(?=[^*])/, "", "@statement"],
                 [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
             ],
@@ -195,7 +208,14 @@ export function registerBbcBasicLanguage() {
                 ],
                 // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
                 [new RegExp(forms("PRINT")), {token: "keyword", switchTo: "@printStatement.list"}],
-                [new RegExp(forms("VDU")), {token: "keyword", switchTo: "@statement.list"}],
+                // On BASIC IV a VDU with nothing before its first | is a syntax error.
+                [
+                    new RegExp(`(?:${forms("VDU")})${basicIV ? "(?![ \\t]*\\|)" : ""}`),
+                    {
+                        token: "keyword",
+                        switchTo: basicIV ? "@vduStatement.list" : "@statement.list",
+                    },
+                ],
                 [invalidAbbreviatedTokensRegex, "invalid"],
                 [
                     new RegExp(
@@ -222,7 +242,8 @@ export function registerBbcBasicLanguage() {
                 StrTilde,
                 [new RegExp(forms("FOR")), {token: "keyword", switchTo: "@forStatement"}],
                 [bracketCollisionRegex, "keyword.string"],
-                [new RegExp(`${TopRegex}|${anyTokenRegex}`), "keyword"],
+                // BASIC IV's tokeniser (Owlet's on either machine) reads COLOR as COLOUR.
+                [new RegExp(`${basicIV ? "COLOR|" : ""}${TopRegex}|${anyTokenRegex}`), "keyword"],
                 // Not an abbreviation, so a name then a dot: the number "." in a list (P.X. prints X then 0), and
                 // otherwise a syntax error.
                 [
@@ -250,6 +271,14 @@ export function registerBbcBasicLanguage() {
                     ["keyword", "white", "invalid"],
                 ],
                 [/~/, "operator"],
+                {include: "@statement"},
+            ],
+            // BASIC IV's | ends a VDU item, as , and ; do, and sends nine zeros. A VDU with nothing before its first |
+            // never gets here.
+            vduStatement: [
+                [/([,;])([ \t]*)(\|)/, ["operator", "white", "invalid"]],
+                [/(\|)([ \t]*)([,;|])/, ["operator", "white", "invalid"]],
+                [/\|/, "operator"],
                 {include: "@statement"},
             ],
             // In a FOR statement TO ends the loop's start expression, except where an operand is expected:
@@ -379,7 +408,9 @@ export function registerBbcBasicLanguage() {
             ],
         },
     });
+}
 
+function configureBbcBasicLanguage() {
     languages.setLanguageConfiguration(LanguageId, {
         comments: {
             lineComment: "REM",
