@@ -147,7 +147,7 @@ const NewTokenizerDifferences = {
         {
             tokens: [
                 "0:delimiter.square 1:keyword 4:white 5:invalid 10:operator 11:keyword 14:operator 15:keyword 18:operator 19:keyword 22:operator 23:keyword 30:operator 31:keyword 34:operator 35:keyword 39:operator 40:keyword 43:operator 44:keyword 47:operator 48:keyword",
-                "0:keyword 3:white 4:invalid 10:operator 11:keyword 17:operator 18:keyword 24:operator 25:keyword 28:operator 29:keyword 33:operator 34:keyword 37:operator 38:keyword 42:operator 43:keyword 45:operator 46:keyword 50:number 51:delimiter.parenthesis 52:symbol 53:delimiter.square",
+                "0:keyword 3:white 4:invalid 10:operator 11:keyword 17:operator 18:keyword 24:operator 25:keyword 28:operator 29:keyword 33:operator 34:keyword 37:operator 38:keyword 42:operator 43:keyword 45:operator 46:keyword 49:delimiter.parenthesis 50:number 51:delimiter.parenthesis 52:symbol 53:delimiter.square",
             ],
             rows: ["[OPT0:LDA CLEAR:]"],
         },
@@ -186,6 +186,10 @@ const NewTokenizerDifferences = {
     "\xe5\u018dTJ@": ["0:keyword 1:constant.linenum"],
     "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK": [
         "0:keyword 1:constant.linenum 5:symbol 6:keyword 7:constant.linenum 11:symbol 12:keyword 13:comment",
+    ],
+    // The ( of MID$( is coloured as a bracket and MID$ as a keyword (#170); the grammar leaves that to Monaco.
+    "Q$=MID$(Q$,2)+STR$(Q%)": [
+        "0:variable 2:operator 3:keyword 7:delimiter.parenthesis 8:variable 10:operator 11:number 12:delimiter.parenthesis 13:operator 14:keyword 18:delimiter.parenthesis 19:variable 21:delimiter.parenthesis",
     ],
 };
 
@@ -581,6 +585,11 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["#167", "[lda42,X", "0:delimiter.square 1:keyword 4:number 6:symbol 7:keyword"],
                 [
                     "#170",
+                    "Q$=MID$(Q$,2)+STR$(Q%)",
+                    "0:variable 2:operator 3:keyword 8:variable 10:operator 11:number 12:delimiter.parenthesis 13:operator 14:keyword 18:delimiter.parenthesis 19:variable 21:delimiter.parenthesis",
+                ],
+                [
+                    "#170",
                     "Q$=\xc1Q$,2)+\xc3(Q%)",
                     "0:variable 2:operator 3:keyword 4:variable 6:operator 7:number 8:delimiter.parenthesis 9:operator 10:keyword 11:delimiter.parenthesis 12:variable 14:delimiter.parenthesis",
                 ],
@@ -905,7 +914,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 // BASIC reads no index after these.
                 ["[LDA #1,x", ["LDA"], []],
                 ["[JSR &70,x", ["JSR"], []],
-                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$("], []],
+                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", parser === "new" ? "MID$" : "MID$("], []],
                 ["[equb 1", [], ["equb"]],
                 ["[EQUw 1", [], ["EQUw"]],
                 ["[Ora 1:orA 1:oRA 1", ["Ora", "orA", "oRA"], []],

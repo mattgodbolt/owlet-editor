@@ -46,7 +46,13 @@ function parts(token) {
         case "linenum":
             return [[start, "constant.linenum"]];
         case "keyword":
-            return [[start, "keyword"]];
+            // The ( of MID$( is the bracket its ) closes, so only the keyword before it is coloured as one (#170).
+            return text.length > 1 && text.endsWith("(")
+                ? [
+                      [start, "keyword"],
+                      [token.end - 1, "delimiter.parenthesis"],
+                  ]
+                : [[start, "keyword"]];
         case "name":
         case "fnname":
             return [[start, "variable"]];
