@@ -15,6 +15,15 @@ const StatementFormOffset = 0x40;
 // The character Owlet uses for a raw token byte.
 export const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
 const byChar = new Map(keywords.map(kw => [tokenChar(kw), kw]));
+
+// Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
+// its lower-case form (END, U+00E0), which has to be tagged as a string to keep it out of bracket matching.
+export const BracketCollisions = new Set(
+    keywords
+        .filter(kw => kw.keyword.endsWith("("))
+        .map(kw => tokenChar(kw).toLowerCase())
+        .filter(lower => byChar.has(lower) && !byChar.get(lower).keyword.endsWith("(")),
+);
 const LineNumberToken = 0x8d;
 // A line number BASIC has already encoded: its token, as Owlet shows that byte, then three bytes.
 const EncodedLineNumber = /\u018d[\s\S]{3}/y;

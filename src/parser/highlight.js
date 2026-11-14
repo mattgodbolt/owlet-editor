@@ -1,5 +1,6 @@
 // The recogniser's tokens as Monaco token types, the same names the Monarch grammar in bbcbasic.js uses, so that
 // everything that reads tokens works with either.
+import {BracketCollisions} from "./lexer.js";
 import {Recogniser} from "./recogniser.js";
 
 const Operators = new Set("+ - * / ^ = <> < > <= >= $ ? ; , ! '".split(" "));
@@ -80,7 +81,10 @@ export function highlightLine(text, inAssembler = false) {
     const open = recogniser.line();
     const tokens = [];
     for (const token of recogniser.tokens) {
-        for (const [offset, type] of parts(token)) {
+        const collides = BracketCollisions.has(token.text);
+        for (const [offset, tokenType] of parts(token)) {
+            const type =
+                collides && !tokenType.endsWith("string") ? `${tokenType}.string` : tokenType;
             if (tokens.length === 0 || tokens[tokens.length - 1].type !== type)
                 tokens.push({offset, type});
         }

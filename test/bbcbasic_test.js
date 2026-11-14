@@ -1,6 +1,5 @@
 import {
     codeActionProvider,
-    colourBrackets,
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
@@ -9,7 +8,7 @@ import {
 import {keywords} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
-import {afterEach, beforeAll, describe, it, vi} from "vitest";
+import {beforeAll, describe, it} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -154,7 +153,7 @@ const NewTokenizerDifferences = {
     "[\nLDA #\u00e0\n]": {
         tokens: [
             "0:delimiter.square",
-            "0:keyword 3:white 4:symbol 5:invalid",
+            "0:keyword 3:white 4:symbol 5:invalid.string",
             "0:delimiter.square",
         ],
         rows: ["[OPT0:LDA #END:]"],
@@ -185,7 +184,7 @@ const NewTokenizerDifferences = {
     // A line number BASIC has already encoded (#161, #74).
     "\xe5\u018dTJ@": ["0:keyword 1:constant.linenum"],
     "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK": [
-        "0:keyword 1:constant.linenum 5:symbol 6:keyword 7:constant.linenum 11:symbol 12:keyword 13:comment",
+        "0:keyword.string 1:constant.linenum 5:symbol 6:keyword 7:constant.linenum 11:symbol 12:keyword 13:comment",
     ],
     // The ( of MID$( is coloured as a bracket and MID$ as a keyword (#170); the grammar leaves that to Monaco.
     "Q$=MID$(Q$,2)+STR$(Q%)": [
@@ -948,8 +947,8 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
     });
 });
 
-describe("Bracket matching", () => {
-    beforeAll(() => registerBbcBasicLanguage("monarch"));
+describe.each(Parsers)("Bracket matching (%s)", parser => {
+    beforeAll(() => registerBbcBasicLanguage(parser));
     it("should pair each ) with its (, including the hidden ( of keywords, abbreviations and tokens", () => {
         const hidden = [
             "RIGHT$(",
@@ -987,6 +986,33 @@ describe("Bracket matching", () => {
             [8, 13],
         );
     });
+    it("should nest brackets by depth, so that Monaco colours each level, and mark a ) with no ( as unexpected", () => {
+        const levels = text => {
+            const model = editor.createModel(text, LanguageId);
+            try {
+                model.tokenization.forceTokenization(model.getLineCount());
+                return model.bracketPairs
+                    .getBracketsInRange(model.getFullModelRange())
+                    .toArray()
+                    .map(b => [b.range.startColumn, b.nestingLevel, b.isInvalid]);
+            } finally {
+                model.dispose();
+            }
+        };
+        assert.deepStrictEqual(levels("PRINT (1+(2*(3+4)))"), [
+            [7, 0, false],
+            [10, 1, false],
+            [13, 2, false],
+            [17, 2, false],
+            [18, 1, false],
+            [19, 0, false],
+        ]);
+        assert.deepStrictEqual(levels("A$=MID$(A$,1,2)"), [
+            [8, 0, false],
+            [15, 0, false],
+        ]);
+        assert.deepStrictEqual(levels("P.(1+2))").at(-1), [8, -1, true]);
+    });
     it("should ignore brackets in strings, comments and * commands", () => {
         for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("])
             assert.deepStrictEqual(brackets(text), [], text);
@@ -1016,61 +1042,6 @@ describe("Bracket matching", () => {
         // abbreviation (LEN) comes first.
         assert.deepStrictEqual(unmatched("P.LE.A$,1)"), []);
         assert.deepStrictEqual(unmatched("P.LENMI.A$,2)"), [13]);
-    });
-});
-
-describe("The new tokenizer in Monaco", () => {
-    beforeAll(() => registerBbcBasicLanguage("new"));
-
-    it("should mark an unmatched ) itself, and Monaco should paint no bracket once its colouring is off", () => {
-        const model = editor.createModel("X=(1))\nPRINTLE.A$,1)\nP.MID$(A$,2)", LanguageId);
-        try {
-            model.updateOptions({
-                bracketColorizationOptions: {
-                    enabled: false,
-                    independentColorPoolPerBracketType: false,
-                },
-            });
-            model.tokenization.forceTokenization(model.getLineCount());
-            const painted = model
-                .getAllDecorations()
-                .filter(d => /bracket/.test(d.options.inlineClassName));
-            assert.deepStrictEqual(painted, []);
-        } finally {
-            model.dispose();
-        }
-        assert.deepStrictEqual(spans("X=(1))", "invalid"), [")"]);
-        for (const text of ["PRINTLE.A$,1)", "P.MID$(A$,2)", "P.LE.A$,1)", "P.LENMI.A$,2)"])
-            assert.deepStrictEqual(spans(text, "invalid"), [], text);
-    });
-});
-
-describe("Bracket colouring in an editor", () => {
-    afterEach(() => vi.restoreAllMocks());
-
-    it("should stay off for the new tokenizer when an editor option changes", () => {
-        // jsdom has no canvas, which the editor measures fonts with.
-        vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-            measureText: () => ({width: 1}),
-        });
-        for (const parser of Parsers) {
-            registerBbcBasicLanguage(parser);
-            const codeEditor = editor.create(document.createElement("div"), {
-                value: "X=(1))",
-                language: LanguageId,
-            });
-            const model = codeEditor.getModel();
-            try {
-                colourBrackets(codeEditor);
-                // As Owlet does when it shows the implicit line numbers again.
-                codeEditor.updateOptions({lineNumbers: line => line * 10});
-                const {enabled} = model.getOptions().bracketPairColorizationOptions;
-                assert.strictEqual(enabled, parser === "monarch", parser);
-            } finally {
-                codeEditor.dispose();
-                model.dispose();
-            }
-        }
     });
 });
 

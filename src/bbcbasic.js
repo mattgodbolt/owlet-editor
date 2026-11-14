@@ -1,6 +1,7 @@
 import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 import {Flags, keywords, immediateCommands} from "./tokens";
 import {tokensProvider} from "./parser/highlight";
+import {BracketCollisions} from "./parser/lexer";
 
 export const LanguageId = "BBCBASIC";
 
@@ -136,18 +137,7 @@ const hiddenOpenParens = [
     ...abbreviations.filter(abbreviation => abbreviatedKeyword(abbreviation).keyword.endsWith("(")),
 ];
 
-// Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
-// its lower-case form (END, U+00E0). Those are tagged "string", which keeps them out of bracket matching.
-const bracketCollisionRegex = (() => {
-    const tokenChars = new Set(keywords.map(tokenChar));
-    const collisions = openParenKeywords
-        .map(kw => tokenChar(kw).toLowerCase())
-        .filter(
-            lower =>
-                tokenChars.has(lower) && !openParenKeywords.some(kw => tokenChar(kw) === lower),
-        );
-    return new RegExp(`[${collisions.join("")}]`);
-})();
+const bracketCollisionRegex = new RegExp(`[${[...BracketCollisions].join("")}]`);
 
 // The tokeniser reads the numbers after these as line numbers. THEN and ELSE also end their statement.
 const lineNumberKeywords = keywords
@@ -398,7 +388,7 @@ export function registerBbcBasicLanguage(
             ["(", ")"],
             // A spelling that ends in "(" is opened by that "(", which leaves the keyword before it uncoloured as a bracket.
             ...hiddenOpenParens
-                .filter(open => !newParser && !open.endsWith("("))
+                .filter(open => !open.endsWith("("))
                 .map(open => [open.toLowerCase(), ")"]),
         ],
         autoClosingPairs: [
@@ -425,20 +415,6 @@ export function registerBbcBasicLanguage(
         configuration,
         languages.registerCodeActionProvider(LanguageId, codeActionProvider),
     ];
-}
-
-// Monaco colours brackets from the text, not the tokens, so with the new tokenizer, which marks unmatched brackets
-// itself, that is off. Monaco does not pass the editor's option on to the model, and resets the model's from its
-// configuration whenever an editor option changes, so the model is given it, and given it again.
-export function colourBrackets(codeEditor) {
-    const options = {enabled: !newParser, independentColorPoolPerBracketType: false};
-    codeEditor.updateOptions({bracketPairColorization: options});
-    const model = codeEditor.getModel();
-    const apply = () =>
-        model.getOptions().bracketPairColorizationOptions.enabled === options.enabled ||
-        model.updateOptions({bracketColorizationOptions: options});
-    apply();
-    return model.onDidChangeOptions(apply);
 }
 
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
