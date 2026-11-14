@@ -23,7 +23,7 @@ describe("renumberReferences", () => {
             ['PRINT "GOTO 10";10:REM GOTO 10', 'PRINT "GOTO 10";10:REM GOTO 10'],
             ["DATA GOTO 10\n*FX 10\nREPEAT 10", "DATA GOTO 10\n*FX 10\nREPEAT 10"],
             ["[JMP 10\n]\nGOTO 10", "[JMP 10\n]\nGOTO 100"],
-            ["10 GOTO 20\n20 GOTO 10", "10 GOTO 200\n20 GOTO 100"],
+            ["10 GOTO 20\n  20 GOTO 10", "10 GOTO 200\n  20 GOTO 100"],
         ];
         for (const [text, expected] of cases) {
             expect(renumberReferences(text, oldToNew), text).toBe(expected);
@@ -118,6 +118,8 @@ describe("followImplicitLineNumbers", () => {
             ["GOTO 30\nPRINT\nEND", [[1, 5]], ["deleteLeft"], "GOT 30\nPRINT\nEND"],
             ["GOTO 30\nPRINT\nEND", [[1, 3]], ["type", {text: "X"}], "GOXTO 30\nPRINT\nEND"],
             ["GOTO 30\nPRINT\nEND", [[2, 2, 2, 4]], ["deleteLeft"], "GOTO 30\nPNT\nEND"],
+            // The number stays put but is no longer a line number.
+            ["GOTO 30\nX\nPRINT", [[1, 1, 1, 5]], ["paste", {text: "\nA="}], "\nA= 30\nX\nPRINT"],
             [
                 "GOTO 30\nPRINT\nGOTO 40",
                 [[3, 6, 3, 8]],

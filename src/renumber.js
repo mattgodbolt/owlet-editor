@@ -2,6 +2,7 @@ import {editor, Selection} from "monaco-editor/esm/vs/editor/editor.api";
 import {LanguageId} from "./bbcbasic";
 
 const LineNumberType = `constant.linenum.${LanguageId}`;
+const WhiteType = `white.${LanguageId}`;
 const ImplicitLineNumberStep = 10;
 const ExplicitLineNumberRegex = /^\s*\d/;
 
@@ -11,8 +12,9 @@ export function lineNumberReferences(text) {
     const lines = text.split("\n");
     return editor.tokenize(text, LanguageId).flatMap((lineTokens, index) =>
         lineTokens.flatMap((token, tokenIndex) => {
-            // A number at the very start of a line is that line's own number.
-            if (token.type !== LineNumberType || token.offset === 0) return [];
+            // A number that starts a line is that line's own number.
+            const ownNumber = lineTokens.slice(0, tokenIndex).every(t => t.type === WhiteType);
+            if (token.type !== LineNumberType || ownNumber) return [];
             const end =
                 tokenIndex + 1 < lineTokens.length
                     ? lineTokens[tokenIndex + 1].offset
@@ -112,6 +114,9 @@ export function implicitRenumberEdits(oldText, newText, changes) {
         }
     });
 
+    const key = ref => `${ref.lineNumber}:${ref.startColumn}:${ref.endColumn}:${ref.target}`;
+    const newReferences = new Set(lineNumberReferences(newText).map(key));
+    // A reference survives where the same number is still read as a line number.
     const references = lineNumberReferences(oldText).flatMap(ref => {
         const start = positionAfterAll(
             {lineNumber: ref.lineNumber, column: ref.startColumn},
@@ -123,24 +128,14 @@ export function implicitRenumberEdits(oldText, newText, changes) {
             changes,
             true,
         );
-        if (!start || !end || start.lineNumber !== end.lineNumber) return [];
-        // Still the same number, not cut into or run together with digits on either side.
-        const digits = oldLines[ref.lineNumber - 1].slice(ref.startColumn - 1, ref.endColumn - 1);
-        const line = newLines[start.lineNumber - 1];
-        const stillThere =
-            line.slice(start.column - 1, end.column - 1) === digits &&
-            !/\d/.test(line.charAt(start.column - 2)) &&
-            !/\d/.test(line.charAt(end.column - 1));
-        return stillThere
-            ? [
-                  {
-                      ...ref,
-                      lineNumber: start.lineNumber,
-                      startColumn: start.column,
-                      endColumn: end.column,
-                  },
-              ]
-            : [];
+        if (!start || !end) return [];
+        const moved = {
+            ...ref,
+            lineNumber: start.lineNumber,
+            startColumn: start.column,
+            endColumn: end.column,
+        };
+        return start.lineNumber === end.lineNumber && newReferences.has(key(moved)) ? [moved] : [];
     });
     return renumberEdits(references, oldToNew);
 }

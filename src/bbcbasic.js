@@ -176,7 +176,7 @@ export function registerBbcBasicLanguage() {
         symbols: /[-+=><!*/:?$;,^']+/,
         tokenizer: {
             root: [
-                [/^[ \t]*\d+/, "constant.linenum"], // the line's own number
+                [/^([ \t]*)(\d+)/, ["white", "constant.linenum"]], // the line's own number
                 {include: "@whitespace"},
                 [notStatementRegex, "invalid", "@statement"],
                 [/(?=[^*])/, "", "@statement"],
