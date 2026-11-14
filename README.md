@@ -51,6 +51,14 @@ Owlet Editor uses Vite as its build system. The project was migrated from webpac
 Red means that BBC BASIC II would stop with an error at that statement if it ran it, and that no more typing at the end
 of the line could change that. The colours are a function of the text alone, wherever the cursor is.
 
+- **Red runs to the end of the statement** (`?parser=new`): BASIC stops at the first token that cannot continue a
+  statement and never reads the rest of it, so that token and everything after it up to the end of the statement is red,
+  where only the stop token used to be. `I am a badger` is `I` as a variable and `am a badger` red; `GOTO 20 30:PRINT 5`
+  is red on `30` only, since the statement ends at the colon and `PRINT 5` is judged on its own. A statement ends at a
+  colon or an `ELSE` outside a string, or at the end of the line, and in an assembler block also at the `]` that closes
+  it. A `REM` or `DATA` after the stop point, its comment or items, and a `*` command are not code and keep their own
+  colours. Red text never takes part in bracket matching. A line that is only unfinished is not red at all.
+
 - **Never red on code the ROM accepts.** The number of false-invalids (the ROM runs a statement, the editor shows it
   red) must be 0 on the recorded tables, the ROM oracle and the saved programs.
 - **Text that is not code is never red:** a comment after `REM`, the items after `DATA`, a `*` command, and the rest
@@ -76,7 +84,7 @@ of the line could change that. The colours are a function of the text alone, whe
   red once the `10` is there). Words typed straight against the word after them with no space (`IF A=1 TPRINT 2`,
   which is a name, `TPRINT`, and a number) are red until the space is typed.
 - **Markers** (`?parser=new`): about half a second after the last edit (the old markers stay, and move with the text,
-  until then), a statement BASIC would stop at gets an error squiggle, and a line that is unfinished gets a warning
+  until then), a statement BASIC would stop at gets an error squiggle from the token where it stops to the end of the statement, and a line that is unfinished gets a warning
   squiggle: at its end, or at the token where the statement stopped when something is missing from the middle. Both
   come from the recogniser that colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`,
   `No TO`, `Missing ,`, `Missing "` and so on) where the recogniser knows it; the recorded rows in
@@ -94,6 +102,9 @@ of the line could change that. The colours are a function of the text alone, whe
     `FORCE -` can never run.
 - **False-valids are measured, not gated.** Where the ROM rejects a statement and nothing is red, that is reported by
   the oracle, but it is never a reason to fail a change.
+- **The oracle reads only the stop token as evidence.** The red after it is text BASIC never read, so the oracle
+  asks the ROM about each red run in turn and drops the ones it never reads, as it does for any text BASIC skips; a
+  statement's verdict is as before.
 - **Unfinished is a third answer in the oracle.** A statement the ROM rejects and the recogniser calls unfinished is
   neither a false-valid nor a false-invalid; the oracle counts it as agreement and lists it apart, and also lists
   any such statement that the ROM accepts (there must be none), outside the text BASIC skips. Where a statement is
@@ -104,7 +115,7 @@ of the line could change that. The colours are a function of the text alone, whe
 
 Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
 `src/bbcbasic.js`: a port of the ROM's tokeniser, a recogniser that marks the token at which BASIC would stop with an
-error, and the assembler. The default is still the Monarch grammar. Bracket colouring and matching work with it as they do
+error and the rest of that statement, and the assembler. The default is still the Monarch grammar. Bracket colouring and matching work with it as they do
 with Monarch (an unclosed `(` is not red while its line is unfinished).
 
 Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a

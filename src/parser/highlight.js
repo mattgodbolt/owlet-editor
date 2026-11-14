@@ -131,10 +131,10 @@ export function programProblems(text) {
         inAssembler = recogniser.line();
         if (recogniser.opener) block = {line: i + 1, token: recogniser.opener};
         const last = recogniser.tokens.findLast(token => token.kind !== "white");
-        return recogniser.problems.map(({message, token, unfinished, hole}) => ({
+        return recogniser.problems.map(({message, token, end, unfinished, hole}) => ({
             line: i + 1,
             start: unfinished && !hole ? last.start : token.start,
-            end: unfinished && !hole ? lineText.length : token.end,
+            end: unfinished && !hole ? lineText.length : end,
             message,
             unfinished,
             hole,

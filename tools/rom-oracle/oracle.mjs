@@ -15,9 +15,11 @@
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
 // nothing about what BASIC skips (see unread.mjs and dropMarksNeverRead), so invalid tokens there are left out. A
-// disagreement is per statement: it does not say where the error is. With --parser new a statement can also be
-// UNFINISHED: the only fault is that the line ends too soon (GOTO, FOR I=1 TO), which is not shown as invalid. If the
-// ROM rejects it, that counts as agreement and is listed on its own; it is neither a FALSE-VALID nor a FALSE-INVALID.
+// disagreement is per statement: it does not say where the error is. With --parser new a mark runs from the token where
+// BASIC stops to the end of the statement, so only its first token is evidence: the rest is text BASIC never read, and
+// dropMarksNeverRead asks the ROM about each mark in turn. With --parser new a statement can also be UNFINISHED: the
+// only fault is that the line ends too soon (GOTO, FOR I=1 TO), which is not shown as invalid. If the ROM rejects it,
+// that counts as agreement and is listed on its own; it is neither a FALSE-VALID nor a FALSE-INVALID.
 // Not run by npm test.
 import {spawnSync} from "child_process";
 import fs from "fs";

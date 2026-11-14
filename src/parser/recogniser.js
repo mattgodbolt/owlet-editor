@@ -41,6 +41,8 @@ const ExpressionCount = {
     SOUND: 4,
     ENVELOPE: 14,
 };
+const NotCode = names("comment data oscli");
+const TextKeyword = names("REM DATA");
 const ForeignOperator = /^(?:[=!]=|\*\*|><|=[<>]|[-+/*^]=|<<|>>)$/;
 const Relations = names("= < > <= >= <>");
 const Arithmetic = names("+ - * / ^");
@@ -150,8 +152,9 @@ export class Recogniser {
                 if (!this.atEnd()) this.fail("Syntax error");
             } catch (e) {
                 if (!(e instanceof Failure)) throw e;
-                this.mark(e, statementStart);
+                const problem = this.mark(e, statementStart);
                 while (!this.atEnd()) this.next();
+                this.redden(problem);
             }
             if (this.isPunct(":")) this.next();
         }
@@ -178,8 +181,9 @@ export class Recogniser {
         const after = token === this.peek() ? this.peek(1) : null;
         const adjacent = (first, second) => first && second && first.end === second.start;
         const marked = before && before.abbreviation && adjacent(before, token) ? before : token;
-        this.problems.push({message, token: marked, unfinished, hole});
-        if (unfinished) return;
+        const problem = {message, token: marked, end: marked.end, unfinished, hole};
+        this.problems.push(problem);
+        if (unfinished) return problem;
         marked.invalid = true;
         // Both halves of an operator from another language, such as == or **.
         for (const [first, second] of [
@@ -188,6 +192,25 @@ export class Recogniser {
         ]) {
             if (adjacent(first, second) && ForeignOperator.test(first.text + second.text))
                 first.invalid = second.invalid = true;
+        }
+        return problem;
+    }
+
+    // BASIC never reads past the token it stopped at, so the rest of the statement, up to the next colon or ELSE (or
+    // the "]" that closes an assembler block), is as wrong as that token; text that is not code stays as it is.
+    redden(problem) {
+        if (problem.unfinished) return;
+        const stop = this.peek().start;
+        let spaces = [];
+        for (const token of this.lexer.tokens) {
+            if (token.start <= problem.token.start || token.start >= stop) continue;
+            if (token.kind === "white") spaces.push(token);
+            else if (!NotCode.has(token.kind) && !TextKeyword.has(token.kw?.keyword)) {
+                for (const space of spaces) space.invalid = true;
+                token.invalid = true;
+                problem.end = token.end;
+            }
+            if (token.kind !== "white") spaces = [];
         }
     }
 
