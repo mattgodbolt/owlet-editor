@@ -5,12 +5,12 @@ import {
     abbreviatedKeyword,
     allTokensRegex,
     FirstStatementToken,
+    LanguageId,
     statementKeywords,
     tokenChar,
 } from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 
-const LanguageId = "BBCBASIC";
 const KeywordType = `keyword.${LanguageId}`;
 const SquareType = `delimiter.square.${LanguageId}`;
 // What Monaco itself treats as a string or a comment: strings, REM, DATA and * commands.

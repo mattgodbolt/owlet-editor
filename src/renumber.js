@@ -1,6 +1,6 @@
 import {editor, Selection} from "monaco-editor/esm/vs/editor/editor.api";
+import {LanguageId} from "./bbcbasic";
 
-const LanguageId = "BBCBASIC";
 const LineNumberType = `constant.linenum.${LanguageId}`;
 const ImplicitLineNumberStep = 10;
 const ExplicitLineNumberRegex = /^\s*\d/;
