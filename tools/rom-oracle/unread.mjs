@@ -72,16 +72,16 @@ export function unreadRanges(text, bytes) {
         return bytes.length;
     };
     const textOf = (from, to) => text.slice(offsets[from], offsets[to]).trim();
-    for (let i = 0; i < bytes.length; ) {
+    for (let i = 0; i < bytes.length;) {
         i = skipSpaces(i);
         const first = bytes[i];
         const end = find(i, Colon, Token.ELSE);
-        if (RestOfLine.has(first) || first === Token.ELSE) return rest(i + 1), ranges;
-        if (EndsLine.has(first) || first === LineNumberToken) return rest(end), ranges;
+        if (RestOfLine.has(first) || first === Token.ELSE) return (rest(i + 1), ranges);
+        if (EndsLine.has(first) || first === LineNumberToken) return (rest(end), ranges);
         if (first === Token.ON) {
             const next = skipSpaces(i + 1);
             if (bytes[next] === Token.ERROR && bytes[skipSpaces(next + 1)] !== Token.OFF)
-                return rest(next + 1), ranges;
+                return (rest(next + 1), ranges);
             const jump = find(i, Token.GOTO, Token.GOSUB);
             if (jump < end) {
                 const index = textOf(i + 1, jump);
@@ -109,9 +109,9 @@ export function unreadRanges(text, bytes) {
                 i = elseAt + 1;
                 continue;
             }
-            return rest(branch), ranges;
+            return (rest(branch), ranges);
         }
-        if (bytes[end] === Token.ELSE) return rest(end + 1), ranges;
+        if (bytes[end] === Token.ELSE) return (rest(end + 1), ranges);
         i = end + 1;
     }
     return ranges;

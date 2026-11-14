@@ -357,8 +357,8 @@ export class Recogniser {
 
     // TAB( and SPC, which only PRINT and INPUT take.
     printItem() {
-        if (this.isKeyword("TAB(")) return this.bracket(this.next(), 1, 2), true;
-        if (this.isKeyword("SPC")) return this.next(), this.operand(), true;
+        if (this.isKeyword("TAB(")) return (this.bracket(this.next(), 1, 2), true);
+        if (this.isKeyword("SPC")) return (this.next(), this.operand(), true);
         return false;
     }
 
