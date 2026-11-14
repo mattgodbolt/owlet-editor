@@ -2,10 +2,9 @@
 // token at which BASIC would stop with an error: one per statement, then on to the next colon, as BASIC reports only
 // the first. Where there is no rule for a statement, anything is accepted.
 import {Assembler, Mnemonics} from "./assembler.js";
-import {keywords} from "../tokens.js";
+import {FirstStatementToken, keywords} from "../tokens.js";
 import {Lexer} from "./lexer.js";
 
-const FirstStatementToken = 0xc6;
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
 
@@ -58,10 +57,10 @@ const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 const Completions = [...new Set([...keywords.map(kw => kw.keyword), ...Mnemonics, "TOP"])];
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
-const Fillers = ["", "1", "A", ",1", "1,1", ",1,1"];
+const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
 
 // `at` is the token that was next when BASIC stopped.
-export class Failure {
+class Failure {
     constructor(message, token, unfinished, at) {
         this.message = message;
         this.token = token;
@@ -151,14 +150,19 @@ export class Recogniser {
                 }
                 if (!this.atEnd()) this.fail("Syntax error");
             } catch (e) {
-                if (!(e instanceof Failure)) throw e;
-                const problem = this.mark(e, statementStart);
-                while (!this.atEnd()) this.next();
-                this.redden(problem);
+                this.recover(e, statementStart, () => this.atEnd());
             }
             if (this.isPunct(":")) this.next();
         }
         return this.inAssembler;
+    }
+
+    // Marks the statement that failed, and skips what is left of it.
+    recover(e, statementStart, atEnd) {
+        if (!(e instanceof Failure)) throw e;
+        const problem = this.mark(e, statementStart);
+        while (!atEnd()) this.next();
+        this.redden(problem);
     }
 
     skipLine() {
@@ -256,47 +260,17 @@ export class Recogniser {
     }
 
     // Whether the statement stopped at a ) with something missing before it: the argument an editor that closes
-    // brackets has not been given yet (LEFT$(B$)), or the rest of a name or keyword just before it. Text typed in front of
-    // existing text is not one: GOTO:PRINT is red, as BASIC stops there, and no typing at the end of the line mends it.
+    // brackets has not been given yet (LEFT$(B$)). Text typed in front of existing text is not one: GOTO:PRINT is red,
+    // as BASIC stops there, and no typing at the end of the line mends it.
     repairable({at}, statementStart) {
         if (this.probing || at.kind !== "punct" || at.text !== ")") return false;
-        const {text} = this.lexer;
-        const inStatement = this.lexer.tokens.filter(
-            t => t.kind !== "white" && t.start >= statementStart.start,
-        );
-        // Where to try, and the start of the word there that might grow, or null to insert at the bracket.
-        const attempts = [[at.start, null]];
-        const name = inStatement.findLast(t => t.start < at.start);
-        if (name?.kind === "name" && name.end === at.start) {
-            attempts.push([name.end, name.start]);
-            const word = inStatement.find(t => t.kind === "keyword" && t.end === name.start);
-            if (word) attempts.push([name.end, word.start]);
-        }
-        for (const [pos, start] of attempts) {
-            const typed = start === null ? "" : text.slice(start, pos).toUpperCase();
-            const words =
-                start === null
-                    ? [null]
-                    : Completions.filter(
-                          word => word.length > typed.length && word.startsWith(typed),
-                      );
-            for (const word of words) {
-                const head = start === null ? text.slice(0, pos) : text.slice(0, start) + word;
-                const tail = text.slice(pos);
-                for (const filler of Fillers) {
-                    if (word === null && !filler) continue;
-                    const candidate =
-                        head +
-                        (filler && /[\w`$%]$/.test(head) && /^[\w`]/.test(filler) ? " " : "") +
-                        filler +
-                        (/[\w`]$/.test(filler) && /^[\w`]/.test(tail) ? " " : "") +
-                        tail;
-                    const from = candidate.length - tail.length;
-                    if (this.valid(candidate, statementStart, from)) return true;
-                }
-            }
-        }
-        return false;
+        const head = this.lexer.text.slice(0, at.start);
+        const tail = this.lexer.text.slice(at.start);
+        return Fillers.some(filler => {
+            const space = /[\w`$%]$/.test(head) && /^[\w`]/.test(filler) ? " " : "";
+            const candidate = head + space + filler + tail;
+            return this.valid(candidate, statementStart, candidate.length - tail.length);
+        });
     }
 
     // Reads what the ROM words differently from the same text elsewhere (the arguments of a call, whose DEF may take

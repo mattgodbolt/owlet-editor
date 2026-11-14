@@ -18,12 +18,9 @@ it("highlights the oracle's statements", () => {
                 ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
                 : [],
         );
-        const unfinished = newParser
-            ? programProblems(text).flatMap(p => (p.unfinished ? [[p.start, p.end]] : []))
-            : [];
-        const stricter = newParser
-            ? programProblems(text).flatMap(p => (p.stricter ? [[p.start, p.end]] : []))
-            : [];
+        const problems = newParser ? programProblems(text) : [];
+        const spans = field => problems.flatMap(p => (p[field] ? [[p.start, p.end]] : []));
+        const [unfinished, stricter] = [spans("unfinished"), spans("stricter")];
         return {invalid, unfinished, stricter};
     });
     fs.writeFileSync(process.env.ORACLE_OUT, JSON.stringify(verdicts));

@@ -1015,5 +1015,9 @@
   ["[OPT0:LD1 &70:]", "Syntax error", "#174"],
   ["[OPT0:LDQ 9:]", "Syntax error", "#174"],
   ["[OPT0:LD: 9:]", "Syntax error", "#174"],
-  ["[OPT0:OPt 0:]", "ok", "", "#174"]
+  ["[OPT0:OPt 0:]", "ok", "", "#174"],
+  ["I=1:PRINT I)", "No such variable"],
+  ["A=1:PRINT A)", "No such variable"],
+  ["S=1:PRINT S)", "No such variable"],
+  ["B$=\"x\":PRINT LEFT$(B$)", "Missing ,"]
 ]

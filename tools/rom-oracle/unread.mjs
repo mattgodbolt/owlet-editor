@@ -4,12 +4,9 @@
 // GOTO, GOSUB, END, STOP and THEN followed by a line number (the prelude's GOSUB target is END); and the branch of an IF that is not taken. An IF is
 // taken when its condition is 1, X or TRUE (all the generator writes), not when it is 0 or FALSE, and is otherwise
 // unknown, so then neither branch counts as read.
-import {keywords} from "../../src/tokens.js";
+import {FirstStatementToken, keywordByToken, keywords, LineNumberToken} from "../../src/tokens.js";
 
 const Token = Object.fromEntries(keywords.map(kw => [kw.keyword, kw.token]));
-const nameByToken = new Map(keywords.map(kw => [kw.token, kw.keyword]));
-const LineNumberToken = 0x8d;
-const FirstStatementToken = 0xc6;
 const Quote = 0x22;
 const Colon = 0x3a;
 const Comma = 0x2c;
@@ -35,7 +32,7 @@ function align(text, bytes) {
             i += 3;
             pos += text.slice(pos).match(/^\d*/)[0].length;
         } else {
-            const name = nameByToken.get(byte);
+            const name = keywordByToken.get(byte)?.keyword;
             if (!name) return null;
             let length = text.startsWith(name, pos) ? name.length : 0;
             for (let n = 1; !length && n < name.length; ++n) {

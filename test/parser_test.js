@@ -213,6 +213,8 @@ describe("Text that is wrong, not unfinished", () => {
     it.each([
         ["GOTO 20 30", ["30"]],
         ["PRINT )", [")"]],
+        ["PRINT A)", [")"]],
+        ["PRINT I)", [")"]],
         ["A=1'", ["'"]],
         ["X=1+*", ["*"]],
         ["X=1 TH", ["TH"]],

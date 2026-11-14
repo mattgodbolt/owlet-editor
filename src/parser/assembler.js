@@ -9,7 +9,6 @@
 //   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9.
 
 import {Flags} from "../tokens.js";
-import {Failure} from "./recogniser.js";
 
 const words = text => new Set(text.split(" "));
 const Implied = words(
@@ -65,10 +64,8 @@ export class Assembler {
             try {
                 this.statement();
             } catch (e) {
-                if (!(e instanceof Failure)) throw e;
-                const problem = r.mark(e, start);
-                while (!r.is("end") && !r.isPunct(":", "]") && !this.isBranchElse()) r.next();
-                r.redden(problem);
+                const atEnd = () => r.is("end") || r.isPunct(":", "]") || this.isBranchElse();
+                r.recover(e, start, atEnd);
             }
         }
     }

@@ -1,5 +1,5 @@
 import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
-import {Flags, keywords, immediateCommands} from "./tokens";
+import {FirstStatementToken, Flags, keywords, immediateCommands, tokenChar} from "./tokens";
 import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
 import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
 import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
@@ -29,10 +29,6 @@ function tokensRegex(kws) {
 }
 
 export const allTokensRegex = tokensRegex(keywords);
-
-export function tokenChar(kw) {
-    return String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token);
-}
 
 function byteTokensRegex(kws) {
     return `[${kws.map(tokenChar).join("")}]`;
@@ -98,9 +94,6 @@ const AsmBadDirective = new RegExp(`${anyCase("EQU")}[bdsw]`);
 
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}`;
 
-// BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
-export const FirstStatementToken = 0xc6;
 export const statementKeywords = new Set([
     "ELSE",
     ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),

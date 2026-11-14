@@ -4,9 +4,8 @@ import {
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
-    tokenChar,
 } from "../src/bbcbasic";
-import {keywords} from "../src/tokens";
+import {keywords, tokenChar} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
 import {beforeAll, describe, it} from "vitest";
