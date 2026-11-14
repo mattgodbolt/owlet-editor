@@ -475,7 +475,9 @@ export class OwletEditor {
             examples: () => this.selectView("examples"),
             about: () => this.selectView("about"),
             reference: () =>
-                this.selectView($("#reference-button").hasClass("selected") ? "screen" : "reference"),
+                this.selectView(
+                    $("#reference-button").hasClass("selected") ? "screen" : "reference",
+                ),
 
             virtualbeeb: () => {
                 const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";

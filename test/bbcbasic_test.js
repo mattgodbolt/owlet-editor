@@ -692,9 +692,18 @@ describe("Bracket matching", () => {
     });
     it("should make only the ( of a keyword that ends in ( a bracket, so the keyword is coloured as one", () => {
         // #170: Q$=MID$(Q$,2) must colour MID$ like STR$, with only the ( in the bracket colour.
-        for (const text of ["Q$=MID$(Q$,2)+STR$(Q%)", "P.RIGHT$(A$,1)", "P.TAB(3)", "X=POINT(1,2)", "A$=STRING$(2,A$)"])
+        for (const text of [
+            "Q$=MID$(Q$,2)+STR$(Q%)",
+            "P.RIGHT$(A$,1)",
+            "P.TAB(3)",
+            "X=POINT(1,2)",
+            "A$=STRING$(2,A$)",
+        ])
             assert.strictEqual(brackets(text)[0][0], text.indexOf("(") + 1, text);
-        assert.deepStrictEqual(brackets("Q$=MID$(Q$,2)").map(([start]) => start), [8, 13]);
+        assert.deepStrictEqual(
+            brackets("Q$=MID$(Q$,2)").map(([start]) => start),
+            [8, 13],
+        );
     });
     it("should ignore brackets in strings, comments and * commands", () => {
         for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("])
