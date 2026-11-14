@@ -72,9 +72,24 @@ const invalidAbbreviatedTokensRegex = abbreviations
 
 const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
 
-const AsmMnemonic =
-    /ADC|AND|ASL|B(CC|CS|EQ|MI|NE|PL|VC|VS)|BIT|BRK|CL[CDIV]|CMP|CP[XY]|DE[CXY]|EOR|IN[CXY]|JMP|JSR|LD[AXY]|LSR|NOP|ORA|PH[AP]|PL[AP]|RO[LR]|RTI|RTS|SBC|SE[CDI]|ST[AXY]|TA[XY]|TSX|TX[AS]|TYA/;
-const AsmDirective = /OPT|EQU[BDSW]/;
+// BASIC reads a mnemonic, OPT and the EQU of a directive in either case, but the accumulator, an index register and
+// the size of an EQU only in upper case, except that LDX and STX take y and LDY and STY take x.
+const anyCase = text => text.replace(/[A-Z]/g, letter => `[${letter}${letter.toLowerCase()}]`);
+const mnemonics = names => names.split(" ").map(anyCase).join("|");
+const AsmShift = mnemonics("ASL LSR ROL ROR");
+const AsmIndexed = new RegExp(
+    `${AsmShift}|${mnemonics("ADC AND CMP DEC EOR INC LDA ORA SBC STA")}`,
+);
+const AsmIndexedByY = new RegExp(mnemonics("LDX STX"));
+const AsmIndexedByX = new RegExp(mnemonics("LDY STY"));
+const AsmMnemonic = new RegExp(
+    mnemonics(
+        "BCC BCS BEQ BIT BMI BNE BPL BRK BVC BVS CLC CLD CLI CLV CPX CPY DEX DEY INX INY JMP JSR NOP " +
+            "PHA PHP PLA PLP RTI RTS SEC SED SEI TAX TAY TSX TXA TXS TYA",
+    ),
+);
+const AsmDirective = new RegExp(`${anyCase("OPT")}|${anyCase("EQU")}[BDSW]`);
+const AsmBadDirective = new RegExp(`${anyCase("EQU")}[bdsw]`);
 
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}`;
 
@@ -132,6 +147,8 @@ const bracketCollisionRegex = (() => {
         );
     return new RegExp(`[${collisions.join("")}]`);
 })();
+
+const AsmOpener = [...hiddenOpenParens.map(escape), "[a-zA-Z_]\\w*[$%]?\\("].join("|");
 
 const UnterminatedString = /"([^"\n]|"")*(?=\n|$)/;
 // STR$ takes one ~, though a PRINT item can start with any number.
@@ -274,9 +291,28 @@ export function registerBbcBasicLanguage() {
             ],
             // After a mnemonic or directive the rest of the statement is ignored by the ROM, so a ; comment can say anything.
             asm: [
+                [
+                    new RegExp(`(${AsmShift})( *)(A)(?![\\w$%])`),
+                    ["keyword", "white", {token: "keyword", switchTo: "@asmBody"}],
+                ],
+                // A state's suffix is the index register, if any, that BASIC takes in lower case after the mnemonic.
+                // BASIC reads ORA as the OR token then A, which it takes only in upper case.
+                [/ORa/, "invalid"],
+                [AsmIndexed, {token: "keyword", switchTo: "@asmIndexed.none"}],
+                [AsmIndexedByY, {token: "keyword", switchTo: "@asmIndexed.y"}],
+                [AsmIndexedByX, {token: "keyword", switchTo: "@asmIndexed.x"}],
                 [AsmMnemonic, {token: "keyword", switchTo: "@asmBody"}],
                 [AsmDirective, {token: "keyword.directive", switchTo: "@asmBody"}],
+                [AsmBadDirective, "invalid"],
                 {include: "@asmCommon"},
+            ],
+            // An operand that can be indexed. BASIC reads no index after an immediate operand, and a comma inside a
+            // function's or array's brackets is not one, so the check stops at either.
+            asmIndexed: [
+                ["#", {token: "symbol", switchTo: "@asmBody"}],
+                [new RegExp(`(?=${AsmOpener})`), {token: "", switchTo: "@asmBody"}],
+                [/,(?= *[xy])/, {token: "symbol", switchTo: "@asmIndex.$S2"}],
+                {include: "@asmBody"},
             ],
             asmBody: [
                 [/^/, {token: "", switchTo: "@asm"}],
@@ -305,6 +341,15 @@ export function registerBbcBasicLanguage() {
             asmIndex: [
                 {include: "@whitespace"},
                 [/[XY]/, {token: "keyword", switchTo: "@asmBody"}],
+                [
+                    /[xy]/,
+                    {
+                        cases: {
+                            "$#==$S2": {token: "keyword", switchTo: "@asmBody"},
+                            "@default": {token: "invalid", switchTo: "@asmBody"},
+                        },
+                    },
+                ],
             ],
         },
     });
@@ -425,7 +470,7 @@ function lineWarnings(lineNum, line, lineTokens) {
         if (abbreviated) {
             const abbreviation = abbreviated[0].slice(0, abbreviated[0].indexOf(".") + 1);
             warn(token.offset, abbreviated[0].length, {
-                message: `${abbreviation} is not read as an abbreviation when followed directly by letters, digits or underscores, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
+                message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
                 code: SpaceAfterAbbreviationCode,
             });
             continue;
