@@ -1,5 +1,6 @@
 import {
     codeActionProvider,
+    colourBrackets,
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
@@ -8,7 +9,7 @@ import {
 import {keywords} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
-import {beforeAll, describe, it} from "vitest";
+import {afterEach, beforeAll, describe, it, vi} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -190,8 +191,11 @@ function differs(parser, text) {
     const entry = NewTokenizerDifferences[text];
     const {tokens: expected, rows = [text]} = Array.isArray(entry) ? {tokens: entry} : entry;
     assert.deepStrictEqual(tokens(text), expected, text);
-    for (const row of rows.filter(row => row !== "="))
+    for (const row of rows.filter(row => row !== "=")) {
         assert.ok(verdicts.has(row) || romTokens.has(row), `${row} is not a recorded row`);
+        // A line the ROM runs backs a mark only in text it never reads.
+        if (verdicts.get(row) === "ok") assert.strictEqual(row, text, `${row} runs on the ROM`);
+    }
     if (verdicts.has(text))
         assert.deepStrictEqual(falseInvalid(text, spanRanges(text, "invalid")), [], text);
     return true;
@@ -909,6 +913,35 @@ describe("The new tokenizer in Monaco", () => {
         assert.deepStrictEqual(spans("X=(1))", "invalid"), [")"]);
         for (const text of ["PRINTLE.A$,1)", "P.MID$(A$,2)", "P.LE.A$,1)", "P.LENMI.A$,2)"])
             assert.deepStrictEqual(spans(text, "invalid"), [], text);
+    });
+});
+
+describe("Bracket colouring in an editor", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("should stay off for the new tokenizer when an editor option changes", () => {
+        // jsdom has no canvas, which the editor measures fonts with.
+        vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+            measureText: () => ({width: 1}),
+        });
+        for (const parser of Parsers) {
+            registerBbcBasicLanguage(parser);
+            const codeEditor = editor.create(document.createElement("div"), {
+                value: "X=(1))",
+                language: LanguageId,
+            });
+            const model = codeEditor.getModel();
+            try {
+                colourBrackets(codeEditor);
+                // As Owlet does when it shows the implicit line numbers again.
+                codeEditor.updateOptions({lineNumbers: line => line * 10});
+                const {enabled} = model.getOptions().bracketPairColorizationOptions;
+                assert.strictEqual(enabled, parser === "monarch", parser);
+            } finally {
+                codeEditor.dispose();
+                model.dispose();
+            }
+        }
     });
 });
 

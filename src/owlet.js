@@ -14,7 +14,7 @@ import {expandCode, partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getWarnings, LanguageId, usesNewParser} from "./bbcbasic";
+import {colourBrackets, getWarnings, LanguageId} from "./bbcbasic";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -48,11 +48,6 @@ export class OwletEditor {
             ],
         });
 
-        // Monaco colours brackets from the text, not the tokens; the new tokenizer marks unmatched ones itself.
-        const bracketColours = {
-            enabled: !usesNewParser(),
-            independentColorPoolPerBracketType: false,
-        };
         this.editor = monacoEditor.create(editorPane[0], {
             value: "",
             minimap: {
@@ -70,16 +65,8 @@ export class OwletEditor {
             wordWrap: "on",
             lineDecorationsWidth: 0,
             automaticLayout: true,
-            bracketPairColorization: bracketColours,
         });
-        // Monaco does not pass that option on to the model, and resets the model's from its configuration whenever an
-        // editor option changes, so the model is given it, and given it again.
-        const model = this.editor.getModel();
-        const colourBrackets = () =>
-            model.getOptions().bracketPairColorizationOptions.enabled === bracketColours.enabled ||
-            model.updateOptions({bracketColorizationOptions: bracketColours});
-        colourBrackets();
-        model.onDidChangeOptions(colourBrackets);
+        colourBrackets(this.editor);
 
         this.editor.addAction({
             id: "execute-basic",

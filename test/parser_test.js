@@ -51,6 +51,13 @@ describe("Recogniser", () => {
         });
         assert.deepStrictEqual(wrong, []);
     });
+    it("should not let errors inside nested reads use up the nesting limit", () => {
+        const text = `[${"LDA #(:".repeat(70)}LDA #1:]`;
+        const {tokens} = highlightLine(text);
+        const marked = tokens.filter(token => token.type === "invalid");
+        assert.strictEqual(marked.length, 70);
+        assert.ok(marked.every(token => token.offset < text.lastIndexOf("LDA #1")));
+    });
     it("should still miss the known gaps, which come out of the list when they are fixed", () => {
         for (const text of KnownGaps) {
             assert.notStrictEqual(verdicts.get(text), "ok", text);

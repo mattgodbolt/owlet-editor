@@ -5,6 +5,9 @@
 // Stricter than the ROM, on purpose: BASIC ignores the rest of a statement after a complete instruction, but a keyword
 // there that an expression cannot use is marked, since it is almost always a mistake (NOP PRINT).
 
+import {Flags} from "../tokens.js";
+import {Failure} from "./recogniser.js";
+
 const words = text => new Set(text.split(" "));
 const Implied = words(
     "BRK CLC CLD CLI CLV DEX DEY INX INY NOP PHA PHP PLA PLP RTI RTS SEC SED SEI TAX TAY TSX TXA TXS TYA",
@@ -16,6 +19,8 @@ const Addressed = words("ADC AND BIT CMP CPX CPY DEC EOR INC LDA LDX LDY ORA SBC
 const Address = words("BCC BCS BEQ BMI BNE BPL BVC BVS JMP JSR");
 // BASIC takes the index register in lower case only after these.
 const LowerCaseIndex = {LDX: "y", STX: "y", LDY: "x", STY: "x"};
+const Label = /\.(?:[A-Za-z_`][\w`]*%?|@%)/y;
+const Comment = /[;\\][^:]*/y;
 
 export class Assembler {
     constructor(recogniser) {
@@ -40,7 +45,7 @@ export class Assembler {
             try {
                 this.statement();
             } catch (e) {
-                if (!r.isFailure(e)) throw e;
+                if (!(e instanceof Failure)) throw e;
                 r.mark(e.token, start);
                 while (!r.is("end") && !r.isPunct(":", "]")) r.next();
             }
@@ -50,13 +55,14 @@ export class Assembler {
     statement() {
         const r = this.recogniser;
         if (this.comment("\\")) return;
-        this.label();
+        this.labels();
         if (r.is("end") || r.isPunct(":", "]") || this.comment("\\")) return;
         this.operand(this.mnemonic());
         if (this.comment(";", "\\")) return;
         while (!r.is("end") && !r.isPunct(":", "]")) {
             const token = r.next();
-            if (token.kind === "keyword" && !r.isExpressionKeyword(token)) token.invalid = true;
+            if (token.kind === "keyword" && !(token.kw.flags & Flags.Expr || token.top))
+                token.invalid = true;
         }
     }
 
@@ -64,20 +70,24 @@ export class Assembler {
     comment(...starts) {
         const r = this.recogniser;
         if (!r.isPunct(...starts)) return false;
-        r.lexer.rawTo("comment");
+        r.lexer.raw(Comment, "comment");
         return true;
     }
 
-    // A dot and a name, which the lexer reads as the number "." and the name.
-    label() {
+    // Labels, each a dot and a name, taken from the text: the lexer reads .E1 as a number. A keyword straight after
+    // the dot is not a name (.END is an error).
+    labels() {
         const r = this.recogniser;
-        if (!r.is("number", ".")) return;
-        const dot = r.next();
-        if (!r.is("name") || !r.adjacent()) r.fail(dot);
-        dot.type = r.next().type = "type.identifier";
+        while (r.peek().kind === "number" && r.peek().text[0] === ".") {
+            const after = r.peek(1);
+            if (after.kind === "keyword" && !after.spaced) r.fail();
+            const label = r.lexer.raw(Label, "label");
+            if (!label) r.fail();
+            label.type = "type.identifier";
+        }
     }
 
-    // Reads the mnemonic or directive, which BASIC takes in either case, and returns it in upper case.
+    // Reads the mnemonic or directive and returns it in upper case.
     mnemonic() {
         const r = this.recogniser;
         const token = r.peek();
@@ -94,20 +104,30 @@ export class Assembler {
             r.next().type = "keyword";
             return "ORA";
         }
-        if (!r.is("name")) r.fail();
-        // OPT, and EQU with its size, which BASIC takes only in upper case.
-        const directive = /^opt/i.test(token.text) ? 3 : /^equ/i.test(token.text) ? 4 : 0;
-        if (directive) {
-            if (directive === 4 && !/^...[BDSW]/.test(token.text)) r.fail();
-            r.lexer.split(token, directive);
-            r.next().type = "keyword.directive";
-            return token.text.toUpperCase();
+        // BASIC compares the low five bits of each character, so it takes a mnemonic in either case, and ST8 as STX;
+        // only the size of an EQU must be an upper-case letter.
+        const {text} = r.lexer;
+        const word = [...text.slice(token.start, token.start + 3)]
+            .map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40))
+            .join("");
+        const size = word === "EQU" ? text[token.start + 3] : "";
+        if (word === "EQU" && !/[BDSW]/.test(size)) r.fail();
+        const directive = word === "OPT" || word === "EQU";
+        if (!directive && ![Implied, Shifts, Addressed, Address].some(set => set.has(word)))
+            r.fail();
+        this.take(token.start + 3 + size.length, directive ? "keyword.directive" : "keyword");
+        return word + size;
+    }
+
+    // The tokens up to the end given, splitting the last, as one of the given type.
+    take(end, type) {
+        const r = this.recogniser;
+        while (r.peek().start < end) {
+            const token = r.peek();
+            if (!["name", "number", "punct"].includes(token.kind)) r.fail();
+            r.lexer.split(token, end - token.start);
+            r.next().type = type;
         }
-        const mnemonic = token.text.slice(0, 3).toUpperCase();
-        if (![Implied, Shifts, Addressed, Address].some(set => set.has(mnemonic))) r.fail();
-        r.lexer.split(token, 3);
-        r.next().type = "keyword";
-        return mnemonic;
     }
 
     operand(mnemonic) {

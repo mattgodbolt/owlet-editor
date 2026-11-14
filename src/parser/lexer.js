@@ -22,14 +22,15 @@ const Pattern = {
     // The tokeniser skips a run of digits and dots; the interpreter reads a number from it, then another.
     mantissa: /\d+\.?\d*|\.\d*/y,
     exponent: /E[-+]?\d*/y,
-    nameRun: /\w+/y,
-    name: /\w+[%$]?|@%/y,
+    // BASIC takes ` (a pound sign on the BBC) as a letter.
+    nameRun: /[\w`]+/y,
+    name: /[\w`]+[%$]?|@%/y,
     hex: /&[0-9A-F]*/y,
     // "" in a string is a quote.
     string: /"(?:[^"]|"")*"?/y,
     relation: /<[=>]?|>=?/y,
 };
-const isNameChar = c => c !== undefined && /\w/.test(c);
+const isNameChar = c => c !== undefined && /[\w`]/.test(c);
 
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
@@ -89,16 +90,18 @@ export class Lexer {
         return this.queue.length ? this.queue.shift() : this.read();
     }
 
-    // The text up to the next colon as one token of the given kind, whatever the tokeniser made of it: the assembler
-    // reads a comment so.
-    rawTo(kind) {
-        if (this.queue.length) {
-            this.pos = this.queue[0].start;
-            this.tokens.splice(this.tokens.lastIndexOf(this.queue[0]));
-            this.queue = [];
-        }
-        const colon = this.text.indexOf(":", this.pos);
-        return this.push(kind, colon < 0 ? this.text.length : colon);
+    // The text from the next token that matches the pattern as one token of the given kind, whatever the tokeniser
+    // made of it, or null if it does not match: the assembler reads a comment or a label so, and the interpreter a
+    // * command.
+    raw(pattern, kind) {
+        const next = this.peek();
+        pattern.lastIndex = next.start;
+        if (!pattern.test(this.text)) return null;
+        this.pos = next.start;
+        const at = this.tokens.lastIndexOf(next);
+        if (at >= 0) this.tokens.splice(at);
+        this.queue = [];
+        return this.push(kind, pattern.lastIndex);
     }
 
     // Splits a token, which must be the next, that the interpreter reads as two: the P of TOP from the name it begins,

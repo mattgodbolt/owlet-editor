@@ -167,7 +167,6 @@ const BeforeOperand = {cases: {"\\(": "@brackets", "@operators": "operator", "@d
 
 // ?parser=new in the URL picks the tokenizer in src/parser over the Monarch grammar below, for the same language.
 let newParser = false;
-export const usesNewParser = () => newParser;
 let registrations = [];
 
 export function registerBbcBasicLanguage(
@@ -426,6 +425,20 @@ export function registerBbcBasicLanguage(
         configuration,
         languages.registerCodeActionProvider(LanguageId, codeActionProvider),
     ];
+}
+
+// Monaco colours brackets from the text, not the tokens, so with the new tokenizer, which marks unmatched brackets
+// itself, that is off. Monaco does not pass the editor's option on to the model, and resets the model's from its
+// configuration whenever an editor option changes, so the model is given it, and given it again.
+export function colourBrackets(codeEditor) {
+    const options = {enabled: !newParser, independentColorPoolPerBracketType: false};
+    codeEditor.updateOptions({bracketPairColorization: options});
+    const model = codeEditor.getModel();
+    const apply = () =>
+        model.getOptions().bracketPairColorizationOptions.enabled === options.enabled ||
+        model.updateOptions({bracketColorizationOptions: options});
+    apply();
+    return model.onDidChangeOptions(apply);
 }
 
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor

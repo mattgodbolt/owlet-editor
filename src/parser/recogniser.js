@@ -1,7 +1,6 @@
 // Reads a line of BBC BASIC II as the interpreter does, by recursive descent over the lexer's tokens, and marks the
 // token at which BASIC would stop with an error: one per statement, then on to the next colon, as BASIC reports only
 // the first. Where there is no rule for a statement, anything is accepted.
-import {Flags} from "../tokens.js";
 import {Assembler} from "./assembler.js";
 import {Lexer} from "./lexer.js";
 
@@ -29,14 +28,11 @@ const BracketFunction = {
 // The number of expressions each of these statements takes.
 const ExpressionCount = {
     ...Object.fromEntries(
-        [..."CLEAR CLG CLS END ENDPROC NEW OLD REPORT RETURN RUN STOP".split(" ")].map(name => [
-            name,
-            0,
-        ]),
+        "CLEAR CLG CLS END ENDPROC NEW OLD REPORT RETURN RUN STOP"
+            .split(" ")
+            .map(name => [name, 0]),
     ),
-    ...Object.fromEntries(
-        [..."CHAIN COLOUR MODE OSCLI UNTIL WIDTH".split(" ")].map(name => [name, 1]),
-    ),
+    ...Object.fromEntries("CHAIN COLOUR MODE OSCLI UNTIL WIDTH".split(" ").map(name => [name, 1])),
     GCOL: 2,
     MOVE: 2,
     DRAW: 2,
@@ -48,7 +44,7 @@ const ForeignOperator = /^(?:[=!]=|\*\*|><|=[<>]|[-+/*^]=|<<|>>)$/;
 const Relations = names("= < > <= >= <>");
 const Arithmetic = names("+ - * / ^");
 
-class Failure {
+export class Failure {
     constructor(token) {
         this.token = token;
     }
@@ -94,15 +90,6 @@ export class Recogniser {
     // Whether the next token follows the last with no space between.
     adjacent() {
         return !this.peek().spaced;
-    }
-
-    isFailure(e) {
-        return e instanceof Failure;
-    }
-
-    // Whether an expression can use the keyword.
-    isExpressionKeyword(token) {
-        return Boolean(token.kw.flags & Flags.Expr) || token.top;
     }
 
     fail(token = this.peek()) {
@@ -173,8 +160,11 @@ export class Recogniser {
 
     nested(read) {
         if (++this.depth > MaxDepth) this.fail();
-        read();
-        this.depth--;
+        try {
+            read();
+        } finally {
+            this.depth--;
+        }
     }
 
     statement() {
@@ -185,6 +175,9 @@ export class Recogniser {
         const token = this.peek();
         if (this.atEnd()) return;
         if (token.kind === "oscli") return void this.next();
+        // BASIC reads * as a command wherever it starts a statement, though the tokeniser may not have seen one start
+        // there (IFX REPEAT*FX15).
+        if (this.isPunct("*")) return void this.lexer.raw(/.*/y, "oscli");
         if (this.isPunct("=")) {
             this.next();
             return this.expression();
@@ -417,26 +410,19 @@ export class Recogniser {
         }
     }
 
-    target() {
+    // A line number, or an expression that gives one; GOSUB is the same.
+    GOTO() {
         if (this.is("linenum")) this.next();
         else this.expression();
     }
 
-    GOTO() {
-        this.target();
-    }
-
-    GOSUB() {
-        this.target();
-    }
-
     RESTORE() {
-        if (!this.atEnd()) this.target();
+        if (!this.atEnd()) this.GOTO();
     }
 
     TRACE() {
         if (this.isKeyword("ON", "OFF")) this.next();
-        else this.target();
+        else this.GOTO();
     }
 
     ON() {
@@ -448,7 +434,7 @@ export class Recogniser {
         this.expression();
         if (!this.isKeyword("GOTO", "GOSUB")) this.fail();
         this.next();
-        this.target();
+        this.GOTO();
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
         while (!this.atEnd()) this.next();
         this.elseIsBranch = true;
@@ -557,3 +543,5 @@ export class Recogniser {
         this.expression();
     }
 }
+
+Recogniser.prototype.GOSUB = Recogniser.prototype.GOTO;
