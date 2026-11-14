@@ -27,7 +27,7 @@
     "node": ">=24.15.0"
   },
   "dependencies": {
-    "base2048": "^2.0.2",
+    "base2048": "^3.0.0",
     "jquery": "^4.0.0",
     "jsbeeb": "2.21.1",
     "monaco-editor": "^0.52.2",
