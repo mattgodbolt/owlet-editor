@@ -14,6 +14,7 @@
 import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
+import prettier from "prettier";
 import {createRom, SyntaxErrors} from "./rom.mjs";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
@@ -67,8 +68,8 @@ async function main() {
         known.set(text, row);
     }
     rom.destroy();
-    const format = row => `  [${row.map(cell => JSON.stringify(cell)).join(", ")}]`;
-    fs.writeFileSync(tableFile, `[\n${table.map(format).join(",\n")}\n]\n`);
+    const options = {...(await prettier.resolveConfig(tableFile)), filepath: tableFile};
+    fs.writeFileSync(tableFile, await prettier.format(JSON.stringify(table), options));
 }
 
 main().catch(e => {
