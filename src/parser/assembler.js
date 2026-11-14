@@ -64,7 +64,7 @@ export class Assembler {
             } catch (e) {
                 if (!(e instanceof Failure)) throw e;
                 r.mark(e, start);
-                while (!r.is("end") && !r.isPunct(":", "]")) r.next();
+                while (!r.is("end") && !r.isPunct(":", "]") && !this.isBranchElse()) r.next();
             }
         }
     }
