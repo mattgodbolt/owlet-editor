@@ -65,7 +65,7 @@ test: prereqs  ## Runs the tests
 check: test lint-fix  ## Runs all checks required before committing (fixing trivial things automatically)
 
 .PHONY: ci-check
-ci-check: test lint format-check  ## What CI runs: the same checks as the pre-commit hook, but failing instead of fixing
+ci-check: test lint format-check build  ## What CI runs: the pre-commit checks, failing instead of fixing, and a build as the deploy does it
 
 .PHONY: clean
 clean:  ## Cleans up everything
