@@ -1,6 +1,7 @@
 import {defineConfig} from "vite";
 import {resolve} from "path";
 import {fileURLToPath} from "url";
+import {execFileSync} from "child_process";
 import monacoEditorPluginModule from "vite-plugin-monaco-editor";
 import {viteStaticCopy} from "vite-plugin-static-copy";
 import yaml from "@rollup/plugin-yaml";
@@ -13,7 +14,24 @@ const monacoEditorPlugin = monacoEditorPluginModule.default ?? monacoEditorPlugi
 // Get the directory name equivalent in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+// CI sets GITHUB_SHA; elsewhere ask git, and carry on without a sha if that fails (e.g. a tarball)
+function gitSha() {
+    if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+    try {
+        return execFileSync("git", ["rev-parse", "HEAD"], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+    } catch (e) {
+        return "";
+    }
+}
+
 export default defineConfig({
+    define: {
+        "import.meta.env.OWLET_GIT_SHA": JSON.stringify(gitSha()),
+        "import.meta.env.OWLET_BUILD_DATE": JSON.stringify(new Date().toISOString().slice(0, 10)),
+    },
     plugins: [
         monacoEditorPlugin({}),
         nodePolyfills(),

@@ -19,6 +19,7 @@ import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 import {createVduReference} from "./vdu-reference";
+import {describeBuild} from "./version";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
@@ -32,6 +33,13 @@ export class OwletEditor {
     constructor(onChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
+        const build = describeBuild(
+            import.meta.env.OWLET_GIT_SHA,
+            import.meta.env.OWLET_BUILD_DATE,
+        );
+        $("#version").append(
+            build.url ? $("<a>").attr("href", build.url).text(build.label) : build.label,
+        );
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
 
