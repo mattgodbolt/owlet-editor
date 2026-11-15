@@ -2,11 +2,14 @@
 // directive, then its operand. A "\" comment can start a statement, and a ";" comment can follow a complete
 // instruction; either runs to the next colon.
 //
-// Stricter than the ROM, on purpose: BASIC ignores the rest of a statement after a complete instruction, but a keyword
-// there that an expression cannot use is marked, since it is almost always a mistake (NOP PRINT).
+// Stricter than the ROM, on purpose (the problems that say so have `stricter` set):
+// - BASIC ignores the rest of a statement after a complete instruction, but a keyword there that an expression cannot
+//   use is marked, since it is almost always a mistake (NOP PRINT);
+// - BASIC compares only the low five bits of each character of a mnemonic, so it reads 8 as X and ! as A, but a
+//   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9. Where
+//   it is the third character, the two letters before it are marked instead (LD is not an instruction).
 
 import {Flags} from "../tokens.js";
-import {Failure} from "./recogniser.js";
 
 const words = text => new Set(text.split(" "));
 const Implied = words(
@@ -17,9 +20,26 @@ const Shifts = words("ASL LSR ROL ROR");
 const Addressed = words("ADC AND BIT CMP CPX CPY DEC EOR INC LDA LDX LDY ORA SBC STA STX STY");
 // And those whose operand is only an address, after which BASIC reads nothing.
 const Address = words("BCC BCS BEQ BMI BNE BPL BVC BVS JMP JSR");
+// Only these read a ( as indirect addressing; for the rest it starts an expression.
+const Indirect = words("ADC AND CMP EOR LDA ORA SBC STA");
+const NoImmediate = words("ASL BIT DEC INC LSR ROL ROR STA STX STY");
+// The index registers each takes, if not X and Y; BASIC reads none after BIT, CPX and CPY.
+const IndexRegisters = {
+    ...Object.fromEntries([...Shifts, "DEC", "INC", "LDY", "STY"].map(m => [m, ["X"]])),
+    ...Object.fromEntries(["LDX", "STX"].map(m => [m, ["Y"]])),
+    ...Object.fromEntries(["BIT", "CPX", "CPY"].map(m => [m, []])),
+};
 // BASIC takes the index register in lower case only after these.
 const LowerCaseIndex = {LDX: "y", STX: "y", LDY: "x", STY: "x"};
-const Label = /\.(?:[A-Za-z_`][\w`]*%?|@%)/y;
+export const Mnemonics = [
+    ...Implied,
+    ...Shifts,
+    ...Addressed,
+    ...Address,
+    ..."OPT EQUB EQUD EQUS EQUW".split(" "),
+];
+const ThirdCharacter = 2;
+const Label = /\. *(?:[A-Za-z_`][\w`]*%?|@%)/y;
 const Comment = /[;\\][^:]*/y;
 
 export class Assembler {
@@ -33,6 +53,7 @@ export class Assembler {
         const r = this.recogniser;
         for (;;) {
             if (r.is("end")) return true;
+            if (this.isBranchElse()) return false;
             if (r.isPunct("]")) {
                 r.next();
                 return false;
@@ -45,11 +66,15 @@ export class Assembler {
             try {
                 this.statement();
             } catch (e) {
-                if (!(e instanceof Failure)) throw e;
-                r.mark(e.token, start);
-                while (!r.is("end") && !r.isPunct(":", "]")) r.next();
+                const atEnd = () => r.is("end") || r.isPunct(":", "]") || this.isBranchElse();
+                r.recover(e, start, atEnd);
             }
         }
+    }
+
+    // The ELSE of an IF, which BASIC takes wherever it is on the line: if the condition is false the block is never read.
+    isBranchElse() {
+        return this.recogniser.elseIsBranch && this.recogniser.isKeyword("ELSE");
     }
 
     statement() {
@@ -59,10 +84,13 @@ export class Assembler {
         if (r.is("end") || r.isPunct(":", "]") || this.comment("\\")) return;
         this.operand(this.mnemonic());
         if (this.comment(";", "\\")) return;
-        while (!r.is("end") && !r.isPunct(":", "]")) {
+        while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (token.kind === "keyword" && !(token.kw.flags & Flags.Expr || token.top))
-                token.invalid = true;
+                this.stricter(
+                    token,
+                    "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
+                );
         }
     }
 
@@ -80,9 +108,11 @@ export class Assembler {
         const r = this.recogniser;
         while (r.peek().kind === "number" && r.peek().text[0] === ".") {
             const after = r.peek(1);
-            if (after.kind === "keyword" && !after.spaced) r.fail();
+            if (after.kind === "keyword" && (!after.spaced || r.peek().text === "."))
+                r.fail("Syntax error");
             const label = r.lexer.raw(Label, "label");
-            if (!label) r.fail();
+            if (!label)
+                r.fail("Syntax error", undefined, r.peek().text === "." && after.kind === "end");
             label.type = "type.identifier";
         }
     }
@@ -97,7 +127,7 @@ export class Assembler {
             const after = r.peek(1);
             if (after.kind !== "name" || after.spaced || after.text[0] !== "A") {
                 if (after.kind === "name" && !after.spaced) after.invalid = true;
-                r.fail(token);
+                r.fail("Syntax error", token, after.kind === "end");
             }
             r.next();
             r.lexer.split(after, 1);
@@ -107,27 +137,78 @@ export class Assembler {
         // BASIC compares the low five bits of each character, so it takes a mnemonic in either case, and ST8 as STX;
         // only the size of an EQU must be an upper-case letter.
         const {text} = r.lexer;
-        const word = [...text.slice(token.start, token.start + 3)]
-            .map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40))
-            .join("");
+        const chars = [...text.slice(token.start, token.start + 3)];
+        const word = chars.map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40)).join("");
         const size = word === "EQU" ? text[token.start + 3] : "";
-        if (word === "EQU" && !/[BDSW]/.test(size)) r.fail();
+        if (word === "EQU" && !/[BDSW]/.test(size)) r.fail("Syntax error");
         const directive = word === "OPT" || word === "EQU";
         if (!directive && ![Implied, Shifts, Addressed, Address].some(set => set.has(word)))
-            r.fail();
-        this.take(token.start + 3 + size.length, directive ? "keyword.directive" : "keyword");
+            r.fail("Syntax error");
+        const aliased = chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [i]));
+        const marks =
+            aliased.length === 1 && aliased[0] === ThirdCharacter
+                ? [this.prefixMark(token.start, word, chars[ThirdCharacter])]
+                : aliased.map(i => ({
+                      start: token.start + i,
+                      end: token.start + i + 1,
+                      message: `BASIC reads ${chars[i]} as ${word[i]} here (it compares only part of each character); probably a typo`,
+                  }));
+        this.take(
+            token.start + 3 + size.length,
+            directive ? "keyword.directive" : "keyword",
+            marks,
+        );
         return word + size;
     }
 
-    // The tokens up to the end given, splitting the last, as one of the given type.
-    take(end, type) {
+    // The mark for a mnemonic whose third character is not a letter: the two letters before it, which are not an
+    // instruction on their own, with the third letters that would make one.
+    prefixMark(start, word, char) {
+        const prefix = word.slice(0, ThirdCharacter);
+        const meant = [
+            ...new Set(Mnemonics.filter(m => m.startsWith(prefix)).map(m => m.slice(0, 3))),
+        ];
+        const kind = meant.every(m => "AXY".includes(m[ThirdCharacter])) ? "register" : "last";
+        const follows = Implied.has(word)
+            ? ""
+            : `, so what follows is the ${word === "OPT" || word === "EQU" ? "operand" : "address"}`;
+        const list = `${meant.slice(0, -1).join(", ")}${meant.length > 1 ? " or " : ""}${meant.at(-1)}`;
+        return {
+            start,
+            end: start + ThirdCharacter,
+            message: `${prefix} is not an instruction: the ${kind} letter is missing. BASIC reads the ${char} as ${word[ThirdCharacter]} (${word})${follows}; probably ${list} was meant`,
+        };
+    }
+
+    // The tokens up to the end given, splitting the last, as one of the given type. Each span in `marks` is a token of
+    // its own and is marked, with its message.
+    take(end, type, marks = []) {
         const r = this.recogniser;
+        const cuts = marks.flatMap(mark => [mark.start, mark.end]);
         while (r.peek().start < end) {
             const token = r.peek();
-            if (!["name", "number", "punct"].includes(token.kind)) r.fail();
-            r.lexer.split(token, end - token.start);
+            if (!["name", "number", "punct"].includes(token.kind)) r.fail(null);
+            const mark = marks.find(m => m.start === token.start);
+            r.lexer.split(
+                token,
+                Math.min(end, ...cuts.filter(at => at > token.start)) - token.start,
+            );
             r.next().type = type;
+            if (mark) this.stricter(token, mark.message);
         }
+    }
+
+    // Marks a token that BASIC accepts but that is almost certainly a mistake.
+    stricter(token, message) {
+        token.invalid = true;
+        this.recogniser.problems.push({
+            message,
+            token,
+            end: token.end,
+            unfinished: false,
+            hole: false,
+            stricter: true,
+        });
     }
 
     operand(mnemonic) {
@@ -136,36 +217,39 @@ export class Assembler {
         if (Shifts.has(mnemonic) && r.is("name", "A")) return void (r.next().type = "keyword");
         if (!Addressed.has(mnemonic) && !Shifts.has(mnemonic)) return r.expression();
         if (r.isPunct("#")) {
+            if (NoImmediate.has(mnemonic)) r.fail("No such variable");
             r.next().type = "symbol";
             return r.expression();
         }
-        if (r.isPunct("(")) {
+        if (Indirect.has(mnemonic) && r.isPunct("(")) {
             const opener = r.next();
             r.expression();
             if (r.isPunct(",")) {
                 this.index(mnemonic, "X");
-                if (!r.isPunct(")")) r.fail();
+                if (!r.isPunct(")")) r.fail("Index");
                 return void r.next();
             }
-            if (!r.isPunct(")")) r.fail(r.atEnd() ? opener : r.peek());
-            r.next();
-            if (r.isPunct(",")) this.index(mnemonic, "Y");
-            return;
+            r.close(opener, "Index");
+            if (!r.isPunct(",")) r.fail("Index", r.last, r.is("end"));
+            return this.index(mnemonic, "Y");
         }
         r.expression();
-        if (r.isPunct(",")) this.index(mnemonic, "X", "Y");
+        const registers = IndexRegisters[mnemonic] || ["X", "Y"];
+        if (registers.length && r.isPunct(",")) this.index(mnemonic, ...registers);
     }
 
     // A comma and an index register.
     index(mnemonic, ...registers) {
         const r = this.recogniser;
         r.next().type = "symbol";
-        const register = r.peek().text;
+        const token = r.peek();
+        const register = token.text?.[0];
         if (
             !r.is("name") ||
             !(registers.includes(register) || register === LowerCaseIndex[mnemonic])
         )
-            r.fail();
+            r.fail("Index");
+        r.lexer.split(token, 1);
         r.next().type = "keyword";
     }
 }

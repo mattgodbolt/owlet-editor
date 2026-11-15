@@ -1,7 +1,7 @@
 // BBC BASIC II's tokeniser, ported: it finds keywords where the ROM does, with the ROM's start-of-statement and
 // line-number flags, so that each token is what BASIC will see when it runs the line. It also splits the text BASIC
 // leaves alone (names, numbers, strings, punctuation) into the pieces the interpreter reads.
-import {Flags, keywords} from "../tokens.js";
+import {Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
 
 // Typed text matches the first entry of the table with each spelling; PAGE, PTR, TIME, LOMEM and HIMEM come again at
 // the end of the table with their statement tokens, which the tokeniser makes by adding 0x40.
@@ -9,12 +9,20 @@ const typed = keywords.filter((kw, i) => keywords.findIndex(k => k.keyword === k
 const byFirstLetter = new Map();
 for (const kw of typed)
     byFirstLetter.set(kw.keyword[0], [...(byFirstLetter.get(kw.keyword[0]) || []), kw]);
-const byToken = new Map(keywords.map(kw => [kw.token, kw]));
 const StatementFormOffset = 0x40;
 
-// The character Owlet uses for a raw token byte.
-export const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
 const byChar = new Map(keywords.map(kw => [tokenChar(kw), kw]));
+
+// Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
+// its lower-case form (END, U+00E0), which has to be tagged as a string to keep it out of bracket matching.
+export const BracketCollisions = new Set(
+    keywords
+        .filter(kw => kw.keyword.endsWith("("))
+        .map(kw => tokenChar(kw).toLowerCase())
+        .filter(lower => byChar.has(lower) && !byChar.get(lower).keyword.endsWith("(")),
+);
+// A line number BASIC has already encoded: its token, as Owlet shows that byte, then three bytes.
+const EncodedLineNumber = /\u018d[\s\S]{3}/y;
 
 const Pattern = {
     white: /[ \t\r]+/y,
@@ -34,7 +42,7 @@ const isNameChar = c => c !== undefined && /[\w`]/.test(c);
 
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
-export function matchKeyword(text, i) {
+function matchKeyword(text, i) {
     for (const kw of byFirstLetter.get(text[i]) || []) {
         const word = kw.keyword;
         let length = 1;
@@ -137,7 +145,7 @@ export class Lexer {
     keyword(kw, end, raw = false) {
         const statementForm = kw.flags & Flags.PseudoVariable && this.start && !raw;
         const token = this.push("keyword", end, {
-            kw: statementForm ? byToken.get(kw.token + StatementFormOffset) : kw,
+            kw: statementForm ? keywordByToken.get(kw.token + StatementFormOffset) : kw,
             raw,
         });
         if (kw.flags & Flags.REM) this.restOfLine = kw.keyword === "REM" ? "comment" : "data";
@@ -173,6 +181,7 @@ export class Lexer {
         if (c === ",") return this.push("punct", pos + 1);
         if (c === "*" && this.start) return this.push("oscli", text.length);
         if (this.lineNumber && (end = this.match(Pattern.digits))) return this.push("linenum", end);
+        if ((end = this.match(EncodedLineNumber))) return this.push("linenum", end, {raw: true});
         if ((end = this.match(Pattern.mantissa))) {
             // An E is an exponent unless it begins a keyword (1EOR2). The tokeniser skips the whole run of name
             // characters from the E, so what the exponent leaves of it is a name: 1E0TO2 is 1E0, then TO2.
@@ -211,14 +220,12 @@ export function lexLine(text) {
     return lexer.tokens;
 }
 
-const LineNumberToken = 0x8d;
-
 // The bytes BASIC stores for the line's tokens after its own number: what the ROM's tokeniser makes of it.
 export function romBytes(tokens) {
     return tokens.flatMap(token => {
         if (token.kind === "linenum" && token.own) return [];
         if (token.kind === "keyword" && !token.raw) return [token.kw.token];
-        if (token.kind === "linenum") {
+        if (token.kind === "linenum" && !token.raw) {
             const n = Number(token.text);
             const high = n >> 8;
             return [

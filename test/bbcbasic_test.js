@@ -1,15 +1,14 @@
 import {
     codeActionProvider,
-    colourBrackets,
+    getSyntaxMarkers,
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
-    tokenChar,
 } from "../src/bbcbasic";
-import {keywords} from "../src/tokens";
+import {keywords, tokenChar} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
-import {afterEach, beforeAll, describe, it, vi} from "vitest";
+import {beforeAll, describe, it} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -70,7 +69,11 @@ function brackets(text) {
     }
 }
 
-const unmatched = text => brackets(text).flatMap(([column, invalid]) => (invalid ? [column] : []));
+// The columns of each ) shown as having no (: by Monaco, or by the new tokenizer as an invalid token.
+const unmatched = text => [
+    ...brackets(text).flatMap(([column, invalid]) => (invalid ? [column] : [])),
+    ...spanRanges(text, "invalid").flatMap(([start]) => (text[start] === ")" ? [start + 1] : [])),
+];
 
 const openers = keywords.filter(kw => kw.keyword.endsWith("(")).map(tokenChar);
 
@@ -94,50 +97,35 @@ function checkWarnings(text, ...expected) {
 const romTokens = new Map(RomTokens);
 
 const NewTokenizerDifferences = {
-    CALL: ["0:invalid"],
-    "C.": ["0:invalid"],
-    TIME: ["0:invalid"],
-    "A%": ["0:invalid"],
-    "X%": ["0:invalid"],
-    "LONGVAR%": ["0:invalid"],
-    "@%": ["0:invalid"],
-    LDA: ["0:invalid"],
-    TIMER: ["0:invalid"],
     "TIME r": ["0:keyword 4:white 5:invalid"],
-    "H.TO": ["0:invalid 1:number.float 2:keyword"],
-    "H._": ["0:invalid 1:number.float 2:variable"],
-    "TI._X": ["0:invalid 2:number.float 3:variable"],
-    "B.X": ["0:invalid 1:number.float 2:variable"],
-    "BG.X": ["0:invalid 2:number.float 3:variable"],
-    "BP.X": ["0:invalid 2:number.float 3:variable"],
-    "CLO.X": ["0:invalid 3:number.float 4:variable"],
-    "EO.X": ["0:invalid 2:number.float 3:variable"],
-    "PT.X": ["0:invalid 2:number.float 3:variable"],
-    "E.X": ["0:invalid 1:number.float 2:variable"],
-    "EN.X": ["0:invalid 2:number.float 3:variable"],
-    "ER.X": ["0:invalid 2:number.float 3:variable"],
-    "O.X": ["0:invalid 1:number.float 2:variable"],
-    "R.X": ["0:invalid 1:number.float 2:variable"],
-    "RE.X": ["0:invalid 2:number.float 3:variable"],
-    "A=8MOD.3": ["0:variable 1:operator 2:number 3:invalid 7:number"],
-    "\u018f#0=1": ["0:invalid 1:symbol 2:number 3:operator 4:number"],
+    "H.TO": ["0:invalid"],
+    "H._": ["0:invalid"],
+    "TI._X": ["0:invalid"],
+    "B.X": ["0:invalid"],
+    "BG.X": ["0:invalid"],
+    "BP.X": ["0:invalid"],
+    "CLO.X": ["0:invalid"],
+    "EO.X": ["0:invalid"],
+    "PT.X": ["0:invalid"],
+    "E.X": ["0:invalid"],
+    "EN.X": ["0:invalid"],
+    "ER.X": ["0:invalid"],
+    "O.X": ["0:invalid"],
+    "R.X": ["0:invalid"],
+    "RE.X": ["0:invalid"],
+    "A=8MOD.3": ["0:variable 1:operator 2:number 3:invalid"],
+    "\u018f#0=1": ["0:invalid"],
     // The tokeniser reads E4TO22400STEP100 as a name, so BASIC finds no TO.
     "FORJ%=2E4TO22400STEP100": ["0:keyword 3:variable 5:operator 6:number.float 9:invalid"],
     "GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20": [
-        "0:keyword 4:white 5:constant.linenum 7:invalid 8:number 9:symbol 10:keyword 14:white 15:constant.linenum 18:invalid 19:number 21:symbol 22:keyword 26:white 27:constant.linenum 30:white 31:invalid 33:symbol 34:keyword 38:white 39:constant.linenum 41:white 42:invalid 43:operator 44:white 45:constant.linenum",
+        "0:keyword 4:white 5:constant.linenum 7:invalid 9:symbol 10:keyword 14:white 15:constant.linenum 18:invalid 21:symbol 22:keyword 26:white 27:constant.linenum 30:white 31:invalid 33:symbol 34:keyword 38:white 39:constant.linenum 41:white 42:invalid",
     ],
     "ON ERROR 30": ["0:keyword 2:white 3:keyword 8:white 9:invalid"],
     "ON ERR. 30": ["0:keyword 2:white 3:keyword 7:white 8:invalid"],
     "\xee\u0185 30": ["0:keyword 2:white 3:invalid"],
-    'ERROR 5,"x"': [
-        "0:invalid 5:white 6:number 7:operator 8:string.quote 9:string 10:string.quote",
-    ],
-    PRINTLEN: ["0:keyword 5:invalid"],
-    "P.LEN": ["0:keyword 2:invalid"],
-    "F.X": ["0:keyword 2:invalid"],
-    "REP.X": ["0:keyword 4:invalid"],
-    "END.X": ["0:invalid 3:number.float 4:variable"],
-    "DEFFNmain:{=0}": ["0:keyword 5:variable 9:symbol 10:invalid 11:operator 12:number 13:symbol"],
+    'ERROR 5,"x"': ["0:invalid 8:invalid.string"],
+    "END.X": ["0:invalid"],
+    "DEFFNmain:{=0}": ["0:keyword 5:variable 9:symbol 10:invalid"],
     // The tokeniser makes no keyword inside a name, so FN is not one here.
     "[\nEQUSFNx": {
         tokens: ["0:delimiter.square", "0:keyword.directive 4:variable"],
@@ -146,41 +134,41 @@ const NewTokenizerDifferences = {
     "[LDA CLEAR+CLG+CLS+DEF+ENDPROC+END+LINE+NEW+OLD+OFF\nSTA RETURN+REPEAT+REPORT+RUN+STEP+SPC+STOP+TO+TAB(1):]":
         {
             tokens: [
-                "0:delimiter.square 1:keyword 4:white 5:invalid 10:operator 11:keyword 14:operator 15:keyword 18:operator 19:keyword 22:operator 23:keyword 30:operator 31:keyword 34:operator 35:keyword 39:operator 40:keyword 43:operator 44:keyword 47:operator 48:keyword",
-                "0:keyword 3:white 4:invalid 10:operator 11:keyword 17:operator 18:keyword 24:operator 25:keyword 28:operator 29:keyword 33:operator 34:keyword 37:operator 38:keyword 42:operator 43:keyword 45:operator 46:keyword 50:number 51:delimiter.parenthesis 52:symbol 53:delimiter.square",
+                "0:delimiter.square 1:keyword 4:white 5:invalid",
+                "0:keyword 3:white 4:invalid 52:symbol 53:delimiter.square",
             ],
             rows: ["[OPT0:LDA CLEAR:]"],
         },
     "[\nLDA #\u00e0\n]": {
         tokens: [
             "0:delimiter.square",
-            "0:keyword 3:white 4:symbol 5:invalid",
+            "0:keyword 3:white 4:symbol 5:invalid.string",
             "0:delimiter.square",
         ],
         rows: ["[OPT0:LDA #END:]"],
     },
     // A ; comment needs an instruction before it.
     "[;notacomment": {
-        tokens: ["0:delimiter.square 1:invalid 2:variable"],
+        tokens: ["0:delimiter.square 1:invalid"],
         rows: ["[OPT0:;notacomment:]"],
     },
     "[NOP ; a\n;notacomment": {
-        tokens: ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid 1:variable"],
+        tokens: ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid"],
         rows: ["[OPT0:;notacomment:]"],
     },
-    "!": ["0:invalid"],
-    // BASIC stops with No FN, which is not a syntax error, so this one has no verdict in the table.
-    "=": ["0:invalid"],
     "^": ["0:invalid"],
     "'": ["0:invalid"],
-    "INVALID=1==2OR8!=2**3": [
-        "0:variable 7:operator 8:number 9:invalid 11:number 12:keyword 14:number 15:operator 17:number 18:operator 20:number",
+    "INVALID=1==2OR8!=2**3": ["0:variable 7:operator 8:number 9:invalid"],
+    "IFA><1ORB=<2ORB=>6GOTO10": ["0:keyword 2:variable 3:invalid"],
+    "A=B<<C OR D>>E": ["0:variable 1:operator 2:variable 3:invalid"],
+    // A line number BASIC has already encoded (#161, #74).
+    "\xe5\u018dTJ@": ["0:keyword 1:constant.linenum"],
+    "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK": [
+        "0:keyword.string 1:constant.linenum 5:symbol 6:keyword 7:constant.linenum 11:symbol 12:keyword 13:comment",
     ],
-    "IFA><1ORB=<2ORB=>6GOTO10": [
-        "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:operator 11:number 12:keyword 14:variable 15:operator 17:number 18:keyword 22:constant.linenum",
-    ],
-    "A=B<<C OR D>>E": [
-        "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:operator 13:variable",
+    // The ( of MID$( is coloured as a bracket and MID$ as a keyword (#170); the grammar leaves that to Monaco.
+    "Q$=MID$(Q$,2)+STR$(Q%)": [
+        "0:variable 2:operator 3:keyword 7:delimiter.parenthesis 8:variable 10:operator 11:number 12:delimiter.parenthesis 13:operator 14:keyword 18:delimiter.parenthesis 19:variable 21:delimiter.parenthesis",
     ],
 };
 
@@ -203,6 +191,7 @@ function differs(parser, text) {
 
 const caseWarning = (keyword, startColumn) => ({
     message: `BASIC keywords should be upper case, did you mean ${keyword}?`,
+    code: "lowercase-keyword",
     startColumn,
     endColumn: startColumn + keyword.length,
 });
@@ -292,20 +281,20 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
         it("should highlight a keyword that cannot start a statement", () => {
             // See #151, checked on the ROM, where each invalid case is a syntax error.
             const cases = [
-                ['ERROR5,"x"', ["ERROR"]],
-                ["RND(-TIME)", ["RND"]],
-                ["STEP1", ["STEP"]],
-                ["TOOMUCH=1", ["TO"]],
-                ["A=1:ABS A", ["ABS"]],
+                ['ERROR5,"x"', parser === "new" ? ["ERROR5,"] : ["ERROR"]],
+                ["RND(-TIME)", parser === "new" ? ["RND(-TIME)"] : ["RND"]],
+                ["STEP1", parser === "new" ? ["STEP1"] : ["STEP"]],
+                ["TOOMUCH=1", parser === "new" ? ["TOOMUCH=1"] : ["TO"]],
+                ["A=1:ABS A", parser === "new" ? ["ABS A"] : ["ABS"]],
                 ["IF A THEN TO", ["TO"]],
-                ["IF 0 THEN 10 ELSE FNf", ["FN"]],
+                ["IF 0 THEN 10 ELSE FNf", parser === "new" ? ["FNf"] : ["FN"]],
                 ["A.", ["A."]],
                 ["10 THEN", ["THEN"]],
                 ["\u0185", ["\u0185"]],
                 // PTR, PAGE and TIME as functions (tokens &8F, &90, &91) cannot start a statement, their statement
                 // forms can.
                 ["\u018f#0=1", ["\u018f#"]],
-                ["\u0190=1", ["\u0190"]],
+                ["\u0190=1", parser === "new" ? ["\u0190=1"] : ["\u0190"]],
                 ["\xcf#0=1", []],
                 ["\xd0=1", []],
                 ["ON ERROR OFF", []],
@@ -370,7 +359,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["VDU X.7,1", []],
                 ["INPUT X.", ["."]],
                 ["I.X.7", [".7"]],
-                ["A=BGET##1", ["#"]],
+                ["A=BGET##1", parser === "new" ? ["#1"] : ["#"]],
                 ['PRINT "a".5', []],
                 ["PRINT STR$(1);.5", []],
                 ["VDU1,2.5", []],
@@ -380,12 +369,12 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["X%=X%.5", [".5"]],
                 ["x=x.5", [".5"]],
                 ["FOR I=1 TO X.", ["."]],
-                ["FOR I=X. TOP", ["."]],
-                ["A=X. TO", ["."]],
-                ["IF X. THEN PRINT", ["."]],
+                ["FOR I=X. TOP", parser === "new" ? [". TOP"] : ["."]],
+                ["A=X. TO", parser === "new" ? [". TO"] : ["."]],
+                ["IF X. THEN PRINT", parser === "new" ? [". THEN PRINT"] : ["."]],
                 ["COLOUR X.", ["."]],
-                ["PRINT#X.,1", ["."]],
-                ["INPUT#X.,Y", ["."]],
+                ["PRINT#X.,1", parser === "new" ? [".,1"] : ["."]],
+                ["INPUT#X.,Y", parser === "new" ? [".,Y"] : ["."]],
                 ["P.X.:Y=X.", ["."]],
                 ["PRINT 1E.5", []],
                 ["VDU 1E.5", []],
@@ -425,7 +414,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["FOR I=ABS TOP TO TOP", ["I"], ["FOR", "ABS", "TOP", "TO", "TOP"]],
                 ["FOR I=AB. TOP TO TOP", ["I"], ["FOR", "AB.", "TOP", "TO", "TOP"]],
                 ["FOR I=AB.TOP TO TOP", ["I"]],
-                ["FOR I=XY.TOP", ["I", "XY", "P"]],
+                ["FOR I=XY.TOP", parser === "new" ? ["I", "XY"] : ["I", "XY", "P"]],
                 ["FOR I=1 AND TOP TO 2", ["I"], ["FOR", "AND", "TOP", "TO"]],
                 // Abbreviated and raw token forms, checked against the ROM by running them.
                 ["FO.I=TOP TO TOP+1", ["I"], ["FO.", "TOP", "TO", "TOP"]],
@@ -469,28 +458,161 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 );
             }
             const invalid = [
-                "A=~B",
-                "A$=STR$(~12)",
-                "A$=\xc3(~1)",
-                "PRINT#0,~A",
-                "INPUT ~A",
-                "VDU ~A",
-                "PRINT 1+~A",
-                "PRINT (~A)",
-                "PRINT TAB(~A)",
-                "PRINT ~A:B=~A",
-                "PRINT !~A",
-                "PRINT ?~A",
-                "PRINT ;-~B",
-                "PRINT A AND ~B",
-                "PRINT A MOD~B",
-                "~",
+                ["A=~B", "~B"],
+                ["A$=STR$(~12)", "~12)"],
+                ["A$=\xc3(~1)", "~1)"],
+                ["PRINT#0,~A", "~A"],
+                ["INPUT ~A", "~A"],
+                ["VDU ~A", "~A"],
+                ["PRINT 1+~A", "~A"],
+                ["PRINT (~A)", "~A)"],
+                ["PRINT TAB(~A)", "~A)"],
+                ["PRINT ~A:B=~A", "~A"],
+                ["PRINT !~A", "~A"],
+                ["PRINT ?~A", "~A"],
+                ["PRINT ;-~B", "~B"],
+                ["PRINT A AND ~B", "~B"],
+                ["PRINT A MOD~B", "~B"],
+                ["~", "~"],
                 // See #152: STR$ takes one ~, though PRINT takes any number.
-                "P.STR$~~42",
-                "A$=STR$~~42",
-                "P.STR.~~42",
+                ["P.STR$~~42", "~42"],
+                ["A$=STR$~~42", "~42"],
+                ["P.STR.~~42", "~42"],
             ];
-            for (const text of invalid) assert.deepStrictEqual(spans(text, "invalid"), ["~"], text);
+            for (const [text, red] of invalid)
+                assert.deepStrictEqual(
+                    spans(text, "invalid"),
+                    [parser === "new" ? red : "~"],
+                    text,
+                );
+        });
+    });
+
+    describe("examples from the issues", () => {
+        // Each is a line someone reported (the number is the issue or pull request), with its tokens; the ROM's
+        // verdict on it, or on the statement it comes from, is a row of test/rom-verdicts.json with the same number.
+        it("should read each as reported", () => {
+            const cases = [
+                ["#26", "Z%=2E4", "0:variable 2:operator 3:number.float"],
+                [
+                    "#27",
+                    "P.1.,.5,.",
+                    "0:keyword 2:number.float 4:operator 5:number.float 7:operator 8:number.float",
+                ],
+                [
+                    "#28",
+                    "A%=@%:@%=A%",
+                    "0:variable 2:operator 3:variable 5:symbol 6:variable 8:operator 9:variable",
+                ],
+                ["#37", "*FX19:PRINT", "0:keyword.oscli.string"],
+                ["#37", "*.:0", "0:keyword.oscli.string"],
+                [
+                    "#41",
+                    "P.'\"a\"'@%''TIME'",
+                    "0:keyword 2:operator 3:string.quote 4:string 5:string.quote 6:operator 7:variable 9:operator 11:keyword 15:operator",
+                ],
+                ["#43", "D.http://bbcmic.ro", "0:keyword 2:string.unquoted"],
+                ["#45", "PRINT TOP", "0:keyword 5:white 6:keyword"],
+                [
+                    "#45",
+                    "F.P=TOP TOP:P.P:N.",
+                    "0:keyword 2:variable 3:operator 4:keyword 7:white 8:keyword 10:variable 11:symbol 12:keyword 14:variable 15:symbol 16:keyword",
+                ],
+                [
+                    "#45",
+                    "FORP=TOP-TOP TOP+TOP/TOP:N.",
+                    "0:keyword 3:variable 4:operator 5:keyword 8:operator 9:keyword 12:white 13:keyword 15:variable 16:operator 17:keyword 20:operator 21:keyword 24:symbol 25:keyword",
+                ],
+                ["#52", 'P."A"X', "0:keyword 2:string.quote 3:string 4:string.quote 5:variable"],
+                ["#62", "PRINTQ.1", "0:keyword 5:variable 6:number.float"],
+                ["#83", "*KEY0PAGE=4608|MO.|MRU.|M", "0:keyword.oscli.string"],
+                ["#83", "*LOAD P.DAT", "0:keyword.oscli.string"],
+                [
+                    "#85",
+                    "@%=0:X=1:P.X.",
+                    "0:variable 2:operator 3:number 4:symbol 5:variable 6:operator 7:number 8:symbol 9:keyword 11:variable 12:number.float",
+                ],
+                [
+                    "#85",
+                    "X=42:V.X.",
+                    "0:variable 1:operator 2:number 4:symbol 5:keyword 7:variable 8:number.float",
+                ],
+                ["#112", "ONERROR*HELP", "0:keyword 7:keyword.oscli.string"],
+                ["#112", "IF0EL.*H.", "0:keyword 2:number 3:keyword 6:keyword.oscli.string"],
+                ["#112", "ONERR.*HELP", "0:keyword 6:keyword.oscli.string"],
+                [
+                    "#140",
+                    "ri=42:P.ri.",
+                    "0:variable 2:operator 3:number 5:symbol 6:keyword 8:variable 10:number.float",
+                ],
+                [
+                    "#144",
+                    "FOR I=AB. TOP TO 9:N.",
+                    "0:keyword 3:white 4:variable 5:operator 6:keyword 9:white 10:keyword 13:white 14:keyword 16:white 17:number 18:symbol 19:keyword",
+                ],
+                ["#149", "Y=X.7", "0:variable 1:operator 2:variable 3:invalid"],
+                ["#150", "Z.", "0:variable 1:invalid"],
+                ["#150", "PRIT.", "0:variable 4:invalid"],
+                [
+                    "#152",
+                    "P.STR$~~42",
+                    parser === "new"
+                        ? "0:keyword 6:operator 7:invalid"
+                        : "0:keyword 6:operator 7:invalid 8:number",
+                ],
+                [
+                    "#152",
+                    "A$=STR$~~42",
+                    parser === "new"
+                        ? "0:variable 2:operator 3:keyword 7:operator 8:invalid"
+                        : "0:variable 2:operator 3:keyword 7:operator 8:invalid 9:number",
+                ],
+                ["#156", "\xf2p", "0:keyword 1:variable"],
+                ["#156", "\xdd\xf2x", "0:keyword 2:variable"],
+                ["#161", "\xe5\u018dTJ@", "0:keyword 1:invalid 2:variable 4:invalid"],
+                [
+                    "#74",
+                    "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK",
+                    "0:keyword.string 1:invalid 2:variable 4:invalid 5:symbol 6:keyword 7:invalid 8:variable 10:invalid 11:symbol 12:keyword 13:comment",
+                ],
+                ["#167", "[lda42,X", "0:delimiter.square 1:keyword 4:number 6:symbol 7:keyword"],
+                [
+                    "#170",
+                    "Q$=MID$(Q$,2)+STR$(Q%)",
+                    "0:variable 2:operator 3:keyword 8:variable 10:operator 11:number 12:delimiter.parenthesis 13:operator 14:keyword 18:delimiter.parenthesis 19:variable 21:delimiter.parenthesis",
+                ],
+                [
+                    "#170",
+                    "Q$=\xc1Q$,2)+\xc3(Q%)",
+                    "0:variable 2:operator 3:keyword 4:variable 6:operator 7:number 8:delimiter.parenthesis 9:operator 10:keyword 11:delimiter.parenthesis 12:variable 14:delimiter.parenthesis",
+                ],
+                [
+                    "#170",
+                    "Q$=MI.Q$,2)+STR.(Q%)",
+                    "0:variable 2:operator 3:keyword 6:variable 8:operator 9:number 10:delimiter.parenthesis 11:operator 12:keyword 16:delimiter.parenthesis 17:variable 19:delimiter.parenthesis",
+                ],
+            ];
+            for (const [source, text, expected] of cases)
+                if (!differs(parser, text))
+                    assert.deepStrictEqual(tokens(text), [expected], `${source} ${text}`);
+        });
+        it("should mark nothing in the lines reported as wrongly red", () => {
+            for (const text of [
+                "\xe440:\xf4 wrongly highlighted as invalid", // #156
+                "\xe0:\xf4 wrongly highlighted as invalid",
+                "\xf8",
+                "\xe22,3,2,-4,4,50,50,50,127,0,0,0,126,0:\xf4 wrongly highlighted as invalid",
+                "\xe1:\xf4 wrongly highlighted as invalid",
+                'MO.4:F.R=2TOLEN"\xff@W\u0197\u0187\xc3\xc3\xe1\xe1\xf0\xe0\xf0\xe0\xf0\u0180<lf\xba\u0199\xaaf\u0100B":?8=R?7180:?9=R:F.X=1TO9:MOVE(X*2OR1A.R)*40,R*40+?8MOD2*@%:P."\u0105\u0119\u0199\u0100\u0100\u011c\u0100":!6=!6/2:N.,:V.1', // #23
+                "F.A=H. TO8^5:?A=42:N.", // #30
+                'A$="OWLET":P.RI.A$,1)LE.A$,2)MI.A$,4,1)MI.A$,3,1)', // #114
+                "P.LE.A$,1)", // #160
+                "PRINTLE.A$,1)",
+                "P.LENMI.A$,2)",
+                "DIM tab(2):P.tab(1)", // #140
+                'READ A$:DATA "abc\nP.1', // #138
+            ])
+                assert.deepStrictEqual(spans(text, "invalid"), [], text);
         });
     });
 
@@ -596,7 +718,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                     ["10", "150", "230", "10", "10", "20"],
                 ],
                 ["GOTO 10;20:GOTO 10.5,20:GOTO 10E2,20:GOTO -10,20", ["10", "10", "10"]],
-                ["GOTO &10,20", ["20"]],
+                ["GOTO &10,20", parser === "new" ? [] : ["20"]],
                 ["ON X GOTO 10,X,20:GOTO (220):GOTO A%*10", ["10"]],
                 ["X=1:250:REPEAT 20:PRINT 170", []],
                 ["ON X GOTO 240,250 ELSE PRINT 260", ["240", "250"]],
@@ -651,12 +773,18 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
             for (const [text, expected] of cases)
                 assert.deepStrictEqual(tokens(text), [expected], text);
         });
-        it("should read strings, and an unterminated one as invalid", () => {
+        it("should read strings, and an unterminated one as invalid (the new tokenizer: as unfinished)", () => {
             assert.deepStrictEqual(tokens('P.""C1'), ["0:keyword 2:string.quote 4:variable"]);
+            const unterminated =
+                parser === "new"
+                    ? [
+                          "0:keyword 2:string.quote",
+                          "0:keyword 2:string.quote 3:string",
+                          "0:keyword 2:string.quote 3:string 6:string.quote 8:string",
+                      ]
+                    : Array(3).fill("0:keyword 2:invalid.string");
             assert.deepStrictEqual(tokens('P."\nP."TEST\nP."ESC""APE\nP."OK"'), [
-                "0:keyword 2:invalid.string",
-                "0:keyword 2:invalid.string",
-                "0:keyword 2:invalid.string",
+                ...unterminated,
                 "0:keyword 2:string.quote 3:string 5:string.quote",
             ]);
         });
@@ -670,7 +798,10 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                     "IFA><1ORB=<2ORB=>6GOTO10",
                     "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:constant.linenum",
                 ],
-                ["A+=2", "0:variable 1:invalid 3:number"],
+                [
+                    "A+=2",
+                    parser === "new" ? "0:variable 1:invalid" : "0:variable 1:invalid 3:number",
+                ],
                 [
                     "A=B<<C OR D>>E",
                     "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:invalid 13:variable",
@@ -777,7 +908,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["[ASL A", ["ASL", "A"], []],
                 ["[asl a", ["asl"], []],
                 ["[LDA 42,x", ["LDA"], ["x"]],
-                ["[lda (&70,x)", ["lda"], ["x"]],
+                ["[lda (&70,x)", ["lda"], parser === "new" ? ["x)"] : ["x"]],
                 ["[LDA (&70), y", ["LDA"], ["y"]],
                 ["[LDX &70,x", ["LDX"], ["x"]],
                 ["[LDX &70,y", ["LDX", "y"], []],
@@ -785,11 +916,11 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 // BASIC reads no index after these.
                 ["[LDA #1,x", ["LDA"], []],
                 ["[JSR &70,x", ["JSR"], []],
-                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$("], []],
-                ["[equb 1", [], ["equb"]],
-                ["[EQUw 1", [], ["EQUw"]],
+                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", parser === "new" ? "MID$" : "MID$("], []],
+                ["[equb 1", [], parser === "new" ? ["equb 1"] : ["equb"]],
+                ["[EQUw 1", [], parser === "new" ? ["EQUw 1"] : ["EQUw"]],
                 ["[Ora 1:orA 1:oRA 1", ["Ora", "orA", "oRA"], []],
-                ["[ORa 1", [], ["ORa"]],
+                ["[ORa 1", [], parser === "new" ? ["ORa 1"] : ["ORa"]],
             ];
             for (const [text, keywords, invalid] of cases) {
                 assert.deepStrictEqual(spans(text, "keyword"), keywords, text);
@@ -800,7 +931,9 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
         it("should allow STR$~ in an expression", () => {
             for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
-            assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), ["~"]);
+            assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), [
+                parser === "new" ? "~(255)" : "~",
+            ]);
         });
         it("should read an operand's names and keywords as BASIC reads them", () => {
             // A mnemonic is only a mnemonic where a statement starts, and BASIC reads PIX and TIMER as names.
@@ -819,8 +952,8 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
     });
 });
 
-describe("Bracket matching", () => {
-    beforeAll(() => registerBbcBasicLanguage("monarch"));
+describe.each(Parsers)("Bracket matching (%s)", parser => {
+    beforeAll(() => registerBbcBasicLanguage(parser));
     it("should pair each ) with its (, including the hidden ( of keywords, abbreviations and tokens", () => {
         const hidden = [
             "RIGHT$(",
@@ -858,6 +991,37 @@ describe("Bracket matching", () => {
             [8, 13],
         );
     });
+    it("should nest brackets by depth, so that Monaco colours each level, and mark a ) with no ( as unexpected", () => {
+        const levels = text => {
+            const model = editor.createModel(text, LanguageId);
+            try {
+                model.tokenization.forceTokenization(model.getLineCount());
+                return model.bracketPairs
+                    .getBracketsInRange(model.getFullModelRange())
+                    .toArray()
+                    .map(b => [b.range.startColumn, b.nestingLevel, b.isInvalid]);
+            } finally {
+                model.dispose();
+            }
+        };
+        assert.deepStrictEqual(levels("PRINT (1+(2*(3+4)))"), [
+            [7, 0, false],
+            [10, 1, false],
+            [13, 2, false],
+            [17, 2, false],
+            [18, 1, false],
+            [19, 0, false],
+        ]);
+        assert.deepStrictEqual(levels("A$=MID$(A$,1,2)"), [
+            [8, 0, false],
+            [15, 0, false],
+        ]);
+        // The new tokenizer marks it invalid itself, and keeps it from Monaco.
+        assert.deepStrictEqual(
+            levels("P.(1+2))").at(-1),
+            parser === "new" ? [7, 0, false] : [8, -1, true],
+        );
+    });
     it("should ignore brackets in strings, comments and * commands", () => {
         for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("])
             assert.deepStrictEqual(brackets(text), [], text);
@@ -878,70 +1042,57 @@ describe("Bracket matching", () => {
                 );
         }
     });
-    it("has a known limitation: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
+    it("has a known limitation in Monarch: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
         // Monaco merges neighbouring same-coloured tokens, so its \b-guarded opener match fails in "PRINTLE.".
-        assert.deepStrictEqual(unmatched("PRINTLE.A$,1)"), [13]);
+        const limited = parser === "new" ? [] : [13];
+        assert.deepStrictEqual(unmatched("PRINTLE.A$,1)"), limited);
         assert.deepStrictEqual(unmatched("PRINT LE.A$,1)"), []);
         assert.deepStrictEqual(unmatched("PRINTLEFT$(A$,1)"), []);
         // A dot before the opener is a word boundary, so fully abbreviated code is fine, unless a keyword with no
         // abbreviation (LEN) comes first.
         assert.deepStrictEqual(unmatched("P.LE.A$,1)"), []);
-        assert.deepStrictEqual(unmatched("P.LENMI.A$,2)"), [13]);
+        assert.deepStrictEqual(unmatched("P.LENMI.A$,2)"), limited);
     });
 });
 
-describe("The new tokenizer in Monaco", () => {
+describe("Bracket matching that only the new tokenizer does", () => {
     beforeAll(() => registerBbcBasicLanguage("new"));
-
-    it("should mark an unmatched ) itself, and Monaco should paint no bracket once its colouring is off", () => {
-        const model = editor.createModel("X=(1))\nPRINTLE.A$,1)\nP.MID$(A$,2)", LanguageId);
+    // Each bracket Monaco pairs, as line:column and nesting level.
+    const paired = text => {
+        const model = editor.createModel(text, LanguageId);
         try {
-            model.updateOptions({
-                bracketColorizationOptions: {
-                    enabled: false,
-                    independentColorPoolPerBracketType: false,
-                },
-            });
             model.tokenization.forceTokenization(model.getLineCount());
-            const painted = model
-                .getAllDecorations()
-                .filter(d => /bracket/.test(d.options.inlineClassName));
-            assert.deepStrictEqual(painted, []);
+            return model.bracketPairs
+                .getBracketsInRange(model.getFullModelRange())
+                .toArray()
+                .map(b => {
+                    assert.ok(!b.isInvalid, text);
+                    return `${b.range.startLineNumber}:${b.range.startColumn}=${b.nestingLevel}`;
+                })
+                .join(" ");
         } finally {
             model.dispose();
         }
-        assert.deepStrictEqual(spans("X=(1))", "invalid"), [")"]);
-        for (const text of ["PRINTLE.A$,1)", "P.MID$(A$,2)", "P.LE.A$,1)", "P.LENMI.A$,2)"])
-            assert.deepStrictEqual(spans(text, "invalid"), [], text);
-    });
-});
-
-describe("Bracket colouring in an editor", () => {
-    afterEach(() => vi.restoreAllMocks());
-
-    it("should stay off for the new tokenizer when an editor option changes", () => {
-        // jsdom has no canvas, which the editor measures fonts with.
-        vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-            measureText: () => ({width: 1}),
-        });
-        for (const parser of Parsers) {
-            registerBbcBasicLanguage(parser);
-            const codeEditor = editor.create(document.createElement("div"), {
-                value: "X=(1))",
-                language: LanguageId,
-            });
-            const model = codeEditor.getModel();
-            try {
-                colourBrackets(codeEditor);
-                // As Owlet does when it shows the implicit line numbers again.
-                codeEditor.updateOptions({lineNumbers: line => line * 10});
-                const {enabled} = model.getOptions().bracketPairColorizationOptions;
-                assert.strictEqual(enabled, parser === "monarch", parser);
-            } finally {
-                codeEditor.dispose();
-                model.dispose();
-            }
-        }
+    };
+    it("should give Monaco only the brackets that pair on their line and that BASIC accepts", () => {
+        for (const [text, expected] of [
+            ["PRINTLE.A$,1)", "1:8=0 1:13=0"],
+            ["P.LENMI.A$,2)", "1:8=0 1:13=0"],
+            ["PRINTLEFT$.RI.A$,2),1)", "1:11=0 1:14=1 1:19=1 1:22=0"],
+            // A ( with no ) does not pair with a ) on a later line or in a later statement, nor nest what follows.
+            ["PRINT (1+2\nPRINT 3)\nPRINT (4)", "3:7=0 3:9=0"],
+            ["PRINT (1:PRINT 2)", ""],
+            // A dot that is not an opener is not a bracket.
+            ["A=.5+(1.5)", "1:6=0 1:10=0"],
+            ["PRINT A.B)", ""],
+            ["P.X.7", ""],
+            // A bracket BASIC rejects stays in the colour of an error, and so its partner is not one of a pair.
+            ["PRINT LEFT$(A$,1,2)", ""],
+            ["P.(1+2))", "1:3=0 1:7=0"],
+            // An assembler block is the pair that spans lines.
+            ["[\nLDA (&70),Y\n]\nPRINT (1)", "1:1=0 2:5=1 2:9=1 3:1=0 4:7=0 4:9=0"],
+        ])
+            assert.strictEqual(paired(text), expected, text);
     });
 });
 
@@ -1035,6 +1186,7 @@ describe.each(Parsers)("Line warnings (%s)", parser => {
             const operator = text.slice(startColumn - 1, startColumn + 1);
             checkWarnings(text, {
                 message: `${operator} is not a BBC BASIC operator, did you mean ${replacement}?`,
+                code: "foreign-operator",
                 startColumn,
                 endColumn: startColumn + 2,
             });
@@ -1090,5 +1242,131 @@ describe.each(Parsers)("Quick fixes (%s)", parser => {
             result: "COLOUR",
         });
         assert.deepStrictEqual(applyQuickFix("A=2**3"), {title: "Replace with ^", result: "A=2^3"});
+    });
+});
+
+describe("Quick fixes and syntax markers", () => {
+    beforeAll(() => registerBbcBasicLanguage("new"));
+    // The titles of the quick fixes offered for every marker the editor has on the text.
+    function offered(text) {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const markers = [...getWarnings(text), ...getSyntaxMarkers(text)];
+            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            return actions.map(action => action.title);
+        } finally {
+            model.dispose();
+        }
+    }
+    it("should offer fixes only for the warnings, and never rewrite the text of a syntax marker", () => {
+        assert.deepStrictEqual(offered('print "lower"'), ["Replace with PRINT"]);
+        assert.deepStrictEqual(offered("GOTO 20 30"), []);
+        assert.deepStrictEqual(offered("x == 3"), ["Replace with ="]);
+    });
+});
+
+describe("Syntax markers", () => {
+    const Unfinished = rom => `Unfinished line: BASIC would stop with "${rom}" if it ended here`;
+    const markers = text =>
+        getSyntaxMarkers(text).map(m => [
+            m.severity,
+            m.message,
+            m.startLineNumber,
+            m.startColumn,
+            m.endColumn,
+        ]);
+    beforeAll(() => registerBbcBasicLanguage("new"));
+    it("should show a line that ends too soon as information at its end", () => {
+        assert.deepStrictEqual(markers("GOTO"), [
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 1, 5],
+        ]);
+        assert.deepStrictEqual(markers("10 FOR I=1 TO "), [
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 12, 15],
+        ]);
+        assert.deepStrictEqual(markers('X=1\nPRINT "HI'), [
+            [MarkerSeverity.Warning, Unfinished('Missing "'), 2, 7, 10],
+        ]);
+        assert.deepStrictEqual(markers("A$=LEFT$(X$"), [
+            [MarkerSeverity.Warning, Unfinished("Missing ,"), 1, 10, 12],
+        ]);
+    });
+    it("should say plainly what BASIC does where a marker is stricter than the ROM, as an error", () => {
+        const reads =
+            "LD is not an instruction: the register letter is missing. BASIC reads the 8 as X (LDX), so what follows is the address; probably LDA, LDX or LDY was meant";
+        assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 2, 4]]);
+    });
+    it("should show something missing from the middle of a statement at the token where it stops", () => {
+        const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
+        assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
+            [MarkerSeverity.Warning, Hole("Missing ,"), 1, 12, 13],
+        ]);
+    });
+    it("should not mark the line the cursor is on as unfinished, only the others", () => {
+        const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";
+        const at = line => getSyntaxMarkers(text, line).map(m => [m.severity, m.startLineNumber]);
+        const error = [MarkerSeverity.Error, 2];
+        assert.deepStrictEqual(at(0), [
+            [MarkerSeverity.Warning, 1],
+            error,
+            [MarkerSeverity.Warning, 3],
+        ]);
+        assert.deepStrictEqual(at(1), [error, [MarkerSeverity.Warning, 3]]);
+        assert.deepStrictEqual(at(2), [
+            [MarkerSeverity.Warning, 1],
+            error,
+            [MarkerSeverity.Warning, 3],
+        ]);
+        assert.deepStrictEqual(at(3), [[MarkerSeverity.Warning, 1], error]);
+    });
+    it("should leave a warning to say what it says about the same text", () => {
+        assert.deepStrictEqual(markers("x == 3"), []);
+        assert.deepStrictEqual(markers("A=2**3"), []);
+        assert.deepStrictEqual(markers("colour"), []);
+    });
+    it("should mark a block that is never closed once, at its [", () => {
+        const program = ["MODE 7", "[OPT 0", "LDA #", "STA &70 FOR", "RTS", "PRINT )", "END"].join(
+            "\n",
+        );
+        assert.deepStrictEqual(markers(program), [
+            [
+                MarkerSeverity.Error,
+                "Assembler block not closed: there is no ] after this [",
+                2,
+                1,
+                2,
+            ],
+        ]);
+        const closed = markers(`${program}\n]`);
+        assert.ok(
+            closed.length > 1 && closed.every(([, message]) => !message.startsWith("Assembler")),
+        );
+    });
+    it("should show a statement BASIC stops at with the error BASIC gives", () => {
+        const stop = rom => `${rom}: BASIC would stop at this statement`;
+        for (const [text, rom, start, end] of [
+            ["GOTO 20 30", "Syntax error", 9, 11],
+            ["PRINT )", "No such variable", 7, 8],
+            ["X=1+*", "No such variable", 5, 6],
+            ["FOR I=1:NEXT", "No TO", 7, 8],
+            ["A$=LEFT$(X$,1,2)", "Missing )", 16, 17],
+            ["A=1'", "Syntax error", 4, 5],
+        ])
+            assert.deepStrictEqual(
+                markers(text),
+                [[MarkerSeverity.Error, stop(rom), 1, start, end]],
+                text,
+            );
+    });
+    it("should show nothing for a line that is complete, and in the grammar", () => {
+        for (const text of ["GOTO 20", "FOR I=1 TO 10", "IF A=1 THEN PRINT 2", "REM GOTO 20 30"])
+            assert.deepStrictEqual(markers(text), [], text);
+        registerBbcBasicLanguage("monarch");
+        assert.deepStrictEqual(markers("GOTO\nGOTO 20 30"), []);
+        registerBbcBasicLanguage("new");
+    });
+    it("should follow an assembler block over the lines", () => {
+        assert.deepStrictEqual(markers("[\nLDA #\n]"), [
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 2, 5, 6],
+        ]);
     });
 });

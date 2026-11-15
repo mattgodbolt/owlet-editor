@@ -1,6 +1,10 @@
 import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
-import {Flags, keywords, immediateCommands} from "./tokens";
-import {tokensProvider} from "./parser/highlight";
+import {FirstStatementToken, Flags, keywords, immediateCommands, tokenChar} from "./tokens";
+import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
+import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
+import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
+import {programProblems, tokensProvider} from "./parser/highlight";
+import {BracketCollisions} from "./parser/lexer";
 
 export const LanguageId = "BBCBASIC";
 
@@ -25,10 +29,6 @@ function tokensRegex(kws) {
 }
 
 export const allTokensRegex = tokensRegex(keywords);
-
-export function tokenChar(kw) {
-    return String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token);
-}
 
 function byteTokensRegex(kws) {
     return `[${kws.map(tokenChar).join("")}]`;
@@ -94,9 +94,6 @@ const AsmBadDirective = new RegExp(`${anyCase("EQU")}[bdsw]`);
 
 const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}`;
 
-// BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
-export const FirstStatementToken = 0xc6;
 export const statementKeywords = new Set([
     "ELSE",
     ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),
@@ -136,18 +133,7 @@ const hiddenOpenParens = [
     ...abbreviations.filter(abbreviation => abbreviatedKeyword(abbreviation).keyword.endsWith("(")),
 ];
 
-// Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
-// its lower-case form (END, U+00E0). Those are tagged "string", which keeps them out of bracket matching.
-const bracketCollisionRegex = (() => {
-    const tokenChars = new Set(keywords.map(tokenChar));
-    const collisions = openParenKeywords
-        .map(kw => tokenChar(kw).toLowerCase())
-        .filter(
-            lower =>
-                tokenChars.has(lower) && !openParenKeywords.some(kw => tokenChar(kw) === lower),
-        );
-    return new RegExp(`[${collisions.join("")}]`);
-})();
+const bracketCollisionRegex = new RegExp(`[${[...BracketCollisions].join("")}]`);
 
 // The tokeniser reads the numbers after these as line numbers. THEN and ELSE also end their statement.
 const lineNumberKeywords = keywords
@@ -164,6 +150,17 @@ const StrTilde = [
 ];
 // An operator, separator or "(" after which an operand is expected.
 const BeforeOperand = {cases: {"\\(": "@brackets", "@operators": "operator", "@default": "symbol"}};
+
+// Monaco's MetadataConsts.BALANCED_BRACKETS_MASK: it looks for brackets only in the text of tokens that have it, and
+// keeps neighbours that differ in it apart, so an opener such as LE. is found though the keyword before it touches it.
+const BalancedBrackets = 1024;
+
+function tokenMetadata(scopes, bracket) {
+    const theme = StandaloneServices.get(IStandaloneThemeService).getColorTheme().tokenTheme;
+    const language =
+        StandaloneServices.get(ILanguageService).languageIdCodec.encodeLanguageId(LanguageId);
+    return (theme.match(language, scopes) | (bracket ? BalancedBrackets : 0)) >>> 0;
+}
 
 // ?parser=new in the URL picks the tokenizer in src/parser over the Monarch grammar below, for the same language.
 let newParser = false;
@@ -397,8 +394,9 @@ export function registerBbcBasicLanguage(
             ["[", "]"],
             ["(", ")"],
             // A spelling that ends in "(" is opened by that "(", which leaves the keyword before it uncoloured as a bracket.
-            ...hiddenOpenParens
-                .filter(open => !newParser && !open.endsWith("("))
+            // The new tokenizer sets the bracket bit on the "." of an abbreviation, and on a raw token.
+            ...(newParser ? [".", ...openParenKeywords.map(tokenChar)] : hiddenOpenParens)
+                .filter(open => !open.endsWith("("))
                 .map(open => [open.toLowerCase(), ")"]),
         ],
         autoClosingPairs: [
@@ -420,31 +418,19 @@ export function registerBbcBasicLanguage(
 
     registrations = [
         newParser
-            ? languages.setTokensProvider(LanguageId, tokensProvider(LanguageId))
+            ? languages.setTokensProvider(LanguageId, tokensProvider(LanguageId, tokenMetadata))
             : languages.setMonarchTokensProvider(LanguageId, grammar),
         configuration,
         languages.registerCodeActionProvider(LanguageId, codeActionProvider),
     ];
 }
 
-// Monaco colours brackets from the text, not the tokens, so with the new tokenizer, which marks unmatched brackets
-// itself, that is off. Monaco does not pass the editor's option on to the model, and resets the model's from its
-// configuration whenever an editor option changes, so the model is given it, and given it again.
-export function colourBrackets(codeEditor) {
-    const options = {enabled: !newParser, independentColorPoolPerBracketType: false};
-    codeEditor.updateOptions({bracketPairColorization: options});
-    const model = codeEditor.getModel();
-    const apply = () =>
-        model.getOptions().bracketPairColorizationOptions.enabled === options.enabled ||
-        model.updateOptions({bracketColorizationOptions: options});
-    apply();
-    return model.onDidChangeOptions(apply);
-}
-
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
 export const codeActionProvider = {
     provideCodeActions(model, range, context) {
-        const actions = context.markers.map(marker => {
+        // Only the warnings above come with a fix; the text under any other marker is not to be rewritten.
+        const fixable = context.markers.filter(marker => QuickFixCodes.has(marker.code));
+        const actions = fixable.map(marker => {
             const text = model.getValueInRange(marker);
             if (marker.code === SpaceAfterAbbreviationCode) {
                 const abbreviation = text.slice(0, text.indexOf(".") + 1);
@@ -482,6 +468,13 @@ const LowerCaseTokenRegex = new RegExp(
 );
 
 const SpaceAfterAbbreviationCode = "space-after-abbreviation";
+const LowerCaseKeywordCode = "lowercase-keyword";
+const ForeignOperatorCode = "foreign-operator";
+const QuickFixCodes = new Set([
+    SpaceAfterAbbreviationCode,
+    LowerCaseKeywordCode,
+    ForeignOperatorCode,
+]);
 
 const InvalidOperatorMap = new Map([
     ["==", "="],
@@ -498,6 +491,45 @@ export function getWarnings(text) {
     return editor
         .tokenize(text, LanguageId)
         .flatMap((lineTokens, i) => lineWarnings(i + 1, lines[i], lineTokens));
+}
+
+// The markers for the lines BASIC would stop at, and for those that end too soon or have something missing; only the
+// new tokenizer knows either. A line is unfinished while the cursor is on it (`cursorLine`) and so is not marked then,
+// and a warning that covers the same text says enough.
+export function getSyntaxMarkers(text, cursorLine = 0) {
+    if (!newParser) return [];
+    const warnings = getWarnings(text);
+    return programProblems(text).flatMap(
+        ({line, start, end, message, unfinished, hole, unclosed, stricter}) => {
+            const covered = warnings.some(
+                warning =>
+                    warning.startLineNumber === line &&
+                    warning.startColumn <= end &&
+                    start + 1 < warning.endColumn,
+            );
+            if (covered || (unfinished && line === cursorLine)) return [];
+            const rom = message ? ` with "${message}"` : "";
+            const text = unclosed
+                ? "Assembler block not closed: there is no ] after this ["
+                : stricter
+                  ? message
+                  : unfinished
+                    ? hole
+                        ? `Unfinished statement: BASIC would stop${rom} here`
+                        : `Unfinished line${message ? `: BASIC would stop${rom} if it ended here` : ""}`
+                    : `${message || "Error"}: BASIC would stop at this statement`;
+            return [
+                {
+                    severity: unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error,
+                    message: text,
+                    startLineNumber: line,
+                    startColumn: start + 1,
+                    endLineNumber: line,
+                    endColumn: end + 1,
+                },
+            ];
+        },
+    );
 }
 
 function lineWarnings(lineNum, line, lineTokens) {
@@ -522,6 +554,7 @@ function lineWarnings(lineNum, line, lineTokens) {
             if (immediateCommands.includes(upper)) continue;
             warn(token.offset, match[0].length, {
                 message: `BASIC keywords should be upper case, did you mean ${upper}?`,
+                code: LowerCaseKeywordCode,
             });
         }
     }
@@ -540,6 +573,7 @@ function lineWarnings(lineNum, line, lineTokens) {
         if (InvalidOperatorMap.has(badOperator)) {
             warn(token.offset, 2, {
                 message: `${badOperator} is not a BBC BASIC operator, did you mean ${InvalidOperatorMap.get(badOperator)}?`,
+                code: ForeignOperatorCode,
             });
         }
     }
