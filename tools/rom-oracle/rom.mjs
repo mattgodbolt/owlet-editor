@@ -40,7 +40,9 @@ const Wordv = 0x20c;
 const Rdchv = 0x210;
 const ErrorPointer = 0xfd;
 const InputBuffer = 0x700;
-const MaxLineLength = 238;
+export const MaxLineLength = 238;
+const Page = 0x18;
+const ResidentIntegers = 0x400;
 const TimeoutSecs = 0.3;
 const MaxInputs = 3;
 
@@ -109,5 +111,30 @@ export async function createRom() {
             .join("");
         return {error: bytes[0], message};
     };
-    return {run, destroy: () => session.destroy()};
+    const integer = name =>
+        word(session.readMemory(ResidentIntegers + 4 * (name.charCodeAt(0) - 64), 2));
+
+    // An assembler statement in [ ] is run after a DIM that points P% at free memory, and also returns the bytes
+    // it assembled as hex.
+    const assemble = async text => {
+        const verdict = await run(`DIM P% 100:Q%=P%:${text}`);
+        if (verdict.error !== null || verdict.timeout) return verdict;
+        const start = integer("Q");
+        const bytes = [...session.readMemory(start, Math.max(0, integer("P") - start))];
+        return {...verdict, bytes};
+    };
+
+    // BASIC II's own tokenisation of the text, read back from the program after entering it as line 1.
+    const tokenise = async text => {
+        if (/^\d/.test(text)) throw new Error(`A line number would swallow the start of: ${text}`);
+        if (text.length > MaxLineLength - 1) throw new Error(`Line too long for BASIC: ${text}`);
+        session.restore(atPrompt);
+        answer(InputBuffer, `1${text}`);
+        await nextLineRead();
+        const page = 256 * session.readMemory(Page, 1)[0];
+        const [cr, high, low, length] = session.readMemory(page, 4);
+        if (cr !== 13 || high !== 0 || low !== 1) throw new Error(`Line 1 was not stored: ${text}`);
+        return [...session.readMemory(page + 4, length - 4)];
+    };
+    return {run, assemble, tokenise, destroy: () => session.destroy()};
 }

@@ -46,6 +46,36 @@ Then visit http://localhost:8080
 
 Owlet Editor uses Vite as its build system. The project was migrated from webpack to Vite to align with the jsbeeb dependency, which also uses Vite.
 
+## Highlighting: what red means
+
+Red means that BBC BASIC II would stop with an error at that statement if it ran it.
+
+- **Never red on code the ROM accepts.** The number of false-invalids (the ROM runs a statement, the editor shows it
+  red) must be 0 on the recorded tables, the ROM oracle and the saved programs.
+- **Text that is not code is never red:** a comment after `REM`, the items after `DATA`, a `*` command, and the rest
+  of a line after an `ELSE` that starts a statement or a `DEF` that is not `DEF FN` or `DEF PROC`, and an `ON ... GOTO`
+  list after its first target, all of which BASIC skips.
+- **Code is red if it would stop BASIC when run, even where it cannot run** (on purpose):
+  - the branch of an `IF` whose condition is false, which BASIC skips;
+  - the body of a `DEF FN` or `DEF PROC`, which BASIC skips on its way through the program and runs only when called;
+  - statements after `GOTO`, `END`, `ENDPROC`, `RETURN`, `STOP` or a function's `=` on the same line, which can
+    never run. Acorn's Welcome disc has one: `IF CHAR=2 THEN=45:FORCE -` (line 7310 of `W.KEYBD`) is red, and its
+    `FORCE -` can never run.
+- **False-valids are measured, not gated.** Where the ROM rejects a statement and nothing is red, that is reported by
+  the oracle, but it is never a reason to fail a change.
+- **Stricter than the ROM only on purpose.** Each other deliberate exception, such as text after a complete assembler
+  instruction, is a row of the recorded table listed as stricter than the ROM in its test.
+
+Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
+`src/bbcbasic.js`: a port of the ROM's tokeniser, a recogniser that marks the token at which BASIC would stop with an
+error, and the assembler. The default is still the Monarch grammar.
+
+Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
+statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
+`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict. Before a change
+to highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on generated statements
+(see the comment at its top).
+
 ## Known Issues
 
 - An abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.
