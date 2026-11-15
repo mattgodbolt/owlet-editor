@@ -162,23 +162,24 @@ export const PlotColumns = [
     {offset: 7, position: "absolute", action: "background colour"},
 ];
 
+// gxr: not drawn by a BBC B without the Graphics Extension ROM; the Master has it built in.
 export const PlotGroups = [
     {base: 0, name: "Solid line, both ends included"},
     {base: 8, name: "Solid line, final point omitted"},
     {base: 16, name: "Dotted line, both ends included"},
     {base: 24, name: "Dotted line, final point omitted"},
-    {base: 32, name: "Solid line, initial point omitted"},
-    {base: 40, name: "Solid line, both ends omitted"},
-    {base: 48, name: "Dotted line, initial point omitted"},
-    {base: 56, name: "Dotted line, both ends omitted"},
+    {base: 32, name: "Solid line, initial point omitted", gxr: true},
+    {base: 40, name: "Solid line, both ends omitted", gxr: true},
+    {base: 48, name: "Dotted line, initial point omitted", gxr: true},
+    {base: 56, name: "Dotted line, both ends omitted", gxr: true},
     {base: 64, name: "Plot a point"},
     {base: 72, name: "Fill row left and right to non-background"},
     {base: 80, name: "Fill triangle"},
     {base: 88, name: "Fill row right to background"},
-    {base: 96, name: "Fill rectangle"},
-    {base: 104, name: "Fill row left and right to foreground"},
-    {base: 112, name: "Fill parallelogram"},
-    {base: 120, name: "Fill row right to non-foreground"},
+    {base: 96, name: "Fill rectangle", gxr: true},
+    {base: 104, name: "Fill row left and right to foreground", gxr: true},
+    {base: 112, name: "Fill parallelogram", gxr: true},
+    {base: 120, name: "Fill row right to non-foreground", gxr: true},
 ];
 
 // Added by the Graphics Extension ROM (and built in to the Master); the columns are as above except for block copy.
@@ -203,7 +204,7 @@ export function decodePlot(k) {
     const basic = PlotGroups.find(g => g.base === base);
     if (basic) {
         const {position, action} = PlotColumns[k - base];
-        return {k, group: basic.name, column: `${position}, ${action}`};
+        return {k, group: basic.name, column: `${position}, ${action}`, gxr: Boolean(basic.gxr)};
     }
     const extended = PlotExtendedGroups.find(g => g.base === base);
     return extended ? {k, group: extended.name, column: null} : null;

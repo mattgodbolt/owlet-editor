@@ -94,12 +94,28 @@ describe("PLOT data", () => {
         [5, "PLOT 5 = Solid line, both ends included, absolute, foreground colour"],
         [69, "PLOT 69 = Plot a point, absolute, foreground colour"],
         [85, "PLOT 85 = Fill triangle, absolute, foreground colour"],
-        [101, "PLOT 101 = Fill rectangle, absolute, foreground colour"],
-        [117, "PLOT 117 = Fill parallelogram, absolute, foreground colour"],
+        [101, "PLOT 101 = Fill rectangle, absolute, foreground colour (GXR / Master)"],
+        [117, "PLOT 117 = Fill parallelogram, absolute, foreground colour (GXR / Master)"],
         [81, "PLOT 81 = Fill triangle, relative, foreground colour"],
+        [
+            37,
+            "PLOT 37 = Solid line, initial point omitted, absolute, foreground colour (GXR / Master)",
+        ],
+        [
+            125,
+            "PLOT 125 = Fill row right to non-foreground, absolute, foreground colour (GXR / Master)",
+        ],
         [150, "PLOT 150 = Circle outline (GXR / Master; the columns are not labelled here)"],
     ])("decodes PLOT %i", (k, text) => {
         expect(describePlot(k)).toBe(text);
+    });
+
+    it("marks as GXR / Master exactly 32-63, 96-127 and 128 up (checked on a B and a Master in jsbeeb)", () => {
+        const needsGxr = PlotGroups.filter(g => g.gxr).map(g => g.base);
+        expect(needsGxr).toEqual([32, 40, 48, 56, 96, 104, 112, 120]);
+        expect(PlotGroups.filter(g => !g.gxr).map(g => g.base)).toEqual([
+            0, 8, 16, 24, 64, 72, 80, 88,
+        ]);
     });
 
     it("decodes nothing beyond the known groups", () => {
@@ -161,6 +177,9 @@ describe("the panel", () => {
         container.querySelector('[data-tab="plot"]').click();
         expect(count(".plot-cell")).toBe((PlotGroups.length + PlotExtendedGroups.length) * 8);
         expect(count(".plot-decode")).toBe(0);
+        expect(count(".plot-title .vdu-hint")).toBe(
+            PlotGroups.filter(g => g.gxr).length + PlotExtendedGroups.length,
+        );
     });
 
     it("decodes a number typed in the search and highlights it in the grid", () => {
