@@ -14,7 +14,8 @@ const monacoEditorPlugin = monacoEditorPluginModule.default ?? monacoEditorPlugi
 // Get the directory name equivalent in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
-// CI sets GITHUB_SHA; elsewhere ask git, and carry on without a sha if that fails (e.g. a tarball)
+// CI sets GITHUB_SHA; elsewhere ask git, and carry on without a sha if that fails (e.g. a tarball).
+// Only builds carry a sha: a dev server serves uncommitted work, so it says so.
 function gitSha() {
     if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
     try {
@@ -27,9 +28,9 @@ function gitSha() {
     }
 }
 
-export default defineConfig({
+export default defineConfig(({command}) => ({
     define: {
-        "import.meta.env.OWLET_GIT_SHA": JSON.stringify(gitSha()),
+        "import.meta.env.OWLET_GIT_SHA": JSON.stringify(command === "build" ? gitSha() : ""),
         "import.meta.env.OWLET_BUILD_DATE": JSON.stringify(new Date().toISOString().slice(0, 10)),
     },
     plugins: [
@@ -94,4 +95,4 @@ export default defineConfig({
             },
         },
     },
-});
+}));
