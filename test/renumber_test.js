@@ -1,5 +1,10 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
-import {followImplicitLineNumbers, lineNumberReferences, renumberReferences} from "../src/renumber";
+import {
+    followImplicitLineNumbers,
+    lineNumberReferences,
+    lineNumberTokens,
+    renumberReferences,
+} from "../src/renumber";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -34,6 +39,23 @@ describe("renumberReferences", () => {
         expect(lineNumberReferences("PRINT\nON X GOTO 10,200")).toEqual([
             {lineNumber: 2, startColumn: 11, endColumn: 13, target: 10},
             {lineNumber: 2, startColumn: 14, endColumn: 17, target: 200},
+        ]);
+    });
+
+    it("should say which keyword each reference follows, however it is spelled", () => {
+        const text = "10 G.20:GOS.30:IF X TH.40 EL.50\n\xe560\nON X GOTO 70,80\nLIST 90";
+        expect(
+            lineNumberTokens(text).map(({target, own, keyword}) => [target, own, keyword]),
+        ).toEqual([
+            [10, true, undefined],
+            [20, false, "GOTO"],
+            [30, false, "GOSUB"],
+            [40, false, "THEN"],
+            [50, false, "ELSE"],
+            [60, false, "GOTO"],
+            [70, false, "GOTO"],
+            [80, false, "GOTO"],
+            [90, false, "LIST"],
         ]);
     });
 });

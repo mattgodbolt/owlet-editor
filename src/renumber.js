@@ -1,34 +1,66 @@
 import {editor, Selection} from "monaco-editor/esm/vs/editor/editor.api";
-import {LanguageId} from "./bbcbasic";
+import {abbreviatedKeyword, LanguageId} from "./bbcbasic";
+import {keywords, tokenChar} from "./tokens";
 
 const LineNumberType = `constant.linenum.${LanguageId}`;
 const WhiteType = `white.${LanguageId}`;
-const ImplicitLineNumberStep = 10;
+export const ImplicitLineNumberStep = 10;
 const ExplicitLineNumberRegex = /^\s*\d/;
 
-// The line numbers the program refers to, as the tokeniser reads them: {lineNumber, startColumn, endColumn, target},
-// where lineNumber is the editor's line and target is the BASIC line number referred to.
-export function lineNumberReferences(text) {
+// Every number the tokeniser reads as a line number: {lineNumber, startColumn, endColumn, target, own, keyword}, where
+// lineNumber is the editor's line, target is the number, own says it starts its line and so is that line's own number,
+// and keyword is the BASIC keyword a reference follows (GOTO, THEN...), undefined for an own number.
+export function lineNumberTokens(text) {
     const lines = text.split("\n");
     return editor.tokenize(text, LanguageId).flatMap((lineTokens, index) =>
         lineTokens.flatMap((token, tokenIndex) => {
-            // A number that starts a line is that line's own number.
-            const ownNumber = lineTokens.slice(0, tokenIndex).every(t => t.type === WhiteType);
-            if (token.type !== LineNumberType || ownNumber) return [];
+            if (token.type !== LineNumberType) return [];
             const end =
                 tokenIndex + 1 < lineTokens.length
                     ? lineTokens[tokenIndex + 1].offset
                     : lines[index].length;
+            const own = lineTokens.slice(0, tokenIndex).every(t => t.type === WhiteType);
             return [
                 {
                     lineNumber: index + 1,
                     startColumn: token.offset + 1,
                     endColumn: end + 1,
                     target: Number(lines[index].slice(token.offset, end)),
+                    own,
+                    keyword: own
+                        ? undefined
+                        : precedingKeyword(lines[index], lineTokens, tokenIndex),
                 },
             ];
         }),
     );
+}
+
+// The keyword in full, as the table has it, from how the program spells it: whole, abbreviated or as its token.
+function precedingKeyword(line, lineTokens, tokenIndex) {
+    const index = lineTokens.findLastIndex(
+        (token, i) => i < tokenIndex && token.type.startsWith("keyword"),
+    );
+    if (index < 0) return undefined;
+    const text = line.slice(lineTokens[index].offset, lineTokens[index + 1].offset).trim();
+    const byToken = keywords.find(kw => tokenChar(kw) === text);
+    if (byToken) return byToken.keyword;
+    return text.endsWith(".")
+        ? abbreviatedKeyword(text.toUpperCase())?.keyword
+        : text.toUpperCase();
+}
+
+// The line numbers the program refers to, as the tokeniser reads them: {lineNumber, startColumn, endColumn, target},
+// where lineNumber is the editor's line and target is the BASIC line number referred to.
+export function lineNumberReferences(text) {
+    return lineNumberTokens(text)
+        .filter(token => !token.own)
+        .map(({lineNumber, startColumn, endColumn, target}) => ({
+            lineNumber,
+            startColumn,
+            endColumn,
+            target,
+        }));
 }
 
 function renumberEdits(references, oldToNew) {

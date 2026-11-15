@@ -15,6 +15,7 @@ import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getSyntaxMarkers, getWarnings, LanguageId} from "./bbcbasic";
+import {getLineNumberMarkers} from "./line-numbers";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -158,8 +159,9 @@ export class OwletEditor {
         monacoEditor.setModelMarkers(model, "warnings", getWarnings(model.getValue()));
     }
 
-    // The markers for lines that end too soon would be wrong while the line is still being typed, so they come only
-    // after the typing stops. The old ones stay until then; Monaco moves them along with the text.
+    // The markers for lines that end too soon, and for lines that are not there yet, would be wrong while the line is
+    // still being typed, so they come only after the typing stops. The old ones stay until then; Monaco moves them
+    // along with the text.
     updateSyntaxMarkers() {
         clearTimeout(this.syntaxTimer);
         this.syntaxTimer = setTimeout(() => this.showSyntaxMarkers(), SyntaxMarkerDelayMs);
@@ -174,6 +176,11 @@ export class OwletEditor {
             model,
             "syntax",
             getSyntaxMarkers(model.getValue(), this.syntaxCursorLine),
+        );
+        monacoEditor.setModelMarkers(
+            model,
+            "lineNumbers",
+            getLineNumberMarkers(model.getValue(), this.syntaxCursorLine),
         );
     }
 
