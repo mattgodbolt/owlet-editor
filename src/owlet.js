@@ -88,6 +88,17 @@ export class OwletEditor {
             run: () => this.expandCode(),
         });
 
+        // Alt+F8 and Ctrl+. are often intercepted outside the page (the problem hover advertises them); these come
+        // later, so the hover footer shows them instead.
+        monacoEditor.addKeybindingRules([
+            {
+                keybinding: KeyMod.Alt | KeyCode.Enter,
+                command: "editor.action.quickFix",
+                when: "editorTextFocus",
+            },
+            {keybinding: KeyCode.F8, command: "editor.action.marker.next", when: "editorFocus"},
+        ]);
+
         followImplicitLineNumbers(this.editor);
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
