@@ -160,7 +160,7 @@ describe("the panel", () => {
 
     it.each([
         [22, "VDU 22 does not"],
-        [23, "6845"],
+        [23, "6845 register"],
         [26, "graphics origin"],
         [30, "VDU 5 in effect"],
     ])("explains VDU %i beyond its name", (code, phrase) => {
@@ -170,6 +170,8 @@ describe("the panel", () => {
         search(`&${code.toString(16)}`);
         expect(text()).toContain(note);
         expect(container.querySelectorAll(".vdu-row")).toHaveLength(1);
+        search(phrase);
+        expect(text()).toContain(note);
     });
 
     it("shows all the PLOT codes on the PLOT tab", () => {
