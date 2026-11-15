@@ -2,6 +2,7 @@
 
 export const hex = code => `&${code.toString(16).toUpperCase().padStart(2, "0")}`;
 
+// An entry's `note` is extra behaviour that its name does not carry.
 // In `syntax`, a name followed by ; is a 16-bit value sent as two bytes, low then high.
 export const VduCodes = [
     {code: 0, params: 0, syntax: "VDU 0", name: "Does nothing"},
@@ -50,6 +51,7 @@ export const VduCodes = [
         syntax: "VDU 22,mode",
         name: "Select the screen mode (MODE)",
         example: ["VDU 22,7", "is MODE 7"],
+        note: "MODE also lowers HIMEM to the start of screen memory; VDU 22 does not, so after VDU 22,2 BASIC's stack just below HIMEM scribbles on the screen.",
     },
     {
         code: 23,
@@ -57,6 +59,7 @@ export const VduCodes = [
         syntax: "VDU 23,char,b1,b2,b3,b4,b5,b6,b7,b8",
         name: "Define a character: eight rows of pixels, top to bottom, one bit per pixel",
         example: ["VDU 23,224,255,129,129,129,129,129,129,255", "makes CHR$(224) a hollow square"],
+        note: "VDU 23,0,reg,value,0,0,0,0,0,0 sets a 6845 register, and VDU 23,1,0;0;0;0; hides the cursor. The Master, or a BBC B with GXR, also has VDU 23,6 line patterns.",
     },
     {
         code: 24,
@@ -71,7 +74,13 @@ export const VduCodes = [
         name: "PLOT k,x,y (see the PLOT tab for k)",
         example: ["VDU 25,4,640;512;", "is MOVE 640,512"],
     },
-    {code: 26, params: 0, syntax: "VDU 26", name: "Restore the default windows"},
+    {
+        code: 26,
+        params: 0,
+        syntax: "VDU 26",
+        name: "Restore the default windows",
+        note: "Also puts the graphics origin and graphics cursor at the bottom left and the text cursor at the top left. On the Master with VDU 5 in effect, the graphics cursor goes to the top left and the text cursor stays.",
+    },
     {code: 27, params: 0, syntax: "VDU 27", name: "Does nothing (Escape)"},
     {
         code: 28,
@@ -87,7 +96,13 @@ export const VduCodes = [
         name: "Move the graphics origin (ORIGIN)",
         example: ["VDU 29,640;512;", "is ORIGIN 640,512: the centre of the screen"],
     },
-    {code: 30, params: 0, syntax: "VDU 30", name: "Home the text cursor to the top left"},
+    {
+        code: 30,
+        params: 0,
+        syntax: "VDU 30",
+        name: "Home the text cursor to the top left",
+        note: "With VDU 5 in effect it moves the graphics cursor to the top left instead and leaves the text cursor alone.",
+    },
     {
         code: 31,
         params: 2,
@@ -147,23 +162,24 @@ export const PlotColumns = [
     {offset: 7, position: "absolute", action: "background colour"},
 ];
 
+// gxr: not drawn by a BBC B without the Graphics Extension ROM; the Master has it built in.
 export const PlotGroups = [
     {base: 0, name: "Solid line, both ends included"},
     {base: 8, name: "Solid line, final point omitted"},
     {base: 16, name: "Dotted line, both ends included"},
     {base: 24, name: "Dotted line, final point omitted"},
-    {base: 32, name: "Solid line, initial point omitted"},
-    {base: 40, name: "Solid line, both ends omitted"},
-    {base: 48, name: "Dotted line, initial point omitted"},
-    {base: 56, name: "Dotted line, both ends omitted"},
+    {base: 32, name: "Solid line, initial point omitted", gxr: true},
+    {base: 40, name: "Solid line, both ends omitted", gxr: true},
+    {base: 48, name: "Dotted line, initial point omitted", gxr: true},
+    {base: 56, name: "Dotted line, both ends omitted", gxr: true},
     {base: 64, name: "Plot a point"},
     {base: 72, name: "Fill row left and right to non-background"},
     {base: 80, name: "Fill triangle"},
     {base: 88, name: "Fill row right to background"},
-    {base: 96, name: "Fill rectangle"},
-    {base: 104, name: "Fill row left and right to foreground"},
-    {base: 112, name: "Fill parallelogram"},
-    {base: 120, name: "Fill row right to non-foreground"},
+    {base: 96, name: "Fill rectangle", gxr: true},
+    {base: 104, name: "Fill row left and right to foreground", gxr: true},
+    {base: 112, name: "Fill parallelogram", gxr: true},
+    {base: 120, name: "Fill row right to non-foreground", gxr: true},
 ];
 
 // Added by the Graphics Extension ROM (and built in to the Master); the columns are as above except for block copy.
@@ -188,7 +204,7 @@ export function decodePlot(k) {
     const basic = PlotGroups.find(g => g.base === base);
     if (basic) {
         const {position, action} = PlotColumns[k - base];
-        return {k, group: basic.name, column: `${position}, ${action}`};
+        return {k, group: basic.name, column: `${position}, ${action}`, gxr: Boolean(basic.gxr)};
     }
     const extended = PlotExtendedGroups.find(g => g.base === base);
     return extended ? {k, group: extended.name, column: null} : null;
