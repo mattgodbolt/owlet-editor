@@ -89,6 +89,17 @@ export class OwletEditor {
             run: () => this.expandCode(),
         });
 
+        // Alt+F8 and Ctrl+. are often intercepted outside the page (the problem hover advertises them); these come
+        // later, so the hover footer shows them instead.
+        monacoEditor.addKeybindingRules([
+            {
+                keybinding: KeyMod.Alt | KeyCode.Enter,
+                command: "editor.action.quickFix",
+                when: "editorTextFocus",
+            },
+            {keybinding: KeyCode.F8, command: "editor.action.marker.next", when: "editorFocus"},
+        ]);
+
         followImplicitLineNumbers(this.editor);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
