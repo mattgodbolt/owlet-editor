@@ -5,6 +5,7 @@ import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/co
 import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
 import {programProblems, tokensProvider} from "./parser/highlight";
 import {BracketCollisions} from "./parser/lexer";
+import {JunkAfterInstructionCode} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
 
@@ -443,6 +444,16 @@ export const codeActionProvider = {
                 };
                 return quickFix(model, marker, `Insert a space after ${abbreviation}`, at, " ");
             }
+            if (marker.code === JunkAfterInstructionCode) {
+                const at = {
+                    ...marker,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn,
+                };
+                return text[0] === "]"
+                    ? quickFix(model, marker, "Insert : before ]", at, ":")
+                    : quickFix(model, marker, "Insert ; before the junk", at, ";");
+            }
             const replacement = InvalidOperatorMap.get(text) || text.toUpperCase();
             return quickFix(model, marker, `Replace with ${replacement}`, marker, replacement);
         });
@@ -474,6 +485,7 @@ const QuickFixCodes = new Set([
     SpaceAfterAbbreviationCode,
     LowerCaseKeywordCode,
     ForeignOperatorCode,
+    JunkAfterInstructionCode,
 ]);
 
 const InvalidOperatorMap = new Map([
@@ -500,7 +512,7 @@ export function getSyntaxMarkers(text, cursorLine = 0) {
     if (!newParser) return [];
     const warnings = getWarnings(text);
     return programProblems(text).flatMap(
-        ({line, start, end, message, unfinished, hole, unclosed, stricter}) => {
+        ({line, start, end, message, unfinished, hole, unclosed, stricter, code}) => {
             const covered = warnings.some(
                 warning =>
                     warning.startLineNumber === line &&
@@ -526,6 +538,7 @@ export function getSyntaxMarkers(text, cursorLine = 0) {
                     startColumn: start + 1,
                     endLineNumber: line,
                     endColumn: end + 1,
+                    ...(code && {code}),
                 },
             ];
         },

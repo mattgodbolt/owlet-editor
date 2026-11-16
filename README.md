@@ -129,8 +129,16 @@ of the line could change that. The colours are a function of the text alone, whe
 Text the ROM runs without error that is red on purpose, because it is almost always a mistake. Each has a hover
 message that says what BASIC does, and shows as an error.
 
-- **A keyword after a complete assembler instruction** (`NOP PRINT`, `LDA #1 FOR`). BASIC ignores the rest of the
-  statement; text there that is not a `;` or `\` comment is probably a comment missing its `;`.
+- **Anything but a comment after a complete assembler instruction** (`NOP PRINT`, `LDA #1 hello`, `NOP 5`,
+  `LDA #1 ,X`, `LDA #1]`). BASIC ignores the rest of the statement up to the next `:`; the first thing there that is
+  not a `;` or `\` comment is red (just that token), probably a comment missing its `;`. A `]` there is the commonest
+  case. It does not close the block: BASIC ignores it like the rest and goes on assembling, so after
+  `[LDA #1]` the next line `tax=1` is assembled as `TAX` followed by ignored junk, not run as an assignment
+  (`[OPT0:NOP]:tax=1` assembles `EA AA`). A `]` after the colon closes it (`[OPT0:NOP]:]:P%=P%+5` runs the
+  assignment), as `[LDA #1:]` does. The hover for a `]` says that a `:` is probably missing before it. Flagging the junk
+  and the two quick fixes, "Insert : before ]" for a `]` and "Insert ; before the junk" for the rest, were suggested by
+  Olly Betts on #174. The oracle takes these marks on trust as ignored text (cutting the statement there changes
+  nothing, so it cannot test them) and lists them as STRICTER.
 - **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`). BASIC compares only
   the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A` and so on: `LD89` is `LDX 9`, but
   is an easy typo for `LDA89`, `LDX89` or `LDY89`. Olly Betts suggested on #174 marking this, and marking the `LD` (in
@@ -154,5 +162,5 @@ generated statements (see the comment at its top).
 ## Known Issues
 
 - With the default tokenizer (not `?parser=new`), an abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.
-- In assembler, a statement keyword after a complete instruction, as in `LDA #1 FOR` or `NOP PRINT`, is highlighted as invalid on purpose. BBC BASIC ignores the rest of the statement, but text there that is not a `;` or `\` comment is almost always a mistake, such as a comment missing its `;`.
+- In assembler, anything but a `;` or `\` comment after a complete instruction, as in `LDA #1 FOR`, `NOP 5` or `LDA #1]`, is highlighted as invalid on purpose. BBC BASIC ignores the rest of the statement, but this is almost always a mistake, such as a comment missing its `;` or a `:` missing before the `]`.
 - When running tests, you may see warnings about missing source maps for Monaco Editor. This is a [known issue with Monaco Editor 0.52.0+](https://github.com/microsoft/monaco-editor/issues/4712) and doesn't affect functionality.
