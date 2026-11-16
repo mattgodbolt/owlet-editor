@@ -30,6 +30,10 @@ const StricterThanRom = [
     "[OPT0:SBC (&70)+1:]",
     "[OPT0:STA (&70)+1:]",
     "[OPT0:JMP (&70)+1:]",
+    ...["(1)+(2,X)", "(1)+2", "(1)+(2)", "(1) LDA 2", "(1))+2", "(1)(2)", "(1)+(2,Y)"].map(
+        o => `[OPT0:JMP ${o}:]`,
+    ),
+    "[OPT0:JMP (1)+(2,X)]",
     "[OPT0:LDA (&70),Ya:]",
     "[OPT0:LDA (&70),y,x:]",
     "[OPT0:INC A,X:]",
@@ -198,14 +202,35 @@ describe("Each BASIC's own recorded rows", () => {
         expect(stops(text)).toBe(false);
     });
     it.each(["[OPT0:JMP (&1234,X):]", "[OPT0:JMP (&1234,x):]"])(
-        "%j is red for BASIC II and runs on BASIC IV (BASIC II's own row waits for #224)",
+        "%j is an Index error on BASIC II and runs on BASIC IV",
         text => {
+            expect(verdicts.get(text)).toBe("Index");
             expect(masterVerdicts.get(text)).toBe("ok");
             expect(stops(text)).toBe(true);
             setBasicIV(true);
             expect(stops(text)).toBe(false);
         },
     );
+    // A ( after JMP is indirect addressing: what follows the ) is ignored on both BASICs.
+    it.each([
+        ["[OPT0:JMP (1)+(2,X):]", "ok", "ok"],
+        ["[OPT0:JMP (1)+2:]", "ok", "ok"],
+        ["[OPT0:JMP (1) LDA 2:]", "ok", "ok"],
+        ["[OPT0:JMP (1,X):]", "Index", "ok"],
+        ["[OPT0:JMP (1)+(2,Y):]", "ok", "ok"],
+        ["[OPT0:JMP (&1234,Y):]", "Index", "Index"],
+        ["[OPT0:JMP (1:]", "Index", "Index"],
+        ["[OPT0:JSR (1)+(2,X):]", "Missing )", "Missing )"],
+    ])("%j is %s on BASIC II and %s on BASIC IV", (text, basicII, basicIV) => {
+        expect(verdicts.get(text)).toBe(basicII);
+        expect(masterVerdicts.get(text)).toBe(basicIV);
+        const message = () => programProblems(text).find(problem => !problem.stricter)?.message;
+        expect(stops(text)).toBe(basicII !== "ok");
+        if (basicII !== "ok") expect(message()).toBe(basicII);
+        setBasicIV(true);
+        expect(stops(text)).toBe(basicIV !== "ok");
+        if (basicIV !== "ok") expect(message()).toBe(basicIV);
+    });
     it.each(OnBothBasics)("%j runs on both", text => {
         expect(masterVerdicts.get(text)).toBe("ok");
         expect(stops(text)).toBe(false);

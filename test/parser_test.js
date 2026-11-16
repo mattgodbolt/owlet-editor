@@ -36,6 +36,11 @@ const KnownGaps = ["X=FNf (1)", "PROCp (1)", 'LIST IF "a"'];
 // Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
 // instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
 const StricterThanRom = [
+    "[OPT0:JMP (&70)+1:]",
+    ...["(1)+(2,X)", "(1)+2", "(1)+(2)", "(1) LDA 2", "(1))+2", "(1)(2)", "(1)+(2,Y)"].map(
+        o => `[OPT0:JMP ${o}:]`,
+    ),
+    "[OPT0:JMP (1)+(2,X)]",
     "[OPT0:STƀ 9:]",
     "[OPT0:STƂ 9:]",
     "[OPT0:ČDA 9:]",

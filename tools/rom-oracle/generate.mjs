@@ -46,7 +46,7 @@ const AssemblerStatements = [
     ["ASL", "A|a|&70"],
     ["JSR", "P%|&70,x"],
     ["BNE", "P%"],
-    ["JMP", "(&70)|P%"],
+    ["JMP", "(&70)|P%|(&70,X)|(&70)+(1,X)"],
     ["EQUB", "1"],
     ["EQUS", '"s"'],
     ["equw", "1"],
