@@ -2,14 +2,10 @@ import {defineConfig} from "vite";
 import {resolve} from "path";
 import {fileURLToPath} from "url";
 import {execFileSync} from "child_process";
-import monacoEditorPluginModule from "vite-plugin-monaco-editor";
 import {viteStaticCopy} from "vite-plugin-static-copy";
 import yaml from "@rollup/plugin-yaml";
 import {nodePolyfills} from "vite-plugin-node-polyfills";
 import {createHtmlPlugin} from "vite-plugin-html";
-
-// vite-plugin-monaco-editor is CommonJS, so Node's ESM loader hands back module.exports rather than its default
-const monacoEditorPlugin = monacoEditorPluginModule.default ?? monacoEditorPluginModule;
 
 // Get the directory name equivalent in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -34,7 +30,6 @@ export default defineConfig(({command}) => ({
         "import.meta.env.OWLET_BUILD_DATE": JSON.stringify(new Date().toISOString().slice(0, 10)),
     },
     plugins: [
-        monacoEditorPlugin({}),
         nodePolyfills(),
         yaml(),
         createHtmlPlugin({
