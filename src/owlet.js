@@ -289,6 +289,10 @@ export class OwletEditor {
     setMachine(machine) {
         const changed = this.emulator.setMachine(machine);
         $("#machine").val(machine);
+        const sendable = machine === DefaultMachine;
+        $("#rocket")
+            .prop("disabled", !sendable)
+            .attr("title", sendable ? "send to beebjit" : "bbcmicrobot snapshots are of a Model B");
         useBasicIV(this.emulator.model.isMaster);
         this.updateWarnings();
         this.showSyntaxMarkers();
@@ -500,6 +504,8 @@ export class OwletEditor {
     }
 
     async rocket() {
+        // The snapshot beebjit loads is of a Model B, whatever machine is running.
+        if (this.emulator.machine !== DefaultMachine) return;
         this.updateProgram();
         const $rocket = $("#rocket");
         $rocket.addClass("backgroundAnimated");
