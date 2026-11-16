@@ -325,7 +325,7 @@ export class Assembler {
             rules.letterA.test(register)
         )
             return void (r.next().type = "keyword");
-        if (rules.basicIV && mnemonic === "JMP" && r.isPunct("(")) return this.indirectJump();
+        if (mnemonic === "JMP" && r.isPunct("(")) return this.indirectJump();
         if (!rules.addressed.has(mnemonic) && !rules.accumulator.has(mnemonic))
             return r.expression();
         if (r.isPunct("#")) {
@@ -348,12 +348,13 @@ export class Assembler {
         if (registers.length && r.isPunct(",")) this.index(mnemonic, ...registers);
     }
 
-    // BASIC IV reads JMP (&1234,X) as well as JMP (&1234); after the ) it ignores the rest, as it does for any address.
+    // A ( after JMP is indirect addressing on both BASICs: after the ) the rest is ignored, as it is for any address.
+    // Only BASIC IV reads JMP (&1234,X); on BASIC II the comma is an Index error.
     indirectJump() {
         const r = this.recogniser;
         const opener = r.next();
         r.expression();
-        if (r.isPunct(",")) return this.indexedIndirect("JMP");
+        if (this.rules.basicIV && r.isPunct(",")) return this.indexedIndirect("JMP");
         r.close(opener, "Index");
     }
 
