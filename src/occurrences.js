@@ -2,17 +2,8 @@ import {editor, KeyCode, KeyMod, languages} from "monaco-editor/esm/vs/editor/ed
 import "monaco-editor/esm/vs/editor/contrib/rename/browser/rename";
 import "monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter";
 import {LanguageId} from "./bbcbasic";
+import {readLines} from "./parser/highlight";
 
-const VariableType = `variable.${LanguageId}`;
-const LabelType = `type.identifier.${LanguageId}`;
-const KeywordType = `keyword.${LanguageId}`;
-const WhiteType = `white.${LanguageId}`;
-
-// The tokeniser joins abutting names into one token (e.g. "A%B"), so a token can hold more than one name.
-const NameRegex = /@%|\w+[$%]?/g;
-const FnRegex = /(?:FN|\xa4)$/;
-const ProcRegex = /(?:PROC|PRO\.|\xf2)$/;
-const AccumulatorModeRegex = /^(?:ASL|LSR|ROL|ROR)$/;
 const MessageControllerId = "editor.contrib.messageController";
 const NotANameReason = "Only variables, arrays, FNs and PROCs can be renamed";
 
@@ -25,38 +16,28 @@ function symbol(kind, name, lineNumber, offset) {
 // Every name in the program that BASIC looks up as a variable, array, FN or PROC. A variable, an array, a FN and a
 // PROC with the same name are different things, as are A, A% and A$; an assembler label is a variable.
 export function programSymbols(text) {
-    const lines = text.split(/\r?\n/);
-    const symbols = [];
-    editor.tokenize(text, LanguageId).forEach((lineTokens, lineIndex) => {
-        const line = lines[lineIndex];
+    return readLines(text).flatMap((recogniser, lineIndex) => {
         const lineNumber = lineIndex + 1;
-        let previous = null;
-        lineTokens.forEach((token, tokenIndex) => {
-            const end =
-                tokenIndex + 1 < lineTokens.length
-                    ? lineTokens[tokenIndex + 1].offset
-                    : line.length;
-            const text = line.slice(token.offset, end);
-            const afterKeyword = previous && previous.type === KeywordType ? previous.text : "";
-            if (token.type === LabelType) {
-                symbols.push(symbol(Kind.Variable, text.slice(1), lineNumber, token.offset + 1));
-            } else if (token.type === VariableType && FnRegex.test(afterKeyword)) {
-                symbols.push(symbol(Kind.Fn, text, lineNumber, token.offset));
-            } else if (token.type === VariableType && ProcRegex.test(afterKeyword)) {
-                symbols.push(symbol(Kind.Proc, text, lineNumber, token.offset));
-            } else if (token.type === VariableType) {
-                for (const match of text.matchAll(NameRegex)) {
-                    const offset = token.offset + match.index;
-                    const name = match[0];
-                    if (name === "A" && AccumulatorModeRegex.test(afterKeyword)) continue;
-                    const kind = line[offset + name.length] === "(" ? Kind.Array : Kind.Variable;
-                    symbols.push(symbol(kind, name, lineNumber, offset));
-                }
-            }
-            if (token.type !== WhiteType) previous = {type: token.type, text};
+        const {text: line} = recogniser.lexer;
+        return recogniser.tokens.flatMap((token, i) => {
+            if (token.kind === "label")
+                return [symbol(Kind.Variable, token.text.slice(1), lineNumber, token.start + 1)];
+            // The tokeniser gives an FN or PROC name as the token after its keyword, and marks what the assembler
+            // reads as an opcode or register, such as the A of ASL A, with a type.
+            if (token.kind === "fnname")
+                return [
+                    symbol(
+                        recogniser.tokens[i - 1].kw.keyword,
+                        token.text,
+                        lineNumber,
+                        token.start,
+                    ),
+                ];
+            if (token.kind !== "name" || token.type) return [];
+            const kind = line[token.end] === "(" ? Kind.Array : Kind.Variable;
+            return [symbol(kind, token.text, lineNumber, token.start)];
         });
     });
-    return symbols;
 }
 
 const symbolsCache = new WeakMap();
