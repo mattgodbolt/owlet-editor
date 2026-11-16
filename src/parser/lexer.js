@@ -189,14 +189,15 @@ export class Lexer {
         if (this.lineNumber && (end = this.match(Pattern.digits))) return this.push("linenum", end);
         if ((end = this.match(EncodedLineNumber))) return this.push("linenum", end, {raw: true});
         if ((end = this.match(Pattern.mantissa))) {
-            // An E is an exponent unless it begins a keyword (1EOR2). The tokeniser skips the whole run of name
+            // An E is an exponent unless it begins a keyword (1EOR2) or a longer abbreviation that is not read as one (1ER.a$;
+            // a bare E. stays the exponent: 1E.5 is 1E then .5). The tokeniser skips the whole run of name
             // characters from the E, so what the exponent leaves of it is a name: 1E0TO2 is 1E0, then TO2.
             const token = this.push("number", end);
             const run = this.match(Pattern.nameRun);
             if (
                 text[end] === "E" &&
                 !matchKeyword(text, end) &&
-                !isUnreadAbbreviation(text, end, run)
+                !(run - end > 1 && isUnreadAbbreviation(text, end, run))
             ) {
                 token.end = this.pos = this.match(Pattern.exponent);
                 token.text = text.slice(pos, token.end);

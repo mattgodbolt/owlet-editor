@@ -5,7 +5,7 @@ import {
     LanguageId,
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
-import {highlightLine} from "../src/parser/highlight";
+import {highlightLine, readLines} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
@@ -1083,6 +1083,8 @@ describe("Line warnings", () => {
             assert.ok(romTokens.has(text), `${text} is not a recorded row`);
             checkWarnings(text);
         }
+        // Also where the recogniser has marked the name invalid (a PROC where a value was wanted).
+        checkWarnings("X=PROCprint");
         checkWarnings("DEFPROCdraw(x):print", caseWarning("PRINT", 16));
     });
     it("should warn about an abbreviation after a number only where the ROM reads it differently", () => {
@@ -1096,6 +1098,14 @@ describe("Line warnings", () => {
             endColumn: 8,
         });
         checkWarnings("A=1ER. a$");
+    });
+    it("should keep a bare E as the exponent of a number even when a dot follows", () => {
+        const numbers = readLines("PRINT 1E.5")
+            .at(-1)
+            .tokens.filter(token => token.kind === "number")
+            .map(token => token.text);
+        assert.deepStrictEqual(numbers, ["1E", ".5"]);
+        checkWarnings("PRINT 1E.5");
     });
     it("should warn on invalid operators from other languages", () => {
         const cases = [
