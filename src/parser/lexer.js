@@ -2,7 +2,7 @@
 // line-number flags, so that each token is what BASIC will see when it runs the line. It also splits the text BASIC
 // leaves alone (names, numbers, strings, punctuation) into the pieces the interpreter reads.
 import {byteChar, Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
-import {currentDialect} from "./dialect.js";
+import {ColorKeyword, currentDialect} from "./dialect.js";
 
 // Typed text matches the first entry of the table with each spelling; PAGE, PTR, TIME, LOMEM and HIMEM come again at
 // the end of the table with their statement tokens, which the tokeniser makes by adding 0x40.
@@ -163,6 +163,17 @@ export class Lexer {
         this.queue.splice(1, 0, rest);
     }
 
+    // Reads the name that is the next token as COLOR, the keyword, and what follows it afresh; the Model B's COLOR.
+    relex(token) {
+        this.tokens.splice(this.tokens.lastIndexOf(token));
+        this.restOfLine = null;
+        this.nameEnd = 0;
+        this.pos = token.start;
+        const keyword = this.keyword(ColorKeyword, token.start + ColorKeyword.keyword.length);
+        keyword.spaced = token.spaced;
+        this.queue = [keyword];
+    }
+
     read() {
         const spaced = !this.restOfLine && this.match(Pattern.white);
         if (spaced) this.push("white", spaced);
@@ -250,10 +261,11 @@ export class Lexer {
     }
 }
 
-// Every token of a line, white space included.
-export function lexLine(text, dialect = currentDialect()) {
+// Every token of a line, white space included; the names that start at an offset of `colors` are read as COLOR.
+export function lexLine(text, dialect = currentDialect(), colors = []) {
     const lexer = new Lexer(text, dialect);
-    while (lexer.next().kind !== "end");
+    for (let token = lexer.next(); token.kind !== "end"; token = lexer.next())
+        if (token.kind === "name" && colors.includes(token.start)) lexer.relex(token);
     return lexer.tokens;
 }
 

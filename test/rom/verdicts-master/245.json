@@ -1,0 +1,11 @@
+[
+  ["COLOR7", "ok", "#245"],
+  ["LETCOLOR=3", "Syntax error", "#245"],
+  ["LETCOLOR=3:COLORCOLOR", "Syntax error", "#245"],
+  ["COLOR 7:COLOR 1", "ok", "#245"],
+  ["COLOR X", "ok", "#245"],
+  ["COLOR(1)=3", "ok", "#245"],
+  ["X=1:REP.COLORX:P.;X:X=X+1:U.X>7", "ok", "#245"],
+  ["ONERRORCOLOR7:GOTO1000", "ok", "#245"],
+  ["color 1", "Mistake", "#245"]
+]

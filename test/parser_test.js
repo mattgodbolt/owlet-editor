@@ -1,7 +1,9 @@
-import {highlightLine, programProblems} from "../src/parser/highlight";
+import {BasicIIDialect, ModelBDialect} from "../src/parser/dialect";
+import {highlightLine, programProblems, readLines} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
 import {
     invalidSpans,
+    LenientThanRom,
     RomTokens,
     RomVerdicts,
     verdicts,
@@ -413,6 +415,118 @@ describe("A line typed in an editor that closes brackets", () => {
         assert.strictEqual("A$=LEFT$(B$)".slice(problem.start, problem.end), ")");
         assert.deepStrictEqual(red("A$=LEFT$(B$,1,2)"), [")"]);
     });
+});
+
+// COLOR, the US spelling, as the editor's Model B reads it: COLOUR where it starts a statement, is followed by an
+// expression and then the end of the statement, and could not be a variable; BASIC II's ROM says Mistake to it.
+describe("COLOR on the editor's Model B", () => {
+    const redB = text => invalidSpans(text, ModelBDialect).map(([a, b]) => text.slice(a, b));
+    const kinds = (text, dialect = ModelBDialect) =>
+        readLines(text, dialect)[0]
+            .tokens.filter(t => t.kind !== "white")
+            .map(t => `${t.kind} ${t.text}`);
+
+    it("should agree with every recorded row of BASIC II but the ones it is lenient on", () => {
+        assert.deepStrictEqual(
+            wrongRows(RomVerdicts, {
+                stricter: StricterThanRom,
+                gaps: KnownGaps,
+                lenient: LenientThanRom,
+                dialect: ModelBDialect,
+            }),
+            [],
+        );
+        assert.deepStrictEqual(wrongMessages(RomVerdicts, OtherWording, ModelBDialect), []);
+    });
+    it("should leave BASIC II's own dialect as the ROM reads COLOR", () => {
+        assert.deepStrictEqual(red("COLOR 1"), ["1"]);
+        assert.deepStrictEqual(kinds("COLOR 1", BasicIIDialect), ["name COLOR", "number 1"]);
+    });
+    it.each([
+        "COLOR7",
+        "COLOR 7",
+        "COLOR X",
+        "COLOR(1)",
+        "COLORC%",
+        "COLOR7:COLOR 1",
+        "IFC%COLORC%ELSECOLORD%:NEXT",
+        "X=1:REP.COLORX:P.;X:X=X+1:U.X>7",
+        "ONERRORCOLOR7:GOTO1000",
+        "LETCOLOR=3:COLORCOLOR",
+        "IF X THEN COLOR 1 ELSE COLOR 2",
+        "10 COLOR 1",
+    ])("%s should be COLOUR where it starts a statement, and not red", text => {
+        assert.deepStrictEqual(redB(text), []);
+        assert.ok(readLines(text)[0].colors.length > 0, text);
+        assert.ok(
+            readLines(text)[0].tokens.some(t => t.kind === "keyword" && t.text === "COLOR"),
+            text,
+        );
+    });
+    it.each([
+        ["COLORS=7", ["name COLORS", "punct =", "number 7"]],
+        ["COLOR=7", ["name COLOR", "punct =", "number 7"]],
+        ["COLOR(1)=7", ["name COLOR", "punct (", "number 1", "punct )", "punct =", "number 7"]],
+        ["COLOR?1=7", ["name COLOR", "punct ?", "number 1", "punct =", "number 7"]],
+        ["LETCOLOR=3", ["keyword LET", "name COLOR", "punct =", "number 3"]],
+        [
+            "LETCOLOR=3:COLORCOLOR",
+            [
+                "keyword LET",
+                "name COLOR",
+                "punct =",
+                "number 3",
+                "punct :",
+                "keyword COLOR",
+                "name COLOR",
+            ],
+        ],
+        ["X=COLOR", ["name X", "punct =", "name COLOR"]],
+        ["PRINT COLOR 1", ["keyword PRINT", "name COLOR", "number 1"]],
+        ["color 7", ["name color", "number 7"]],
+        ["REM COLOR 7", ["keyword REM", "comment  COLOR 7"]],
+        ["DATA COLOR 7", ["keyword DATA", "data  COLOR 7"]],
+        ['PRINT "COLOR 7"', ["keyword PRINT", 'string "COLOR 7"']],
+        ["COLOR 1,2", ["name COLOR", "number 1", "punct ,", "number 2"]],
+        ["COLOR 7 7", ["name COLOR", "number 7", "number 7"]],
+        ["EDITED=FALSE", ["name EDITED", "punct =", "keyword FALSE"]],
+    ])("%s should keep COLOR as characters", (text, expected) => {
+        assert.deepStrictEqual(kinds(text), expected);
+    });
+    it("should be red where BASIC II is, when COLOR is not COLOUR", () => {
+        assert.deepStrictEqual(redB("COLOR 1,2"), ["1,2"]);
+        assert.deepStrictEqual(redB("color 7"), ["7"]);
+        assert.deepStrictEqual(redB("COLOR 7 7"), ["7 7"]);
+        assert.deepStrictEqual(redB("X=COLOR 1"), ["1"]);
+    });
+    it("should stay a variable, not red, while it is typed", () => {
+        const [problem] = programProblems("COLOR", readLines("COLOR", ModelBDialect));
+        assert.deepStrictEqual(redB("COLOR"), []);
+        assert.strictEqual(problem.unfinished, true);
+        assert.deepStrictEqual(kinds("COLOR"), ["name COLOR"]);
+    });
+    it.each([
+        "COLOR 7",
+        "COLOR7",
+        "COLORS=7",
+        "IFC%COLORC%ELSECOLORD%:NEXT",
+        "X=1:REP.COLORX:P.;X:X=X+1:U.X>7",
+        "ONERRORCOLOR7:GOTO1000",
+        "LETCOLOR=3:COLORCOLOR",
+        "COLOR(1)=3",
+        "COLOR X:COLOR Y",
+    ])("%s should be red on no key when typed a key at a time", typed => {
+        assert.deepStrictEqual(
+            keysTyped(typed).filter(text => redB(text).length),
+            [],
+        );
+    });
+    it.each(["COL.7", "COLO.7", "COLOUR 7", "GCOL 0,1", "COLOURS=7"])(
+        "should read %s as BASIC II does",
+        text => {
+            assert.deepStrictEqual(kinds(text), kinds(text, BasicIIDialect));
+        },
+    );
 });
 
 // Text typed in front of existing text is red where BASIC stops at a colon, ELSE or keyword that follows a statement

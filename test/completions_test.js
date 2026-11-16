@@ -5,7 +5,7 @@ import {expandCode} from "../src/expand-code";
 import Examples from "../src/examples.yaml";
 import {generate} from "../tools/rom-oracle/generate.mjs";
 import {immediateCommands, keywords} from "../src/tokens";
-import {describe, it} from "vitest";
+import {describe, expect, it} from "vitest";
 import assert from "assert";
 import {readFileSync} from "fs";
 import {env} from "process";
@@ -76,6 +76,13 @@ function hiddenKeywords(program) {
 }
 
 describe("Completions", () => {
+    it("should offer the same after COLOR as after COLOUR, and never COLOR itself", () => {
+        for (const after of [" X‸", " 7:PRI‸", " 7:‸"]) {
+            expect(offered(`COLOR${after}`)).toEqual(offered(`COLOUR${after}`));
+        }
+        expect(offered("COL‸")).not.toContain("COLOR");
+        expect(offered("COLOR‸")).toEqual([]);
+    });
     it("should offer the keywords that can be typed where the cursor is", () => {
         const cases = [
             ["PRI‸", ["PRINT"]],

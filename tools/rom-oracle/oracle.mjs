@@ -20,9 +20,9 @@
 import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
-import {highlightLine, programProblems} from "../../src/parser/highlight.js";
+import {highlightLine, programProblems, readLines} from "../../src/parser/highlight.js";
 import {setBasicIV} from "../../src/parser/dialect.js";
-import {generate} from "./generate.mjs";
+import {generate, generateColor} from "./generate.mjs";
 import {generateBasicIV} from "./generate-iv.mjs";
 import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
 import {isUnread, unreadRanges} from "./unread.mjs";
@@ -78,7 +78,8 @@ async function romVerdicts(texts) {
 }
 
 // For each text: its invalid tokens as [start, end], and the spans of its problems that are unfinished, stricter than
-// the ROM on purpose, or text the ROM ignores (junk after an assembler instruction).
+// the ROM on purpose, or text the ROM ignores (junk after an assembler instruction); and whether it is lenient on
+// purpose, which is where it read a COLOR as COLOUR, which BASIC II does not.
 function highlighterVerdicts(texts) {
     return texts.map(text => {
         const tokens = highlightLine(text).tokens.filter(
@@ -91,7 +92,9 @@ function highlighterVerdicts(texts) {
         );
         const problems = programProblems(text);
         const spans = field => problems.flatMap(p => (p[field] ? [[p.start, p.end]] : []));
+        const [reading] = readLines(text);
         return {
+            lenient: reading.colors.length > 0,
             invalid,
             unfinished: spans("unfinished"),
             stricter: spans("stricter"),
@@ -150,7 +153,11 @@ function report(results, examples) {
     const kinds = [
         [
             "FALSE-VALID (the ROM rejects it, nothing highlighted invalid)",
-            r => r.rom === "syntax error" && !r.invalid && !r.unfinished,
+            r => r.rom === "syntax error" && !r.invalid && !r.unfinished && !r.lenient,
+        ],
+        [
+            "LENIENT (the ROM rejects it, accepted on purpose as COLOR for COLOUR; see the README)",
+            r => r.rom === "syntax error" && !r.invalid && !r.unfinished && r.lenient,
         ],
         [
             "FALSE-INVALID (the ROM accepts it, highlighted invalid)",
@@ -206,6 +213,7 @@ async function main() {
                 count: Number(option("count", 3000)),
             }),
         );
+    else statements.push(...generateColor());
     const extra = option("input", null);
     if (extra) statements.push(...readJson(extra, []));
     const texts = statements.map(s => s.text);
@@ -213,6 +221,7 @@ async function main() {
     const highlighted = highlighterVerdicts(texts);
     const results = statements.map((s, i) => ({
         ...s,
+        lenient: highlighted[i].lenient,
         rom: runnable(s.text) ? romClass(rom[i]) : "inconclusive",
         message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
     }));

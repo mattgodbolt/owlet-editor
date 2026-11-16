@@ -3,8 +3,8 @@ import assert from "assert";
 import {editor} from "monaco-editor/editor/editor.api";
 import {getSyntaxMarkers, getWarnings, registerBbcBasicLanguage, useBasicIV} from "../src/bbcbasic";
 import {completionContext} from "../src/completions";
-import {setBasicIV} from "../src/parser/dialect";
-import {programProblems} from "../src/parser/highlight";
+import {BasicIIDialect, BasicIVDialect, setBasicIV} from "../src/parser/dialect";
+import {programProblems, readLines} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
 import {
     MasterTokens,
@@ -17,7 +17,8 @@ import {
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 // Whether the recogniser says BASIC stops at the line, or would if the line ended there.
-const stops = text => programProblems(text).some(problem => !problem.stricter);
+const stops = (text, dialect) =>
+    programProblems(text, readLines(text, dialect)).some(problem => !problem.stricter);
 
 // Lines BASIC IV runs that are marked on purpose (see the README): what follows a complete instruction is ignored.
 const StricterThanRom = [
@@ -156,19 +157,23 @@ describe("BASIC IV", () => {
 
     it("should tokenise each line as the Master's BASIC does", () => {
         const wrong = MasterTokens.flatMap(([text, recorded]) => {
-            const ours = hex(romBytes(lexLine(text)));
+            const ours = hex(romBytes(lexLine(text, BasicIVDialect)));
             return ours === recorded.replace(/( 20)+$/, "") ? [] : [{text, recorded, ours}];
         });
         assert.deepStrictEqual(wrong, []);
     });
     it("should mark an error in each line BASIC IV stops at with one, and none where it runs", () => {
         assert.deepStrictEqual(
-            wrongRows(MasterVerdicts, {stricter: StricterThanRom, gaps: KnownGaps}),
+            wrongRows(MasterVerdicts, {
+                stricter: StricterThanRom,
+                gaps: KnownGaps,
+                dialect: BasicIVDialect,
+            }),
             [],
         );
     });
     it("should give the error BASIC IV gives, or none where it does not know it", () => {
-        assert.deepStrictEqual(wrongMessages(MasterVerdicts), []);
+        assert.deepStrictEqual(wrongMessages(MasterVerdicts, [], BasicIVDialect), []);
     });
     it("should word a bad hexadecimal number as BASIC IV does", () => {
         const [{message}] = getSyntaxMarkers("X=&G");
@@ -193,9 +198,8 @@ describe("Each BASIC's own recorded rows", () => {
     it.each(OnlyOnBasicIV)("%j is red for BASIC II and runs on BASIC IV", text => {
         expect(verdicts.get(text)).not.toBe("ok");
         expect(masterVerdicts.get(text)).toBe("ok");
-        expect(stops(text)).toBe(true);
-        setBasicIV(true);
-        expect(stops(text)).toBe(false);
+        expect(stops(text, BasicIIDialect)).toBe(true);
+        expect(stops(text, BasicIVDialect)).toBe(false);
     });
     it.each(["[OPT0:JMP (&1234,X):]", "[OPT0:JMP (&1234,x):]"])(
         "%j is red for BASIC II and runs on BASIC IV (BASIC II's own row waits for #224)",
@@ -248,11 +252,13 @@ describe("The editor on the Master", () => {
         useBasicIV(false);
         expect(redAt("V.23,255,255|", 12)).toBe(true);
     });
-    it("should read COLOR as the keyword on the Master", () => {
+    it("should read COLOR as the keyword on the Master wherever it is, and on a Model B only where it is COLOUR", () => {
         const keyword = colourAt("COLOUR 1", 0);
-        expect(colourAt("COLOR 1", 0)).not.toBe(keyword);
+        expect(colourAt("COLOR 1", 0)).toBe(keyword);
+        expect(colourAt("COLORS=7", 0)).not.toBe(keyword);
         useBasicIV(true);
         expect(colourAt("COLOR 1", 0)).toBe(keyword);
+        expect(colourAt("COLORS=7", 0)).toBe(keyword);
     });
     it("should mark the lines BASIC IV stops at, not those BASIC II does", () => {
         const text = "V.7|\nVDU|";

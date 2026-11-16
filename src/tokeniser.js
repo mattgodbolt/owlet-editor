@@ -1,18 +1,19 @@
 import * as master from "jsbeeb/src/basic-tokenise";
-import {BasicIIDialect} from "./parser/dialect";
-import {lexLine, romBytes} from "./parser/lexer";
+import {ModelBDialect} from "./parser/dialect";
+import {romBytes} from "./parser/lexer";
+import {tokenise} from "./parser/recogniser";
 
 const MaxTokenisedLength = 251;
 
 // jsbeeb's tokeniser runs the Master's BASIC IV ROM, so a Model B's program is tokenised by the parser's BASIC II
-// lexer, which lexfuzz checks against the B's own ROM.
+// lexer, which lexfuzz checks against the B's own ROM, and the highlighter's reading of COLOR.
 export function tokeniseBasicII(text) {
     let result = "";
     text.split("\n").forEach((line, i) => {
         if (!line) return;
         const [, number, rest] = line.match(/^([0-9]+)?(.*)/);
         const lineNumber = number ? parseInt(number) : 10 + i * 10;
-        const tokens = String.fromCharCode(...romBytes(lexLine(rest, BasicIIDialect)));
+        const tokens = String.fromCharCode(...romBytes(tokenise(rest, ModelBDialect)));
         if (tokens.length > MaxTokenisedLength)
             throw new Error(
                 `Line ${lineNumber} tokenised length ${tokens.length} > ${MaxTokenisedLength} bytes`,
