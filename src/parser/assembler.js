@@ -12,7 +12,7 @@
 //   that is marked.
 
 import {keywords, tokenChar} from "../tokens.js";
-import {isBasicIV} from "./dialect.js";
+import {currentDialect} from "./dialect.js";
 import {matchKeyword} from "./lexer.js";
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
@@ -83,7 +83,8 @@ const MnemonicLists = new Map([
     [BasicII, [...new Set(mnemonicsOf(BasicII))]],
     [BasicIV, [...new Set(mnemonicsOf(BasicIV))]],
 ]);
-export const mnemonicsFor = () => MnemonicLists.get(isBasicIV() ? BasicIV : BasicII);
+export const mnemonicsFor = (dialect = currentDialect()) =>
+    MnemonicLists.get(dialect.basicIV ? BasicIV : BasicII);
 const ThirdCharacter = 2;
 const LogicalTokenChars = new Set(
     keywords.filter(kw => ["AND", "EOR", "OR"].includes(kw.keyword)).map(tokenChar),
@@ -94,7 +95,7 @@ const Comment = /[;\\][^:]*/y;
 export class Assembler {
     constructor(recogniser) {
         this.recogniser = recogniser;
-        this.rules = isBasicIV() ? BasicIV : BasicII;
+        this.rules = recogniser.dialect.basicIV ? BasicIV : BasicII;
     }
 
     // Reads assembler statements up to the "]" that ends the block, or the end of the line; returns whether the block
@@ -162,7 +163,9 @@ export class Assembler {
         const r = this.recogniser;
         const {text} = r.lexer;
         const keyword =
-            operand.kind === "name" && !operand.spaced && matchKeyword(text, operand.start);
+            operand.kind === "name" &&
+            !operand.spaced &&
+            matchKeyword(text, operand.start, this.recogniser.dialect);
         if (!keyword || this.rules.implied.has(mnemonic) || r.probing) return null;
         const spaced = `${text.slice(0, operand.start)} ${text.slice(operand.start)}`;
         if (!r.valid(spaced, first, operand.start)) return null;

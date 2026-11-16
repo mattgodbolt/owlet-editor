@@ -3,7 +3,7 @@
 // the first. Where there is no rule for a statement, anything is accepted.
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {FirstStatementToken} from "../tokens.js";
-import {currentKeywords, isBasicIV} from "./dialect.js";
+import {currentDialect} from "./dialect.js";
 import {Lexer} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -69,13 +69,13 @@ const BadHexIV = "Bad Hex";
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
 const CompletionWords = new Map();
-function completions(assembling) {
-    const key = `${isBasicIV()} ${assembling}`;
+function completions(assembling, dialect) {
+    const key = `${dialect.basicIV} ${assembling}`;
     if (!CompletionWords.has(key)) {
-        const keywords = [...new Set([...currentKeywords().map(kw => kw.keyword), "TOP"])];
+        const keywords = [...new Set([...dialect.keywords.map(kw => kw.keyword), "TOP"])];
         CompletionWords.set(
             key,
-            assembling ? [...new Set([...keywords, ...mnemonicsFor()])] : keywords,
+            assembling ? [...new Set([...keywords, ...mnemonicsFor(dialect)])] : keywords,
         );
     }
     return CompletionWords.get(key);
@@ -95,9 +95,10 @@ class Failure {
 }
 
 export class Recogniser {
-    constructor(text, inAssembler, probing = false) {
-        this.lexer = new Lexer(text);
-        this.basicIV = isBasicIV();
+    constructor(text, inAssembler, probing = false, dialect = currentDialect()) {
+        this.dialect = dialect;
+        this.lexer = new Lexer(text, dialect);
+        this.basicIV = dialect.basicIV;
         this.assembler = new Assembler(this);
         this.inAssembler = inAssembler;
         this.startsInAssembler = inAssembler;
@@ -261,7 +262,7 @@ export class Recogniser {
         if (before?.kind === "keyword" && before.end === token.start) starts.push(before.start);
         return starts.some(start => {
             const typed = text.slice(start).toUpperCase();
-            return completions(assembling).some(word => {
+            return completions(assembling, this.dialect).some(word => {
                 if (word.length <= typed.length || !word.startsWith(typed)) return false;
                 return this.valid(text.slice(0, start) + word, statementStart, text.length);
             });
@@ -271,7 +272,7 @@ export class Recogniser {
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
     // up to the next colon or ELSE after `from`, or that is not itself unfinished.
     valid(candidate, statementStart, from) {
-        const probe = new Recogniser(candidate, this.startsInAssembler, true);
+        const probe = new Recogniser(candidate, this.startsInAssembler, true, this.dialect);
         probe.line();
         const stop =
             probe.tokens.find(

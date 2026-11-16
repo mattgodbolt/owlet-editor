@@ -2,7 +2,7 @@
 // line-number flags, so that each token is what BASIC will see when it runs the line. It also splits the text BASIC
 // leaves alone (names, numbers, strings, punctuation) into the pieces the interpreter reads.
 import {Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
-import {currentKeywords} from "./dialect.js";
+import {currentDialect} from "./dialect.js";
 
 // Typed text matches the first entry of the table with each spelling; PAGE, PTR, TIME, LOMEM and HIMEM come again at
 // the end of the table with their statement tokens, which the tokeniser makes by adding 0x40.
@@ -16,10 +16,9 @@ function tablesOf(list) {
     return {byFirstLetter, byChar};
 }
 const Tables = new Map();
-function tables() {
-    const list = currentKeywords();
-    if (!Tables.has(list)) Tables.set(list, tablesOf(list));
-    return Tables.get(list);
+function tablesFor(dialect) {
+    if (!Tables.has(dialect.keywords)) Tables.set(dialect.keywords, tablesOf(dialect.keywords));
+    return Tables.get(dialect.keywords);
 }
 const StatementFormOffset = 0x40;
 const byChar = tablesOf(keywords).byChar;
@@ -53,8 +52,8 @@ const isNameChar = c => c !== undefined && /[\w`]/.test(c);
 
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
-export function matchKeyword(text, i) {
-    for (const kw of tables().byFirstLetter.get(text[i]) || []) {
+export function matchKeyword(text, i, dialect = currentDialect()) {
+    for (const kw of tablesFor(dialect).byFirstLetter.get(text[i]) || []) {
         const word = kw.keyword;
         let length = 1;
         while (length < word.length && text[i + length] === word[length]) length++;
@@ -67,8 +66,8 @@ export function matchKeyword(text, i) {
 }
 
 // A name and a dot that abbreviate a Conditional keyword were not read as one because a letter or digit followed.
-function isUnreadAbbreviation(text, start, end) {
-    const abbreviated = text[end] === "." && matchKeyword(`${text.slice(start, end)}.`, 0);
+function isUnreadAbbreviation(text, start, end, dialect) {
+    const abbreviated = text[end] === "." && matchKeyword(`${text.slice(start, end)}.`, 0, dialect);
     return Boolean(abbreviated && abbreviated.kw.flags & Flags.Conditional);
 }
 
@@ -76,8 +75,9 @@ function isUnreadAbbreviation(text, start, end) {
 // statement token's) for a keyword. Kinds: white, linenum, keyword, name, fnname, number, hex, string, punct, comment
 // (after REM), data (after DATA), oscli (a * command). A string has `closed`, a token after white space `spaced`.
 export class Lexer {
-    constructor(text) {
+    constructor(text, dialect = currentDialect()) {
         this.text = text;
+        this.dialect = dialect;
         this.pos = 0;
         // BASIC reads a number at the start of a line as a line number, and so one after a keyword that leaves the
         // flag alone (TAB(10 at the start of a line refers to line 10).
@@ -207,8 +207,8 @@ export class Lexer {
             const run = this.match(Pattern.nameRun);
             if (
                 text[end] === "E" &&
-                !matchKeyword(text, end) &&
-                !(run - end > 1 && isUnreadAbbreviation(text, end, run))
+                !matchKeyword(text, end, this.dialect) &&
+                !(run - end > 1 && isUnreadAbbreviation(text, end, run, this.dialect))
             ) {
                 token.end = this.pos = this.match(Pattern.exponent);
                 token.text = text.slice(pos, token.end);
@@ -218,12 +218,15 @@ export class Lexer {
             return token;
         }
         if (this.nameEnd > pos) return this.push("name", this.match(Pattern.name));
-        if (tables().byChar.has(c)) return this.keyword(tables().byChar.get(c), pos + 1, true);
-        const keyword = matchKeyword(text, pos);
+        const {byChar} = tablesFor(this.dialect);
+        if (byChar.has(c)) return this.keyword(byChar.get(c), pos + 1, true);
+        const keyword = matchKeyword(text, pos, this.dialect);
         if (keyword) return this.keyword(keyword.kw, keyword.end);
         if ((end = this.match(Pattern.name))) {
             this.middle();
-            return this.push("name", end, {abbreviation: isUnreadAbbreviation(text, pos, end)});
+            return this.push("name", end, {
+                abbreviation: isUnreadAbbreviation(text, pos, end, this.dialect),
+            });
         }
         this.middle();
         return this.push("punct", this.match(Pattern.relation) || pos + 1);
@@ -231,8 +234,8 @@ export class Lexer {
 }
 
 // Every token of a line, white space included.
-export function lexLine(text) {
-    const lexer = new Lexer(text);
+export function lexLine(text, dialect = currentDialect()) {
+    const lexer = new Lexer(text, dialect);
     while (lexer.next().kind !== "end");
     return lexer.tokens;
 }

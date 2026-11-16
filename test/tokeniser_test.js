@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it} from "vitest";
 import {tokeniseBasicII, tokeniserFor} from "../src/tokeniser";
-import {setBasicIV} from "../src/parser/dialect";
+import {isBasicIV, setBasicIV} from "../src/parser/dialect";
 import {RomTokens} from "./rom-tables";
 
 const hex = text => [...text].map(c => c.charCodeAt(0).toString(16).padStart(2, "0")).join(" ");
@@ -38,6 +38,12 @@ describe("Tokeniser", () => {
         ["COLOUR 1", "fb 20 31"],
     ])("should not read %s as a Master's keyword", (text, bytes) => {
         expect(lineBytes(tokeniseBasicII(text))).toBe(bytes);
+    });
+
+    it("should follow the Model B's BASIC whatever the editor is set to, and leave the setting alone", () => {
+        setBasicIV(true);
+        expect(lineBytes(tokeniseBasicII("COLOR 1"))).toBe("43 4f 4c 4f 52 20 31");
+        expect(isBasicIV()).toBe(true);
     });
 
     it("should lay a program out as BASIC stores it", () => {
