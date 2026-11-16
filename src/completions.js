@@ -10,6 +10,8 @@ const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
 const SpcAndTab = ["SPC", "TAB("];
+// The ROM has no token for TOP: it reads TO, then a P where a value is expected, so the table cannot offer it.
+const Top = "TOP";
 // The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
 const labelSets = new Map();
 function labelSetsFor(table) {
@@ -30,10 +32,13 @@ function labelSetsFor(table) {
         const statement = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
         labelSets.set(table, {
             statement,
-            expression: labels(
-                programKeywords.filter(kw => kw.flags & Flags.Expr || kw.keyword === "ELSE"),
-            ),
-            assembler: labels(table.filter(kw => kw.flags & Flags.Expr)),
+            expression: [
+                ...labels(
+                    programKeywords.filter(kw => kw.flags & Flags.Expr || kw.keyword === "ELSE"),
+                ),
+                Top,
+            ],
+            assembler: [...labels(table.filter(kw => kw.flags & Flags.Expr)), Top],
             // The words besides values that BBC BASIC reads in each statement (tools/rom-oracle), by the statement's
             // first keyword; "ON ERROR" is what follows ON ERROR, which is read as a statement.
             inStatement: new Map([
