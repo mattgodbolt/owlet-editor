@@ -92,6 +92,19 @@ of the line could change that. The colours are a function of the text alone, whe
   leaves it. An assembler block that is never closed is one error on its `[` in place of one per later line (the
   later lines are coloured as before). A syntax marker is left out where a warning already covers the same text
   (`x == 3` has the warning about `==`), and quick fixes are offered only for the warnings, never for a syntax marker.
+- **Line number markers** (both tokenizers): after the same delay, an error squiggle on a `GOTO`, `GOSUB`, `THEN`,
+  `ELSE` (and so `ON ... GOTO` lists) or `RESTORE` that names a line the program does not have (BASIC's `No such line`),
+  and on any line number above 32767, which BASIC cannot have: the program ends at the first such line, so BASIC never
+  runs it. That includes a line without a number that the editor would number above 32767, which takes a program of
+  over 3276 lines. A `GOTO`, `GOSUB`, `RESTORE` or `TRACE` number of 65536 or more is marked too: the ROM keeps only its
+  bottom 16 bits (`TRACE 65536` is `TRACE 0`) and says `Too big` from 2147483648. `THEN` and `ELSE` say `Syntax error`
+  above 32767. `LIST`, `DELETE`, `AUTO` and `RENUMBER` are not marked, and a `TRACE` is not marked as missing, as
+  their numbers need not be lines. A reference on the line the cursor is on is not marked as missing until the cursor
+  leaves it.
+- **Line numbers follow the edits of a program without them**: the editor numbers such a program 10, 20, 30... and
+  rewrites each `GOTO`, `GOSUB`, `THEN`, `ELSE` and `RESTORE` as lines are added and removed. A `TRACE` limit that is
+  not a line keeps its place between the same two lines (the number just above the one below it). A reference to a
+  line that does not exist is otherwise left as it is, so placeholders such as `GOTO 11` do not collapse together.
 - **Code is red if it would stop BASIC when run, even where it cannot run** (on purpose):
   - the branch of an `IF` whose condition is false, which BASIC skips;
   - the body of a `DEF FN` or `DEF PROC`, which BASIC skips on its way through the program and runs only when called;
