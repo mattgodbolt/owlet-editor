@@ -7,8 +7,11 @@
 //   comment is marked, since it is almost always a mistake (NOP PRINT, LDA #1 hello, LDA #1] with a : missing);
 // - BASIC compares only the low five bits of each character of a mnemonic, so it reads 8 as X and ! as A, but a
 //   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9. Where
-//   it is the third character, the two letters before it are marked instead (LD is not an instruction).
+//   it is the third character, the two letters before it are marked instead (LD is not an instruction);
+// - BASIC drops what comes before an AND, EOR or OR token that is the second or third character of a mnemonic, so
+//   that is marked.
 
+import {keywords, tokenChar} from "../tokens.js";
 import {matchKeyword} from "./lexer.js";
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
@@ -42,6 +45,9 @@ export const Mnemonics = [
     ..."OPT EQUB EQUD EQUS EQUW".split(" "),
 ];
 const ThirdCharacter = 2;
+const LogicalTokenChars = new Set(
+    keywords.filter(kw => ["AND", "EOR", "OR"].includes(kw.keyword)).map(tokenChar),
+);
 const Label = /\. *(?:[A-Za-z_`][\w`]*%?|@%)/y;
 const Comment = /[;\\][^:]*/y;
 
@@ -150,6 +156,7 @@ export class Assembler {
     // Reads the mnemonic or directive and returns it in upper case.
     mnemonic() {
         const r = this.recogniser;
+        this.dropBeforeToken();
         const token = r.peek();
         if (r.isKeyword("AND", "EOR")) return r.next().kw.keyword;
         // ORA is the keyword OR then an A, which BASIC takes only in upper case.
@@ -189,6 +196,24 @@ export class Assembler {
             marks,
         );
         return word + size;
+    }
+
+    // BASIC reads an AND, EOR or OR token among the first three characters as the mnemonic, and drops the characters
+    // before it.
+    dropBeforeToken() {
+        const r = this.recogniser;
+        const {start} = r.peek();
+        const {text} = r.lexer;
+        const at = [1, 2].find(i => LogicalTokenChars.has(text[start + i]));
+        if (at === undefined) return;
+        const dropped = text.slice(start, start + at);
+        this.take(start + at, "keyword", [
+            {
+                start,
+                end: start + at,
+                message: `BASIC drops the ${dropped} before the token that follows and reads that as the mnemonic; probably a typo`,
+            },
+        ]);
     }
 
     // The mark for a mnemonic whose third character is not a letter: the two letters before it, which are not an
