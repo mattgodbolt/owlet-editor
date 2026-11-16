@@ -1055,6 +1055,20 @@ describe("Line warnings", () => {
             [2, 5],
         ]);
     });
+    it("should leave alone the names that BASIC does not read as keywords or abbreviations", () => {
+        // ` is a letter, so COUNT` is a name; after FN a dot ends the name, so there is no abbreviation to space out.
+        for (const [text, row] of [
+            ["A=count`", "A=COUNT`"],
+            ["A=FNO.X1", "A=FNO.X1"],
+        ]) {
+            assert.ok(romTokens.has(row), `${row} is not a recorded row`);
+            checkWarnings(text);
+        }
+        assert.strictEqual(
+            romTokens.get("A=FNO. X1").replace(" 20", ""),
+            romTokens.get("A=FNO.X1"),
+        );
+    });
     it("should warn on invalid operators from other languages", () => {
         const cases = [
             ["==", "=", 1],

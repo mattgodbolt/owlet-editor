@@ -132,9 +132,8 @@ export function readLines(text) {
 // shown at its last token and on to the end of the line, and one that something is missing from (a `hole`) at the token
 // where it stops; `message` is the error BASIC would give, or null where the recogniser does not know it. A block
 // that is never closed is one problem at its "[" ({unclosed: true}) in place of those of the lines after it, if it has any.
-export function programProblems(text) {
+export function programProblems(text, recognisers = readLines(text)) {
     let block = null;
-    const recognisers = readLines(text);
     const problems = recognisers.flatMap((recogniser, i) => {
         const lineText = recogniser.lexer.text;
         if (recogniser.opener) block = {line: i + 1, token: recogniser.opener};

@@ -1,7 +1,7 @@
 import {languages} from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController";
 import {FirstStatementToken, Flags, immediateCommands, keywords} from "./tokens";
-import {LanguageId, statementKeywords} from "./bbcbasic";
+import {LanguageId} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
 
@@ -9,7 +9,12 @@ const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const programKeywords = keywords.filter(kw => !immediateCommands.includes(kw.keyword));
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
-const StatementLabels = labels(programKeywords.filter(kw => statementKeywords.has(kw.keyword)));
+const statementWords = new Set(
+    keywords
+        .filter(kw => kw.token >= FirstStatementToken || kw.keyword === "ELSE")
+        .map(kw => kw.keyword),
+);
+const StatementLabels = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
 const ExpressionLabels = labels(programKeywords.filter(kw => kw.token < FirstStatementToken));
 const AllLabels = labels(programKeywords);
 const AssemblerLabels = labels(keywords.filter(kw => kw.flags & Flags.Expr));
