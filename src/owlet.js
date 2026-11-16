@@ -16,6 +16,7 @@ import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getSyntaxMarkers, getWarnings, LanguageId, withoutCodes} from "./bbcbasic";
+import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
@@ -35,6 +36,10 @@ export class OwletEditor {
     constructor(onChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
+        this.problems = $("#problems").on("click", () => {
+            this.editor.focus();
+            this.editor.trigger("problems", "editor.action.marker.next", null);
+        });
         const build = describeBuild(
             import.meta.env.OWLET_GIT_SHA,
             import.meta.env.OWLET_BUILD_DATE,
@@ -186,16 +191,19 @@ export class OwletEditor {
         const model = this.editor.getModel();
         this.syntaxCursorLine = this.editor.getPosition().lineNumber;
         const text = model.getValue();
-        monacoEditor.setModelMarkers(
-            model,
-            "syntax",
-            withoutCodes(getSyntaxMarkers(text, this.syntaxCursorLine)),
+        const syntax = getSyntaxMarkers(text, this.syntaxCursorLine);
+        const lineNumbers = getLineNumberMarkers(text, this.syntaxCursorLine);
+        monacoEditor.setModelMarkers(model, "syntax", withoutCodes(syntax));
+        monacoEditor.setModelMarkers(model, "lineNumbers", lineNumbers);
+        const warnings = getWarnings(text);
+        const summary = problemCount({syntax, lineNumbers, warnings});
+        const [first] = [...syntax, ...lineNumbers, ...warnings].sort(
+            (a, b) => a.startLineNumber - b.startLineNumber || a.startColumn - b.startColumn,
         );
-        monacoEditor.setModelMarkers(
-            model,
-            "lineNumbers",
-            getLineNumberMarkers(text, this.syntaxCursorLine),
-        );
+        this.problems
+            .prop("hidden", !summary)
+            .text(summary)
+            .attr("title", first?.message ?? "");
     }
 
     updateEditorText(newText, updateType) {

@@ -6,6 +6,7 @@ import {
     LanguageId,
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
+import {problemCount} from "../src/problem-count";
 import {highlightLine} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
@@ -1351,5 +1352,23 @@ describe("Syntax markers", () => {
         assert.deepStrictEqual(markers("[\nLDA #\n]"), [
             [MarkerSeverity.Warning, Unfinished("a value", "#", "No such variable"), 2, 5, 6],
         ]);
+    });
+});
+
+describe("Problem count", () => {
+    const marker = severity => ({severity});
+    it.each([
+        [{syntax: [], lineNumbers: [], warnings: []}, ""],
+        [
+            {
+                syntax: [marker(MarkerSeverity.Error), marker(MarkerSeverity.Warning)],
+                lineNumbers: [marker(MarkerSeverity.Error)],
+                warnings: [marker(MarkerSeverity.Warning)],
+            },
+            "2 errors, 1 unfinished, 1 warning",
+        ],
+        [{syntax: [marker(MarkerSeverity.Error)], lineNumbers: [], warnings: []}, "1 error"],
+    ])("should summarise %j as %j", (markers, summary) => {
+        assert.strictEqual(problemCount(markers), summary);
     });
 });
