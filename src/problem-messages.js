@@ -1,4 +1,5 @@
 import {keywords} from "./tokens";
+import {isBasicIV} from "./parser/dialect.js";
 
 // What the ROM's error says is missing, in plain words.
 const Needed = {
@@ -10,9 +11,10 @@ const Needed = {
     "No TO": "TO",
     "Bad HEX": "a hex digit",
     "Bad Hex": "a hex digit",
-    "ON syntax": "GOTO, GOSUB or PROC",
     Index: "an array index",
 };
+
+const neededAfterOn = () => (isBasicIV() ? "GOTO, GOSUB or PROC" : "GOTO or GOSUB");
 
 const UnclosedBlock = "Assembler block not closed: there is no ] after this [";
 
@@ -35,7 +37,7 @@ export function problemMessage(
     if (unclosed) return UnclosedBlock;
     if (stricter) return message;
     const rom = message ? ` (BASIC: ${message})` : "";
-    const needed = Needed[message];
+    const needed = message === "ON syntax" ? neededAfterOn() : Needed[message];
     let plain;
     if (unfinished && !hole) {
         plain = needed ? `Expected ${needed} after ${at}` : `Unfinished after ${at}`;
