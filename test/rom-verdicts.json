@@ -1073,5 +1073,11 @@
   ["[OPT0:LDAGETX 5:]", "ok", "ad e8 19", "#174"],
   ["[OPT0:AND H.:]", "No such variable", "#174"],
   ["[OPT0:AND #1:]", "ok", "29 01", "#174"],
-  ["[OPT0:EOR H.:]", "No such variable", "#174"]
+  ["[OPT0:EOR H.:]", "No such variable", "#174"],
+  ["FOR I:PRINT I:NEXT", "Mistake", "#201"],
+  ["FOR I:", "Mistake", "#201"],
+  ["FOR I", "Mistake", "#201"],
+  ["IF A THEN PRINT:FOR I:NEXT", "Mistake", "#201"],
+  ["A=1:FOR I:NEXT", "Mistake", "#201"],
+  ["FOR I:PRINT I", "Mistake", "#201"]
 ]
