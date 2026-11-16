@@ -1,9 +1,9 @@
-import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
 import {FirstStatementToken, Flags, keywords, immediateCommands, tokenChar} from "./tokens";
 import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
 import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
 import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
-import {programProblems, tokensProvider} from "./parser/highlight";
+import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {BracketCollisions} from "./parser/lexer";
 
 export const LanguageId = "BBCBASIC";
@@ -487,10 +487,9 @@ const InvalidOperatorMap = new Map([
 
 // The warnings for each line of the program.
 export function getWarnings(text) {
-    const lines = text.split(/\r?\n/);
-    return editor
-        .tokenize(text, LanguageId)
-        .flatMap((lineTokens, i) => lineWarnings(i + 1, lines[i], lineTokens));
+    return readLines(text).flatMap((recogniser, i) =>
+        lineWarnings(i + 1, recogniser.lexer.text, recogniser.tokens),
+    );
 }
 
 // The markers for the lines BASIC would stop at, and for those that end too soon or have something missing; only the
@@ -544,34 +543,33 @@ function lineWarnings(lineNum, line, lineTokens) {
             endColumn: offset + length + 1,
         });
 
-    // The new tokenizer marks a statement that is only a name, such as "colour", invalid.
-    const nameTypes = [`variable.${LanguageId}`, `invalid.${LanguageId}`];
-    for (const token of lineTokens.filter(token => nameTypes.includes(token.type))) {
-        const match = line.substr(token.offset).match(LowerCaseTokenRegex);
+    const isName = token => token.invalid || token.kind === "name" || token.kind === "fnname";
+    for (const token of lineTokens.filter(isName)) {
+        const match = line.substr(token.start).match(LowerCaseTokenRegex);
         if (match) {
             const upper = match[0].toUpperCase();
             // Don't warn about lower case versions of immediate commands, e.g. `new`.
             if (immediateCommands.includes(upper)) continue;
-            warn(token.offset, match[0].length, {
+            warn(token.start, match[0].length, {
                 message: `BASIC keywords should be upper case, did you mean ${upper}?`,
                 code: LowerCaseKeywordCode,
             });
         }
     }
-    for (const token of lineTokens.filter(token => token.type === `invalid.${LanguageId}`)) {
-        const abbreviated = line.substr(token.offset).match(invalidAbbreviatedTokenAtStart);
+    for (const token of lineTokens.filter(token => token.invalid)) {
+        const abbreviated = line.substr(token.start).match(invalidAbbreviatedTokenAtStart);
         if (abbreviated) {
             const abbreviation = abbreviated[0].slice(0, abbreviated[0].indexOf(".") + 1);
-            warn(token.offset, abbreviated[0].length, {
+            warn(token.start, abbreviated[0].length, {
                 message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
                 code: SpaceAfterAbbreviationCode,
             });
             continue;
         }
         // Every operator in the map is two characters long.
-        const badOperator = line.substr(token.offset, 2);
+        const badOperator = line.substr(token.start, 2);
         if (InvalidOperatorMap.has(badOperator)) {
-            warn(token.offset, 2, {
+            warn(token.start, 2, {
                 message: `${badOperator} is not a BBC BASIC operator, did you mean ${InvalidOperatorMap.get(badOperator)}?`,
                 code: ForeignOperatorCode,
             });

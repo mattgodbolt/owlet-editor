@@ -1,13 +1,11 @@
-import {editor, languages} from "monaco-editor/esm/vs/editor/editor.api";
+import {languages} from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController";
-import {FirstStatementToken, Flags, immediateCommands, keywords, tokenChar} from "./tokens";
-import {abbreviatedKeyword, allTokensRegex, LanguageId, statementKeywords} from "./bbcbasic";
+import {FirstStatementToken, Flags, immediateCommands, keywords} from "./tokens";
+import {LanguageId, statementKeywords} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
+import {readLines} from "./parser/highlight";
 
-const KeywordType = `keyword.${LanguageId}`;
-const SquareType = `delimiter.square.${LanguageId}`;
-// What Monaco itself treats as a string or a comment: strings, REM, DATA and * commands.
-const TextTypeRegex = /\b(string|comment)\b/;
+const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const programKeywords = keywords.filter(kw => !immediateCommands.includes(kw.keyword));
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
@@ -22,64 +20,29 @@ const NameKinds = new Map([
     ["PROC", Kind.Proc],
 ]);
 
-const keywordByChar = new Map(keywords.map(kw => [tokenChar(kw), kw]));
-const KeywordRegex = new RegExp(
-    `${allTokensRegex}|[A-Z]+\\$?\\.|[${[...keywordByChar.keys()].join("")}]`,
-    "g",
-);
+const nameKind = token => token && token.kind === "keyword" && NameKinds.get(token.kw.keyword);
 
-function keywordOf(text) {
-    if (text.endsWith(".")) return abbreviatedKeyword(text);
-    return keywordByChar.get(text) || keywords.find(kw => kw.keyword === text);
-}
+// A label starts an assembler statement as a colon does. Only the line's own number starts one; the others are the
+// targets of GOTO, THEN and the like.
+const startsStatement = token =>
+    (token.kind === "linenum" && token.own) ||
+    token.kind === "label" ||
+    (token.kind === "punct" && token.text === ":") ||
+    (token.kind === "keyword" && (token.kw.flags & Flags.Start || token.kw.keyword === "REPEAT"));
 
-// A line's tokens with their text, without white space. Monaco joins adjacent tokens of the same type, so a keyword
-// token is split into its keywords.
-export function lineItems(line, lineTokens) {
-    return lineTokens.flatMap((token, index) => {
-        const end = index + 1 < lineTokens.length ? lineTokens[index + 1].offset : line.length;
-        const text = line.slice(token.offset, end);
-        if (token.type === `white.${LanguageId}` || text === "") return [];
-        const matches = token.type === KeywordType ? [...text.matchAll(KeywordRegex)] : [];
-        if (matches.length === 0) return [{type: token.type, offset: token.offset, end, text}];
-        return matches.map(match => {
-            const offset = token.offset + match.index;
-            return {
-                type: token.type,
-                offset,
-                end: offset + match[0].length,
-                text: match[0],
-                kw: keywordOf(match[0]),
-            };
-        });
-    });
-}
-
-const nameKind = item => item && item.kw && NameKinds.get(item.kw.keyword);
-
-// A label starts an assembler statement as a colon does. The tokeniser joins a colon to the symbols before it (";:").
-// Only the line's own number starts one; the others are the targets of GOTO, THEN and the like.
-const startsStatement = (item, index) =>
-    (item.type === `constant.linenum.${LanguageId}` && index === 0) ||
-    item.type === `type.identifier.${LanguageId}` ||
-    (/^(symbol|operator)\./.test(item.type) && item.text.endsWith(":")) ||
-    (item.kw && (item.kw.flags & Flags.Start || item.kw.keyword === "REPEAT"));
-
-function statementState(items, inAssembler) {
-    const state = {inAssembler, atStart: true, statement: null, inText: false};
-    for (const [index, item] of items.entries()) {
-        if (item.type === SquareType) {
-            state.inAssembler = item.text === "[";
+function statementState(tokens, inAssembler) {
+    const state = {inAssembler, atStart: true, statement: null};
+    for (const token of tokens) {
+        if (token.kind === "punct" && (token.text === "[" || token.text === "]")) {
+            state.inAssembler = token.text === "[";
             state.atStart = true;
-        } else if (item.kw && item.kw.flags & Flags.REM && !state.inAssembler) {
-            state.inText = true;
-        } else if (startsStatement(item, index)) {
+        } else if (startsStatement(token)) {
             state.atStart = true;
             // ON ERROR is followed by a statement or OFF.
-            if (item.kw && item.kw.keyword === "ERROR") continue;
+            if (token.kind === "keyword" && token.kw.keyword === "ERROR") continue;
             state.statement = null;
         } else {
-            if (state.atStart) state.statement = item.kw ? item.kw.keyword : "";
+            if (state.atStart) state.statement = token.kind === "keyword" ? token.kw.keyword : "";
             state.atStart = false;
         }
     }
@@ -89,43 +52,23 @@ function statementState(items, inAssembler) {
 // What can be typed at the end of the text: {startColumn, labels} for keywords, {startColumn, nameKind} after FN or
 // PROC, or null for nothing (in a string, REM, DATA, * command or number, or after DEF PROC or DEF FN).
 export function completionContext(text) {
-    const lines = text.split(/\r?\n/);
-    const lineTokens = editor.tokenize(text, LanguageId);
-    let inAssembler = false;
-    for (let i = 0; i < lines.length - 1; i++) {
-        if (lineTokens[i].some(token => token.type === SquareType)) {
-            inAssembler = statementState(
-                lineItems(lines[i], lineTokens[i]),
-                inAssembler,
-            ).inAssembler;
-        }
-    }
-    const line = lines[lines.length - 1];
-    const items = lineItems(line, lineTokens[lines.length - 1]);
-    let last = items[items.length - 1];
+    const recogniser = readLines(text).at(-1);
+    const line = recogniser.lexer.text;
+    const tokens = recogniser.tokens.filter(token => token.kind !== "white");
+    let last = tokens.at(-1);
     const lastAtEnd = last && last.end === line.length;
-    if (lastAtEnd && TextTypeRegex.test(last.type)) return null;
+    if (lastAtEnd && (TextKinds.has(last.kind) || last.kind === "hex")) return null;
     let startColumn = line.length + 1;
     if (/[\w$%]$/.test(line) && !nameKind(last)) {
-        // The tokeniser joins abutting names ("A%B"): the word is the last of them.
-        const word = lastAtEnd && last.text.match(/\w+[$%]?$/);
-        if (!word) return null;
-        items.pop();
-        if (word.index > 0) {
-            items.push({
-                ...last,
-                end: last.offset + word.index,
-                text: last.text.slice(0, word.index),
-            });
-        }
-        startColumn = last.offset + word.index + 1;
-        last = items[items.length - 1];
+        if (!lastAtEnd) return null;
+        tokens.pop();
+        startColumn = last.start + 1;
+        last = tokens.at(-1);
     }
-    const state = statementState(items, inAssembler);
-    if (state.inText || (last && last.text.endsWith("&"))) return null;
+    if (last && last.kind === "hex" && last.text === "&") return null;
+    const state = statementState(tokens, recogniser.startsInAssembler);
     if (nameKind(last) && last.end === startColumn - 1) {
-        const beforeName = items[items.length - 2];
-        const afterDef = beforeName && beforeName.kw && beforeName.kw.keyword === "DEF";
+        const afterDef = tokens.at(-2)?.kw?.keyword === "DEF";
         return afterDef ? null : {startColumn, nameKind: nameKind(last)};
     }
     if (state.inAssembler) return state.atStart ? null : {startColumn, labels: AssemblerLabels};

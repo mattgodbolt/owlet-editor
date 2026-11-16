@@ -119,16 +119,25 @@ export function highlightLine(text, inAssembler = false) {
     return {tokens: joined, inAssembler: open};
 }
 
+// The recogniser's reading of each line of the program, an assembler block open at the end of one carrying into the next.
+export function readLines(text) {
+    let inAssembler = false;
+    return text.split(/\r?\n/).map(lineText => {
+        const recogniser = new Recogniser(lineText, inAssembler);
+        inAssembler = recogniser.line();
+        return recogniser;
+    });
+}
+
 // What each line's errors are, for editor markers: {line, start, end, message, unfinished, hole, stricter}. An unfinished line is
 // shown at its last token and on to the end of the line, and one that something is missing from (a `hole`) at the token
 // where it stops; `message` is the error BASIC would give, or null where the recogniser does not know it. A block
 // that is never closed is one problem at its "[" ({unclosed: true}) in place of those of the lines after it, if it has any.
 export function programProblems(text) {
-    let inAssembler = false;
     let block = null;
-    const problems = text.split(/\r?\n/).flatMap((lineText, i) => {
-        const recogniser = new Recogniser(lineText, inAssembler);
-        inAssembler = recogniser.line();
+    const recognisers = readLines(text);
+    const problems = recognisers.flatMap((recogniser, i) => {
+        const lineText = recogniser.lexer.text;
         if (recogniser.opener) block = {line: i + 1, token: recogniser.opener};
         const last = recogniser.tokens.findLast(token => token.kind !== "white");
         return recogniser.problems.map(({message, token, end, unfinished, hole, stricter}) => ({
@@ -141,7 +150,7 @@ export function programProblems(text) {
             stricter: Boolean(stricter),
         }));
     });
-    if (!inAssembler || !block) return problems;
+    if (!recognisers.at(-1).inAssembler || !block) return problems;
     const {line, token} = block;
     const before = problems.filter(problem => problem.line <= line);
     if (before.length === problems.length) return problems;
