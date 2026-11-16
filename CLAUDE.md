@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run all tests: `npm run test` or `make test`
 - Run specific test: `npx vitest run test/file_name_test.js`
 - Run all checks: `make check` (tests + lint-fix)
+- What CI runs: `make ci-check` (tests, lint, `prettier --check` and the build, failing rather than fixing)
 
 ## Code Style
 - Use ESLint + Prettier configuration

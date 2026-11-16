@@ -1,43 +1,53 @@
 import {
     codeActionProvider,
+    getSyntaxMarkers,
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
-    tokenChar,
 } from "../src/bbcbasic";
-import {keywords} from "../src/tokens";
+import {highlightLine} from "../src/parser/highlight";
+import {keywords, tokenChar} from "../src/tokens";
+import {falseInvalid, verdicts} from "./rom-tables";
+import RomTokens from "./rom-tokens.json";
 import {describe, it} from "vitest";
 import assert from "assert";
-import {editor, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
 registerBbcBasicLanguage();
 
+// Each line's tokens as {offset, type}, neighbours of the same type joined, an open assembler block carrying on.
+function tokenLines(text) {
+    let inAssembler = false;
+    return text.split("\n").map(line => {
+        const result = highlightLine(line, inAssembler);
+        inAssembler = result.inAssembler;
+        return result.tokens.filter((t, i, all) => i === 0 || t.type !== all[i - 1].type);
+    });
+}
+
 // Each line's tokens, as "offset:type" separated by spaces.
 function tokens(text) {
-    return editor
-        .tokenize(text, LanguageId)
-        .map(line =>
-            line.map(t => `${t.offset}:${t.type.replace(`.${LanguageId}`, "")}`).join(" "),
-        );
+    return tokenLines(text).map(line => line.map(t => `${t.offset}:${t.type}`).join(" "));
 }
 
 // The source text of each token of the given type, on every line.
 function spans(text, type) {
     const lines = text.split("\n");
-    return editor
-        .tokenize(text, LanguageId)
-        .flatMap((line, l) =>
-            line.flatMap((t, i) =>
-                t.type === `${type}.${LanguageId}`
-                    ? [
-                          lines[l].slice(
-                              t.offset,
-                              i + 1 < line.length ? line[i + 1].offset : undefined,
-                          ),
-                      ]
-                    : [],
-            ),
-        );
+    return tokenLines(text).flatMap((line, l) =>
+        line.flatMap((t, i) =>
+            t.type === type
+                ? [lines[l].slice(t.offset, i + 1 < line.length ? line[i + 1].offset : undefined)]
+                : [],
+        ),
+    );
+}
+
+// [start, end] of each token of the given type in a one-line text.
+function spanRanges(text, type) {
+    const line = tokenLines(text)[0];
+    return line.flatMap((t, i) =>
+        t.type === type ? [[t.offset, i + 1 < line.length ? line[i + 1].offset : text.length]] : [],
+    );
 }
 
 // Each bracket Monaco finds, as [column, isUnmatched].
@@ -54,7 +64,11 @@ function brackets(text) {
     }
 }
 
-const unmatched = text => brackets(text).flatMap(([column, invalid]) => (invalid ? [column] : []));
+// The columns of each ) shown as having no (: by Monaco, or by the tokenizer as an invalid token.
+const unmatched = text => [
+    ...brackets(text).flatMap(([column, invalid]) => (invalid ? [column] : [])),
+    ...spanRanges(text, "invalid").flatMap(([start]) => (text[start] === ")" ? [start + 1] : [])),
+];
 
 const openers = keywords.filter(kw => kw.keyword.endsWith("(")).map(tokenChar);
 
@@ -71,8 +85,23 @@ function checkWarnings(text, ...expected) {
     );
 }
 
+const romTokens = new Map(RomTokens);
+
+// Checks that the ROM backs the marks the tokenizer makes on a text it rejects: the text, or for one that cannot be a
+// row of the table the rows given, is a recorded row, and nothing the ROM runs is red. A line the ROM runs backs a mark
+// only in text it never reads (ON ERROR 30 reads the 30 only after an error).
+function backedByRom(text, ...rows) {
+    for (const row of rows.length ? rows : [text]) {
+        assert.ok(verdicts.has(row) || romTokens.has(row), `${row} is not a recorded row`);
+        if (verdicts.get(row) === "ok") assert.strictEqual(row, text, `${row} runs on the ROM`);
+    }
+    if (verdicts.has(text))
+        assert.deepStrictEqual(falseInvalid(text, spanRanges(text, "invalid")), [], text);
+}
+
 const caseWarning = (keyword, startColumn) => ({
     message: `BASIC keywords should be upper case, did you mean ${keyword}?`,
+    code: "lowercase-keyword",
     startColumn,
     endColumn: startColumn + keyword.length,
 });
@@ -96,7 +125,8 @@ describe("Tokenisation", () => {
             assert.deepStrictEqual(tokens("IFVALA$PRINTA$.1"), [
                 "0:keyword 5:variable 7:keyword 12:variable 14:number.float",
             ]);
-            assert.deepStrictEqual(tokens("TIME r"), ["0:keyword 4:white 5:variable"]);
+            assert.deepStrictEqual(tokens("TIME r"), ["0:keyword 4:white 5:invalid"]);
+            backedByRom("TIME r");
         });
         it("should read names with a type suffix", () => {
             for (const text of ["A%", "X%", "LONGVAR%", "@%", "LDA"])
@@ -130,19 +160,27 @@ describe("Tokenisation", () => {
                 "H.TO H._ TI._X B.X BG.X BP.X CLO.X EO.X PT.X E.X EN.X ER.X O.X R.X RE.X".split(
                     " ",
                 );
-            for (const text of names) assert.deepStrictEqual(spans(text, "invalid"), [text], text);
+            for (const text of names) {
+                assert.deepStrictEqual(tokens(text), ["0:invalid"], text);
+                backedByRom(text);
+            }
             for (const text of ["A=B. #X", "R.:", "RE.", "P.X", "I.X", "F.X", "D.X", "REP.X"])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
         });
         it("should read a keyword and a dot as the abbreviation of an earlier keyword it begins", () => {
             // END. is ENDPROC, MOD. is MODE and so on, since those come first in the table.
-            for (const text of ["END.", "ON ERR.", "A=GET.", "A=INKEY.5", "A=8MOD.3"])
+            for (const text of ["END.", "ON ERR.", "A=GET.", "A=INKEY.5"])
                 assert.deepStrictEqual(
                     spans(text, "keyword").slice(-1),
                     [text.match(/[A-Z]+\./)[0]],
                     text,
                 );
-            assert.deepStrictEqual(spans("END.X", "invalid"), ["END.X"]);
+            assert.deepStrictEqual(tokens("END.X"), ["0:invalid"]);
+            assert.deepStrictEqual(tokens("A=8MOD.3"), [
+                "0:variable 1:operator 2:number 3:invalid",
+            ]);
+            backedByRom("END.X");
+            backedByRom("A=8MOD.3");
             assert.deepStrictEqual(spans("A=8MOD 3", "keyword"), ["MOD"]);
         });
         it("should allow FN and PROC names starting with a digit", () => {
@@ -153,20 +191,20 @@ describe("Tokenisation", () => {
         it("should highlight a keyword that cannot start a statement", () => {
             // See #151, checked on the ROM, where each invalid case is a syntax error.
             const cases = [
-                ['ERROR5,"x"', ["ERROR"]],
-                ["RND(-TIME)", ["RND"]],
-                ["STEP1", ["STEP"]],
-                ["TOOMUCH=1", ["TO"]],
-                ["A=1:ABS A", ["ABS"]],
+                ['ERROR5,"x"', ["ERROR5,"]],
+                ["RND(-TIME)", ["RND(-TIME)"]],
+                ["STEP1", ["STEP1"]],
+                ["TOOMUCH=1", ["TOOMUCH=1"]],
+                ["A=1:ABS A", ["ABS A"]],
                 ["IF A THEN TO", ["TO"]],
-                ["IF 0 THEN 10 ELSE FNf", ["FN"]],
+                ["IF 0 THEN 10 ELSE FNf", ["FNf"]],
                 ["A.", ["A."]],
                 ["10 THEN", ["THEN"]],
                 ["\u0185", ["\u0185"]],
                 // PTR, PAGE and TIME as functions (tokens &8F, &90, &91) cannot start a statement, their statement
                 // forms can.
-                ["\u018f#0=1", ["\u018f#"]],
-                ["\u0190=1", ["\u0190"]],
+                ["\u018f#0=1", ["\u018f#0=1"]],
+                ["\u0190=1", ["\u0190=1"]],
                 ["\xcf#0=1", []],
                 ["\xd0=1", []],
                 ["ON ERROR OFF", []],
@@ -180,6 +218,7 @@ describe("Tokenisation", () => {
             ];
             for (const [text, invalid] of cases)
                 assert.deepStrictEqual(spans(text, "invalid"), invalid, text);
+            backedByRom("\u018f#0=1");
         });
     });
 
@@ -209,9 +248,11 @@ describe("Tokenisation", () => {
                     text,
                 );
             // See #26.
+            // The tokeniser reads E4TO22400STEP100 as a name, so BASIC finds no TO.
             assert.deepStrictEqual(tokens("FORJ%=2E4TO22400STEP100"), [
-                "0:keyword 3:variable 5:operator 6:number.float 9:keyword 11:number 16:keyword 20:number",
+                "0:keyword 3:variable 5:operator 6:number.float 9:invalid",
             ]);
+            backedByRom("FORJ%=2E4TO22400STEP100");
             assert.deepStrictEqual(tokens("P.$.114338E6"), ["0:keyword 2:operator 3:number.float"]);
         });
         it("should read a dot after a value as a number only where one value can follow another", () => {
@@ -229,7 +270,7 @@ describe("Tokenisation", () => {
                 ["VDU X.7,1", []],
                 ["INPUT X.", ["."]],
                 ["I.X.7", [".7"]],
-                ["A=BGET##1", ["#"]],
+                ["A=BGET##1", ["#1"]],
                 ['PRINT "a".5', []],
                 ["PRINT STR$(1);.5", []],
                 ["VDU1,2.5", []],
@@ -239,12 +280,12 @@ describe("Tokenisation", () => {
                 ["X%=X%.5", [".5"]],
                 ["x=x.5", [".5"]],
                 ["FOR I=1 TO X.", ["."]],
-                ["FOR I=X. TOP", ["."]],
-                ["A=X. TO", ["."]],
-                ["IF X. THEN PRINT", ["."]],
+                ["FOR I=X. TOP", [". TOP"]],
+                ["A=X. TO", [". TO"]],
+                ["IF X. THEN PRINT", [". THEN PRINT"]],
                 ["COLOUR X.", ["."]],
-                ["PRINT#X.,1", ["."]],
-                ["INPUT#X.,Y", ["."]],
+                ["PRINT#X.,1", [".,1"]],
+                ["INPUT#X.,Y", [".,Y"]],
                 ["P.X.:Y=X.", ["."]],
                 ["PRINT 1E.5", []],
                 ["VDU 1E.5", []],
@@ -284,7 +325,7 @@ describe("Tokenisation", () => {
                 ["FOR I=ABS TOP TO TOP", ["I"], ["FOR", "ABS", "TOP", "TO", "TOP"]],
                 ["FOR I=AB. TOP TO TOP", ["I"], ["FOR", "AB.", "TOP", "TO", "TOP"]],
                 ["FOR I=AB.TOP TO TOP", ["I"]],
-                ["FOR I=XY.TOP", ["I", "XY", "P"]],
+                ["FOR I=XY.TOP", ["I", "XY"]],
                 ["FOR I=1 AND TOP TO 2", ["I"], ["FOR", "AND", "TOP", "TO"]],
                 // Abbreviated and raw token forms, checked against the ROM by running them.
                 ["FO.I=TOP TO TOP+1", ["I"], ["FO.", "TOP", "TO", "TOP"]],
@@ -328,28 +369,147 @@ describe("Tokenisation", () => {
                 );
             }
             const invalid = [
-                "A=~B",
-                "A$=STR$(~12)",
-                "A$=\xc3(~1)",
-                "PRINT#0,~A",
-                "INPUT ~A",
-                "VDU ~A",
-                "PRINT 1+~A",
-                "PRINT (~A)",
-                "PRINT TAB(~A)",
-                "PRINT ~A:B=~A",
-                "PRINT !~A",
-                "PRINT ?~A",
-                "PRINT ;-~B",
-                "PRINT A AND ~B",
-                "PRINT A MOD~B",
-                "~",
+                ["A=~B", "~B"],
+                ["A$=STR$(~12)", "~12)"],
+                ["A$=\xc3(~1)", "~1)"],
+                ["PRINT#0,~A", "~A"],
+                ["INPUT ~A", "~A"],
+                ["VDU ~A", "~A"],
+                ["PRINT 1+~A", "~A"],
+                ["PRINT (~A)", "~A)"],
+                ["PRINT TAB(~A)", "~A)"],
+                ["PRINT ~A:B=~A", "~A"],
+                ["PRINT !~A", "~A"],
+                ["PRINT ?~A", "~A"],
+                ["PRINT ;-~B", "~B"],
+                ["PRINT A AND ~B", "~B"],
+                ["PRINT A MOD~B", "~B"],
+                ["~", "~"],
                 // See #152: STR$ takes one ~, though PRINT takes any number.
-                "P.STR$~~42",
-                "A$=STR$~~42",
-                "P.STR.~~42",
+                ["P.STR$~~42", "~42"],
+                ["A$=STR$~~42", "~42"],
+                ["P.STR.~~42", "~42"],
             ];
-            for (const text of invalid) assert.deepStrictEqual(spans(text, "invalid"), ["~"], text);
+            for (const [text, red] of invalid)
+                assert.deepStrictEqual(spans(text, "invalid"), [red], text);
+        });
+    });
+
+    describe("examples from the issues", () => {
+        // Each is a line someone reported (the number is the issue or pull request), with its tokens; the ROM's
+        // verdict on it, or on the statement it comes from, is a row of test/rom-verdicts.json with the same number.
+        it("should read each as reported", () => {
+            const cases = [
+                ["#26", "Z%=2E4", "0:variable 2:operator 3:number.float"],
+                [
+                    "#27",
+                    "P.1.,.5,.",
+                    "0:keyword 2:number.float 4:operator 5:number.float 7:operator 8:number.float",
+                ],
+                [
+                    "#28",
+                    "A%=@%:@%=A%",
+                    "0:variable 2:operator 3:variable 5:symbol 6:variable 8:operator 9:variable",
+                ],
+                ["#37", "*FX19:PRINT", "0:keyword.oscli.string"],
+                ["#37", "*.:0", "0:keyword.oscli.string"],
+                [
+                    "#41",
+                    "P.'\"a\"'@%''TIME'",
+                    "0:keyword 2:operator 3:string.quote 4:string 5:string.quote 6:operator 7:variable 9:operator 11:keyword 15:operator",
+                ],
+                ["#43", "D.http://bbcmic.ro", "0:keyword 2:string.unquoted"],
+                ["#45", "PRINT TOP", "0:keyword 5:white 6:keyword"],
+                [
+                    "#45",
+                    "F.P=TOP TOP:P.P:N.",
+                    "0:keyword 2:variable 3:operator 4:keyword 7:white 8:keyword 10:variable 11:symbol 12:keyword 14:variable 15:symbol 16:keyword",
+                ],
+                [
+                    "#45",
+                    "FORP=TOP-TOP TOP+TOP/TOP:N.",
+                    "0:keyword 3:variable 4:operator 5:keyword 8:operator 9:keyword 12:white 13:keyword 15:variable 16:operator 17:keyword 20:operator 21:keyword 24:symbol 25:keyword",
+                ],
+                ["#52", 'P."A"X', "0:keyword 2:string.quote 3:string 4:string.quote 5:variable"],
+                ["#62", "PRINTQ.1", "0:keyword 5:variable 6:number.float"],
+                ["#83", "*KEY0PAGE=4608|MO.|MRU.|M", "0:keyword.oscli.string"],
+                ["#83", "*LOAD P.DAT", "0:keyword.oscli.string"],
+                [
+                    "#85",
+                    "@%=0:X=1:P.X.",
+                    "0:variable 2:operator 3:number 4:symbol 5:variable 6:operator 7:number 8:symbol 9:keyword 11:variable 12:number.float",
+                ],
+                [
+                    "#85",
+                    "X=42:V.X.",
+                    "0:variable 1:operator 2:number 4:symbol 5:keyword 7:variable 8:number.float",
+                ],
+                ["#112", "ONERROR*HELP", "0:keyword 7:keyword.oscli.string"],
+                ["#112", "IF0EL.*H.", "0:keyword 2:number 3:keyword 6:keyword.oscli.string"],
+                ["#112", "ONERR.*HELP", "0:keyword 6:keyword.oscli.string"],
+                [
+                    "#140",
+                    "ri=42:P.ri.",
+                    "0:variable 2:operator 3:number 5:symbol 6:keyword 8:variable 10:number.float",
+                ],
+                [
+                    "#144",
+                    "FOR I=AB. TOP TO 9:N.",
+                    "0:keyword 3:white 4:variable 5:operator 6:keyword 9:white 10:keyword 13:white 14:keyword 16:white 17:number 18:symbol 19:keyword",
+                ],
+                ["#149", "Y=X.7", "0:variable 1:operator 2:variable 3:invalid"],
+                ["#150", "Z.", "0:variable 1:invalid"],
+                ["#150", "PRIT.", "0:variable 4:invalid"],
+                ["#152", "P.STR$~~42", "0:keyword 6:operator 7:invalid"],
+                ["#152", "A$=STR$~~42", "0:variable 2:operator 3:keyword 7:operator 8:invalid"],
+                ["#156", "\xf2p", "0:keyword 1:variable"],
+                ["#156", "\xdd\xf2x", "0:keyword 2:variable"],
+                // A line number BASIC has already encoded.
+                ["#161", "\xe5\u018dTJ@", "0:keyword 1:constant.linenum"],
+                [
+                    "#74",
+                    "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK",
+                    "0:keyword.string 1:constant.linenum 5:symbol 6:keyword 7:constant.linenum 11:symbol 12:keyword 13:comment",
+                ],
+                ["#167", "[lda42,X", "0:delimiter.square 1:keyword 4:number 6:symbol 7:keyword"],
+                [
+                    "#170",
+                    "Q$=MID$(Q$,2)+STR$(Q%)",
+                    "0:variable 2:operator 3:keyword 7:delimiter.parenthesis 8:variable 10:operator 11:number 12:delimiter.parenthesis 13:operator 14:keyword 18:delimiter.parenthesis 19:variable 21:delimiter.parenthesis",
+                ],
+                [
+                    "#170",
+                    "Q$=\xc1Q$,2)+\xc3(Q%)",
+                    "0:variable 2:operator 3:keyword 4:variable 6:operator 7:number 8:delimiter.parenthesis 9:operator 10:keyword 11:delimiter.parenthesis 12:variable 14:delimiter.parenthesis",
+                ],
+                [
+                    "#170",
+                    "Q$=MI.Q$,2)+STR.(Q%)",
+                    "0:variable 2:operator 3:keyword 6:variable 8:operator 9:number 10:delimiter.parenthesis 11:operator 12:keyword 16:delimiter.parenthesis 17:variable 19:delimiter.parenthesis",
+                ],
+            ];
+            for (const [source, text, expected] of cases)
+                assert.deepStrictEqual(tokens(text), [expected], `${source} ${text}`);
+            for (const text of ["\xe5\u018dTJ@", "\xe4\u018dTJ@:\xe5\u018dTT@:\xf4OK"])
+                backedByRom(text);
+        });
+        it("should mark nothing in the lines reported as wrongly red", () => {
+            for (const text of [
+                "\xe440:\xf4 wrongly highlighted as invalid", // #156
+                "\xe0:\xf4 wrongly highlighted as invalid",
+                "\xf8",
+                "\xe22,3,2,-4,4,50,50,50,127,0,0,0,126,0:\xf4 wrongly highlighted as invalid",
+                "\xe1:\xf4 wrongly highlighted as invalid",
+                'MO.4:F.R=2TOLEN"\xff@W\u0197\u0187\xc3\xc3\xe1\xe1\xf0\xe0\xf0\xe0\xf0\u0180<lf\xba\u0199\xaaf\u0100B":?8=R?7180:?9=R:F.X=1TO9:MOVE(X*2OR1A.R)*40,R*40+?8MOD2*@%:P."\u0105\u0119\u0199\u0100\u0100\u011c\u0100":!6=!6/2:N.,:V.1', // #23
+                "F.A=H. TO8^5:?A=42:N.", // #30
+                'A$="OWLET":P.RI.A$,1)LE.A$,2)MI.A$,4,1)MI.A$,3,1)', // #114
+                "P.LE.A$,1)", // #160
+                "PRINTLE.A$,1)",
+                "P.LENMI.A$,2)",
+                "DIM tab(2):P.tab(1)", // #140
+                'READ A$:DATA "abc\nP.1', // #138
+            ])
+                assert.deepStrictEqual(spans(text, "invalid"), [], text);
         });
     });
 
@@ -450,36 +610,48 @@ describe("Tokenisation", () => {
                     "LIST 230:AUTO 240:DELETE 10,20:RENUMBER 10,20",
                     ["230", "240", "10", "20", "10", "20"],
                 ],
-                [
-                    "GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20",
-                    ["10", "150", "230", "10", "10", "20"],
-                ],
+                // BASIC stops at the first token that is not part of the list.
+                ["GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20", ["10", "150", "230", "10"]],
                 ["GOTO 10;20:GOTO 10.5,20:GOTO 10E2,20:GOTO -10,20", ["10", "10", "10"]],
-                ["GOTO &10,20", ["20"]],
+                ["GOTO &10,20", []],
                 ["ON X GOTO 10,X,20:GOTO (220):GOTO A%*10", ["10"]],
                 ["X=1:250:REPEAT 20:PRINT 170", []],
                 ["ON X GOTO 240,250 ELSE PRINT 260", ["240", "250"]],
                 ['PRINT "GOTO 80":REM GOTO 80\nDATA 90\n*FX 140', []],
             ];
-            for (const [text, lineNumbers] of cases) {
+            for (const [text, lineNumbers] of cases)
                 assert.deepStrictEqual(spans(text, "constant.linenum"), lineNumbers, text);
+            // The 30 is read only after an error.
+            for (const [text, expected] of [
+                ["ON ERROR 30", "0:keyword 2:white 3:keyword 8:white 9:invalid"],
+                ['ERROR 5,"x"', "0:invalid 8:invalid.string"],
+                ["ON ERR. 30", "0:keyword 2:white 3:keyword 7:white 8:invalid"],
+                ["\xee\u0185 30", "0:keyword 2:white 3:invalid"],
+            ]) {
+                assert.deepStrictEqual(tokens(text), [expected], text);
+                backedByRom(text);
             }
-            for (const text of ["ON ERROR 30", 'ERROR 5,"x"', "ON ERR. 30", "\xee\u0185 30"]) {
-                assert.deepStrictEqual(spans(text, "constant.linenum"), [], text);
-                assert.deepStrictEqual(spans(text, "number"), [text.match(/\d+/)[0]], text);
-            }
+            assert.deepStrictEqual(tokens("GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20"), [
+                "0:keyword 4:white 5:constant.linenum 7:invalid 9:symbol 10:keyword 14:white 15:constant.linenum 18:invalid 21:symbol 22:keyword 26:white 27:constant.linenum 30:white 31:invalid 33:symbol 34:keyword 38:white 39:constant.linenum 41:white 42:invalid",
+            ]);
+            backedByRom("GOTO 10*2:GOTO 150+10:GOTO 230 10:GOTO 10 ,, 20");
         });
     });
 
     describe("strings, symbols and operators", () => {
         it("should handle symbols and operators", () => {
-            for (const text of ["!", "=", "^", "'"])
+            for (const text of ["!", "="])
                 assert.deepStrictEqual(tokens(text), ["0:operator"], text);
+            for (const text of ["^", "'"]) {
+                assert.deepStrictEqual(tokens(text), ["0:invalid"], text);
+                backedByRom(text);
+            }
             assert.deepStrictEqual(tokens(":"), ["0:symbol"]);
             assert.deepStrictEqual(tokens("#"), ["0:invalid"]);
             assert.deepStrictEqual(tokens("DEFFNmain:{=0}"), [
-                "0:keyword 5:variable 9:symbol 10:invalid 11:operator 12:number 13:invalid",
+                "0:keyword 5:variable 9:symbol 10:invalid",
             ]);
+            backedByRom("DEFFNmain:{=0}");
         });
         it("should handle # operator where valid", () => {
             const cases = [
@@ -506,28 +678,26 @@ describe("Tokenisation", () => {
             for (const [text, expected] of cases)
                 assert.deepStrictEqual(tokens(text), [expected], text);
         });
-        it("should read strings, and an unterminated one as invalid", () => {
+        it("should read strings, and an unterminated one as unfinished", () => {
             assert.deepStrictEqual(tokens('P.""C1'), ["0:keyword 2:string.quote 4:variable"]);
             assert.deepStrictEqual(tokens('P."\nP."TEST\nP."ESC""APE\nP."OK"'), [
-                "0:keyword 2:invalid.string",
-                "0:keyword 2:invalid.string",
-                "0:keyword 2:invalid.string",
+                "0:keyword 2:string.quote",
+                "0:keyword 2:string.quote 3:string",
+                "0:keyword 2:string.quote 3:string 6:string.quote 8:string",
                 "0:keyword 2:string.quote 3:string 5:string.quote",
             ]);
         });
         it("should highlight invalid operators from other languages", () => {
-            const lines = [
-                "INVALID=1==2OR8!=2**3",
-                "IFA><1ORB=<2ORB=>6GOTO10",
-                "A+=2",
-                "A=B<<C OR D>>E",
+            const cases = [
+                ["INVALID=1==2OR8!=2**3", "0:variable 7:operator 8:number 9:invalid"],
+                ["IFA><1ORB=<2ORB=>6GOTO10", "0:keyword 2:variable 3:invalid"],
+                ["A+=2", "0:variable 1:invalid"],
+                ["A=B<<C OR D>>E", "0:variable 1:operator 2:variable 3:invalid"],
             ];
-            assert.deepStrictEqual(tokens(lines.join("\n")), [
-                "0:variable 7:operator 8:number 9:invalid 11:number 12:keyword 14:number 15:invalid 17:number 18:invalid 20:number",
-                "0:keyword 2:variable 3:invalid 5:number 6:keyword 8:variable 9:invalid 11:number 12:keyword 14:variable 15:invalid 17:number 18:keyword 22:constant.linenum",
-                "0:variable 1:invalid 3:number",
-                "0:variable 1:operator 2:variable 3:invalid 5:variable 6:white 7:keyword 9:white 10:variable 11:invalid 13:variable",
-            ]);
+            for (const [text, expected] of cases) {
+                assert.deepStrictEqual(tokens(text), [expected], text);
+                backedByRom(text);
+            }
         });
     });
 
@@ -559,7 +729,8 @@ describe("Tokenisation", () => {
                     "[\nEQUB LENA$",
                     ["0:delimiter.square", "0:keyword.directive 4:white 5:keyword 8:variable"],
                 ],
-                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:keyword 6:variable"]],
+                // The tokeniser makes no keyword inside a name, so FN is not one here.
+                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:variable"], "EQUSFNx"],
                 [
                     "[ROR 80\\comment:ROR80\\comment:]P.",
                     [
@@ -567,28 +738,36 @@ describe("Tokenisation", () => {
                     ],
                 ],
                 // ; starts a comment only after a mnemonic or directive, and each line starts a new statement.
-                ["[;notacomment", ["0:delimiter.square 1:operator 2:variable"]],
+                ["[;notacomment", ["0:delimiter.square 1:invalid"], "[OPT0:;notacomment:]"],
                 [
                     "[NOP ; a\n;notacomment",
-                    ["0:delimiter.square 1:keyword 4:white 5:comment", "0:operator 1:variable"],
+                    ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid"],
+                    "[OPT0:;notacomment:]",
                 ],
             ];
-            for (const [text, expected] of cases)
+            for (const [text, expected, row] of cases) {
                 assert.deepStrictEqual(tokens(text), expected, text);
+                if (row) backedByRom(text, row);
+            }
         });
         it("should highlight tokens invalid in assembler", () => {
             const text = [
                 "[LDA CLEAR+CLG+CLS+DEF+ENDPROC+END+LINE+NEW+OLD+OFF",
                 "STA RETURN+REPEAT+REPORT+RUN+STEP+SPC+STOP+TO+TAB(1):]",
             ].join("\n");
-            assert.deepStrictEqual(
-                spans(text, "invalid"),
-                "CLEAR CLG CLS DEF ENDPROC END LINE NEW OLD OFF RETURN REPEAT REPORT RUN STEP SPC STOP TO TAB(".split(
-                    " ",
-                ),
-            );
+            // BASIC stops at the first, and what follows it is as wrong.
+            assert.deepStrictEqual(tokens(text), [
+                "0:delimiter.square 1:keyword 4:white 5:invalid",
+                "0:keyword 3:white 4:invalid 52:symbol 53:delimiter.square",
+            ]);
+            backedByRom(text, "[OPT0:LDA CLEAR:]");
             // The raw END token is tagged as a string too, which keeps it out of bracket matching.
-            assert.deepStrictEqual(spans("[\nLDA #\u00e0\n]", "invalid.string"), ["\u00e0"]);
+            assert.deepStrictEqual(tokens("[\nLDA #\u00e0\n]"), [
+                "0:delimiter.square",
+                "0:keyword 3:white 4:symbol 5:invalid.string",
+                "0:delimiter.square",
+            ]);
+            backedByRom("[\nLDA #\u00e0\n]", "[OPT0:LDA #END:]");
         });
         it("should treat a ; comment as text up to the next colon, whatever it says", () => {
             for (const comment of [
@@ -625,19 +804,19 @@ describe("Tokenisation", () => {
                 ["[ASL A", ["ASL", "A"], []],
                 ["[asl a", ["asl"], []],
                 ["[LDA 42,x", ["LDA"], ["x"]],
-                ["[lda (&70,x)", ["lda"], ["x"]],
+                ["[lda (&70,x)", ["lda"], ["x)"]],
                 ["[LDA (&70), y", ["LDA"], ["y"]],
                 ["[LDX &70,x", ["LDX"], ["x"]],
                 ["[LDX &70,y", ["LDX", "y"], []],
                 ["[sty &70,x", ["sty", "x"], []],
                 // BASIC reads no index after these.
-                ["[LDA #1,x", ["LDA"], []],
-                ["[JSR &70,x", ["JSR"], []],
-                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$("], []],
-                ["[equb 1", [], ["equb"]],
-                ["[EQUw 1", [], ["EQUw"]],
+                ["[LDA #1,x", ["LDA"], [","]],
+                ["[JSR &70,x", ["JSR"], [","]],
+                ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", "MID$"], []],
+                ["[equb 1", [], ["equb 1"]],
+                ["[EQUw 1", [], ["EQUw 1"]],
                 ["[Ora 1:orA 1:oRA 1", ["Ora", "orA", "oRA"], []],
-                ["[ORa 1", [], ["ORa"]],
+                ["[ORa 1", [], ["ORa 1"]],
             ];
             for (const [text, keywords, invalid] of cases) {
                 assert.deepStrictEqual(spans(text, "keyword"), keywords, text);
@@ -648,13 +827,13 @@ describe("Tokenisation", () => {
         it("should allow STR$~ in an expression", () => {
             for (const text of ["[OPT3:EQUS STR$~(255):]", "[OPT3:EQUB ASC(STR$~A%):]"])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
-            assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), ["~"]);
+            assert.deepStrictEqual(spans("[OPT3:EQUS STR$~~(255):]", "invalid"), ["~(255)"]);
         });
         it("should read an operand's names and keywords as BASIC reads them", () => {
             // A mnemonic is only a mnemonic where a statement starts, and BASIC reads PIX and TIMER as names.
             const cases = [
                 ["[LDA TAXRATE", ["TAXRATE"]],
-                ["[EQUB 1 LDA 2", ["LDA"]],
+                ["[EQUB LDA+2", ["LDA"]],
                 ["[LDA #PIX", ["PIX"]],
                 ["[LDA #TIMER", ["TIMER"]],
                 ["[LDA #PI", []],
@@ -692,9 +871,46 @@ describe("Bracket matching", () => {
     });
     it("should make only the ( of a keyword that ends in ( a bracket, so the keyword is coloured as one", () => {
         // #170: Q$=MID$(Q$,2) must colour MID$ like STR$, with only the ( in the bracket colour.
-        for (const text of ["Q$=MID$(Q$,2)+STR$(Q%)", "P.RIGHT$(A$,1)", "P.TAB(3)", "X=POINT(1,2)", "A$=STRING$(2,A$)"])
+        for (const text of [
+            "Q$=MID$(Q$,2)+STR$(Q%)",
+            "P.RIGHT$(A$,1)",
+            "P.TAB(3)",
+            "X=POINT(1,2)",
+            "A$=STRING$(2,A$)",
+        ])
             assert.strictEqual(brackets(text)[0][0], text.indexOf("(") + 1, text);
-        assert.deepStrictEqual(brackets("Q$=MID$(Q$,2)").map(([start]) => start), [8, 13]);
+        assert.deepStrictEqual(
+            brackets("Q$=MID$(Q$,2)").map(([start]) => start),
+            [8, 13],
+        );
+    });
+    it("should nest brackets by depth, so that Monaco colours each level, and mark a ) with no ( as unexpected", () => {
+        const levels = text => {
+            const model = editor.createModel(text, LanguageId);
+            try {
+                model.tokenization.forceTokenization(model.getLineCount());
+                return model.bracketPairs
+                    .getBracketsInRange(model.getFullModelRange())
+                    .toArray()
+                    .map(b => [b.range.startColumn, b.nestingLevel, b.isInvalid]);
+            } finally {
+                model.dispose();
+            }
+        };
+        assert.deepStrictEqual(levels("PRINT (1+(2*(3+4)))"), [
+            [7, 0, false],
+            [10, 1, false],
+            [13, 2, false],
+            [17, 2, false],
+            [18, 1, false],
+            [19, 0, false],
+        ]);
+        assert.deepStrictEqual(levels("A$=MID$(A$,1,2)"), [
+            [8, 0, false],
+            [15, 0, false],
+        ]);
+        // The tokenizer marks it invalid itself, and keeps it from Monaco.
+        assert.deepStrictEqual(levels("P.(1+2))").at(-1), [7, 0, false]);
     });
     it("should ignore brackets in strings, comments and * commands", () => {
         for (const text of ['P."RI.A$,1)"', "REM RI.A$,1)", "*FX 1)", "10 *RUN RI.("])
@@ -716,15 +932,82 @@ describe("Bracket matching", () => {
                 );
         }
     });
-    it("has a known limitation: an abbreviated opener straight after a keyword leaves its close unmatched", () => {
-        // Monaco merges neighbouring same-coloured tokens, so its \b-guarded opener match fails in "PRINTLE.".
-        assert.deepStrictEqual(unmatched("PRINTLE.A$,1)"), [13]);
-        assert.deepStrictEqual(unmatched("PRINT LE.A$,1)"), []);
-        assert.deepStrictEqual(unmatched("PRINTLEFT$(A$,1)"), []);
-        // A dot before the opener is a word boundary, so fully abbreviated code is fine, unless a keyword with no
-        // abbreviation (LEN) comes first.
-        assert.deepStrictEqual(unmatched("P.LE.A$,1)"), []);
-        assert.deepStrictEqual(unmatched("P.LENMI.A$,2)"), [13]);
+    it("should match an abbreviated opener straight after a keyword", () => {
+        for (const text of [
+            "PRINTLE.A$,1)",
+            "PRINT LE.A$,1)",
+            "PRINTLEFT$(A$,1)",
+            "P.LE.A$,1)",
+            "P.LENMI.A$,2)",
+        ])
+            assert.deepStrictEqual(unmatched(text), [], text);
+    });
+    // Each bracket Monaco pairs, as line:column and nesting level.
+    const paired = text => {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            model.tokenization.forceTokenization(model.getLineCount());
+            return model.bracketPairs
+                .getBracketsInRange(model.getFullModelRange())
+                .toArray()
+                .map(b => {
+                    assert.ok(!b.isInvalid, text);
+                    return `${b.range.startLineNumber}:${b.range.startColumn}=${b.nestingLevel}`;
+                })
+                .join(" ");
+        } finally {
+            model.dispose();
+        }
+    };
+    it("should give Monaco only the brackets that pair on their line and that BASIC accepts", () => {
+        for (const [text, expected] of [
+            ["PRINTLE.A$,1)", "1:8=0 1:13=0"],
+            ["P.LENMI.A$,2)", "1:8=0 1:13=0"],
+            ["PRINTLEFT$.RI.A$,2),1)", "1:11=0 1:14=1 1:19=1 1:22=0"],
+            // A ( with no ) does not pair with a ) on a later line or in a later statement, nor nest what follows.
+            ["PRINT (1+2\nPRINT 3)\nPRINT (4)", "3:7=0 3:9=0"],
+            ["PRINT (1:PRINT 2)", ""],
+            // A dot that is not an opener is not a bracket.
+            ["A=.5+(1.5)", "1:6=0 1:10=0"],
+            ["PRINT A.B)", ""],
+            ["P.X.7", ""],
+            // A bracket BASIC rejects stays in the colour of an error, and so its partner is not one of a pair.
+            ["PRINT LEFT$(A$,1,2)", ""],
+            ["P.(1+2))", "1:3=0 1:7=0"],
+            // An assembler block is the pair that spans lines.
+            ["[\nLDA (&70),Y\n]\nPRINT (1)", "1:1=0 2:5=1 2:9=1 3:1=0 4:7=0 4:9=0"],
+        ])
+            assert.strictEqual(paired(text), expected, text);
+    });
+});
+
+describe("The tokenizer's state in a Monaco model", () => {
+    it("should carry an open assembler block from line to line, through edits, undo and redo", () => {
+        const model = editor.createModel("[OPT 3\nLDA #1\n]\nLDA=1", LanguageId);
+        // The colour of the first token of each line, from the model's own incremental tokenization.
+        const firstColours = () => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            return Array.from({length: model.getLineCount()}, (_, i) =>
+                model.tokenization.getLineTokens(i + 1).getForeground(0),
+            );
+        };
+        try {
+            const [, mnemonic, , name] = firstColours();
+            assert.notStrictEqual(mnemonic, name);
+            // Without the "]", the last line is in the block, where LDA is a mnemonic.
+            model.pushEditOperations([], [{range: new Range(3, 1, 4, 1), text: ""}], () => null);
+            assert.deepStrictEqual(firstColours().slice(1), [mnemonic, mnemonic]);
+            model.undo();
+            const undone = firstColours();
+            assert.deepStrictEqual([undone[1], undone[3]], [mnemonic, name]);
+            model.redo();
+            assert.deepStrictEqual(firstColours().slice(1), [mnemonic, mnemonic]);
+            // Typing the "]" back at the end of the second line closes the block there.
+            model.pushEditOperations([], [{range: new Range(2, 7, 2, 7), text: ":]"}], () => null);
+            assert.deepStrictEqual(firstColours().slice(1), [mnemonic, name]);
+        } finally {
+            model.dispose();
+        }
     });
 });
 
@@ -772,6 +1055,20 @@ describe("Line warnings", () => {
             [2, 5],
         ]);
     });
+    it("should leave alone the names that BASIC does not read as keywords or abbreviations", () => {
+        // ` is a letter, so COUNT` is a name; after FN a dot ends the name, so there is no abbreviation to space out.
+        for (const [text, row] of [
+            ["A=count`", "A=COUNT`"],
+            ["A=FNO.X1", "A=FNO.X1"],
+        ]) {
+            assert.ok(romTokens.has(row), `${row} is not a recorded row`);
+            checkWarnings(text);
+        }
+        assert.strictEqual(
+            romTokens.get("A=FNO. X1").replace(" 20", ""),
+            romTokens.get("A=FNO.X1"),
+        );
+    });
     it("should warn on invalid operators from other languages", () => {
         const cases = [
             ["==", "=", 1],
@@ -785,6 +1082,7 @@ describe("Line warnings", () => {
             const operator = text.slice(startColumn - 1, startColumn + 1);
             checkWarnings(text, {
                 message: `${operator} is not a BBC BASIC operator, did you mean ${replacement}?`,
+                code: "foreign-operator",
                 startColumn,
                 endColumn: startColumn + 2,
             });
@@ -839,5 +1137,183 @@ describe("Quick fixes", () => {
             result: "COLOUR",
         });
         assert.deepStrictEqual(applyQuickFix("A=2**3"), {title: "Replace with ^", result: "A=2^3"});
+    });
+});
+
+describe("Quick fixes and syntax markers", () => {
+    // The titles of the quick fixes offered for every marker the editor has on the text.
+    function offered(text) {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const markers = [...getWarnings(text), ...getSyntaxMarkers(text)];
+            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            return actions.map(action => action.title);
+        } finally {
+            model.dispose();
+        }
+    }
+    it("should offer fixes only for the warnings, and never rewrite the text of a syntax marker", () => {
+        assert.deepStrictEqual(offered('print "lower"'), ["Replace with PRINT"]);
+        assert.deepStrictEqual(offered("GOTO 20 30"), []);
+        assert.deepStrictEqual(offered("x == 3"), ["Replace with ="]);
+    });
+    it("should offer a fix for junk after a complete instruction, and a ] fix when it is a ]", () => {
+        assert.deepStrictEqual(offered("[OPT0:LDA #1]:tax=1"), [
+            "Insert : before ]",
+            "Insert ; before the junk",
+        ]);
+        assert.deepStrictEqual(offered("[OPT0:NOP hello:]"), ["Insert ; before the junk"]);
+    });
+    it("should offer only the space for a keyword straight after a mnemonic", () => {
+        assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
+    });
+    // The fixes offered for the junk markers of the text, applied one at a time, with the text each leaves.
+    function fixed(text) {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const markers = getSyntaxMarkers(text).filter(marker => marker.code);
+            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            return actions.map(({title, edit}) => {
+                const {range, text: inserted} = edit.edits[0].textEdit;
+                const lines = text.split("\n");
+                const line = lines[range.startLineNumber - 1];
+                lines[range.startLineNumber - 1] =
+                    line.slice(0, range.startColumn - 1) +
+                    inserted +
+                    line.slice(range.endColumn - 1);
+                return [title, lines.join("\n")];
+            });
+        } finally {
+            model.dispose();
+        }
+    }
+    it.each([
+        ["[OPT0:LDA#1]", "Insert : before ]", "[OPT0:LDA#1:]"],
+        ["[LDA #1]\ntax=1\n]", "Insert : before ]", "[LDA #1:]\ntax=1\n]"],
+        ["[OPT0:NOP hello:]", "Insert ; before the junk", "[OPT0:NOP ;hello:]"],
+        ["[OPT0:LDA #1 ,X:]", "Insert ; before the junk", "[OPT0:LDA #1 ;,X:]"],
+        ["[OPT0:STAH.,X:]", "Insert a space after STA", "[OPT0:STA H.,X:]"],
+        ["[OPT0:LDAUSR@%+GET:]", "Insert a space after LDA", "[OPT0:LDA USR@%+GET:]"],
+        ["[OPT0:LDAH.:]", "Insert a space after LDA", "[OPT0:LDA H.:]"],
+        ["[OPT0:EQUBH.:]", "Insert a space after EQUB", "[OPT0:EQUB H.:]"],
+        ["[OPT0:.lab STAH.,X:]", "Insert a space after STA", "[OPT0:.lab STA H.,X:]"],
+        ["[OPT0:NOPPAGE:]", "Insert ; before the junk", "[OPT0:NOP;PAGE:]"],
+        ["[OPT0:LDAP.,X:]", "Insert ; before the junk", "[OPT0:LDAP;.,X:]"],
+    ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
+        const [offer] = fixed(text).filter(([name]) => name === title);
+        assert.deepStrictEqual(offer, [title, result]);
+        assert.deepStrictEqual(
+            getSyntaxMarkers(result).filter(marker => marker.code),
+            [],
+        );
+    });
+});
+
+describe("Syntax markers", () => {
+    const Unfinished = rom => `Unfinished line: BASIC would stop with "${rom}" if it ended here`;
+    const markers = text =>
+        getSyntaxMarkers(text).map(m => [
+            m.severity,
+            m.message,
+            m.startLineNumber,
+            m.startColumn,
+            m.endColumn,
+        ]);
+    it("should show a line that ends too soon as information at its end", () => {
+        assert.deepStrictEqual(markers("GOTO"), [
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 1, 5],
+        ]);
+        assert.deepStrictEqual(markers("10 FOR I=1 TO "), [
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 12, 15],
+        ]);
+        assert.deepStrictEqual(markers('X=1\nPRINT "HI'), [
+            [MarkerSeverity.Warning, Unfinished('Missing "'), 2, 7, 10],
+        ]);
+        assert.deepStrictEqual(markers("A$=LEFT$(X$"), [
+            [MarkerSeverity.Warning, Unfinished("Missing ,"), 1, 10, 12],
+        ]);
+    });
+    it("should say plainly what BASIC does where a marker is stricter than the ROM, as an error", () => {
+        const reads =
+            "LD is not an instruction: the register letter is missing. BASIC reads the 8 as X (LDX), so what follows is the address; probably LDA, LDX or LDY was meant";
+        assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 2, 4]]);
+    });
+    it("should say that a keyword straight after a mnemonic is read as a variable, and a space was meant", () => {
+        const message =
+            "H. here is read as the variable H, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows STA with no space, so the rest of the instruction is ignored; probably a space was meant after STA";
+        assert.deepStrictEqual(markers("[OPT0:STAH.,X:]"), [
+            [MarkerSeverity.Error, message, 1, 10, 12],
+        ]);
+    });
+    it("should show something missing from the middle of a statement at the token where it stops", () => {
+        const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
+        assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
+            [MarkerSeverity.Warning, Hole("Missing ,"), 1, 12, 13],
+        ]);
+    });
+    it("should not mark the line the cursor is on as unfinished, only the others", () => {
+        const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";
+        const at = line => getSyntaxMarkers(text, line).map(m => [m.severity, m.startLineNumber]);
+        const error = [MarkerSeverity.Error, 2];
+        assert.deepStrictEqual(at(0), [
+            [MarkerSeverity.Warning, 1],
+            error,
+            [MarkerSeverity.Warning, 3],
+        ]);
+        assert.deepStrictEqual(at(1), [error, [MarkerSeverity.Warning, 3]]);
+        assert.deepStrictEqual(at(2), [
+            [MarkerSeverity.Warning, 1],
+            error,
+            [MarkerSeverity.Warning, 3],
+        ]);
+        assert.deepStrictEqual(at(3), [[MarkerSeverity.Warning, 1], error]);
+    });
+    it("should leave a warning to say what it says about the same text", () => {
+        assert.deepStrictEqual(markers("x == 3"), []);
+        assert.deepStrictEqual(markers("A=2**3"), []);
+        assert.deepStrictEqual(markers("colour"), []);
+    });
+    it("should mark a block that is never closed once, at its [", () => {
+        const program = ["MODE 7", "[OPT 0", "LDA #", "STA &70 FOR", "RTS", "PRINT )", "END"].join(
+            "\n",
+        );
+        assert.deepStrictEqual(markers(program), [
+            [
+                MarkerSeverity.Error,
+                "Assembler block not closed: there is no ] after this [",
+                2,
+                1,
+                2,
+            ],
+        ]);
+        const closed = markers(`${program}\n]`);
+        assert.ok(
+            closed.length > 1 && closed.every(([, message]) => !message.startsWith("Assembler")),
+        );
+    });
+    it("should show a statement BASIC stops at with the error BASIC gives", () => {
+        const stop = rom => `${rom}: BASIC would stop at this statement`;
+        for (const [text, rom, start, end] of [
+            ["GOTO 20 30", "Syntax error", 9, 11],
+            ["PRINT )", "No such variable", 7, 8],
+            ["X=1+*", "No such variable", 5, 6],
+            ["FOR I=1:NEXT", "No TO", 7, 8],
+            ["A$=LEFT$(X$,1,2)", "Missing )", 16, 17],
+            ["A=1'", "Syntax error", 4, 5],
+        ])
+            assert.deepStrictEqual(
+                markers(text),
+                [[MarkerSeverity.Error, stop(rom), 1, start, end]],
+                text,
+            );
+    });
+    it("should show nothing for a line that is complete", () => {
+        for (const text of ["GOTO 20", "FOR I=1 TO 10", "IF A=1 THEN PRINT 2", "REM GOTO 20 30"])
+            assert.deepStrictEqual(markers(text), [], text);
+    });
+    it("should follow an assembler block over the lines", () => {
+        assert.deepStrictEqual(markers("[\nLDA #\n]"), [
+            [MarkerSeverity.Warning, Unfinished("No such variable"), 2, 5, 6],
+        ]);
     });
 });

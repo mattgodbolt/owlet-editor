@@ -1,6 +1,8 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
-import {completionContext, completionItems, lineItems} from "../src/completions";
-import {expandCode, immediateCommands, keywords} from "../src/tokens";
+import {completionContext, completionItems} from "../src/completions";
+import {readLines} from "../src/parser/highlight";
+import {expandCode} from "../src/expand-code";
+import {immediateCommands, keywords} from "../src/tokens";
 import {describe, it} from "vitest";
 import assert from "assert";
 import {readFileSync} from "fs";
@@ -31,33 +33,37 @@ function offered(textWithCursor) {
     }
 }
 
-const isMachineCode = item =>
-    !/string|comment/.test(item.type) && /[\u0100-\u011f]/.test(item.text);
+// A keyword where BASIC would stop (a lone LOG at the start of a line) is not somewhere to offer it.
+const keywordTokens = recogniser =>
+    recogniser.tokens.filter(token => token.kind === "keyword" && !token.invalid);
+
+const isMachineCode = token =>
+    !["string", "comment", "data", "oscli"].includes(token.kind) &&
+    /[\u0100-\u011f]/.test(token.text);
 
 // Types each keyword of the program one letter at a time where it stands, and returns the ones that a prefix of
 // would not have offered, as "line: text typed". A line with a control character outside a string or comment is
 // machine code that followed a newline byte in a REM or DATA, not BASIC.
 function hiddenKeywords(program) {
     const lines = program.split("\n");
-    const lineTokens = editor.tokenize(program, "BBCBASIC");
     const hidden = [];
-    lines.forEach((line, lineIndex) => {
-        const items = lineItems(line, lineTokens[lineIndex]);
-        if (items.some(isMachineCode)) return;
-        for (const item of items) {
-            if (!item.kw || !/^[A-Z]/.test(item.text)) continue;
+    readLines(program).forEach(({tokens}, lineIndex) => {
+        const line = lines[lineIndex];
+        if (tokens.some(isMachineCode)) return;
+        for (const item of keywordTokens({tokens})) {
+            if (!/^[A-Z]/.test(item.text)) continue;
             const typed = item.text.replace(/[.(]$/, "");
-            const before = [...lines.slice(0, lineIndex), line.slice(0, item.offset)].join("\n");
+            const before = [...lines.slice(0, lineIndex), line.slice(0, item.start)].join("\n");
             // Once FN or PROC is typed in full a name follows it.
             const lengths = ["FN", "PROC"].includes(item.kw.keyword)
                 ? typed.length - 1
                 : typed.length;
             for (let length = 1; length <= lengths; length++) {
                 const context = completionContext(before + typed.slice(0, length));
-                const shown = context && context.labels && context.startColumn === item.offset + 1;
+                const shown = context && context.labels && context.startColumn === item.start + 1;
                 if (!(shown && context.labels.includes(item.kw.keyword))) {
                     hidden.push(
-                        `${lineIndex + 1}: ${line.slice(0, item.offset)}${typed.slice(0, length)}`,
+                        `${lineIndex + 1}: ${line.slice(0, item.start)}${typed.slice(0, length)}`,
                     );
                     break;
                 }
@@ -84,6 +90,29 @@ describe("Completions", () => {
             ["TI‸", ["TIME"]],
             ["X=TI‸", ["TIME"]],
             ["X=INS‸", ["INSTR("]],
+            // An E straight after a number starts a word: 7ELSE is 7 then ELSE.
+            ["X=E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["X=7E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["GCOL0,7E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["X=1.5E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["PRINT 7EL‸", ["ELSE"]],
+            [
+                "IF0E‸",
+                [
+                    "ELSE",
+                    "END",
+                    "ENDPROC",
+                    "ENVELOPE",
+                    "EOF",
+                    "EOR",
+                    "ERL",
+                    "ERR",
+                    "ERROR",
+                    "EVAL",
+                    "EXP",
+                    "EXT",
+                ],
+            ],
             ["LIS‸", []],
             ["REPEAT PRI‸", ["PRINT"]],
             ["IFX THENPRI‸", ["PRINT"]],
@@ -178,11 +207,9 @@ describe("Completions", () => {
 
     it("should not hide any keyword where it is used", () => {
         const used = new Set();
-        everyKeyword.split("\n").forEach((line, i) => {
-            for (const item of lineItems(line, editor.tokenize(everyKeyword, "BBCBASIC")[i])) {
-                if (item.kw) used.add(item.kw.keyword);
-            }
-        });
+        for (const recogniser of readLines(everyKeyword)) {
+            for (const token of keywordTokens(recogniser)) used.add(token.kw.keyword);
+        }
         const programKeywords = keywords
             .map(kw => kw.keyword)
             .filter(kw => !immediateCommands.includes(kw));

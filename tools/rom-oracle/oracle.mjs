@@ -1,33 +1,32 @@
 // A differential test of the highlighter against BBC BASIC II: generated statements are run on the real ROM (in
-// jsbeeb, from the jsbeeb dependency's ROMs) and highlighted by src/bbcbasic.js, and the statements where the two
+// jsbeeb, from the jsbeeb dependency's ROMs) and highlighted by src/parser, and the statements where the two
 // disagree about whether there is a syntax error are reported, grouped by the shape of statement they came from.
 //
-//   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json] [--master]
+//   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json]
 //
 // --count is the number of random statements on top of the fixed set (every keyword at the start of a statement,
 // abbreviated, misspelt...). --input adds statements from a JSON list of {shape, text}. --summary prints only the
 // counts. Results go to .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a
-// grammar change only runs the highlighter (delete the directory after changing rom.mjs); results.json has every
+// change to src/parser only runs the highlighter (delete the directory after changing rom.mjs); results.json has every
 // statement's verdicts.
 //
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
-// runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. The ROM cannot judge
-// what it skips (the rest of a line after REM, DATA, DEF, ELSE or a false IF), so the generator leaves those out, along
-// with * commands and the assembler. A disagreement is per statement: it does not say where the error is.
-// --master runs them on the Master's BASIC IV instead, and highlights them as for the Master (the generator's statements
-// are still BASIC II's, so --input is where BASIC IV's own go); its results are in .cache/rom-oracle/master/.
+// runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
+// nothing about what BASIC skips (see unread.mjs and dropMarksNeverRead), so invalid tokens there are left out. A
+// disagreement is per statement: it does not say where the error is. A statement can also be UNFINISHED or STRICTER,
+// and only a mark's first token is evidence; the README ("Highlighting: what red means") has the policy for both.
 // Not run by npm test.
-import {spawnSync} from "child_process";
 import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
+import {highlightLine, programProblems} from "../../src/parser/highlight.js";
 import {generate} from "./generate.mjs";
-import {createRom, SyntaxErrors} from "./rom.mjs";
+import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
+import {isUnread, unreadRanges} from "./unread.mjs";
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const Master = option("master", false);
-const OutDir = path.join(Root, ".cache/rom-oracle", Master ? "master" : "");
+const OutDir = path.join(Root, ".cache/rom-oracle");
 
 function option(name, fallback) {
     const index = process.argv.indexOf(`--${name}`);
@@ -43,14 +42,27 @@ function readJson(file, fallback) {
     }
 }
 
+// A line number would make BASIC store the line rather than run it.
+const runnable = text => text.length <= MaxLineLength && !/^\s*\d/.test(text);
+
+const isCovered = (spans, [start, end]) =>
+    Array.from({length: end - start}, (_, i) => start + i).every(at =>
+        spans.some(([from, to]) => from <= at && at < to),
+    );
+
+// For each text, the ROM's verdict and its tokenisation (null if it cannot be run).
 async function romVerdicts(texts) {
     const cacheFile = path.join(OutDir, "rom.json");
     const cache = readJson(cacheFile, {});
     const missing = [...new Set(texts.filter(text => !(text in cache)))];
     if (missing.length) {
-        const rom = await createRom(Master ? "Master" : "B-DFS1.2");
+        const rom = await createRom();
         const start = Date.now();
-        for (const text of missing) cache[text] = await rom.run(text);
+        for (const text of missing) {
+            cache[text] = runnable(text)
+                ? {...(await rom.run(text)), tokens: await rom.tokenise(text)}
+                : {timeout: true, tokens: null};
+        }
         rom.destroy();
         const seconds = (Date.now() - start) / 1000;
         console.log(
@@ -61,25 +73,51 @@ async function romVerdicts(texts) {
     return texts.map(text => cache[text]);
 }
 
+// For each text: its invalid tokens as [start, end], and the spans of its problems that are unfinished, stricter than
+// the ROM on purpose, or text the ROM ignores (junk after an assembler instruction).
 function highlighterVerdicts(texts) {
-    const input = path.join(OutDir, "highlight.in.json");
-    const output = path.join(OutDir, "highlight.out.json");
-    fs.writeFileSync(input, JSON.stringify(texts));
-    const vitest = path.join(Root, "node_modules/vitest/vitest.mjs");
-    const config = path.join(Root, "tools/rom-oracle/vitest.config.mjs");
-    const result = spawnSync(process.execPath, [vitest, "run", "--config", config], {
-        cwd: Root,
-        env: {
-            ...process.env,
-            ORACLE_IN: input,
-            ORACLE_OUT: output,
-            ORACLE_BASIC_IV: Master ? "1" : "",
-        },
-        encoding: "utf8",
+    return texts.map(text => {
+        const tokens = highlightLine(text).tokens.filter(
+            (token, i, all) => i === 0 || token.type !== all[i - 1].type,
+        );
+        const invalid = tokens.flatMap((token, i) =>
+            token.type.includes("invalid")
+                ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
+                : [],
+        );
+        const problems = programProblems(text);
+        const spans = field => problems.flatMap(p => (p[field] ? [[p.start, p.end]] : []));
+        return {
+            invalid,
+            unfinished: spans("unfinished"),
+            stricter: spans("stricter"),
+            ignored: spans("code"),
+        };
     });
-    if (result.status !== 0)
-        throw new Error(`Highlighting failed:\n${result.stdout}${result.stderr}`);
-    return JSON.parse(fs.readFileSync(output, "utf8"));
+}
+
+// The invalid tokens outside the text that BASIC skipped, if given its tokenisation.
+function readMarks(text, invalid, tokens) {
+    const ranges = tokens && unreadRanges(text, tokens);
+    return invalid.filter(([start, end]) => !isUnread(ranges, start, end));
+}
+
+// Where the ROM ran a statement that is still marked invalid, the ROM is asked whether it reads the mark at all: the
+// statement is cut there and "}", which BASIC never accepts, put in its place. If BASIC still runs it, the mark is
+// in text BASIC never reads, and the next one is tried. The first mark left is kept as `field` of the result.
+async function dropMarksNeverRead(results, marks, field) {
+    let pending = results.flatMap((r, i) => (r.rom === "valid" && marks[i].length ? [i] : []));
+    while (pending.length) {
+        const cut = await romVerdicts(
+            pending.map(i => `${results[i].text.slice(0, marks[i][0][0])}}`),
+        );
+        pending = pending.filter((i, n) => {
+            if (cut[n].timeout || cut[n].error !== null) return false;
+            marks[i].shift();
+            return marks[i].length > 0;
+        });
+    }
+    results.forEach((r, i) => (r[field] = marks[i].length ? r.text.slice(...marks[i][0]) : null));
 }
 
 function romClass(verdict) {
@@ -92,7 +130,9 @@ function report(results, examples) {
     const count = filter => results.filter(filter).length;
     const conclusive = results.filter(r => r.rom !== "inconclusive");
     const agree = count(
-        r => r.rom !== "inconclusive" && (r.rom === "valid") === (r.invalid === null),
+        r =>
+            r.rom !== "inconclusive" &&
+            (r.rom === "valid" ? r.invalid === null && !r.unfinished : r.invalid || r.unfinished),
     );
     console.log(
         `${results.length} statements: ${conclusive.length} conclusive on the ROM ` +
@@ -106,11 +146,23 @@ function report(results, examples) {
     const kinds = [
         [
             "FALSE-VALID (the ROM rejects it, nothing highlighted invalid)",
-            r => r.rom === "syntax error" && !r.invalid,
+            r => r.rom === "syntax error" && !r.invalid && !r.unfinished,
         ],
         [
             "FALSE-INVALID (the ROM accepts it, highlighted invalid)",
             r => r.rom === "valid" && r.invalid,
+        ],
+        [
+            "STRICTER (the ROM accepts it, highlighted invalid on purpose; see the README)",
+            r => r.rom === "valid" && r.stricter,
+        ],
+        [
+            "UNFINISHED-BUT-VALID (the ROM accepts it, shown as ending too soon)",
+            r => r.rom === "valid" && r.unfinished,
+        ],
+        [
+            "UNFINISHED (the ROM rejects it, only because the line ends too soon; agreed)",
+            r => r.rom === "syntax error" && !r.invalid && r.unfinished,
         ],
     ];
     for (const [title, test] of kinds) {
@@ -124,7 +176,13 @@ function report(results, examples) {
                 `  ${String(rs.length).padStart(5)} of ${String(total).padEnd(5)} ${shape}`,
             );
             for (const r of rs.slice(0, examples)) {
-                const why = r.invalid ? `invalid: ${JSON.stringify(r.invalid)}` : r.message;
+                const why = r.invalid
+                    ? `invalid: ${JSON.stringify(r.invalid)}`
+                    : r.stricter
+                      ? `on purpose: ${JSON.stringify(r.stricter)}`
+                      : r.unfinished && r.rom === "valid"
+                        ? "unfinished"
+                        : r.message;
                 console.log(`          ${r.text.padEnd(32)} ${why}`);
             }
         }
@@ -144,10 +202,32 @@ async function main() {
     const highlighted = highlighterVerdicts(texts);
     const results = statements.map((s, i) => ({
         ...s,
-        rom: romClass(rom[i]),
+        rom: runnable(s.text) ? romClass(rom[i]) : "inconclusive",
         message: rom[i].timeout ? "(timeout)" : rom[i].message || null,
-        invalid: highlighted[i],
     }));
+    const romTokens = i => (results[i].rom === "valid" ? rom[i].tokens : null);
+    const marks = results.map((r, i) => readMarks(r.text, highlighted[i].invalid, romTokens(i)));
+    // Where the ROM runs a statement, the marks that are deliberate are kept apart from the others.
+    const onPurpose = results.map((r, i) =>
+        r.rom === "valid" ? marks[i].filter(mark => isCovered(highlighted[i].stricter, mark)) : [],
+    );
+    marks.forEach((list, i) => (marks[i] = list.filter(mark => !onPurpose[i].includes(mark))));
+    await dropMarksNeverRead(results, marks, "invalid");
+    // Text the ROM ignores on purpose cannot be tested by cutting the statement there, as the cut is ignored too.
+    const ignored = onPurpose.map((list, i) =>
+        list.filter(mark => isCovered(highlighted[i].ignored, mark)),
+    );
+    onPurpose.forEach(
+        (list, i) => (onPurpose[i] = list.filter(mark => !ignored[i].includes(mark))),
+    );
+    await dropMarksNeverRead(results, onPurpose, "stricter");
+    results.forEach((r, i) => {
+        if (!r.stricter && ignored[i].length) r.stricter = r.text.slice(...ignored[i][0]);
+    });
+    results.forEach((r, i) => {
+        r.unfinished =
+            !r.invalid && readMarks(r.text, highlighted[i].unfinished, romTokens(i)).length > 0;
+    });
     fs.writeFileSync(path.join(OutDir, "results.json"), JSON.stringify(results, null, 1));
     report(results, option("summary", false) ? 0 : Number(option("examples", 3)));
 }

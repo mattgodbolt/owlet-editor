@@ -1,0 +1,587 @@
+import {highlightLine, programProblems} from "../src/parser/highlight";
+import {lexLine, romBytes} from "../src/parser/lexer";
+import {falseInvalid, verdicts} from "./rom-tables";
+import {describe, it} from "vitest";
+import assert from "assert";
+import RomTokens from "./rom-tokens.json";
+import RomVerdicts from "./rom-verdicts.json";
+
+const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
+
+// The rows of a recorded table on which the function's answer differs from the recorded one, with both answers.
+const disagreements = (rows, answer) =>
+    rows.flatMap(([text, recorded]) => {
+        const ours = answer(text);
+        return ours === recorded ? [] : [{text, recorded, ours}];
+    });
+
+describe("Lexer", () => {
+    it("should tokenise each line as BASIC II does", () => {
+        assert.deepStrictEqual(
+            disagreements(RomTokens, text => hex(romBytes(lexLine(text)))),
+            [],
+        );
+    });
+});
+
+// Lines BASIC II rejects that the recogniser does not mark: false-valids are measured, not gated (see the README).
+// A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
+const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
+
+// Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
+// instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
+const StricterThanRom = [
+    "[OPT0:STAH.,X:]",
+    "[OPT0:LDAUSR@%+GET:]",
+    "[OPT0:LDAH.:]",
+    "[OPT0:EQUBH.:]",
+    "[OPT0:ORAH.:]",
+    "[OPT0:JMPH.:]",
+    "[OPT0:ASLH.:]",
+    "[OPT0:LDAP.,X:]",
+    "[OPT0:LDAPRINT 5:]",
+    "[OPT0:staH.,x:]",
+    "[OPT0:LDAGETX 5:]",
+    "[OPT0:NOP PAGE:]",
+    "[OPT0:INXH.:]",
+    "[OPT0:NOPPAGE:]",
+    "[OPT0:NOP PRINT:]",
+    "[OPT0:LDA #1 FOR:]",
+    "[OPT0:LDA #1 hello:]",
+    "[OPT0:NOP 5:]",
+    "[OPT0:NOP =1:]",
+    '[OPT0:LDA #1 "x":]',
+    "[OPT0:LDA #1 ,X:]",
+    "[OPT0:LDA #1,x:]",
+    "[OPT0:JSR &70,x:]",
+    "[OPT0:EQUB 1 LDA 2:]",
+    "[OPT0:BRK 1:]",
+    "[OPT0:TAX X:]",
+    "[OPT0:ROR A | Anagram of ROAR:]",
+    "[OPT0:ROR A Anagram of ROAR:]",
+    "[OPT0:BIT &70,X:]",
+    "[OPT0:BIT &70,Y:]",
+    "[OPT0:BIT (&70),Y:]",
+    "[OPT0:CPX &70,X:]",
+    "[OPT0:CPX &70,Y:]",
+    "[OPT0:CPX (&70),Y:]",
+    "DIM P% 99:[OPT0:STA &70,XX:]",
+    "[STA &70,XX:]",
+    "[STA &70,Xa:]",
+    "[STA &70,X1:]",
+    "[STA &70,Xfoo:]",
+    "[STA &70,Y1:]",
+    "[LDA (&70),YY:]",
+    "[LDX &70,yy:]",
+    "[LDY &70,Xx:]",
+    "[ASL &70,XX:]",
+    "[LDA (&70,X)X:]",
+    "[. lab LDA #1]",
+    "[NOP]:]",
+    "[NOP]:NOP",
+    "[LDA #1]:]",
+    "[LDA #1]]",
+    "[LDA #1]:NOP:]",
+    "[LDA #1]:]:PRINT",
+    "[OPT0:LDA #1]:tax=1",
+    "[OPT0:NOP]:]:P%=P%+5",
+    "[ST89:]",
+    "[OPT0:ST89:]",
+    "[OPT0:LDA 1:LD! 1:]",
+    "[OPT0:LD89:]",
+    "[OPT0:LD99:]",
+    "[OPT0:LD89 &70:]",
+    "[OPT0:LD!5:]",
+    "[OPT0:ST!76:]",
+    "[OPT0:LD90:]",
+    "[OPT0:ST\u0001 9:]",
+    "[OPT0:TA8:]",
+    "[OPT0:IN9:]",
+    "[OPT0:CP8 5:]",
+    "[OPT0:CP9 5:]",
+    "[OPT0:J-P &70:]",
+    "[OPT0:3EC:]",
+    "[OPT0:B2K:]",
+    "[OPT0:O2A 5:]",
+    "[OPT0:/RA 5:]",
+    "[OPT0:EO2 5:]",
+    "[OPT0:E/R 5:]",
+    "[OPT0:AN$ 5:]",
+    "[OPT0:!ND 5:]",
+    "[OPT0:OP4 0:]",
+    "[OPT0:O0T 0:]",
+];
+
+const invalid = text => {
+    const {tokens} = highlightLine(text);
+    return tokens.flatMap((token, i) =>
+        token.type.startsWith("invalid")
+            ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
+            : [],
+    );
+};
+
+// Lines where BASIC's error is not the one the recogniser gives for that kind of mistake: H.TO8 is not read as HIMEM.
+const OtherWording = ["F.A=H.TO8^5:?A=42:N."];
+
+describe("Recogniser", () => {
+    it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
+        const wrong = RomVerdicts.flatMap(([text, verdict]) => {
+            const marked = invalid(text);
+            const problems = programProblems(text);
+            if (verdict === "ok") {
+                const stricter = StricterThanRom.includes(text);
+                // Text BASIC skips can be unfinished, as it can be wrong (see the README).
+                const unfinished = problems.filter(problem => problem.unfinished);
+                const ends = unfinished.map(({start, end}) => [start, end]);
+                // What is red on purpose says so, with a message.
+                const onPurpose = problems.filter(problem => problem.stricter);
+                const unexplained = marked.filter(
+                    ([start, end]) => !onPurpose.some(p => p.start <= start && end <= p.end),
+                );
+                return falseInvalid(text, marked).length > 0 === stricter &&
+                    falseInvalid(text, unexplained).length === 0 &&
+                    falseInvalid(text, ends).length === 0
+                    ? []
+                    : [[text, verdict]];
+            }
+            // A line that only ends too soon is not marked, which is what lets it be typed.
+            const unfinished = problems.length > 0 && problems.every(problem => problem.unfinished);
+            return marked.length || unfinished || KnownGaps.includes(text) ? [] : [[text, verdict]];
+        });
+        assert.deepStrictEqual(wrong, []);
+    });
+    it("should give the error BASIC II gives, or none where it does not know it", () => {
+        const wrong = RomVerdicts.flatMap(([text, verdict]) => {
+            const {message} = programProblems(text).find(problem => !problem.stricter) || {};
+            return verdict === "ok" ||
+                !message ||
+                message === verdict ||
+                OtherWording.includes(text)
+                ? []
+                : [[text, verdict, message]];
+        });
+        assert.deepStrictEqual(wrong, []);
+    });
+    it("should not let errors inside nested reads use up the nesting limit", () => {
+        const text = `[${"LDA #(:".repeat(70)}LDA #1:]`;
+        const {tokens} = highlightLine(text);
+        const marked = tokens.filter(token => token.type === "invalid");
+        assert.strictEqual(marked.length, 70);
+        assert.ok(marked.every(token => token.offset < text.lastIndexOf("LDA #1")));
+    });
+    it("should still miss the known gaps, which come out of the list when they are fixed", () => {
+        for (const text of KnownGaps) {
+            assert.notStrictEqual(verdicts.get(text), "ok", text);
+            assert.ok(
+                highlightLine(text).tokens.every(token => !token.type.startsWith("invalid")),
+                text,
+            );
+        }
+    });
+});
+
+// The text of each run of tokens marked invalid.
+const redRuns = text => {
+    const runs = [];
+    for (const [start, end] of invalid(text)) {
+        if (runs.length && runs[runs.length - 1][1] === start) runs[runs.length - 1][1] = end;
+        else runs.push([start, end]);
+    }
+    return runs.map(([start, end]) => text.slice(start, end));
+};
+
+// The text of each token marked invalid.
+const red = text => invalid(text).map(([start, end]) => text.slice(start, end));
+
+// Every prefix of each line, as typed a key at a time, and the prefixes that are red: only those that no ending can
+// make valid, such as a number after a complete GOTO.
+const Typed = [
+    ["GOTO 20", []],
+    ["FOR I=1 TO 10", []],
+    ["FOR I=1 TO 10 STEP 2", []],
+    ["IF A=1 THEN PRINT 2", []],
+    ["PRINT (1+2)", []],
+    ["A$=LEFT$(B$,3)", []],
+    ["REPEAT UNTIL X=1", []],
+    ["10 GOSUB 100", []],
+    ["DEF PROCfoo", []],
+    ['PRINT "HI"', []],
+    ["X=1+2*3", []],
+    ["X=1 AND 2", []],
+    ["ON X GOTO 10", []],
+    ["ENDPROC", []],
+    ["[LDA (&70),Y", []],
+    ["[EQUB 1", []],
+    ["GOTO 20 30", ["GOTO 20 3", "GOTO 20 30"]],
+    ["X=1 THEN", ["X=1 T", "X=1 TH", "X=1 THE", "X=1 THEN"]],
+];
+
+describe("A line typed a key at a time", () => {
+    it.each(Typed)(
+        "%s should be red only where no ending could make it valid",
+        (line, expected) => {
+            const prefixes = [...line].map((_, i) => line.slice(0, i + 1));
+            assert.deepStrictEqual(
+                prefixes.filter(prefix => invalid(prefix).length),
+                expected,
+            );
+        },
+    );
+});
+
+// BASIC stops at the first token that cannot continue the statement and never reads the rest of it, up to the next
+// colon, ELSE, or the ] that ends an assembler block: all of that is red, and it is what the marker covers.
+describe("A statement BASIC stops at", () => {
+    it.each([
+        ["I am a badger", ["am a badger"]],
+        ["X Y Z", ["Y Z"]],
+        ["PRINT 1 2 3", []],
+        ["GOTO 20 30:PRINT 5", ["30"]],
+        ["GOTO 20 30 40:PRINT 5 6", ["30 40"]],
+        ["PRINT 1: I am a badger:PRINT 2", ["am a badger"]],
+        ["IF A=1 THEN PRINT ) ELSE PRINT 2", [")"]],
+        ["IF A=1 THEN PRINT ) 1 ELSE PRINT 2 3", [") 1"]],
+        ["PRINT (1 2 3):PRINT 4 5", ["2 3)"]],
+        ['I am "a:b" badger:X Y', ['am "a:b" badger', "Y"]],
+        ["X Y REM hi", ["Y"]],
+        ["[LDA CLEAR 1 2:NOP:]", ["CLEAR 1 2"]],
+        ["IF A THEN [LDA CLEAR 1 ELSE PRINT 2", ["CLEAR 1"]],
+    ])("%s should be red on %j", (text, expected) => {
+        assert.deepStrictEqual(redRuns(text), expected);
+        const {tokens} = highlightLine(text);
+        assert.ok(tokens.every(token => !token.type.startsWith("invalid") || !token.bracket));
+        const marked = programProblems(text).filter(problem => !problem.unfinished);
+        assert.deepStrictEqual(
+            marked.map(({start, end}) => text.slice(start, end)),
+            expected,
+        );
+    });
+    it("should leave the marker at the single [ of a block that is never closed", () => {
+        const problems = programProblems("[NOP\nLDA CLEAR 1 2");
+        assert.deepStrictEqual(
+            problems.map(({line, start, end, unclosed}) => [line, start, end, unclosed]),
+            [[1, 0, 1, true]],
+        );
+    });
+});
+
+describe("Text that is wrong, not unfinished", () => {
+    it.each([
+        ["GOTO 20 30", ["30"]],
+        ["PRINT )", [")"]],
+        ["PRINT A)", [")"]],
+        ["PRINT I)", [")"]],
+        ["A=1'", ["'"]],
+        ["X=1+*", ["*"]],
+        ["X=1 TH", ["TH"]],
+        ["END 1", ["1"]],
+        ["PRINT (1+2))", [")"]],
+        ["A$=LEFT$(X$,1,", [","]],
+        ["X=RND(1,", [","]],
+        ["GOTO:PRINT", ["GOTO"]],
+        ["FOR I=1 TO:NEXT", ["TO"]],
+    ])("%s should be red", (text, expected) => {
+        assert.deepStrictEqual(red(text), expected);
+    });
+});
+
+// The text at each key of a line typed in front of `after`, with Monaco's auto-closing "(": a typed ")" goes over the
+// one it inserted.
+function keysTyped(typed, after = "") {
+    let before = "";
+    let closing = "";
+    return [...typed].map(key => {
+        if (key === ")" && closing.startsWith(")")) closing = closing.slice(1);
+        else if (key === "(") closing = `)${closing}`;
+        before += key;
+        return before + closing + after;
+    });
+}
+
+describe("A line typed in an editor that closes brackets", () => {
+    it.each([
+        ["PRINT (1+2)*3"],
+        ["A$=LEFT$(B$,2)"],
+        ['PRINT TAB(1,2);"x"'],
+        ["PROCbox(1,2)"],
+        ["DIM a(10)"],
+        ["PRINT LEFT$(A$,LEN(B$))"],
+    ])("%s should be red on no key", typed => {
+        assert.deepStrictEqual(
+            keysTyped(typed).filter(text => invalid(text).length),
+            [],
+        );
+    });
+    it("should be unfinished at the ) with the last argument missing, and red with one too many", () => {
+        const [problem] = programProblems("A$=LEFT$(B$)");
+        assert.deepStrictEqual(invalid("A$=LEFT$(B$)"), []);
+        assert.strictEqual(problem.unfinished, true);
+        assert.strictEqual("A$=LEFT$(B$)".slice(problem.start, problem.end), ")");
+        assert.deepStrictEqual(red("A$=LEFT$(B$,1,2)"), [")"]);
+    });
+});
+
+// Text typed in front of existing text is red where BASIC stops at a colon, ELSE or keyword that follows a statement
+// still to be finished: no typing at the end of the line mends that.
+describe("A line typed in front of existing text", () => {
+    it.each([
+        [
+            "FOR I=1 TO 10",
+            ":PRINT I:NEXT",
+            [
+                "F",
+                "FO",
+                "FOR",
+                "FOR ",
+                "FOR I",
+                "FOR I=",
+                "FOR I=1",
+                "FOR I=1 ",
+                "FOR I=1 T",
+                "FOR I=1 TO",
+                "FOR I=1 TO ",
+            ],
+        ],
+        ["GOTO 100", ":REM x", ["G", "GO", "GOT", "GOTO", "GOTO "]],
+        [
+            "IF A=1 THEN ",
+            " PRINT 2",
+            ["I", "IF", "IF ", "IF A=", "IF A=1 T", "IF A=1 TH", "IF A=1 THE"],
+        ],
+        ["X=1+2", ":PRINT X", ["X", "X=", "X=1+"]],
+    ])("%s typed before %j should be red only on %j", (typed, after, prefixes) => {
+        const reds = keysTyped(typed, after)
+            .map((text, i) => [text, typed.slice(0, i + 1)])
+            .filter(([text]) => invalid(text).length)
+            .map(([, prefix]) => prefix);
+        assert.deepStrictEqual(reds, prefixes);
+    });
+});
+
+describe("A keyword that is the start of a longer one", () => {
+    it.each(["MOD", "IF A THEN MOD", "A=TO", "X=1:A=TO", "A=INKEY", "[OR"])(
+        "%s should not be red while it could grow",
+        text => {
+            assert.deepStrictEqual(red(text), []);
+        },
+    );
+    it.each([["MODX", ["MODX"]]])("%s should be red", (text, expected) => {
+        assert.deepStrictEqual(red(text), expected);
+    });
+});
+
+const AliasMessage = (char, letter) =>
+    `BASIC reads ${char} as ${letter} here (it compares only part of each character); probably a typo`;
+const PrefixMessage = (prefix, kind, char, word, tail, meant) =>
+    `${prefix} is not an instruction: the ${kind} letter is missing. BASIC reads the ${char} as ${word[2]} (${word})${tail}; probably ${meant} was meant`;
+const Address = ", so what follows is the address";
+
+// BASIC compares only the low five bits of each character of a mnemonic (the ROM rows in test/rom-verdicts.json), so
+// it reads a non-letter as a letter, which is marked on purpose. Where that is the third character, the two letters
+// before it are marked, as they are not an instruction on their own (Olly Betts, #174).
+describe("A character in a mnemonic that BASIC reads as a letter", () => {
+    it.each([
+        ["[LD89", "LD", PrefixMessage("LD", "register", "8", "LDX", Address, "LDA, LDX or LDY")],
+        ["[ST89", "ST", PrefixMessage("ST", "register", "8", "STX", Address, "STA, STX or STY")],
+        [
+            "[OPT0:ST89:]",
+            "ST",
+            PrefixMessage("ST", "register", "8", "STX", Address, "STA, STX or STY"),
+        ],
+        [
+            "[OPT0:ST!76:]",
+            "ST",
+            PrefixMessage("ST", "register", "!", "STA", Address, "STA, STX or STY"),
+        ],
+        [
+            "[OPT0:LD90:]",
+            "LD",
+            PrefixMessage("LD", "register", "9", "LDY", Address, "LDA, LDX or LDY"),
+        ],
+        [
+            "[OPT0:LD99:]",
+            "LD",
+            PrefixMessage("LD", "register", "9", "LDY", Address, "LDA, LDX or LDY"),
+        ],
+        ["[LD! 5", "LD", PrefixMessage("LD", "register", "!", "LDA", Address, "LDA, LDX or LDY")],
+        ["[CP8 5", "CP", PrefixMessage("CP", "register", "8", "CPX", Address, "CPX or CPY")],
+        ["[CP9 5", "CP", PrefixMessage("CP", "register", "9", "CPY", Address, "CPX or CPY")],
+        ["[TA8", "TA", PrefixMessage("TA", "register", "8", "TAX", "", "TAX or TAY")],
+        ["[IN9", "IN", PrefixMessage("IN", "last", "9", "INY", "", "INX, INY or INC")],
+        [
+            "[OP4 0",
+            "OP",
+            PrefixMessage("OP", "last", "4", "OPT", ", so what follows is the operand", "OPT"),
+        ],
+        ["[OPT0:AN$ 5:]", "AN", PrefixMessage("AN", "last", "$", "AND", Address, "AND")],
+        ["[BE1 5", "BE", PrefixMessage("BE", "last", "1", "BEQ", Address, "BEQ")],
+        [
+            "[OPT0:ST\u0001 9:]",
+            "ST",
+            PrefixMessage("ST", "register", "\u0001", "STA", Address, "STA, STX or STY"),
+        ],
+    ])(
+        "%s should be red on the letters before it, saying what is missing",
+        (text, prefix, message) => {
+            assert.deepStrictEqual(red(text), [prefix]);
+            assert.deepStrictEqual(
+                programProblems(text)
+                    .filter(problem => problem.stricter)
+                    .map(({start, end, message}) => [text.slice(start, end), message]),
+                [[prefix, message]],
+            );
+        },
+    );
+    // With the character before the third there is no prefix to blame, so just that character is red.
+    it.each([
+        ["[J-P &70", [[2, 3, "-", "M"]]],
+        ["[3EC", [[1, 2, "3", "S"]]],
+        ["[/RA 5", [[1, 2, "/", "O"]]],
+        ["[O2A 5", [[2, 3, "2", "R"]]],
+        ["[OPT0:!ND 5:]", [[6, 7, "!", "A"]]],
+        ["[OPT0:E/R 5:]", [[7, 8, "/", "O"]]],
+        ["[OPT0:B2K:]", [[7, 8, "2", "R"]]],
+    ])("%s should be red on the character, with what BASIC reads it as", (text, expected) => {
+        assert.deepStrictEqual(
+            programProblems(text)
+                .filter(problem => problem.stricter)
+                .map(({start, end, message}) => [start, end, message]),
+            expected.map(([start, end, char, letter]) => [start, end, AliasMessage(char, letter)]),
+        );
+        assert.deepStrictEqual(
+            red(text),
+            expected.map(([start, end]) => text.slice(start, end)),
+        );
+    });
+    it.each([
+        "[LDX 9",
+        "[ldx 9",
+        "[LDA89",
+        "[OPT0:LDA 1:]",
+        "[Ldx &70,y",
+        "[OPT0:ora 5:]",
+        "[oRA 5",
+        "[ORA 5",
+        "[AND 5",
+        "[AN. 5",
+        "[EOR 5",
+        "[eOr 5",
+        "[opt0",
+        "[EQUB 1",
+        "[.LD89 LDA 1",
+    ])("%s should not be red", text => {
+        assert.deepStrictEqual(red(text), []);
+    });
+});
+
+// Keys typed one at a time: the letters of an instruction that is still being typed are not red, and a digit or
+// symbol straight after LD or ST is, as no letter of a register follows it.
+describe("An instruction typed one key at a time", () => {
+    it.each([["[LDA 1"], ["[STA &70"], ["[LDX 5,"], ["[TAX"], ["[INY"], ["[OPT0:CPX 1:]"]])(
+        "%s typed one key at a time should never be red",
+        text => {
+            for (let n = 1; n <= text.length; ++n) {
+                const typed = text.slice(0, n);
+                assert.deepStrictEqual(
+                    programProblems(typed).filter(problem => problem.stricter),
+                    [],
+                    typed,
+                );
+                assert.deepStrictEqual(red(typed), [], typed);
+            }
+        },
+    );
+    it.each([["[L", "[LD", "[S", "[ST"]])(
+        "%s, %s, %s and %s should be unfinished, not red",
+        (...texts) => {
+            for (const text of texts) {
+                assert.deepStrictEqual(red(text), [], text);
+                assert.deepStrictEqual(
+                    programProblems(text).map(problem => [problem.unfinished, problem.stricter]),
+                    [[true, false]],
+                    text,
+                );
+            }
+        },
+    );
+    it("should mark LD as soon as a digit follows it, since no letter of a register can come after", () => {
+        assert.deepStrictEqual(red("[LD8"), ["LD"]);
+    });
+});
+
+// BASIC ignores what follows a complete instruction up to the next colon, so the first thing there that is not a
+// comment is red, and only that: the rest of the statement is ignored with it.
+describe("Junk after a complete instruction", () => {
+    const stricter = text => programProblems(text).filter(problem => problem.stricter);
+    it.each([
+        ["[OPT0:LDA #1 hello:]", "hello"],
+        ["[OPT0:NOP 5 6:]", "5"],
+        ["[OPT0:LDA #1 ,X:]", ","],
+        ["[OPT0:NOP =1:]", "="],
+        ["[OPT0:LDA #1 PRINT 2:]", "PRINT"],
+        ["[OPT0:NOP]:NOP", "]"],
+        ["[OPT0:LDA #1]]", "]"],
+    ])("%s should be red on its first junk token only", (text, junk) => {
+        assert.deepStrictEqual(red(text), [junk]);
+    });
+    it.each([
+        "[OPT0:LDA #1 ;comment:]",
+        "[OPT0:LDA #1 \\comment:]",
+        "[OPT0:LDA #1:]:tax=1",
+        "[OPT0:NOP:]:P%=P%+5",
+        "[OPT0:LDA #1:LDX #2 ;c:NOP:]",
+    ])("%s should not be red", text => {
+        assert.deepStrictEqual(red(text), []);
+    });
+    it("should mark the second ] of NOP]:] as closing the block, not as junk", () => {
+        assert.deepStrictEqual(red("[OPT0:NOP]:]:P%=P%+5"), ["]"]);
+        assert.deepStrictEqual(stricter("[OPT0:NOP]:]:P%=P%+5").length, 1);
+    });
+    it.each([
+        ["[OPT0:NOP]", "]", "BASIC ignores this ] and goes on assembling"],
+        ["[OPT0:NOP 5", "5", "BASIC ignores everything after a complete instruction"],
+    ])("%s should say what BASIC does and what was probably meant", (text, junk, begins) => {
+        const [problem] = stricter(text);
+        assert.strictEqual(text.slice(problem.start, problem.end), junk);
+        assert.strictEqual(problem.code, "junk-after-instruction");
+        assert.ok(problem.message.startsWith(begins), problem.message);
+        assert.match(problem.message, junk === "]" ? /a : is missing/ : /a ; is missing/);
+    });
+    // BASIC tokenises a keyword only at the start of a word, so one straight after a mnemonic is a variable's name.
+    it.each([
+        ["[OPT0:STAH.,X:]", "H.", ".", "H. here is read as the variable H, not the keyword"],
+        ["[OPT0:LDAUSR@%+GET:]", "USR@%", "@%", "USR here is read as the variable USR"],
+        ["[OPT0:EQUBH.:]", "H.", ".", "H. here is read as the variable H"],
+    ])(
+        "%s should show %j as one problem, red on %j, that says a space was probably meant",
+        (text, shown, junk, begins) => {
+            const [problem] = stricter(text);
+            assert.deepStrictEqual(red(text), [junk]);
+            assert.strictEqual(text.slice(problem.start, problem.end), shown);
+            assert.strictEqual(problem.code, "space-after-mnemonic");
+            assert.ok(problem.message.startsWith(begins), problem.message);
+            assert.match(problem.message, /follows (?:STA|LDA|EQUB) with no space/);
+            assert.match(problem.message, /probably a space was meant after (?:STA|LDA|EQUB)$/);
+        },
+    );
+    it.each([
+        ["[OPT0:NOPPAGE:]", "PAGE"],
+        ["[OPT0:INXH.:]", "H"],
+        ["[OPT0:LDAP.,X:]", "."],
+        ["[OPT0:LDAPRINT 5:]", "5"],
+        ["[OPT0:LDAGETX 5:]", "5"],
+    ])(
+        "%s should still say a ; is probably missing, as a space would not mend it",
+        (text, junk) => {
+            const [problem] = stricter(text);
+            assert.strictEqual(text.slice(problem.start, problem.end), junk);
+            assert.strictEqual(problem.code, "junk-after-instruction");
+        },
+    );
+    it("should leave the block open after a ] that is ignored, so the next line is assembled", () => {
+        const [first, second] = programProblems("[LDA #1]\ntax=1\n]").filter(p => p.stricter);
+        assert.deepStrictEqual([first.line, first.start], [1, 7]);
+        assert.deepStrictEqual([second.line, second.start], [2, 3]);
+    });
+});

@@ -14,11 +14,14 @@ jobs:
         with:
           path: .cache/roms
           key: roms-${{ hashFiles('Makefile') }}
-      - run: make check
+      - run: make ci-check
   deploy-code:
     needs: build-and-test
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

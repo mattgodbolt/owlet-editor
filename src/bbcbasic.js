@@ -1,417 +1,50 @@
-import {editor, languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
-import {Flags, keywords, immediateCommands} from "./tokens";
+import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {Flags, keywords, immediateCommands, tokenChar} from "./tokens";
+import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
+import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
+import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
+import {programProblems, readLines, tokensProvider} from "./parser/highlight";
+import {lexLine} from "./parser/lexer";
+import {ForeignOperators} from "./parser/recogniser";
+import {isBasicIV, setBasicIV} from "./parser/dialect";
+import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
 
-function escape(token) {
-    return token.replace("$", "\\$").replace("(", "\\(").replace(".", "\\.");
-}
-
-const conditionalTokens = new Set(
+const ConditionalWords = new Set(
     keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword),
 );
+const KeywordWord = [...new Set(keywords.map(kw => kw.keyword))]
+    .sort((x, y) => y.length - x.length)
+    .map(word => word.replace(/[$(]/g, "\\$&") + (ConditionalWords.has(word) ? "\\b" : ""))
+    .join("|");
 
-function tokensRegex(kws) {
-    return kws
-        .map(kw => kw.keyword)
-        .sort((x, y) => y.length - x.length)
-        .map(kw => {
-            // A keyword that begins an earlier one in the table is not read before a dot: "END." is ENDPROC.
-            const beforeDot = abbreviatedKeyword(`${kw}.`).keyword === kw ? "" : "(?!\\.)";
-            return escape(kw) + beforeDot + (conditionalTokens.has(kw) ? "\\b" : "");
-        })
-        .join("|");
-}
+// Monaco's MetadataConsts.BALANCED_BRACKETS_MASK: it looks for brackets only in the text of tokens that have it, and
+// keeps neighbours that differ in it apart, so an opener such as LE. is found though the keyword before it touches it.
+const BalancedBrackets = 1024;
 
-export const allTokensRegex = tokensRegex(keywords);
-
-export function tokenChar(kw) {
-    return String.fromCodePoint(kw.token < 160 ? kw.token + 0x100 : kw.token);
-}
-
-function byteTokensRegex(kws) {
-    return `[${kws.map(tokenChar).join("")}]`;
-}
-
-// BASIC expands an abbreviation to the first keyword in the table with its prefix.
-export function abbreviatedKeyword(abbreviation) {
-    return keywords.find(kw => kw.keyword.startsWith(abbreviation.slice(0, -1)));
-}
-
-const abbreviations = [
-    ...new Set(
-        keywords.flatMap(({keyword}) =>
-            Array.from({length: keyword.length - 1}, (_, i) => `${keyword.slice(0, i + 1)}.`),
-        ),
-    ),
-];
-
-// Every way of typing these keywords: in full, abbreviated or as a token character.
-function forms(...names) {
-    const kws = keywords.filter(kw => names.includes(kw.keyword));
-    return [
-        tokensRegex(kws),
-        ...abbreviations.filter(a => names.includes(abbreviatedKeyword(a).keyword)).map(escape),
-        byteTokensRegex(kws),
-    ].join("|");
+function tokenMetadata(scopes, bracket) {
+    const theme = StandaloneServices.get(IStandaloneThemeService).getColorTheme().tokenTheme;
+    const language =
+        StandaloneServices.get(ILanguageService).languageIdCodec.encodeLanguageId(LanguageId);
+    return (theme.match(language, scopes) | (bracket ? BalancedBrackets : 0)) >>> 0;
 }
 
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
-const expressionKeywords = keywords.filter(kw => kw.flags & Flags.Expr);
-const logicalOperatorsRegex = "AND|OR|EOR|MOD|DIV|NOT|[\\u0180-\\u0184\\xac]";
-const allByteTokensRegex = byteTokensRegex(keywords);
-const TopRegex = "TOP|\\xb8P";
+let registrations = [];
 
-// The "Conditional" bit applies even to abbreviations, so "F.A=H.TO8^5" is
-// parsed as a variable named "H" followed by ".", and BASIC reports error
-// "No such variable" if "H" isn't a variable or "No TO" if it is.
-const invalidAbbreviatedTokensRegex = abbreviations
-    .filter(abbreviation => abbreviatedKeyword(abbreviation).flags & Flags.Conditional)
-    .map(abbreviation => escape(abbreviation) + "\\w+")
-    .join("|");
-
-const invalidAbbreviatedTokenAtStart = new RegExp(`^(?:${invalidAbbreviatedTokensRegex})`);
-
-// BASIC reads a mnemonic, OPT and the EQU of a directive in either case, but the accumulator, an index register and
-// the size of an EQU only in upper case, except that LDX and STX take y and LDY and STY take x.
-const anyCase = text => text.replace(/[A-Z]/g, letter => `[${letter}${letter.toLowerCase()}]`);
-const mnemonics = names => names.split(" ").map(anyCase).join("|");
-const AsmShift = mnemonics("ASL LSR ROL ROR");
-const AsmIndexed = new RegExp(
-    `${AsmShift}|${mnemonics("ADC AND CMP DEC EOR INC LDA ORA SBC STA")}`,
-);
-const AsmIndexedByY = new RegExp(mnemonics("LDX STX"));
-const AsmIndexedByX = new RegExp(mnemonics("LDY STY"));
-const AsmMnemonic = new RegExp(
-    mnemonics(
-        "BCC BCS BEQ BIT BMI BNE BPL BRK BVC BVS CLC CLD CLI CLV CPX CPY DEX DEY INX INY JMP JSR NOP " +
-            "PHA PHP PLA PLP RTI RTS SEC SED SEI TAX TAY TSX TXA TXS TYA",
-    ),
-);
-const AsmDirective = new RegExp(`${anyCase("OPT")}|${anyCase("EQU")}[BDSW]`);
-const AsmBadDirective = new RegExp(`${anyCase("EQU")}[bdsw]`);
-
-const anyTokenRegex = `${allTokensRegex}|${allByteTokensRegex}`;
-
-// BASIC II starts a statement only with a token from &C6 up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line.
-export const FirstStatementToken = 0xc6;
-export const statementKeywords = new Set([
-    "ELSE",
-    ...keywords.filter(kw => kw.token >= FirstStatementToken).map(kw => kw.keyword),
-]);
-const notStatementKeywords = keywords.filter(kw => !statementKeywords.has(kw.keyword));
-// By token number, not name: PTR, PAGE, TIME, LOMEM and HIMEM have a statement token and a different expression one.
-const notStatementTokens = keywords.filter(
-    kw => kw.token < FirstStatementToken && kw.keyword !== "ELSE",
-);
-const notStatementRegex = (() => {
-    // MOD begins MODE.
-    const begunStatements = keywords.filter(
-        statement =>
-            statementKeywords.has(statement.keyword) &&
-            notStatementKeywords.some(
-                kw => statement.keyword !== kw.keyword && statement.keyword.startsWith(kw.keyword),
-            ),
-    );
-    // A conditional keyword's abbreviation followed by a letter, digit or _ is a name.
-    const notStatementAbbreviations = abbreviations
-        .filter(abbreviation => notStatementKeywords.includes(abbreviatedKeyword(abbreviation)))
-        .map(
-            abbreviation =>
-                escape(abbreviation) +
-                (abbreviatedKeyword(abbreviation).flags & Flags.Conditional ? "(?!\\w)" : ""),
-        );
-    return new RegExp(
-        `(?!${tokensRegex(begunStatements)})` +
-            `(?:${[...notStatementAbbreviations, tokensRegex(notStatementKeywords), byteTokensRegex(notStatementTokens)].join("|")})`,
-    );
-})();
-// BASIC IV, the Master's, also starts a statement with EXT#, which sets the length of a file.
-const notStatementRegexIV = new RegExp(
-    `(?!(?:${forms("EXT")})[ \\t]*#)${notStatementRegex.source}`,
-);
-
-// Every way of typing a token that ends in "(" (e.g. RIGHT$(, RI., RIGHT$., or the raw token character). Monaco's
-// bracket matching scans the text, so it needs these as openers to pair them with their ")".
-const hiddenOpenParens = [
-    ...openParenKeywords.flatMap(kw => [kw.keyword, tokenChar(kw)]),
-    ...abbreviations.filter(abbreviation => abbreviatedKeyword(abbreviation).keyword.endsWith("(")),
-];
-
-// Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
-// its lower-case form (END, U+00E0). Those are tagged "string", which keeps them out of bracket matching.
-const bracketCollisionRegex = (() => {
-    const tokenChars = new Set(keywords.map(tokenChar));
-    const collisions = openParenKeywords
-        .map(kw => tokenChar(kw).toLowerCase())
-        .filter(
-            lower =>
-                tokenChars.has(lower) && !openParenKeywords.some(kw => tokenChar(kw) === lower),
-        );
-    return new RegExp(`[${collisions.join("")}]`);
-})();
-
-// The tokeniser reads the numbers after these as line numbers. THEN and ELSE also end their statement.
-const lineNumberKeywords = keywords
-    .filter(kw => kw.flags & Flags.LineNumber && !["THEN", "ELSE"].includes(kw.keyword))
-    .map(kw => kw.keyword);
-
-const AsmOpener = [...hiddenOpenParens.map(escape), "[a-zA-Z_]\\w*[$%]?\\("].join("|");
-
-const UnterminatedString = /"([^"\n]|"")*(?=\n|$)/;
-// STR$ takes one ~, though a PRINT item can start with any number.
-const StrTilde = [
-    new RegExp(`(${forms("STR$")})([ \\t]*)(~)((?:[ \\t]*~)*)`),
-    ["keyword", "white", "operator", "invalid"],
-];
-// An operator, separator or "(" after which an operand is expected.
-const BeforeOperand = {cases: {"\\(": "@brackets", "@operators": "operator", "@default": "symbol"}};
+/** Follows the Master's BASIC IV rather than BASIC II, and has the editor read its text again. */
+export function useBasicIV(enabled) {
+    if (Boolean(enabled) === isBasicIV()) return;
+    setBasicIV(enabled);
+    if (registrations.length) registerBbcBasicLanguage();
+}
 
 export function registerBbcBasicLanguage() {
-    languages.register({id: LanguageId});
-    useBasicIV(false);
-    configureBbcBasicLanguage();
-}
+    if (registrations.length === 0) languages.register({id: LanguageId});
+    for (const registration of registrations) registration.dispose();
 
-let basicIV = null;
-
-/** Highlights for the Master's BASIC IV rather than BASIC II, where the two differ. */
-export function useBasicIV(enabled) {
-    if (enabled === basicIV) return;
-    basicIV = enabled;
-    languages.setMonarchTokensProvider(LanguageId, {
-        defaultToken: "invalid",
-        includeLF: true,
-        brackets: [["(", ")", "delimiter.parenthesis"]],
-        operators: "+ - * / ^ = <> < > <= >= $ ? ; , ! '".split(" "),
-        tokenPrefix: abbreviations,
-        symbols: /[-+=><!*/:?$;,^']+/,
-        tokenizer: {
-            root: [
-                [/^([ \t]*)(\d+)/, ["white", "constant.linenum"]], // the line's own number
-                {include: "@whitespace"},
-                [basicIV ? notStatementRegexIV : notStatementRegex, "invalid", "@statement"],
-                [/(?=[^*])/, "", "@statement"],
-                [/\*.*/, "keyword.oscli.string"], // "string" keeps bracket matching out; the theme colours it as keyword.oscli
-            ],
-            statement: [
-                ["\n", "", "@pop"],
-                [":", "symbol", "@pop"],
-                [new RegExp(`(${forms("REM")})(.*)`), ["keyword", "comment"]],
-                // FN and PROC names can start with a digit.
-                [new RegExp(`(${forms("FN", "PROC")})(\\w*)`), ["keyword", "variable"]],
-                [new RegExp(forms("DATA")), {token: "keyword", switchTo: "@dataStatement"}],
-                [
-                    new RegExp(`(${forms("PRINT", "INPUT")})([ \\t]*)(#)`),
-                    ["keyword", "white", "symbol"],
-                ],
-                // A state ending ".list" is one in which a value can directly follow another, as in PRINT X"a".
-                [new RegExp(forms("PRINT")), {token: "keyword", switchTo: "@printStatement.list"}],
-                // On BASIC IV a VDU with nothing before its first | is a syntax error.
-                [
-                    new RegExp(`(?:${forms("VDU")})${basicIV ? "(?![ \\t]*\\|)" : ""}`),
-                    {
-                        token: "keyword",
-                        switchTo: basicIV ? "@vduStatement.list" : "@statement.list",
-                    },
-                ],
-                [invalidAbbreviatedTokensRegex, "invalid"],
-                [
-                    new RegExp(
-                        `(${forms("BGET", "BPUT", "CLOSE", "EOF", "EXT", "PTR")})([ \\t]*)(#?)`,
-                    ),
-                    ["keyword", "white", "symbol"],
-                ],
-                [new RegExp(forms("THEN", "ELSE")), {token: "keyword", switchTo: "@lineNumbers"}],
-                [new RegExp(forms("REPEAT")), "keyword", "@pop"],
-                [
-                    new RegExp(forms(...lineNumberKeywords)),
-                    {
-                        cases: {
-                            [bracketCollisionRegex.source]: {
-                                token: "keyword.string",
-                                next: "@lineNumbers",
-                            },
-                            "@default": {token: "keyword", next: "@lineNumbers"},
-                        },
-                    },
-                ],
-                // A number after ERROR is not a line number, but a * command may follow ON ERROR.
-                [new RegExp(`(?:${forms("ERROR")})(?=[ \\t]*\\*)`), "keyword", "@pop"],
-                StrTilde,
-                [new RegExp(forms("FOR")), {token: "keyword", switchTo: "@forStatement"}],
-                [bracketCollisionRegex, "keyword.string"],
-                // BASIC IV's tokeniser (Owlet's on either machine) reads COLOR as COLOUR.
-                [new RegExp(`${basicIV ? "COLOR|" : ""}${TopRegex}|${anyTokenRegex}`), "keyword"],
-                // Not an abbreviation, so a name then a dot: the number "." in a list (P.X. prints X then 0), and
-                // otherwise a syntax error.
-                [
-                    /[a-zA-Z_]\w*[$%]?\./,
-                    {
-                        cases: {
-                            "@tokenPrefix": "keyword",
-                            "$S2==list": {token: "variable", goBack: 1},
-                            "@default": {token: "variable", goBack: 1, next: "@strayDot"},
-                        },
-                    },
-                ],
-                {include: "@common"},
-                ["\\[", {token: "delimiter.square", next: "@asm"}],
-            ],
-            // `~` (hex) is only valid at the start of a PRINT item, never after an operator or `(`.
-            printStatement: [
-                // A separator is split from any operator that follows it, so `;-~B` is caught below.
-                [/[;,']/, "operator"],
-                [/([-+=<>*/^!?$]+|\()([ \t]*)(~)/, [BeforeOperand, "white", "invalid"]],
-                [
-                    new RegExp(
-                        `(${logicalOperatorsRegex}|${tokensRegex(openParenKeywords)})([ \\t]*)(~)`,
-                    ),
-                    ["keyword", "white", "invalid"],
-                ],
-                [/~/, "operator"],
-                {include: "@statement"},
-            ],
-            // BASIC IV's | ends a VDU item, as , and ; do, and sends nine zeros. A VDU with nothing before its first |
-            // never gets here.
-            vduStatement: [
-                [/([,;])([ \t]*)(\|)/, ["operator", "white", "invalid"]],
-                [/(\|)([ \t]*)([,;|])/, ["operator", "white", "invalid"]],
-                [/\|/, "operator"],
-                {include: "@statement"},
-            ],
-            // In a FOR statement TO ends the loop's start expression, except where an operand is expected:
-            // there the tokeniser's TO followed by P is TOP.
-            forStatement: [
-                [
-                    new RegExp(`([-+=<>*/^,!?$]+|\\()([ \\t]*)(${TopRegex})`),
-                    [BeforeOperand, "white", "keyword"],
-                ],
-                [new RegExp(forms("TO")), {token: "keyword", switchTo: "@statement"}],
-                [invalidAbbreviatedTokensRegex, "invalid"],
-                // A function or other keyword that takes an operand, as in `ABS TOP` or `AB. TOP`.
-                [
-                    new RegExp(`(?:${anyTokenRegex}|[A-Z]+\\.)(?=[ \\t]*(${TopRegex}))`),
-                    {
-                        cases: {
-                            "@tokenPrefix": {token: "keyword", next: "@forOperand"},
-                            "[A-Z]+\\.": {token: "variable", goBack: 1, next: "@strayDot"},
-                            "@default": {token: "keyword", next: "@forOperand"},
-                        },
-                    },
-                ],
-                {include: "@statement"},
-            ],
-            forOperand: [{include: "@whitespace"}, [new RegExp(TopRegex), "keyword", "@pop"]],
-            common: [
-                {include: "@whitespace"},
-                [/~/, "invalid"],
-                // Operators from other languages: C, Fortran, Python, Apple ][ BASIC and others.
-                [/[=!]=|\*\*|><|=[<>]|[-+/*^]=|<<|>>/, "invalid"],
-                ["@symbols", {cases: {"@operators": "operator", "@default": "symbol"}}],
-                [/(\d+\.?\d*|\.\d+)E(?=\.)/, "number.float"], // an empty exponent: the next item is ".5" or ".X"
-                [/\d*\.\d*(E[-+\d]\d*)?|\d+E[-+\d]\d*/, "number.float"],
-                [/\d+/, "number"],
-                [/&[0-9A-F]+/, "number.hex"],
-                [/[()]/, "@brackets"],
-                [/[a-zA-Z_]\w*[$%]?/, "variable"],
-                [UnterminatedString, "invalid.string"],
-                ['"', {token: "string.quote", next: "@string"}],
-                // We treat @% as a regular variable (see #28).
-                ["@%", "variable"],
-            ],
-            // As in the tokeniser, a space or comma does not end the list but anything else does: GOTO 10*2 is to line 10.
-            lineNumbers: [
-                {include: "@whitespace"},
-                [/\d+/, "constant.linenum"],
-                [/&[0-9A-F]+/, "number.hex"],
-                [",", "operator"],
-                ["", "", "@pop"],
-            ],
-            strayDot: [[/\.\d*/, "invalid", "@pop"]],
-            // Not the newline, which would carry a state such as this statement's on to the next line.
-            whitespace: [[/[ \t\r]+/, "white"]],
-            string: [
-                [/[^"]+/, "string"],
-                ['"', {token: "string.quote", next: "@pop"}],
-            ],
-            dataStatement: [
-                ["\n", "", "@pop"],
-                [",", "symbol"],
-                {include: "@whitespace"},
-                [UnterminatedString, "string"],
-                ['"', {token: "string.quote", next: "@string"}],
-                [/[^,\n]*[^,\n ]/, "string.unquoted"],
-            ],
-            // After a mnemonic or directive the rest of the statement is ignored by the ROM, so a ; comment can say anything.
-            asm: [
-                [
-                    new RegExp(`(${AsmShift})( *)(A)(?![\\w$%])`),
-                    ["keyword", "white", {token: "keyword", switchTo: "@asmBody"}],
-                ],
-                // A state's suffix is the index register, if any, that BASIC takes in lower case after the mnemonic.
-                // BASIC reads ORA as the OR token then A, which it takes only in upper case.
-                [/ORa/, "invalid"],
-                [AsmIndexed, {token: "keyword", switchTo: "@asmIndexed.none"}],
-                [AsmIndexedByY, {token: "keyword", switchTo: "@asmIndexed.y"}],
-                [AsmIndexedByX, {token: "keyword", switchTo: "@asmIndexed.x"}],
-                [AsmMnemonic, {token: "keyword", switchTo: "@asmBody"}],
-                [AsmDirective, {token: "keyword.directive", switchTo: "@asmBody"}],
-                [AsmBadDirective, "invalid"],
-                {include: "@asmCommon"},
-            ],
-            // An operand that can be indexed. BASIC reads no index after an immediate operand, and a comma inside a
-            // function's or array's brackets is not one, so the check stops at either.
-            asmIndexed: [
-                ["#", {token: "symbol", switchTo: "@asmBody"}],
-                [new RegExp(`(?=${AsmOpener})`), {token: "", switchTo: "@asmBody"}],
-                [/,(?= *[xy])/, {token: "symbol", switchTo: "@asmIndex.$S2"}],
-                {include: "@asmBody"},
-            ],
-            asmBody: [
-                [/^/, {token: "", switchTo: "@asm"}],
-                [/;[^:]*/, "comment"],
-                [":", {token: "symbol", switchTo: "@asm"}],
-                {include: "@asmCommon"},
-            ],
-            asmCommon: [
-                [/\\[^:]*/, "comment"],
-                StrTilde,
-                [/,(?= *[XY]\b)/, {token: "symbol", switchTo: "@asmIndex"}],
-                ["#", "symbol"], // Immediate addressing
-                [/\.([a-zA-Z_]\w*%?|@%)/, "type.identifier"], // a label
-                [bracketCollisionRegex, "invalid.string"],
-                [
-                    new RegExp(
-                        `${TopRegex}|${tokensRegex(expressionKeywords)}|${byteTokensRegex(expressionKeywords)}`,
-                    ),
-                    "keyword",
-                ],
-                [new RegExp(`${anyTokenRegex}|${invalidAbbreviatedTokensRegex}`), "invalid"],
-                [/^\d+/, "constant.linenum"],
-                {include: "@common"},
-                ["]", {token: "delimiter.square", next: "@pop"}],
-            ],
-            asmIndex: [
-                {include: "@whitespace"},
-                [/[XY]/, {token: "keyword", switchTo: "@asmBody"}],
-                [
-                    /[xy]/,
-                    {
-                        cases: {
-                            "$#==$S2": {token: "keyword", switchTo: "@asmBody"},
-                            "@default": {token: "invalid", switchTo: "@asmBody"},
-                        },
-                    },
-                ],
-            ],
-        },
-    });
-}
-
-function configureBbcBasicLanguage() {
-    languages.setLanguageConfiguration(LanguageId, {
+    const configuration = languages.setLanguageConfiguration(LanguageId, {
         comments: {
             lineComment: "REM",
         },
@@ -419,7 +52,8 @@ function configureBbcBasicLanguage() {
             ["[", "]"],
             ["(", ")"],
             // A spelling that ends in "(" is opened by that "(", which leaves the keyword before it uncoloured as a bracket.
-            ...hiddenOpenParens.filter(open => !open.endsWith("(")).map(open => [open.toLowerCase(), ")"]),
+            // The tokenizer sets the bracket bit on the "." of an abbreviation, and on a raw token.
+            ...[".", ...openParenKeywords.map(tokenChar)].map(open => [open.toLowerCase(), ")"]),
         ],
         autoClosingPairs: [
             {open: "(", close: ")"},
@@ -432,19 +66,25 @@ function configureBbcBasicLanguage() {
         // In order to separate 10PRINT into "10" "PRINT" and
         // PRINTLN12 into "PRINT" "LN" "12", we override the default word pattern.
         wordPattern: new RegExp(
-            allTokensRegex +
+            KeywordWord +
                 "|" +
                 /(@%)|(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+%?)/g.source,
         ),
     });
 
-    languages.registerCodeActionProvider(LanguageId, codeActionProvider);
+    registrations = [
+        languages.setTokensProvider(LanguageId, tokensProvider(LanguageId, tokenMetadata)),
+        configuration,
+        languages.registerCodeActionProvider(LanguageId, codeActionProvider),
+    ];
 }
 
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
 export const codeActionProvider = {
     provideCodeActions(model, range, context) {
-        const actions = context.markers.map(marker => {
+        // Only the warnings above come with a fix; the text under any other marker is not to be rewritten.
+        const fixable = context.markers.filter(marker => QuickFixCodes.has(marker.code));
+        const actions = fixable.map(marker => {
             const text = model.getValueInRange(marker);
             if (marker.code === SpaceAfterAbbreviationCode) {
                 const abbreviation = text.slice(0, text.indexOf(".") + 1);
@@ -457,7 +97,29 @@ export const codeActionProvider = {
                 };
                 return quickFix(model, marker, `Insert a space after ${abbreviation}`, at, " ");
             }
-            const replacement = InvalidOperatorMap.get(text) || text.toUpperCase();
+            if (marker.code === SpaceAfterMnemonicCode) {
+                const before = model
+                    .getLineContent(marker.startLineNumber)
+                    .slice(0, marker.startColumn - 1);
+                const [mnemonic] = before.match(/EQU[BDSW]$|.{3}$/i);
+                const at = {
+                    ...marker,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn,
+                };
+                return quickFix(model, marker, `Insert a space after ${mnemonic}`, at, " ");
+            }
+            if (marker.code === JunkAfterInstructionCode) {
+                const at = {
+                    ...marker,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn,
+                };
+                return text[0] === "]"
+                    ? quickFix(model, marker, "Insert : before ]", at, ":")
+                    : quickFix(model, marker, "Insert ; before the junk", at, ";");
+            }
+            const replacement = ForeignOperators.get(text) || text.toUpperCase();
             return quickFix(model, marker, `Replace with ${replacement}`, marker, replacement);
         });
         return {actions, dispose: () => {}};
@@ -474,70 +136,104 @@ function quickFix(model, marker, title, range, text) {
     };
 }
 
-// A whole lower-case keyword. A name ends at its `$`, and these keywords end at their bracket, so what follows them
-// is not part of the name; any other keyword must not be followed by a name character (`radius%` is not RAD).
-const nameEndKeywords = keywords.filter(kw => /[($]$/.test(kw.keyword));
-const LowerCaseTokenRegex = new RegExp(
-    `^(?:(${tokensRegex(nameEndKeywords).toLowerCase()})|(${tokensRegex(keywords.filter(kw => !nameEndKeywords.includes(kw))).toLowerCase()})(?![\\w%$]))`,
-);
-
 const SpaceAfterAbbreviationCode = "space-after-abbreviation";
-
-const InvalidOperatorMap = new Map([
-    ["==", "="],
-    ["!=", "<>"],
-    ["**", "^"],
-    ["><", "<>"],
-    ["=<", "<="],
-    ["=>", ">="],
+const LowerCaseKeywordCode = "lowercase-keyword";
+const ForeignOperatorCode = "foreign-operator";
+const QuickFixCodes = new Set([
+    SpaceAfterAbbreviationCode,
+    LowerCaseKeywordCode,
+    ForeignOperatorCode,
+    JunkAfterInstructionCode,
+    SpaceAfterMnemonicCode,
 ]);
+
+const marker = (severity, line, start, end, details) => ({
+    severity,
+    ...details,
+    startLineNumber: line,
+    startColumn: start + 1,
+    endLineNumber: line,
+    endColumn: end + 1,
+});
 
 // The warnings for each line of the program.
 export function getWarnings(text) {
-    const lines = text.split(/\r?\n/);
-    return editor
-        .tokenize(text, LanguageId)
-        .flatMap((lineTokens, i) => lineWarnings(i + 1, lines[i], lineTokens));
+    return readLines(text).flatMap(({lexer, tokens}, i) =>
+        lineWarnings(lexer.text, tokens).map(({start, end, ...details}) =>
+            marker(MarkerSeverity.Warning, i + 1, start, end, details),
+        ),
+    );
 }
 
-function lineWarnings(lineNum, line, lineTokens) {
-    const warnings = [];
-    const warn = (offset, length, details) =>
-        warnings.push({
-            severity: MarkerSeverity.Warning,
-            ...details,
-            startLineNumber: lineNum,
-            startColumn: offset + 1,
-            endLineNumber: lineNum,
-            endColumn: offset + length + 1,
-        });
+// The markers for the lines BASIC would stop at, and for those that end too soon or have something missing. A line is unfinished while the cursor is on it (`cursorLine`) and so is not marked then,
+// and a warning that covers the same text says enough.
+export function getSyntaxMarkers(text, cursorLine = 0) {
+    const recognisers = readLines(text);
+    const warnings = recognisers.map(({lexer, tokens}) => lineWarnings(lexer.text, tokens));
+    return programProblems(text, recognisers).flatMap(
+        ({line, start, end, message, unfinished, hole, unclosed, stricter, code}) => {
+            const covered = warnings[line - 1].some(
+                warning => warning.start < end && start < warning.end,
+            );
+            if (covered || (unfinished && line === cursorLine)) return [];
+            const rom = message ? ` with "${message}"` : "";
+            const text = unclosed
+                ? "Assembler block not closed: there is no ] after this ["
+                : stricter
+                  ? message
+                  : unfinished
+                    ? hole
+                        ? `Unfinished statement: BASIC would stop${rom} here`
+                        : `Unfinished line${message ? `: BASIC would stop${rom} if it ended here` : ""}`
+                    : `${message || "Error"}: BASIC would stop at this statement`;
+            const severity = unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error;
+            return [marker(severity, line, start, end, {message: text, ...(code && {code})})];
+        },
+    );
+}
 
-    for (const token of lineTokens.filter(token => token.type === `variable.${LanguageId}`)) {
-        const match = line.substr(token.offset).match(LowerCaseTokenRegex);
-        if (match) {
-            const upper = match[0].toUpperCase();
-            // Don't warn about lower case versions of immediate commands, e.g. `new`.
-            if (immediateCommands.includes(upper)) continue;
-            warn(token.offset, match[0].length, {
-                message: `BASIC keywords should be upper case, did you mean ${upper}?`,
-            });
-        }
+// The keyword that a name, typed in capitals, would be read as in full (with the ( that ends LEFT$( and the like), or
+// null: a name BASIC reads as a variable with the lower case letters it has.
+function upperCaseKeyword(line, token) {
+    const name = line.slice(token.start, token.end);
+    if (name !== name.toLowerCase()) return null;
+    const [first] = lexLine(name.toUpperCase() + line.slice(token.end, token.end + 1));
+    return first.kind === "keyword" && first.text === first.kw.keyword && first.end >= name.length
+        ? first
+        : null;
+}
+
+function lineWarnings(line, lineTokens) {
+    const warnings = [];
+    const warn = (start, length, details) =>
+        warnings.push({start, end: start + length, ...details});
+
+    const isName = token => token.invalid || token.kind === "name" || token.kind === "fnname";
+    for (const token of lineTokens.filter(isName)) {
+        const keyword = upperCaseKeyword(line, token);
+        // Don't warn about lower case versions of immediate commands, e.g. `new`.
+        if (!keyword || immediateCommands.includes(keyword.text)) continue;
+        warn(token.start, keyword.end, {
+            message: `BASIC keywords should be upper case, did you mean ${keyword.text}?`,
+            code: LowerCaseKeywordCode,
+        });
     }
-    for (const token of lineTokens.filter(token => token.type === `invalid.${LanguageId}`)) {
-        const abbreviated = line.substr(token.offset).match(invalidAbbreviatedTokenAtStart);
-        if (abbreviated) {
-            const abbreviation = abbreviated[0].slice(0, abbreviated[0].indexOf(".") + 1);
-            warn(token.offset, abbreviated[0].length, {
-                message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${abbreviated[0].slice(abbreviation.length)}"?`,
+    for (const token of lineTokens.filter(token => token.invalid)) {
+        const rest = token.abbreviation && /^\w+/.exec(line.slice(token.end + 1));
+        if (rest) {
+            const abbreviation = `${token.text}.`;
+            warn(token.start, abbreviation.length + rest[0].length, {
+                message: `${abbreviation} is not read as an abbreviation when followed directly by letters or digits, did you mean "${abbreviation} ${rest[0]}"?`,
                 code: SpaceAfterAbbreviationCode,
             });
             continue;
         }
-        // Every operator in the map is two characters long.
-        const badOperator = line.substr(token.offset, 2);
-        if (InvalidOperatorMap.has(badOperator)) {
-            warn(token.offset, 2, {
-                message: `${badOperator} is not a BBC BASIC operator, did you mean ${InvalidOperatorMap.get(badOperator)}?`,
+        // Every operator in the table is two characters long.
+        const operator = line.substr(token.start, 2);
+        if (ForeignOperators.get(operator)) {
+            warn(token.start, 2, {
+                message: `${operator} is not a BBC BASIC operator, did you mean ${ForeignOperators.get(operator)}?`,
+                code: ForeignOperatorCode,
             });
         }
     }

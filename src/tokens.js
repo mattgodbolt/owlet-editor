@@ -1,5 +1,3 @@
-import {decode} from "base2048";
-
 /*
 
  BBC BASIC Keyword Byte Tokens
@@ -154,98 +152,24 @@ export const keywords = [
     {keyword: "HIMEM", token: 211, flags: 0},
 ];
 
-const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
+export const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
+
+// BASIC II starts a statement only with a token from here up (they include the statement forms of PTR, PAGE, TIME,
+// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
+export const FirstStatementToken = 0xc6;
+export const LineNumberToken = 0x8d;
+// The character Owlet uses for a raw token byte.
+export const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
 
 export const immediateCommands = keywords
-    .filter(kw => kw.token >= 0xc6 && kw.token <= 0xcd)
+    .filter(kw => kw.token >= FirstStatementToken && kw.token <= 0xcd)
     .map(kw => kw.keyword);
 
 const Chars = {
-    Colon: ":".charCodeAt(0),
-    Dot: ".".charCodeAt(0),
     FirstToken: 0x80,
-    LineNumberToken: 0x8d,
     NewLine: "\n".charCodeAt(0),
     Quote: '"'.charCodeAt(0),
-    Star: "*".charCodeAt(0),
 };
-
-function findKeyword(abbreviation) {
-    for (const keyword of keywords) {
-        if (keyword.keyword.indexOf(abbreviation) === 0 && abbreviation !== keyword.keyword) {
-            return keyword;
-        }
-    }
-    return null;
-}
-
-function isUpperCase(c) {
-    return c > 64 && c < 91;
-}
-
-export function debbreviate(text) {
-    let output = "";
-    let buffer = "";
-    let withinString = false;
-    let starCommand = false;
-    let start = true;
-    for (const char of text) {
-        const charCode = char.charCodeAt(0) & 0xff;
-        if (charCode === Chars.NewLine && char !== "\n") {
-            // U+010A stands for the byte &0A (data), and only a real newline ends a line.
-            output += buffer + char;
-            buffer = "";
-            continue;
-        }
-        if (starCommand) {
-            if (charCode !== Chars.NewLine) {
-                output += String.fromCodePoint(charCode);
-                continue;
-            }
-            starCommand = false;
-        }
-        if (charCode === Chars.NewLine) {
-            start = true;
-            // Handle unterminated string by implicitly closing at end of line.
-            withinString = false;
-        }
-        if (charCode === Chars.Quote) withinString = !withinString;
-        if (start && charCode === Chars.Star) {
-            // *-command so don't expand tokens until the end of the line.
-            output += buffer;
-            buffer = "";
-            starCommand = true;
-        }
-        if (!withinString && charCode === Chars.Colon) start = true;
-        if (isUpperCase(charCode) && !withinString) {
-            buffer += String.fromCodePoint(charCode);
-            // Scan for complete unabbreviated keyword so we handle an
-            // abbreviated keyword after a non-abbreviated keyword correctly
-            // e.g. IFCOU.
-            for (const keyword of keywords) {
-                if (keyword.keyword === buffer && !(keyword.flags & Flags.Conditional)) {
-                    output += buffer;
-                    buffer = "";
-                    start = (keyword.flags & Flags.Start);
-                    break;
-                }
-            }
-        } else {
-            let keyword = null;
-            if (charCode === Chars.Dot && !withinString && buffer !== "") {
-                keyword = findKeyword(buffer);
-            }
-            if (keyword !== null) {
-                output += keyword.keyword;
-                start = (keyword.flags & Flags.Start);
-            } else {
-                output += buffer + String.fromCodePoint(charCode);
-            }
-            buffer = "";
-        }
-    }
-    return output + buffer;
-}
 
 class StringHandler {
     constructor() {
@@ -316,7 +240,7 @@ function detokeniseInternal(text, handler) {
             continue;
         }
         if (charCode === Chars.Quote) withinString = !withinString;
-        if (!withinString && charCode === Chars.LineNumberToken) {
+        if (!withinString && charCode === LineNumberToken) {
             // If we see the magic line number token we need to accumulate the
             // next three bytes.
             lineNumberBuffer = [];
@@ -337,6 +261,11 @@ function detokeniseInternal(text, handler) {
         }
         if (charCode >= Chars.FirstToken) {
             if (withinString) {
+                handler.onCharCode(charCode);
+                continue;
+            }
+            if (identifier === "REM" || identifier === "DATA") {
+                leaveRestOfLine = true;
                 handler.onCharCode(charCode);
                 continue;
             }
@@ -422,7 +351,7 @@ export function partialDetokenise(rawText) {
         lines.push({num: lineNum, line: handler.output});
     });
     let lineno = 0;
-    return lines.map(x => addLineNo(lineno += 10, x)).join("\n");
+    return lines.map(x => addLineNo((lineno += 10), x)).join("\n");
 }
 
 function addLineNo(lineno, x) {
@@ -433,19 +362,6 @@ function addLineNo(lineno, x) {
         return x.line.trimStart();
     } else {
         return `${x.num}${x.line}`;
-    }
-}
-
-function decode2048(input) {
-    try {
-        let code = input.match(/🗜(\S*)/);
-        // Without the clamp emoji, try decoding the whole lot, unless it is plain ASCII: "END" and "RUN" are
-        // valid base2048, and real payloads are not ASCII.
-        if (code === null && [...input].every(char => char.charCodeAt(0) < 0x80)) return input;
-        code = code === null ? input : code[1];
-        return String.fromCharCode.apply(null, decode(code.trim()));
-    } catch (e) {
-        return input;
     }
 }
 
@@ -472,16 +388,4 @@ export function backwardCompat(text) {
         output += String.fromCodePoint(newCode);
     }
     return output;
-}
-
-// fits says whether a line, as expanded, can still be tokenised: expanding can add a space (TIME before a name, say),
-// which can push a full line over the limit, and then the line is left as it was.
-export function expandCode(text, fits = () => true) {
-    if (text !== decode2048(text)) {
-        return decode2048(text);
-    }
-    const original = text.split("\n");
-    const expanded = detokenise(debbreviate(text)).split("\n");
-    if (original.length !== expanded.length) return expanded.join("\n");
-    return expanded.map((line, i) => (fits(line) ? line : original[i])).join("\n");
 }

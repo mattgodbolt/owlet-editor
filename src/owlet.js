@@ -10,19 +10,23 @@ import "monaco-editor/esm/vs/editor/contrib/codeAction/browser/codeActionContrib
 
 import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
-import {expandCode, partialDetokenise} from "./tokens";
+import {expandCode} from "./expand-code";
+import {partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getWarnings, LanguageId, useBasicIV} from "./bbcbasic";
+import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV} from "./bbcbasic";
+import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, withMachine} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 import {createVduReference} from "./vdu-reference";
+import {describeBuild} from "./version";
 
 const TweetMaximum = 500;
 const StateVersion = 1;
+const SyntaxMarkerDelayMs = 500;
 
 function defaultLineNumber(line) {
     return line * 10;
@@ -32,6 +36,13 @@ export class OwletEditor {
     constructor(onChangeHandler, onMachineChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
+        const build = describeBuild(
+            import.meta.env.OWLET_GIT_SHA,
+            import.meta.env.OWLET_BUILD_DATE,
+        );
+        $("#version").append(
+            build.url ? $("<a>").attr("href", build.url).text(build.label) : build.label,
+        );
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
         this.onMachineChangeHandler = onMachineChangeHandler;
@@ -90,13 +101,31 @@ export class OwletEditor {
             run: () => this.expandCode(),
         });
 
+        // Alt+F8 and Ctrl+. are often intercepted outside the page (the problem hover advertises them); these come
+        // later, so the hover footer shows them instead.
+        monacoEditor.addKeybindingRules([
+            {
+                keybinding: KeyMod.Alt | KeyCode.Enter,
+                command: "editor.action.quickFix",
+                when: "editorTextFocus",
+            },
+            {keybinding: KeyCode.F8, command: "editor.action.marker.next", when: "editorFocus"},
+        ]);
+
         followImplicitLineNumbers(this.editor);
+        // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
+        // markers about to be made anyway.
+        this.editor.onDidChangeCursorPosition(({position}) => {
+            if (!this.syntaxTimer && position.lineNumber !== this.syntaxCursorLine)
+                this.showSyntaxMarkers();
+        });
         this.editor.getModel().onDidChangeContent(() => {
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);
             this.lineNumberDetect(basicText);
             this.updateStatus(basicText);
             this.updateWarnings();
+            this.updateSyntaxMarkers();
         });
 
         this.emulator = new Emulator($("#emulator"));
@@ -139,6 +168,31 @@ export class OwletEditor {
     updateWarnings() {
         const model = this.editor.getModel();
         monacoEditor.setModelMarkers(model, "warnings", getWarnings(model.getValue()));
+    }
+
+    // The markers for lines that end too soon, and for lines that are not there yet, would be wrong while the line is
+    // still being typed, so they come only after the typing stops. The old ones stay until then; Monaco moves them
+    // along with the text.
+    updateSyntaxMarkers() {
+        clearTimeout(this.syntaxTimer);
+        this.syntaxTimer = setTimeout(() => this.showSyntaxMarkers(), SyntaxMarkerDelayMs);
+    }
+
+    showSyntaxMarkers() {
+        clearTimeout(this.syntaxTimer);
+        this.syntaxTimer = null;
+        const model = this.editor.getModel();
+        this.syntaxCursorLine = this.editor.getPosition().lineNumber;
+        monacoEditor.setModelMarkers(
+            model,
+            "syntax",
+            getSyntaxMarkers(model.getValue(), this.syntaxCursorLine),
+        );
+        monacoEditor.setModelMarkers(
+            model,
+            "lineNumbers",
+            getLineNumberMarkers(model.getValue(), this.syntaxCursorLine),
+        );
     }
 
     updateEditorText(newText, updateType) {
@@ -224,6 +278,7 @@ export class OwletEditor {
         $("#machine").val(machine);
         useBasicIV(this.emulator.model.isMaster);
         this.updateWarnings();
+        this.showSyntaxMarkers();
         this.onMachineChangeHandler(machine);
         return changed;
     }
@@ -509,7 +564,9 @@ export class OwletEditor {
             examples: () => this.selectView("examples"),
             about: () => this.selectView("about"),
             reference: () =>
-                this.selectView($("#reference-button").hasClass("selected") ? "screen" : "reference"),
+                this.selectView(
+                    $("#reference-button").hasClass("selected") ? "screen" : "reference",
+                ),
 
             virtualbeeb: () => {
                 const gxr = this.emulator.hasGxr ? "&rom=gxr.rom" : "";

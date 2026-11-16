@@ -1,16 +1,38 @@
 import {defineConfig} from "vite";
 import {resolve} from "path";
 import {fileURLToPath} from "url";
-import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import {execFileSync} from "child_process";
+import monacoEditorPluginModule from "vite-plugin-monaco-editor";
 import {viteStaticCopy} from "vite-plugin-static-copy";
 import yaml from "@rollup/plugin-yaml";
 import {nodePolyfills} from "vite-plugin-node-polyfills";
 import {createHtmlPlugin} from "vite-plugin-html";
 
+// vite-plugin-monaco-editor is CommonJS, so Node's ESM loader hands back module.exports rather than its default
+const monacoEditorPlugin = monacoEditorPluginModule.default ?? monacoEditorPluginModule;
+
 // Get the directory name equivalent in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
-export default defineConfig({
+// CI sets GITHUB_SHA; elsewhere ask git, and carry on without a sha if that fails (e.g. a tarball).
+// Only builds carry a sha: a dev server serves uncommitted work, so it says so.
+function gitSha() {
+    if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+    try {
+        return execFileSync("git", ["rev-parse", "HEAD"], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+    } catch (e) {
+        return "";
+    }
+}
+
+export default defineConfig(({command}) => ({
+    define: {
+        "import.meta.env.OWLET_GIT_SHA": JSON.stringify(command === "build" ? gitSha() : ""),
+        "import.meta.env.OWLET_BUILD_DATE": JSON.stringify(new Date().toISOString().slice(0, 10)),
+    },
     plugins: [
         monacoEditorPlugin({}),
         nodePolyfills(),
@@ -30,6 +52,7 @@ export default defineConfig({
                 {
                     src: "node_modules/jsbeeb/public/roms/**/*",
                     dest: "roms",
+                    rename: {stripBase: 4},
                     globOptions: {
                         ignore: ["**/*.txt", "**/*README*"],
                     },
@@ -46,10 +69,12 @@ export default defineConfig({
         rollupOptions: {
             external: ["electron"],
             output: {
-                manualChunks: {
-                    vendor: ["jquery", "underscore"],
-                    monaco: ["monaco-editor"],
-                    jsbeeb: ["jsbeeb"],
+                codeSplitting: {
+                    groups: [
+                        {name: "vendor", test: /node_modules[\\/](jquery|underscore)[\\/]/},
+                        {name: "monaco", test: /node_modules[\\/]monaco-editor[\\/]/},
+                        {name: "jsbeeb", test: /node_modules[\\/]jsbeeb[\\/]/},
+                    ],
                 },
             },
         },
@@ -70,4 +95,4 @@ export default defineConfig({
             },
         },
     },
-});
+}));

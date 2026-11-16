@@ -52,7 +52,7 @@ function codeColumn(code) {
 
 function vduRows(query) {
     return VduCodes.filter(c =>
-        matchesCode(query, c.code, c.syntax, c.name, c.example?.join(" ") ?? ""),
+        matchesCode(query, c.code, c.syntax, c.name, c.example?.join(" ") ?? "", c.note ?? ""),
     ).map(c => {
         const row = el("div", "vdu-row");
         const text = el("div", "vdu-text");
@@ -62,6 +62,7 @@ function vduRows(query) {
             example.append(el("code", "", c.example[0]), ` ${c.example[1]}`);
             text.append(example);
         }
+        if (c.note) text.append(el("span", "vdu-example", c.note));
         row.append(codeColumn(c.code), text);
         return row;
     });
@@ -99,17 +100,19 @@ export function describePlot(k) {
     const column = decoded.column.endsWith("move")
         ? `${decoded.column} (nothing is drawn)`
         : decoded.column;
-    return `PLOT ${k} = ${decoded.group}, ${column}`;
+    const needs = decoded.gxr ? " (GXR / Master)" : "";
+    return `PLOT ${k} = ${decoded.group}, ${column}${needs}`;
 }
 
 function plotGroupRow(group, extended, highlight) {
+    const gxr = extended || group.gxr;
     const row = el("div", "plot-group");
     const title = el("div", "plot-title");
     title.append(
         el("span", "vdu-num", `${group.base}-${group.base + GroupSize - 1}`),
         el("span", "vdu-name", group.name),
     );
-    if (extended) title.append(el("span", "vdu-hint", "GXR / Master"));
+    if (gxr) title.append(el("span", "vdu-hint", "GXR / Master"));
     row.append(title);
     const cells = el("div", "plot-cells");
     for (const column of PlotColumns) {
@@ -150,7 +153,7 @@ function plotRows(query) {
         el(
             "div",
             "vdu-hint",
-            "Codes 0-127: +0 to +3 are relative (move, foreground, inverse, background colour), +4 to +7 the same but absolute. 128 and up (GXR / Master): see its manual for the columns.",
+            "+0 to +3 are relative (move, foreground, inverse, background colour), +4 to +7 the same but absolute. Groups marked GXR / Master (32-63, 96-127, and 128 and up) draw nothing on a BBC B without the Graphics Extension ROM; for 128 and up see its manual for the columns.",
         ),
     );
     return [...intro, ...rows];
