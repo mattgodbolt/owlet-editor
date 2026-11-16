@@ -1,23 +1,41 @@
 import {languages} from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController";
-import {FirstStatementToken, Flags, immediateCommands, keywords} from "./tokens";
+import {FirstStatementToken, Flags} from "./tokens";
+import {currentImmediateCommands, currentKeywords, isBasicIV} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
 
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
-const programKeywords = keywords.filter(kw => !immediateCommands.includes(kw.keyword));
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
-const statementWords = new Set(
-    keywords
-        .filter(kw => kw.token >= FirstStatementToken || kw.keyword === "ELSE")
-        .map(kw => kw.keyword),
-);
-const StatementLabels = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
-const ExpressionLabels = labels(programKeywords.filter(kw => kw.token < FirstStatementToken));
-const AllLabels = labels(programKeywords);
-const AssemblerLabels = labels(keywords.filter(kw => kw.flags & Flags.Expr));
+// The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
+const labelSets = new Map();
+function labelSetsFor(table) {
+    if (!labelSets.has(table)) {
+        const programKeywords = table.filter(
+            kw => !currentImmediateCommands().includes(kw.keyword),
+        );
+        const statementWords = new Set(
+            table
+                .filter(
+                    kw =>
+                        kw.token >= FirstStatementToken ||
+                        kw.keyword === "ELSE" ||
+                        (isBasicIV() && kw.keyword === "EXT"),
+                )
+                .map(kw => kw.keyword),
+        );
+        labelSets.set(table, {
+            statement: labels(programKeywords.filter(kw => statementWords.has(kw.keyword))),
+            expression: labels(programKeywords.filter(kw => kw.token < FirstStatementToken)),
+            all: labels(programKeywords),
+            assembler: labels(table.filter(kw => kw.flags & Flags.Expr)),
+        });
+    }
+    return labelSets.get(table);
+}
+
 // Statements in which a statement keyword can follow an expression: IF X PRINT, ON X GOTO, TRACE ON, DEF PROC.
 const MixedStatements = new Set(["IF", "ON", "TRACE", "DEF"]);
 const NameKinds = new Map([
@@ -102,9 +120,10 @@ export function completionContext(text) {
         const afterDef = tokens.at(-2)?.kw?.keyword === "DEF";
         return afterDef ? null : {startColumn, nameKind: nameKind(last)};
     }
-    if (state.inAssembler) return state.atStart ? null : {startColumn, labels: AssemblerLabels};
-    if (MixedStatements.has(state.statement)) return {startColumn, labels: AllLabels};
-    return {startColumn, labels: state.atStart ? StatementLabels : ExpressionLabels};
+    const sets = labelSetsFor(currentKeywords());
+    if (state.inAssembler) return state.atStart ? null : {startColumn, labels: sets.assembler};
+    if (MixedStatements.has(state.statement)) return {startColumn, labels: sets.all};
+    return {startColumn, labels: state.atStart ? sets.statement : sets.expression};
 }
 
 function programNames(model, kind, position, startColumn) {

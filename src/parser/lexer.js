@@ -2,16 +2,27 @@
 // line-number flags, so that each token is what BASIC will see when it runs the line. It also splits the text BASIC
 // leaves alone (names, numbers, strings, punctuation) into the pieces the interpreter reads.
 import {Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
+import {currentKeywords} from "./dialect.js";
 
 // Typed text matches the first entry of the table with each spelling; PAGE, PTR, TIME, LOMEM and HIMEM come again at
 // the end of the table with their statement tokens, which the tokeniser makes by adding 0x40.
-const typed = keywords.filter((kw, i) => keywords.findIndex(k => k.keyword === kw.keyword) === i);
-const byFirstLetter = new Map();
-for (const kw of typed)
-    byFirstLetter.set(kw.keyword[0], [...(byFirstLetter.get(kw.keyword[0]) || []), kw]);
+function tablesOf(list) {
+    const typed = list.filter((kw, i) => list.findIndex(k => k.keyword === kw.keyword) === i);
+    const byFirstLetter = new Map();
+    for (const kw of typed)
+        byFirstLetter.set(kw.keyword[0], [...(byFirstLetter.get(kw.keyword[0]) || []), kw]);
+    const byChar = new Map();
+    for (const kw of list) if (!byChar.has(tokenChar(kw))) byChar.set(tokenChar(kw), kw);
+    return {byFirstLetter, byChar};
+}
+const Tables = new Map();
+function tables() {
+    const list = currentKeywords();
+    if (!Tables.has(list)) Tables.set(list, tablesOf(list));
+    return Tables.get(list);
+}
 const StatementFormOffset = 0x40;
-
-const byChar = new Map(keywords.map(kw => [tokenChar(kw), kw]));
+const byChar = tablesOf(keywords).byChar;
 
 // Monaco compares bracket text lower-cased, so a raw opener such as LEFT$( (U+00C0) also matches the raw token that is
 // its lower-case form (END, U+00E0), which has to be tagged as a string to keep it out of bracket matching.
@@ -43,7 +54,7 @@ const isNameChar = c => c !== undefined && /[\w`]/.test(c);
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
 export function matchKeyword(text, i) {
-    for (const kw of byFirstLetter.get(text[i]) || []) {
+    for (const kw of tables().byFirstLetter.get(text[i]) || []) {
         const word = kw.keyword;
         let length = 1;
         while (length < word.length && text[i + length] === word[length]) length++;
@@ -196,7 +207,7 @@ export class Lexer {
             return token;
         }
         if (this.nameEnd > pos) return this.push("name", this.match(Pattern.name));
-        if (byChar.has(c)) return this.keyword(byChar.get(c), pos + 1, true);
+        if (tables().byChar.has(c)) return this.keyword(tables().byChar.get(c), pos + 1, true);
         const keyword = matchKeyword(text, pos);
         if (keyword) return this.keyword(keyword.kw, keyword.end);
         if ((end = this.match(Pattern.name))) {
