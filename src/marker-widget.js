@@ -1,4 +1,5 @@
 import {editor as monacoEditor} from "monaco-editor/editor/editor.api";
+import ResizeObserver from "resize-observer-polyfill";
 
 const MarkerControllerId = "editor.contrib.markerController";
 const WidgetChromeLines = 3;
