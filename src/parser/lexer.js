@@ -66,6 +66,12 @@ export function matchKeyword(text, i) {
     return null;
 }
 
+// A name and a dot that abbreviate a Conditional keyword were not read as one because a letter or digit followed.
+function isUnreadAbbreviation(text, start, end) {
+    const abbreviated = text[end] === "." && matchKeyword(`${text.slice(start, end)}.`, 0);
+    return Boolean(abbreviated && abbreviated.kw.flags & Flags.Conditional);
+}
+
 // Tokens are {kind, start, end}, with kw (the table entry, which for a statement form of a pseudo-variable is the
 // statement token's) for a keyword. Kinds: white, linenum, keyword, name, fnname, number, hex, string, punct, comment
 // (after REM), data (after DATA), oscli (a * command). A string has `closed`, a token after white space `spaced`.
@@ -194,11 +200,16 @@ export class Lexer {
         if (this.lineNumber && (end = this.match(Pattern.digits))) return this.push("linenum", end);
         if ((end = this.match(EncodedLineNumber))) return this.push("linenum", end, {raw: true});
         if ((end = this.match(Pattern.mantissa))) {
-            // An E is an exponent unless it begins a keyword (1EOR2). The tokeniser skips the whole run of name
+            // An E is an exponent unless it begins a keyword (1EOR2) or a longer abbreviation that is not read as one (1ER.a$;
+            // a bare E. stays the exponent: 1E.5 is 1E then .5). The tokeniser skips the whole run of name
             // characters from the E, so what the exponent leaves of it is a name: 1E0TO2 is 1E0, then TO2.
             const token = this.push("number", end);
-            if (text[end] === "E" && !matchKeyword(text, end)) {
-                const run = this.match(Pattern.nameRun);
+            const run = this.match(Pattern.nameRun);
+            if (
+                text[end] === "E" &&
+                !matchKeyword(text, end) &&
+                !(run - end > 1 && isUnreadAbbreviation(text, end, run))
+            ) {
                 token.end = this.pos = this.match(Pattern.exponent);
                 token.text = text.slice(pos, token.end);
                 this.nameEnd = run;
@@ -212,12 +223,7 @@ export class Lexer {
         if (keyword) return this.keyword(keyword.kw, keyword.end);
         if ((end = this.match(Pattern.name))) {
             this.middle();
-            // A name and a dot that abbreviate a Conditional keyword were not read as one because a letter or digit
-            // followed.
-            const abbreviated = text[end] === "." && matchKeyword(`${text.slice(pos, end)}.`, 0);
-            return this.push("name", end, {
-                abbreviation: Boolean(abbreviated && abbreviated.kw.flags & Flags.Conditional),
-            });
+            return this.push("name", end, {abbreviation: isUnreadAbbreviation(text, pos, end)});
         }
         this.middle();
         return this.push("punct", this.match(Pattern.relation) || pos + 1);
