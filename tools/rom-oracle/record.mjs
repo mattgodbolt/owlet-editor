@@ -1,7 +1,10 @@
 // Records what BBC BASIC II does with each statement given, as rows appended to a table the tests read, so that no
 // expected value is typed by hand.
 //
-//   node tools/rom-oracle/record.mjs [--tokens] [--hex] [--source '#123'] [--file statements.txt] [statement ...]
+//   node tools/rom-oracle/record.mjs [--tokens] [--hex] [--master] [--source '#123'] [--file statements.txt] [statement ...]
+//
+// --master runs them on the Master's BASIC IV and keeps the rows in test/rom-verdicts-master.json and
+// test/rom-tokens-master.json, the tables for the parser's BASIC IV rules.
 //
 // By default each row is [text, verdict] in test/rom-verdicts.json, where the verdict is the name of the syntax error
 // the ROM stops with (as in rom.mjs) or "ok". A statement in [ ] is run as assembler after DIM P% 100:Q%=P%: and its
@@ -32,6 +35,7 @@ const fromHex = text => {
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
 const tokens = args.includes("--tokens");
+const master = args.includes("--master");
 const asHex = args.includes("--hex");
 const fileIndex = args.indexOf("--file");
 const sourceIndex = args.indexOf("--source");
@@ -46,7 +50,11 @@ if (fileIndex >= 0)
             .filter(Boolean),
     );
 if (asHex) texts.forEach((text, i) => (texts[i] = fromHex(text)));
-const tableFile = path.join(Root, "test", tokens ? "rom-tokens.json" : "rom-verdicts.json");
+const tableFile = path.join(
+    Root,
+    "test",
+    `${tokens ? "rom-tokens" : "rom-verdicts"}${master ? "-master" : ""}.json`,
+);
 
 async function record(rom, text) {
     if (tokens) return [text, hex(await rom.tokenise(text))];
@@ -55,13 +63,14 @@ async function record(rom, text) {
     if (verdict.timeout) return null;
     if (verdict.error === null)
         return verdict.bytes === undefined ? [text, "ok"] : [text, "ok", hex(verdict.bytes)];
-    return SyntaxErrors.has(verdict.error) ? [text, SyntaxErrors.get(verdict.error)] : null;
+    if (!SyntaxErrors.has(verdict.error)) return null;
+    return [text, master ? verdict.message : SyntaxErrors.get(verdict.error)];
 }
 
 async function main() {
     const table = fs.existsSync(tableFile) ? JSON.parse(fs.readFileSync(tableFile, "utf8")) : [];
     const known = new Map(table.map(row => [row[0], row]));
-    const rom = await createRom();
+    const rom = await createRom(master ? "Master" : undefined);
     for (const text of texts) {
         if (known.has(text)) {
             const row = known.get(text);

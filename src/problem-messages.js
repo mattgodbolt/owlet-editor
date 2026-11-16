@@ -9,6 +9,7 @@ const Needed = {
     'Missing "': "a closing quote",
     "No TO": "TO",
     "Bad HEX": "a hex digit",
+    "Bad Hex": "a hex digit",
     "ON syntax": "GOTO, GOSUB or PROC",
     Index: "an array index",
 };

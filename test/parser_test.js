@@ -1,6 +1,6 @@
 import {highlightLine, programProblems} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
-import {falseInvalid, verdicts} from "./rom-tables";
+import {invalidSpans, verdicts, wrongMessages, wrongRows} from "./rom-tables";
 import {describe, it} from "vitest";
 import assert from "assert";
 import RomTokens from "./rom-tokens.json";
@@ -26,7 +26,7 @@ describe("Lexer", () => {
 
 // Lines BASIC II rejects that the recogniser does not mark: false-valids are measured, not gated (see the README).
 // A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
-const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
+const KnownGaps = ["X=FNf (1)", "PROCp (1)", 'LIST IF "a"'];
 
 // Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
 // instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
@@ -174,58 +174,38 @@ const StricterThanRom = [
     "[OPT0:!ND 5:]",
     "[OPT0:OP4 0:]",
     "[OPT0:O0T 0:]",
+    // BASIC II reads no index after BIT, CPX and CPY, and nothing after the register of (&70),Y.
+    "[OPT0:BIT &70,x:]",
+    "[OPT0:BIT &1234,Y:]",
+    "[OPT0:BIT &1234,y:]",
+    "[OPT0:BIT (&70),y:]",
+    "[OPT0:CPX &70,x:]",
+    "[OPT0:CPX &1234,Y:]",
+    "[OPT0:CPX &1234,y:]",
+    "[OPT0:CPX (&70),y:]",
+    "[OPT0:CPY &70,X:]",
+    "[OPT0:CPY &70,x:]",
+    "[OPT0:CPY &1234,Y:]",
+    "[OPT0:CPY &1234,y:]",
+    "[OPT0:CPY (&70),Y:]",
+    "[OPT0:CPY (&70),y:]",
+    "[OPT0:LDA (&70),Ya:]",
 ];
 
-const invalid = text => {
-    const {tokens} = highlightLine(text);
-    return tokens.flatMap((token, i) =>
-        token.type.startsWith("invalid")
-            ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
-            : [],
-    );
-};
+const invalid = invalidSpans;
 
 // Lines where BASIC's error is not the one the recogniser gives for that kind of mistake: H.TO8 is not read as HIMEM.
 const OtherWording = ["F.A=H.TO8^5:?A=42:N."];
 
 describe("Recogniser", () => {
     it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
-        const wrong = RomVerdicts.flatMap(([text, verdict]) => {
-            const marked = invalid(text);
-            const problems = programProblems(text);
-            if (verdict === "ok") {
-                const stricter = StricterThanRom.includes(text);
-                // Text BASIC skips can be unfinished, as it can be wrong (see the README).
-                const unfinished = problems.filter(problem => problem.unfinished);
-                const ends = unfinished.map(({start, end}) => [start, end]);
-                // What is red on purpose says so, with a message.
-                const onPurpose = problems.filter(problem => problem.stricter);
-                const unexplained = marked.filter(
-                    ([start, end]) => !onPurpose.some(p => p.start <= start && end <= p.end),
-                );
-                return falseInvalid(text, marked).length > 0 === stricter &&
-                    falseInvalid(text, unexplained).length === 0 &&
-                    falseInvalid(text, ends).length === 0
-                    ? []
-                    : [[text, verdict]];
-            }
-            // A line that only ends too soon is not marked, which is what lets it be typed.
-            const unfinished = problems.length > 0 && problems.every(problem => problem.unfinished);
-            return marked.length || unfinished || KnownGaps.includes(text) ? [] : [[text, verdict]];
-        });
-        assert.deepStrictEqual(wrong, []);
+        assert.deepStrictEqual(
+            wrongRows(RomVerdicts, {stricter: StricterThanRom, gaps: KnownGaps}),
+            [],
+        );
     });
     it("should give the error BASIC II gives, or none where it does not know it", () => {
-        const wrong = RomVerdicts.flatMap(([text, verdict]) => {
-            const {message} = programProblems(text).find(problem => !problem.stricter) || {};
-            return verdict === "ok" ||
-                !message ||
-                message === verdict ||
-                OtherWording.includes(text)
-                ? []
-                : [[text, verdict, message]];
-        });
-        assert.deepStrictEqual(wrong, []);
+        assert.deepStrictEqual(wrongMessages(RomVerdicts, OtherWording), []);
     });
     it("should not let errors inside nested reads use up the nesting limit", () => {
         const text = `[${"LDA #(:".repeat(70)}LDA #1:]`;

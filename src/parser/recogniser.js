@@ -1,8 +1,9 @@
 // Reads a line of BBC BASIC II as the interpreter does, by recursive descent over the lexer's tokens, and marks the
 // token at which BASIC would stop with an error: one per statement, then on to the next colon, as BASIC reports only
 // the first. Where there is no rule for a statement, anything is accepted.
-import {Assembler, Mnemonics} from "./assembler.js";
-import {FirstStatementToken, keywords} from "../tokens.js";
+import {Assembler, mnemonicsFor} from "./assembler.js";
+import {FirstStatementToken} from "../tokens.js";
+import {currentKeywords, isBasicIV} from "./dialect.js";
 import {Lexer} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -32,7 +33,9 @@ const ExpressionCount = {
             .split(" ")
             .map(name => [name, 0]),
     ),
-    ...Object.fromEntries("CHAIN COLOUR MODE OSCLI UNTIL WIDTH".split(" ").map(name => [name, 1])),
+    ...Object.fromEntries(
+        "CHAIN COLOUR COLOR MODE OSCLI UNTIL WIDTH".split(" ").map(name => [name, 1]),
+    ),
     GCOL: 2,
     MOVE: 2,
     DRAW: 2,
@@ -60,11 +63,23 @@ const Arithmetic = names("+ - * / ^");
 // a string with no end.
 const ExpectedPunct = {",": "Missing ,", "=": "Mistake", "#": "Missing #"};
 const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
+// BASIC IV words one of its errors differently.
+const BadHexIV = "Bad Hex";
 
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
-const KeywordCompletions = [...new Set([...keywords.map(kw => kw.keyword), "TOP"])];
-const AssemblerCompletions = [...new Set([...KeywordCompletions, ...Mnemonics])];
+const CompletionWords = new Map();
+function completions(assembling) {
+    const key = `${isBasicIV()} ${assembling}`;
+    if (!CompletionWords.has(key)) {
+        const keywords = [...new Set([...currentKeywords().map(kw => kw.keyword), "TOP"])];
+        CompletionWords.set(
+            key,
+            assembling ? [...new Set([...keywords, ...mnemonicsFor()])] : keywords,
+        );
+    }
+    return CompletionWords.get(key);
+}
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
@@ -82,6 +97,7 @@ class Failure {
 export class Recogniser {
     constructor(text, inAssembler, probing = false) {
         this.lexer = new Lexer(text);
+        this.basicIV = isBasicIV();
         this.assembler = new Assembler(this);
         this.inAssembler = inAssembler;
         this.startsInAssembler = inAssembler;
@@ -245,7 +261,7 @@ export class Recogniser {
         if (before?.kind === "keyword" && before.end === token.start) starts.push(before.start);
         return starts.some(start => {
             const typed = text.slice(start).toUpperCase();
-            return (assembling ? AssemblerCompletions : KeywordCompletions).some(word => {
+            return completions(assembling).some(word => {
                 if (word.length <= typed.length || !word.startsWith(typed)) return false;
                 return this.valid(text.slice(0, start) + word, statementStart, text.length);
             });
@@ -327,22 +343,31 @@ export class Recogniser {
         }
         if (token.kind !== "keyword") return this.assignment();
         const {keyword} = token.kw;
-        if (token.kw.token < FirstStatementToken) this.fail("Syntax error");
+        // BASIC IV also starts a statement with EXT#, which sets the length of a file.
+        const extStatement = this.basicIV && keyword === "EXT";
+        if (token.kw.token < FirstStatementToken && !extStatement) this.fail("Syntax error");
         this.next();
         // The lexer has made these the statement forms of the pseudo-variables.
-        if (PseudoVariables.has(keyword)) return this.pseudoVariable(keyword);
+        if (PseudoVariables.has(keyword) || extStatement) return this.pseudoVariable(keyword);
         if (keyword in ExpressionCount) return this.expressions(ExpressionCount[keyword]);
         if (this[keyword]) return this[keyword]();
         while (!this.atEnd()) this.next();
     }
 
     pseudoVariable(keyword) {
-        if (keyword === "PTR") {
+        if (keyword === "PTR" || keyword === "EXT") {
             this.expectPunct("#");
             this.operand();
         }
+        this.timeString(keyword);
         this.expectPunct("=");
         this.expression();
+    }
+
+    // BASIC IV reads TIME$, the clock as a string, as one word, with the $ straight after TIME.
+    timeString(keyword) {
+        if (this.basicIV && keyword === "TIME" && this.isPunct("$") && this.adjacent())
+            this.next().type = "keyword";
     }
 
     assignment() {
@@ -464,14 +489,10 @@ export class Recogniser {
         if (token.kind === "hex" && token.text.length > 1) return void this.next();
         if (token.kind === "name") return (this.name(), true);
         if (token.kind !== "keyword" || token.kw.token >= FirstStatementToken)
-            this.fail(
-                OperandErrors[token.kind] || "No such variable",
-                token,
-                this.unfinishedOperand(token),
-                true,
-            );
+            this.fail(this.operandError(token), token, this.unfinishedOperand(token), true);
         this.next();
         const {keyword} = token.kw;
+        this.timeString(keyword);
         if (NoArgument.has(keyword)) return;
         if (OneArgument.has(keyword)) return this.operand();
         if (ChannelFunction.has(keyword)) {
@@ -490,6 +511,11 @@ export class Recogniser {
         if (keyword === "FN") return this.call();
         if (keyword === "TO" && this.top()) return;
         this.fail("No such variable", token);
+    }
+
+    operandError(token) {
+        if (token.kind === "hex" && this.basicIV) return BadHexIV;
+        return OperandErrors[token.kind] || "No such variable";
     }
 
     // The end of the line, or text that can still be finished: a string with no end yet, or a & with no digits.
@@ -565,11 +591,13 @@ export class Recogniser {
         }
     }
 
-    // Items need nothing between them (VDU 1 2), and one comma or semicolon may follow each (VDU 1,,2 is an error).
+    // Items need nothing between them (VDU 1 2), and one comma or semicolon may follow each (VDU 1,,2 is an error). BASIC IV
+    // also ends an item with a |, which sends nine zeros.
     VDU() {
         while (!this.atEnd()) {
             this.expression();
-            this.separator(",", ";");
+            if (this.basicIV) this.separator(",", ";", "|");
+            else this.separator(",", ";");
         }
     }
 
@@ -595,9 +623,11 @@ export class Recogniser {
             return this.statement();
         }
         this.expression();
-        if (!this.isKeyword("GOTO", "GOSUB")) this.fail("ON syntax");
-        this.next();
-        this.GOTO();
+        // BASIC IV can also call a procedure from the list.
+        const branch = this.basicIV ? ["GOTO", "GOSUB", "PROC"] : ["GOTO", "GOSUB"];
+        if (!this.isKeyword(...branch)) this.fail("ON syntax");
+        if (this.next().kw.keyword === "PROC") this.call();
+        else this.GOTO();
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
         while (!this.atEnd()) this.next();
         this.elseIsBranch = true;

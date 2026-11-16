@@ -2,8 +2,8 @@
 // whole, abbreviated and cut short, numbers, names, punctuation, strings), and prints the lines where the bytes
 // differ. Not run by npm test.
 //
-//   node tools/rom-oracle/lexfuzz.mjs [--seed N] [--count N] [--examples N]
-import {keywords} from "../../src/tokens.js";
+//   node tools/rom-oracle/lexfuzz.mjs [--seed N] [--count N] [--examples N] [--master]
+import {currentKeywords, setBasicIV} from "../../src/parser/dialect.js";
 import {lexLine, romBytes} from "../../src/parser/lexer.js";
 import {mulberry32} from "./generate.mjs";
 import {createRom, MaxLineLength} from "./rom.mjs";
@@ -13,7 +13,8 @@ function option(name, fallback) {
     return index < 0 ? fallback : Number(process.argv[index + 1]);
 }
 
-const names = [...new Set(keywords.map(kw => kw.keyword))];
+setBasicIV(process.argv.includes("--master"));
+const names = [...new Set(currentKeywords().map(kw => kw.keyword))];
 
 export function lexicalLines(seed, count) {
     const random = mulberry32(seed);
@@ -41,15 +42,18 @@ export function lexicalLines(seed, count) {
     return lines;
 }
 
+const master = process.argv.includes("--master");
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 
 async function main() {
     const lines = lexicalLines(option("seed", 1), option("count", 5000));
-    const rom = await createRom();
+    const rom = await createRom(master ? "Master" : undefined);
     const different = [];
     for (const line of lines) {
-        const theirs = hex(await rom.tokenise(line));
-        const ours = hex(romBytes(lexLine(line)));
+        // BASIC IV drops the spaces at the end of a line as it stores it.
+        const stored = bytes => (master ? hex(bytes).replace(/( 20)+$/, "") : hex(bytes));
+        const theirs = stored(await rom.tokenise(line));
+        const ours = stored(romBytes(lexLine(line)));
         if (theirs !== ours) different.push({line, theirs, ours});
     }
     rom.destroy();

@@ -155,7 +155,7 @@ export const keywords = [
 export const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
 
 // BASIC II starts a statement only with a token from here up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV would add ERROR.
+// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV also starts one with EXT#.
 export const FirstStatementToken = 0xc6;
 export const LineNumberToken = 0x8d;
 // The character Owlet uses for a raw token byte.

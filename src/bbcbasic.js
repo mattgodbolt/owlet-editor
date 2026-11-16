@@ -1,5 +1,5 @@
 import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
-import {Flags, keywords, immediateCommands, tokenChar} from "./tokens";
+import {Flags, keywords, tokenChar} from "./tokens";
 import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
 import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
 import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
@@ -7,6 +7,7 @@ import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
 import {ForeignOperators} from "./parser/recogniser";
+import {currentImmediateCommands, isBasicIV, setBasicIV} from "./parser/dialect";
 import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
@@ -32,6 +33,13 @@ function tokenMetadata(scopes, bracket) {
 
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
 let registrations = [];
+
+/** Follows the Master's BASIC IV rather than BASIC II, and has the editor read its text again. */
+export function useBasicIV(enabled) {
+    if (Boolean(enabled) === isBasicIV()) return;
+    setBasicIV(enabled);
+    if (registrations.length) registerBbcBasicLanguage();
+}
 
 export function registerBbcBasicLanguage() {
     if (registrations.length === 0) languages.register({id: LanguageId});
@@ -227,7 +235,7 @@ function lineWarnings(line, lineTokens) {
     for (const token of lineTokens.filter(isName)) {
         const keyword = upperCaseKeyword(line, token);
         // Don't warn about lower case versions of immediate commands, e.g. `new`.
-        if (!keyword || immediateCommands.includes(keyword.text)) continue;
+        if (!keyword || currentImmediateCommands().includes(keyword.text)) continue;
         warn(token.start, keyword.end, {
             message: `BASIC keywords should be upper case, did you mean ${keyword.text}?`,
             code: LowerCaseKeywordCode,

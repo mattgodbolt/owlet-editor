@@ -12,38 +12,78 @@
 //   that is marked.
 
 import {keywords, tokenChar} from "../tokens.js";
+import {isBasicIV} from "./dialect.js";
 import {matchKeyword} from "./lexer.js";
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
 export const SpaceAfterMnemonicCode = "space-after-mnemonic";
 
 const words = text => new Set(text.split(" "));
-const Implied = words(
-    "BRK CLC CLD CLI CLV DEX DEY INX INY NOP PHA PHP PLA PLP RTI RTS SEC SED SEI TAX TAY TSX TXA TXS TYA",
-);
-const Shifts = words("ASL LSR ROL ROR");
-// Mnemonics whose operand can be immediate, indirect or indexed.
-const Addressed = words("ADC AND BIT CMP CPX CPY DEC EOR INC LDA LDX LDY ORA SBC STA STX STY");
-// And those whose operand is only an address, after which BASIC reads nothing.
-const Address = words("BCC BCS BEQ BMI BNE BPL BVC BVS JMP JSR");
-// Only these read a ( as indirect addressing; for the rest it starts an expression.
-const Indirect = words("ADC AND CMP EOR LDA ORA SBC STA");
-const NoImmediate = words("ASL BIT DEC INC LSR ROL ROR STA STX STY");
-// The index registers each takes, if not X and Y; BASIC reads none after BIT, CPX and CPY.
-const IndexRegisters = {
-    ...Object.fromEntries([...Shifts, "DEC", "INC", "LDY", "STY"].map(m => [m, ["X"]])),
-    ...Object.fromEntries(["LDX", "STX"].map(m => [m, ["Y"]])),
-    ...Object.fromEntries(["BIT", "CPX", "CPY"].map(m => [m, []])),
+const BasicII = {
+    implied: words(
+        "BRK CLC CLD CLI CLV DEX DEY INX INY NOP PHA PHP PLA PLP RTI RTS SEC SED SEI TAX TAY TSX TXA TXS TYA",
+    ),
+    // The instructions that can take A as their operand.
+    accumulator: words("ASL LSR ROL ROR"),
+    // Mnemonics whose operand can be immediate, indirect or indexed.
+    addressed: words("ADC AND BIT CMP CPX CPY DEC EOR INC LDA LDX LDY ORA SBC STA STX STY"),
+    // And those whose operand is only an address, after which BASIC reads nothing.
+    address: words("BCC BCS BEQ BMI BNE BPL BVC BVS JMP JSR"),
+    // Only these read a ( as indirect addressing; for the rest it starts an expression.
+    indirect: words("ADC AND CMP EOR LDA ORA SBC STA"),
+    noImmediate: words("ASL BIT DEC INC LSR ROL ROR STA STX STY"),
+    // The index registers each takes, if not X and Y; BASIC reads none after BIT, CPX and CPY.
+    indexRegisters: {
+        ...Object.fromEntries(
+            ["ASL", "LSR", "ROL", "ROR", "DEC", "INC", "LDY", "STY"].map(m => [m, ["X"]]),
+        ),
+        ...Object.fromEntries(["LDX", "STX"].map(m => [m, ["Y"]])),
+        ...Object.fromEntries(["BIT", "CPX", "CPY"].map(m => [m, []])),
+    },
+    // BASIC II takes the index register in lower case only after these.
+    lowerCaseIndex: {LDX: "y", STX: "y", LDY: "x", STY: "x"},
+    equSize: /[BDSW]/,
+    letterA: /^A/,
+    basicIV: false,
+    indexRegister: (mnemonic, registers, register) =>
+        registers.includes(register) || register === BasicII.lowerCaseIndex[mnemonic],
 };
-// BASIC takes the index register in lower case only after these.
-const LowerCaseIndex = {LDX: "y", STX: "y", LDY: "x", STY: "x"};
-export const Mnemonics = [
-    ...Implied,
-    ...Shifts,
-    ...Addressed,
-    ...Address,
+// BASIC IV adds the 65C12's instructions to BASIC II's, reads an index register or the accumulator in either case, and
+// reads a zero page indirect address (LDA (&70)) and JMP (&1234,X).
+const BasicIV = {
+    ...BasicII,
+    implied: new Set([...BasicII.implied, ..."DEA INA PHX PHY PLX PLY".split(" ")]),
+    accumulator: new Set([...BasicII.accumulator, "DEC", "INC"]),
+    addressed: new Set([...BasicII.addressed, "STZ", "TRB", "TSB"]),
+    address: new Set([...BasicII.address, "BRA"]),
+    noImmediate: new Set([
+        ...[...BasicII.noImmediate].filter(m => m !== "BIT"),
+        ...["STZ", "TRB", "TSB"],
+    ]),
+    indexRegisters: {
+        ...BasicII.indexRegisters,
+        BIT: ["X"],
+        STZ: ["X"],
+        TRB: [],
+        TSB: [],
+    },
+    equSize: /[BDSWbdsw]/,
+    letterA: /^[Aa]/,
+    indexRegister: (mnemonic, registers, register) => registers.includes(register.toUpperCase()),
+    basicIV: true,
+};
+const mnemonicsOf = rules => [
+    ...rules.implied,
+    ...rules.accumulator,
+    ...rules.addressed,
+    ...rules.address,
     ..."OPT EQUB EQUD EQUS EQUW".split(" "),
 ];
+const MnemonicLists = new Map([
+    [BasicII, [...new Set(mnemonicsOf(BasicII))]],
+    [BasicIV, [...new Set(mnemonicsOf(BasicIV))]],
+]);
+export const mnemonicsFor = () => MnemonicLists.get(isBasicIV() ? BasicIV : BasicII);
 const ThirdCharacter = 2;
 const LogicalTokenChars = new Set(
     keywords.filter(kw => ["AND", "EOR", "OR"].includes(kw.keyword)).map(tokenChar),
@@ -54,6 +94,7 @@ const Comment = /[;\\][^:]*/y;
 export class Assembler {
     constructor(recogniser) {
         this.recogniser = recogniser;
+        this.rules = isBasicIV() ? BasicIV : BasicII;
     }
 
     // Reads assembler statements up to the "]" that ends the block, or the end of the line; returns whether the block
@@ -122,7 +163,7 @@ export class Assembler {
         const {text} = r.lexer;
         const keyword =
             operand.kind === "name" && !operand.spaced && matchKeyword(text, operand.start);
-        if (!keyword || Implied.has(mnemonic) || r.probing) return null;
+        if (!keyword || this.rules.implied.has(mnemonic) || r.probing) return null;
         const spaced = `${text.slice(0, operand.start)} ${text.slice(operand.start)}`;
         if (!r.valid(spaced, first, operand.start)) return null;
         const written = text.slice(first.start, operand.start);
@@ -159,10 +200,10 @@ export class Assembler {
         this.dropBeforeToken();
         const token = r.peek();
         if (r.isKeyword("AND", "EOR")) return r.next().kw.keyword;
-        // ORA is the keyword OR then an A, which BASIC takes only in upper case.
+        // ORA is the keyword OR then an A, which BASIC II takes only in upper case.
         if (r.isKeyword("OR")) {
             const after = r.peek(1);
-            if (after.kind !== "name" || after.spaced || after.text[0] !== "A") {
+            if (after.kind !== "name" || after.spaced || !this.rules.letterA.test(after.text[0])) {
                 if (after.kind === "name" && !after.spaced) after.invalid = true;
                 r.fail("Syntax error", token, after.kind === "end");
             }
@@ -172,14 +213,15 @@ export class Assembler {
             return "ORA";
         }
         // BASIC compares the low five bits of each character, so it takes a mnemonic in either case, and ST8 as STX;
-        // only the size of an EQU must be an upper-case letter.
+        // BASIC II needs the size of an EQU to be an upper-case letter.
         const {text} = r.lexer;
         const chars = [...text.slice(token.start, token.start + 3)];
         const word = chars.map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40)).join("");
         const size = word === "EQU" ? text[token.start + 3] : "";
-        if (word === "EQU" && !/[BDSW]/.test(size)) r.fail("Syntax error");
+        if (word === "EQU" && !this.rules.equSize.test(size)) r.fail("Syntax error");
         const directive = word === "OPT" || word === "EQU";
-        if (!directive && ![Implied, Shifts, Addressed, Address].some(set => set.has(word)))
+        const {implied, accumulator, addressed, address} = this.rules;
+        if (!directive && ![implied, accumulator, addressed, address].some(set => set.has(word)))
             r.fail("Syntax error");
         const aliased = chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [i]));
         const marks =
@@ -221,10 +263,14 @@ export class Assembler {
     prefixMark(start, word, char) {
         const prefix = word.slice(0, ThirdCharacter);
         const meant = [
-            ...new Set(Mnemonics.filter(m => m.startsWith(prefix)).map(m => m.slice(0, 3))),
+            ...new Set(
+                mnemonicsFor()
+                    .filter(m => m.startsWith(prefix))
+                    .map(m => m.slice(0, 3)),
+            ),
         ];
         const kind = meant.every(m => "AXY".includes(m[ThirdCharacter])) ? "register" : "last";
-        const follows = Implied.has(word)
+        const follows = this.rules.implied.has(word)
             ? ""
             : `, so what follows is the ${word === "OPT" || word === "EQU" ? "operand" : "address"}`;
         const list = `${meant.slice(0, -1).join(", ")}${meant.length > 1 ? " or " : ""}${meant.at(-1)}`;
@@ -269,29 +315,54 @@ export class Assembler {
 
     operand(mnemonic) {
         const r = this.recogniser;
-        if (Implied.has(mnemonic)) return;
-        if (Shifts.has(mnemonic) && r.is("name", "A")) return void (r.next().type = "keyword");
-        if (!Addressed.has(mnemonic) && !Shifts.has(mnemonic)) return r.expression();
+        const rules = this.rules;
+        if (rules.implied.has(mnemonic)) return;
+        const register = r.peek().text;
+        if (
+            rules.accumulator.has(mnemonic) &&
+            r.is("name") &&
+            register.length === 1 &&
+            rules.letterA.test(register)
+        )
+            return void (r.next().type = "keyword");
+        if (rules.basicIV && mnemonic === "JMP" && r.isPunct("(")) return this.indirectJump();
+        if (!rules.addressed.has(mnemonic) && !rules.accumulator.has(mnemonic))
+            return r.expression();
         if (r.isPunct("#")) {
-            if (NoImmediate.has(mnemonic)) r.fail("No such variable");
+            if (rules.noImmediate.has(mnemonic)) r.fail("No such variable");
             r.next().type = "symbol";
             return r.expression();
         }
-        if (Indirect.has(mnemonic) && r.isPunct("(")) {
+        if (rules.indirect.has(mnemonic) && r.isPunct("(")) {
             const opener = r.next();
             r.expression();
-            if (r.isPunct(",")) {
-                this.index(mnemonic, "X");
-                if (!r.isPunct(")")) r.fail("Index");
-                return void r.next();
-            }
+            if (r.isPunct(",")) return this.indexedIndirect(mnemonic);
             r.close(opener, "Index");
+            // BASIC IV takes (&70) as an address in the zero page, and ignores what follows it.
+            if (rules.basicIV && !r.isPunct(",")) return;
             if (!r.isPunct(",")) r.fail("Index", r.last, r.is("end"));
             return this.index(mnemonic, "Y");
         }
         r.expression();
-        const registers = IndexRegisters[mnemonic] || ["X", "Y"];
+        const registers = rules.indexRegisters[mnemonic] || ["X", "Y"];
         if (registers.length && r.isPunct(",")) this.index(mnemonic, ...registers);
+    }
+
+    // BASIC IV reads JMP (&1234,X) as well as JMP (&1234); after the ) it ignores the rest, as it does for any address.
+    indirectJump() {
+        const r = this.recogniser;
+        const opener = r.next();
+        r.expression();
+        if (r.isPunct(",")) return this.indexedIndirect("JMP");
+        r.close(opener, "Index");
+    }
+
+    // After the comma in (address,X).
+    indexedIndirect(mnemonic) {
+        const r = this.recogniser;
+        this.index(mnemonic, "X");
+        if (!r.isPunct(")")) r.fail("Index");
+        r.next();
     }
 
     // A comma and an index register.
@@ -300,10 +371,7 @@ export class Assembler {
         r.next().type = "symbol";
         const token = r.peek();
         const register = token.text?.[0];
-        if (
-            !r.is("name") ||
-            !(registers.includes(register) || register === LowerCaseIndex[mnemonic])
-        )
+        if (!r.is("name") || !this.rules.indexRegister(mnemonic, registers, register))
             r.fail("Index");
         r.lexer.split(token, 1);
         r.next().type = "keyword";

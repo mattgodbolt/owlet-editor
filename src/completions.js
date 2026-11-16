@@ -1,37 +1,55 @@
 import {languages} from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController";
-import {FirstStatementToken, Flags, immediateCommands, keywords} from "./tokens";
+import {FirstStatementToken, Flags} from "./tokens";
+import {currentImmediateCommands, currentKeywords, isBasicIV} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
 
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
-const programKeywords = keywords.filter(kw => !immediateCommands.includes(kw.keyword));
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
-const statementWords = new Set(
-    keywords
-        .filter(kw => kw.token >= FirstStatementToken || kw.keyword === "ELSE")
-        .map(kw => kw.keyword),
-);
-const StatementLabels = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
-const ExpressionLabels = labels(
-    programKeywords.filter(kw => kw.flags & Flags.Expr || kw.keyword === "ELSE"),
-);
-const AssemblerLabels = labels(keywords.filter(kw => kw.flags & Flags.Expr));
-// The words besides values that BBC BASIC II reads in each statement (tools/rom-oracle), by the statement's first
-// keyword; "ON ERROR" is what follows ON ERROR, which is read as a statement.
 const SpcAndTab = ["SPC", "TAB("];
-const StatementWords = new Map([
-    ["PRINT", SpcAndTab],
-    ["INPUT", [...SpcAndTab, "LINE"]],
-    ["FOR", ["TO", "STEP"]],
-    ["IF", ["THEN", ...StatementLabels]],
-    ["ON", ["ERROR", "GOTO", "GOSUB"]],
-    ["ON ERROR", ["OFF"]],
-    ["TRACE", ["ON", "OFF"]],
-    ["DEF", StatementLabels],
-]);
+// The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
+const labelSets = new Map();
+function labelSetsFor(table) {
+    if (!labelSets.has(table)) {
+        const programKeywords = table.filter(
+            kw => !currentImmediateCommands().includes(kw.keyword),
+        );
+        const statementWords = new Set(
+            table
+                .filter(
+                    kw =>
+                        kw.token >= FirstStatementToken ||
+                        kw.keyword === "ELSE" ||
+                        (isBasicIV() && kw.keyword === "EXT"),
+                )
+                .map(kw => kw.keyword),
+        );
+        const statement = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
+        labelSets.set(table, {
+            statement,
+            expression: labels(
+                programKeywords.filter(kw => kw.flags & Flags.Expr || kw.keyword === "ELSE"),
+            ),
+            assembler: labels(table.filter(kw => kw.flags & Flags.Expr)),
+            // The words besides values that BBC BASIC reads in each statement (tools/rom-oracle), by the statement's
+            // first keyword; "ON ERROR" is what follows ON ERROR, which is read as a statement.
+            inStatement: new Map([
+                ["PRINT", SpcAndTab],
+                ["INPUT", [...SpcAndTab, "LINE"]],
+                ["FOR", ["TO", "STEP"]],
+                ["IF", ["THEN", ...statement]],
+                ["ON", ["ERROR", "GOTO", "GOSUB", ...(isBasicIV() ? ["PROC"] : [])]],
+                ["ON ERROR", ["OFF"]],
+                ["TRACE", ["ON", "OFF"]],
+                ["DEF", statement],
+            ]),
+        });
+    }
+    return labelSets.get(table);
+}
 // Statements that a statement can follow without a colon: IF X FOR, DEF PROCa FOR. The PROC after DEF is its name.
 const HoldsStatement = new Set(["IF", "DEF"]);
 const startsNestedStatement = token =>
@@ -124,11 +142,12 @@ export function completionContext(text) {
         const afterDef = tokens.at(-2)?.kw?.keyword === "DEF";
         return afterDef ? null : {startColumn, nameKind: nameKind(last)};
     }
-    if (state.inAssembler) return state.atStart ? null : {startColumn, labels: AssemblerLabels};
-    const base = state.atStart ? StatementLabels : ExpressionLabels;
+    const sets = labelSetsFor(currentKeywords());
+    if (state.inAssembler) return state.atStart ? null : {startColumn, labels: sets.assembler};
+    const base = state.atStart ? sets.statement : sets.expression;
     return {
         startColumn,
-        labels: [...new Set([...base, ...(StatementWords.get(state.statement) ?? [])])],
+        labels: [...new Set([...base, ...(sets.inStatement.get(state.statement) ?? [])])],
     };
 }
 

@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it} from "vitest";
-import {savedProgram, saveProgram} from "../src/saved-program";
+import {saveMachine, savedMachine, savedProgram, saveProgram} from "../src/saved-program";
 
 describe("Saved program", () => {
     afterEach(() => {
@@ -34,5 +34,14 @@ describe("Saved program", () => {
     it("starts a new tab from the latest edit anywhere", () => {
         localStorage.setItem("program", "PRINT TWO");
         expect(savedProgram()).toBe("PRINT TWO");
+    });
+    it("keeps the machine per tab like the program, and apart from it", () => {
+        saveProgram("PRINT ONE");
+        saveMachine("Master");
+        localStorage.setItem("machine", "B");
+        expect(savedMachine()).toBe("Master");
+        expect(savedProgram()).toBe("PRINT ONE");
+        sessionStorage.clear();
+        expect(savedMachine()).toBe("B");
     });
 });

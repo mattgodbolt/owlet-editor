@@ -1,4 +1,5 @@
-// Runs statements in immediate mode on BBC BASIC II in jsbeeb's headless BBC B, and reports the error each raised.
+// Runs statements in immediate mode on BBC BASIC II in jsbeeb's headless BBC B (or BASIC IV in its Master), and reports
+// the error each raised.
 // Each statement starts from the same snapshot, taken at the prompt after the prelude, so none can affect another.
 // Lines are handed to BASIC by a WORDV handler in RAM rather than typed, which is what makes this fast.
 import {MachineSession} from "jsbeeb/machine-session";
@@ -47,10 +48,12 @@ const TimeoutSecs = 0.3;
 const MaxInputs = 3;
 
 const tokenNames = new Map(keywords.map(kw => [kw.token, kw.keyword]));
+// BASIC IV stores "Missing " in its error messages as a token.
+const MissingToken = 0x8d;
 const word = bytes => bytes[0] + 256 * bytes[1];
 
-export async function createRom() {
-    const session = new MachineSession("B-DFS1.2");
+export async function createRom(model = "B-DFS1.2") {
+    const session = new MachineSession(model);
     await session.initialise();
     await session.boot(10);
     await session.loadBasic(SupportProgram);
@@ -107,7 +110,9 @@ export async function createRom() {
         const bytes = [...session.readMemory(block, 64)];
         const message = bytes
             .slice(1, bytes.indexOf(0, 1))
-            .map(b => tokenNames.get(b) || String.fromCharCode(b))
+            .map(b =>
+                b === MissingToken ? "Missing " : tokenNames.get(b) || String.fromCharCode(b),
+            )
             .join("");
         return {error: bytes[0], message};
     };

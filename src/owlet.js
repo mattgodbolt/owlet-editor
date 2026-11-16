@@ -15,9 +15,10 @@ import {partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getSyntaxMarkers, getWarnings, LanguageId, withoutCodes} from "./bbcbasic";
+import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV, withoutCodes} from "./bbcbasic";
 import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
+import {DefaultMachine, Machines, machineOf, withMachine} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -33,7 +34,7 @@ function defaultLineNumber(line) {
 }
 
 export class OwletEditor {
-    constructor(onChangeHandler) {
+    constructor(onChangeHandler, onMachineChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
         this.problems = $("#problems").on("click", () => {
@@ -49,6 +50,7 @@ export class OwletEditor {
         );
         this.tokeniser = null;
         this.onChangeHandler = onChangeHandler;
+        this.onMachineChangeHandler = onMachineChangeHandler;
 
         monacoEditor.defineTheme("bbcbasicTheme", {
             base: "vs-dark",
@@ -137,8 +139,8 @@ export class OwletEditor {
         for (const example of Examples.examples) this.addExample(example);
     }
 
-    static stateForBasicProgram(program) {
-        return {v: StateVersion, program: program};
+    static stateForBasicProgram(program, machine = DefaultMachine) {
+        return withMachine({v: StateVersion, program: program}, machine);
     }
 
     static decodeStateString(stateString, fixup = true) {
@@ -248,7 +250,8 @@ export class OwletEditor {
     }
 
     toStateString(basicText) {
-        return encodeURIComponent(JSON.stringify(OwletEditor.stateForBasicProgram(basicText)))
+        const state = OwletEditor.stateForBasicProgram(basicText, this.emulator.machine);
+        return encodeURIComponent(JSON.stringify(state))
             .replace(/[(]/g, "%28")
             .replace(/[)]/g, "%29");
     }
@@ -265,6 +268,8 @@ export class OwletEditor {
         this.selectView("screen");
 
         if (state.mode > 1) {
+            // A snapshot from bbcmicrobot is of a Model B.
+            if (this.setMachine(DefaultMachine)) await this.emulator.initialise();
             //  Load BBC Micro state snapshot
             await this.updateProgram();
             this.emulator.pause();
@@ -273,10 +278,44 @@ export class OwletEditor {
             this.emulator.setTotalCycles(this.emulator.cyclesPerSecond * 60 * 60 * 3);
             this.emulator.start();
         } else {
+            this.setMachine(machineOf(state));
             this.emulator.gxr();
             await this.emulator.initialise();
             this.updateProgram();
         }
+    }
+
+    /** Chooses the machine the emulator builds next, and its BASIC for the editor; returns whether it changed. */
+    setMachine(machine) {
+        const changed = this.emulator.setMachine(machine);
+        $("#machine").val(machine);
+        useBasicIV(this.emulator.model.isMaster);
+        this.updateWarnings();
+        this.showSyntaxMarkers();
+        this.onMachineChangeHandler(machine);
+        return changed;
+    }
+
+    async chooseMachine(machine) {
+        const $machine = $("#machine").prop("disabled", true);
+        const previous = this.emulator.machine;
+        try {
+            this.setMachine(machine);
+            await this.emulator.initialise();
+            this.run();
+        } catch (e) {
+            // The machine that was running goes on.
+            this.setMachine(previous);
+            throw e;
+        } finally {
+            $machine.prop("disabled", false);
+        }
+    }
+
+    run() {
+        this.updateProgram();
+        this.emulator.pause();
+        this.selectView("screen");
     }
 
     lineNumberDetect(text) {
@@ -527,11 +566,7 @@ export class OwletEditor {
         sound.ignore = event =>
             event.target instanceof Element && event.target.closest("#sound") !== null;
         const actions = {
-            run: () => {
-                this.updateProgram();
-                this.emulator.pause();
-                this.selectView("screen");
-            },
+            run: () => this.run(),
             new: () => this.updateEditorText("", "new"),
             tokenise: () => this.tokenise(),
             expand: () => this.expandCode(),
@@ -547,7 +582,7 @@ export class OwletEditor {
                 ),
 
             virtualbeeb: () => {
-                const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";
+                const gxr = this.emulator.hasGxr ? "&rom=gxr.rom" : "";
                 window.open(
                     `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
                         this.getBasicText(),
@@ -557,11 +592,15 @@ export class OwletEditor {
                 this.closeModal();
             },
             jsbeeb: () => {
-                const gxr = this.emulator.hasGxr() ? "&rom=gxr.rom" : "";
+                const gxr = this.emulator.hasGxr ? "&rom=gxr.rom" : "";
+                const model =
+                    this.emulator.machine === DefaultMachine
+                        ? ""
+                        : `&model=${this.emulator.machine}`;
                 window.open(
                     `https://bbc.xania.org/?embedBasic=${encodeURIComponent(
                         this.getBasicText(),
-                    )}${gxr}`,
+                    )}${gxr}${model}`,
                     "_blank",
                 );
                 this.closeModal();
@@ -625,6 +664,10 @@ export class OwletEditor {
             closeModal: () => this.closeModal(),
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
+        const $machine = $("#machine");
+        for (const [machine, {label}] of Object.entries(Machines))
+            $("<option>").val(machine).text(label).appendTo($machine);
+        $machine.change(() => this.chooseMachine($machine.val()));
 
         createVduReference($("#reference")[0]);
 
