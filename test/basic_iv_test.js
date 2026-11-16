@@ -90,8 +90,6 @@ const OnlyOnBasicIV = [
     "[OPT0:LDA &1234,y:]",
     "[OPT0:LDA (&70,x):]",
     "[OPT0:LDA (&70),y:]",
-    "[OPT0:JMP (&1234,X):]",
-    "[OPT0:JMP (&1234,x):]",
     "[OPT0:equb 1:]",
     "[OPT0:EQUb 1:]",
     "[OPT0:EQUw 1:]",
@@ -185,6 +183,15 @@ describe("Each BASIC's own recorded rows", () => {
         setBasicIV(true);
         expect(stops(text)).toBe(false);
     });
+    it.each(["[OPT0:JMP (&1234,X):]", "[OPT0:JMP (&1234,x):]"])(
+        "%j is red for BASIC II and runs on BASIC IV (BASIC II's own row waits for #224)",
+        text => {
+            expect(masterVerdicts.get(text)).toBe("ok");
+            expect(stops(text)).toBe(true);
+            setBasicIV(true);
+            expect(stops(text)).toBe(false);
+        },
+    );
     it.each(OnBothBasics)("%j runs on both", text => {
         expect(masterVerdicts.get(text)).toBe("ok");
         expect(stops(text)).toBe(false);

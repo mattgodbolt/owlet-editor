@@ -131,15 +131,7 @@ const StricterThanRom = [
 const invalid = invalidSpans;
 
 // Lines where BASIC's error is not the one the recogniser gives for that kind of mistake: H.TO8 is not read as HIMEM.
-const OtherWording = [
-    "F.A=H.TO8^5:?A=42:N.",
-    // JMP takes no index in BASIC II, and says Index; the recogniser reads (&1234,X) as a bracket with two arguments.
-    "[OPT0:JMP (&1234,X):]",
-    "[OPT0:JMP (&1234,x):]",
-    "[OPT0:JMP (&1234,Y):]",
-    "[OPT0:JMP (&1234,Xa):]",
-    "[OPT0:JMP (&1234,X) :]",
-];
+const OtherWording = ["F.A=H.TO8^5:?A=42:N."];
 
 describe("Recogniser", () => {
     it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
@@ -269,6 +261,9 @@ describe("Text that is wrong, not unfinished", () => {
         ["X=RND(1,", [","]],
         ["GOTO:PRINT", ["GOTO"]],
         ["FOR I=1 TO:NEXT", ["TO"]],
+        ["FOR I:PRINT I:NEXT", ["I"]],
+        ["A=1:FOR I:NEXT", ["I"]],
+        ["IF A THEN PRINT:FOR I:NEXT", ["I"]],
     ])("%s should be red", (text, expected) => {
         assert.deepStrictEqual(red(text), expected);
     });

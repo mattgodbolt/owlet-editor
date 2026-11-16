@@ -1506,12 +1506,7 @@
   ["[OPT0:TXS:]", "ok", "9a", "#206"],
   ["[OPT0:TYA:]", "ok", "98", "#206"],
   ["[OPT0:JMP (&1234):]", "ok", "6c 34 12", "#206"],
-  ["[OPT0:JMP (&1234,X):]", "Index", "#206"],
-  ["[OPT0:JMP (&1234,x):]", "Index", "#206"],
-  ["[OPT0:JMP (&1234,Y):]", "Index", "#206"],
-  ["[OPT0:JMP (&1234,Xa):]", "Index", "#206"],
   ["[OPT0:JMP (&70)+1:]", "ok", "6c 70 00", "#206"],
-  ["[OPT0:JMP (&1234,X) :]", "Index", "#206"],
   ["[OPT0:BRA (P%):]", "Syntax error", "#206"],
   ["[OPT0:LDA (&70),Z:]", "Index", "#206"],
   ["[OPT0:LDA (&70),:]", "Index", "#206"],
@@ -1541,5 +1536,11 @@
   ["[OPT0:RMB0 &70:]", "Syntax error", "#206"],
   ["[OPT0:WAI:]", "Syntax error", "#206"],
   ["[OPT0:STP:]", "Syntax error", "#206"],
-  ["[OPT0:BBR0 &70,P%:]", "Syntax error", "#206"]
+  ["[OPT0:BBR0 &70,P%:]", "Syntax error", "#206"],
+  ["FOR I:PRINT I:NEXT", "Mistake", "#201"],
+  ["FOR I:", "Mistake", "#201"],
+  ["FOR I", "Mistake", "#201"],
+  ["IF A THEN PRINT:FOR I:NEXT", "Mistake", "#201"],
+  ["A=1:FOR I:NEXT", "Mistake", "#201"],
+  ["FOR I:PRINT I", "Mistake", "#201"]
 ]

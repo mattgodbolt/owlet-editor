@@ -5,6 +5,7 @@ import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/co
 import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
+import {problemMessage} from "./problem-messages";
 import {ForeignOperators} from "./parser/recogniser";
 import {currentImmediateCommands, isBasicIV, setBasicIV} from "./parser/dialect";
 import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
@@ -82,8 +83,23 @@ export function registerBbcBasicLanguage() {
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
 export const codeActionProvider = {
     provideCodeActions(model, range, context) {
-        // Only the warnings above come with a fix; the text under any other marker is not to be rewritten.
-        const fixable = context.markers.filter(marker => QuickFixCodes.has(marker.code));
+        // Only the warnings above come with a fix; the text under any other marker is not to be rewritten. The editor's
+        // markers carry no code (Monaco would show it in the hover), so it is found from the text again.
+        let known = null;
+        const codeOf = marker => {
+            if (marker.code) return marker.code;
+            const text = model.getValue();
+            known = known || [...getWarnings(text), ...getSyntaxMarkers(text)];
+            return known.find(
+                found =>
+                    found.message === marker.message &&
+                    found.startLineNumber === marker.startLineNumber &&
+                    found.startColumn === marker.startColumn,
+            )?.code;
+        };
+        const fixable = context.markers
+            .map(marker => ({...marker, code: codeOf(marker)}))
+            .filter(marker => QuickFixCodes.has(marker.code));
         const actions = fixable.map(marker => {
             const text = model.getValueInRange(marker);
             if (marker.code === SpaceAfterAbbreviationCode) {
@@ -147,6 +163,9 @@ const QuickFixCodes = new Set([
     SpaceAfterMnemonicCode,
 ]);
 
+// Markers as the editor shows them: the code is only for the quick fixes, and Monaco would add it to the hover text.
+export const withoutCodes = markers => markers.map(marker => ({...marker, code: undefined}));
+
 const marker = (severity, line, start, end, details) => ({
     severity,
     ...details,
@@ -170,26 +189,30 @@ export function getWarnings(text) {
 export function getSyntaxMarkers(text, cursorLine = 0) {
     const recognisers = readLines(text);
     const warnings = recognisers.map(({lexer, tokens}) => lineWarnings(lexer.text, tokens));
-    return programProblems(text, recognisers).flatMap(
-        ({line, start, end, message, unfinished, hole, unclosed, stricter, code}) => {
-            const covered = warnings[line - 1].some(
-                warning => warning.start < end && start < warning.end,
-            );
-            if (covered || (unfinished && line === cursorLine)) return [];
-            const rom = message ? ` with "${message}"` : "";
-            const text = unclosed
-                ? "Assembler block not closed: there is no ] after this ["
-                : stricter
-                  ? message
-                  : unfinished
-                    ? hole
-                        ? `Unfinished statement: BASIC would stop${rom} here`
-                        : `Unfinished line${message ? `: BASIC would stop${rom} if it ended here` : ""}`
-                    : `${message || "Error"}: BASIC would stop at this statement`;
-            const severity = unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error;
-            return [marker(severity, line, start, end, {message: text, ...(code && {code})})];
-        },
-    );
+    return programProblems(text, recognisers).flatMap(problem => {
+        const {line, start, end, unfinished, code} = problem;
+        const covered = warnings[line - 1].some(
+            warning => warning.start < end && start < warning.end,
+        );
+        if (covered || (unfinished && line === cursorLine)) return [];
+        const {lexer, tokens} = recognisers[line - 1];
+        const stopped = tokens.find(token => token.start === start);
+        const before = tokens.filter(token => token.kind !== "white" && token.end <= start);
+        const previous = before.at(-1);
+        const next = tokens.find(
+            token => token.kind !== "white" && token.start >= (stopped?.end ?? end),
+        );
+        const atEnd = !next || next.text === ":" || next.kw?.keyword === "ELSE";
+        const statementStart = before.slice(0, -1).every(token => token.kind === "linenum");
+        const message = problemMessage(problem, {
+            at: stopped?.text ?? lexer.text.slice(start, end).trim(),
+            previous: previous?.text,
+            atEnd,
+            statementName: previous?.kind === "name" && statementStart,
+        });
+        const severity = unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error;
+        return [marker(severity, line, start, end, {message, ...(code && {code})})];
+    });
 }
 
 // The keyword that a name, typed in capitals, would be read as in full (with the ( that ends LEFT$( and the like), or

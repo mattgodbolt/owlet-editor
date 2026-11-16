@@ -15,7 +15,8 @@ import {partialDetokenise} from "./tokens";
 import {encode} from "base2048";
 import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
-import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV} from "./bbcbasic";
+import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV, withoutCodes} from "./bbcbasic";
+import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, withMachine} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
@@ -36,6 +37,10 @@ export class OwletEditor {
     constructor(onChangeHandler, onMachineChangeHandler) {
         const editorPane = $("#editor");
         this.editStatus = $("#edit_status");
+        this.problems = $("#problems").on("click", () => {
+            this.editor.focus();
+            this.editor.trigger("problems", "editor.action.marker.next", null);
+        });
         const build = describeBuild(
             import.meta.env.OWLET_GIT_SHA,
             import.meta.env.OWLET_BUILD_DATE,
@@ -167,7 +172,11 @@ export class OwletEditor {
 
     updateWarnings() {
         const model = this.editor.getModel();
-        monacoEditor.setModelMarkers(model, "warnings", getWarnings(model.getValue()));
+        monacoEditor.setModelMarkers(
+            model,
+            "warnings",
+            withoutCodes(getWarnings(model.getValue())),
+        );
     }
 
     // The markers for lines that end too soon, and for lines that are not there yet, would be wrong while the line is
@@ -183,16 +192,20 @@ export class OwletEditor {
         this.syntaxTimer = null;
         const model = this.editor.getModel();
         this.syntaxCursorLine = this.editor.getPosition().lineNumber;
-        monacoEditor.setModelMarkers(
-            model,
-            "syntax",
-            getSyntaxMarkers(model.getValue(), this.syntaxCursorLine),
+        const text = model.getValue();
+        const syntax = getSyntaxMarkers(text, this.syntaxCursorLine);
+        const lineNumbers = getLineNumberMarkers(text, this.syntaxCursorLine);
+        monacoEditor.setModelMarkers(model, "syntax", withoutCodes(syntax));
+        monacoEditor.setModelMarkers(model, "lineNumbers", lineNumbers);
+        const warnings = getWarnings(text);
+        const summary = problemCount({syntax, lineNumbers, warnings});
+        const [first] = [...syntax, ...lineNumbers, ...warnings].sort(
+            (a, b) => a.startLineNumber - b.startLineNumber || a.startColumn - b.startColumn,
         );
-        monacoEditor.setModelMarkers(
-            model,
-            "lineNumbers",
-            getLineNumberMarkers(model.getValue(), this.syntaxCursorLine),
-        );
+        this.problems
+            .prop("hidden", !summary)
+            .text(summary)
+            .attr("title", first?.message ?? "");
     }
 
     updateEditorText(newText, updateType) {
