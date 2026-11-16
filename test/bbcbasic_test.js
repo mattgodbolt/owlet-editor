@@ -914,8 +914,8 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
                 ["[LDX &70,y", ["LDX", "y"], []],
                 ["[sty &70,x", ["sty", "x"], []],
                 // BASIC reads no index after these.
-                ["[LDA #1,x", ["LDA"], []],
-                ["[JSR &70,x", ["JSR"], []],
+                ["[LDA #1,x", ["LDA"], parser === "new" ? [","] : []],
+                ["[JSR &70,x", ["JSR"], parser === "new" ? [","] : []],
                 ["[LDA ASC(MID$(A$,x,1))", ["LDA", "ASC", parser === "new" ? "MID$" : "MID$("], []],
                 ["[equb 1", [], parser === "new" ? ["equb 1"] : ["equb"]],
                 ["[EQUw 1", [], parser === "new" ? ["EQUw 1"] : ["EQUw"]],
@@ -939,7 +939,7 @@ describe.each(Parsers)("Tokenisation (%s)", parser => {
             // A mnemonic is only a mnemonic where a statement starts, and BASIC reads PIX and TIMER as names.
             const cases = [
                 ["[LDA TAXRATE", ["TAXRATE"]],
-                ["[EQUB 1 LDA 2", ["LDA"]],
+                ["[EQUB LDA+2", ["LDA"]],
                 ["[LDA #PIX", ["PIX"]],
                 ["[LDA #TIMER", ["TIMER"]],
                 ["[LDA #PI", []],
@@ -1262,6 +1262,46 @@ describe("Quick fixes and syntax markers", () => {
         assert.deepStrictEqual(offered('print "lower"'), ["Replace with PRINT"]);
         assert.deepStrictEqual(offered("GOTO 20 30"), []);
         assert.deepStrictEqual(offered("x == 3"), ["Replace with ="]);
+    });
+    it("should offer a fix for junk after a complete instruction, and a ] fix when it is a ]", () => {
+        assert.deepStrictEqual(offered("[OPT0:LDA #1]:tax=1"), [
+            "Insert : before ]",
+            "Insert ; before the junk",
+        ]);
+        assert.deepStrictEqual(offered("[OPT0:NOP hello:]"), ["Insert ; before the junk"]);
+    });
+    // The fixes offered for the junk markers of the text, applied one at a time, with the text each leaves.
+    function fixed(text) {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const markers = getSyntaxMarkers(text).filter(marker => marker.code);
+            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            return actions.map(({title, edit}) => {
+                const {range, text: inserted} = edit.edits[0].textEdit;
+                const lines = text.split("\n");
+                const line = lines[range.startLineNumber - 1];
+                lines[range.startLineNumber - 1] =
+                    line.slice(0, range.startColumn - 1) +
+                    inserted +
+                    line.slice(range.endColumn - 1);
+                return [title, lines.join("\n")];
+            });
+        } finally {
+            model.dispose();
+        }
+    }
+    it.each([
+        ["[OPT0:LDA#1]", "Insert : before ]", "[OPT0:LDA#1:]"],
+        ["[LDA #1]\ntax=1\n]", "Insert : before ]", "[LDA #1:]\ntax=1\n]"],
+        ["[OPT0:NOP hello:]", "Insert ; before the junk", "[OPT0:NOP ;hello:]"],
+        ["[OPT0:LDA #1 ,X:]", "Insert ; before the junk", "[OPT0:LDA #1 ;,X:]"],
+    ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
+        const [offer] = fixed(text).filter(([name]) => name === title);
+        assert.deepStrictEqual(offer, [title, result]);
+        assert.deepStrictEqual(
+            getSyntaxMarkers(result).filter(marker => marker.code),
+            [],
+        );
     });
 });
 

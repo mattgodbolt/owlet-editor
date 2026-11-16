@@ -28,11 +28,49 @@ describe("Lexer", () => {
 // A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
 const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
 
-// Lines BASIC II runs that are marked on purpose (see the README): a keyword after a complete assembler instruction,
-// and a character in a mnemonic that is not a letter but that BASIC reads as one.
+// Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
+// instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
 const StricterThanRom = [
     "[OPT0:NOP PRINT:]",
     "[OPT0:LDA #1 FOR:]",
+    "[OPT0:LDA #1 hello:]",
+    "[OPT0:NOP 5:]",
+    "[OPT0:NOP =1:]",
+    '[OPT0:LDA #1 "x":]',
+    "[OPT0:LDA #1 ,X:]",
+    "[OPT0:LDA #1,x:]",
+    "[OPT0:JSR &70,x:]",
+    "[OPT0:EQUB 1 LDA 2:]",
+    "[OPT0:BRK 1:]",
+    "[OPT0:TAX X:]",
+    "[OPT0:ROR A | Anagram of ROAR:]",
+    "[OPT0:ROR A Anagram of ROAR:]",
+    "[OPT0:BIT &70,X:]",
+    "[OPT0:BIT &70,Y:]",
+    "[OPT0:BIT (&70),Y:]",
+    "[OPT0:CPX &70,X:]",
+    "[OPT0:CPX &70,Y:]",
+    "[OPT0:CPX (&70),Y:]",
+    "DIM P% 99:[OPT0:STA &70,XX:]",
+    "[STA &70,XX:]",
+    "[STA &70,Xa:]",
+    "[STA &70,X1:]",
+    "[STA &70,Xfoo:]",
+    "[STA &70,Y1:]",
+    "[LDA (&70),YY:]",
+    "[LDX &70,yy:]",
+    "[LDY &70,Xx:]",
+    "[ASL &70,XX:]",
+    "[LDA (&70,X)X:]",
+    "[. lab LDA #1]",
+    "[NOP]:]",
+    "[NOP]:NOP",
+    "[LDA #1]:]",
+    "[LDA #1]]",
+    "[LDA #1]:NOP:]",
+    "[LDA #1]:]:PRINT",
+    "[OPT0:LDA #1]:tax=1",
+    "[OPT0:NOP]:]:P%=P%+5",
     "[ST89:]",
     "[OPT0:ST89:]",
     "[OPT0:LDA 1:LD! 1:]",
@@ -193,7 +231,7 @@ describe("A statement BASIC stops at", () => {
         ["PRINT (1 2 3):PRINT 4 5", ["2 3)"]],
         ['I am "a:b" badger:X Y', ['am "a:b" badger', "Y"]],
         ["X Y REM hi", ["Y"]],
-        ["[LDA CLEAR 1 2:NOP]", ["CLEAR 1 2"]],
+        ["[LDA CLEAR 1 2:NOP:]", ["CLEAR 1 2"]],
         ["IF A THEN [LDA CLEAR 1 ELSE PRINT 2", ["CLEAR 1"]],
     ])("%s should be red on %j", (text, expected) => {
         assert.deepStrictEqual(redRuns(text), expected);
@@ -426,7 +464,7 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
 // Keys typed one at a time: the letters of an instruction that is still being typed are not red, and a digit or
 // symbol straight after LD or ST is, as no letter of a register follows it.
 describe("An instruction typed one key at a time", () => {
-    it.each([["[LDA 1"], ["[STA &70"], ["[LDX #5,"], ["[TAX"], ["[INY"], ["[OPT0:CPX 1:]"]])(
+    it.each([["[LDA 1"], ["[STA &70"], ["[LDX 5,"], ["[TAX"], ["[INY"], ["[OPT0:CPX 1:]"]])(
         "%s typed one key at a time should never be red",
         text => {
             for (let n = 1; n <= text.length; ++n) {
@@ -455,5 +493,50 @@ describe("An instruction typed one key at a time", () => {
     );
     it("should mark LD as soon as a digit follows it, since no letter of a register can come after", () => {
         assert.deepStrictEqual(red("[LD8"), ["LD"]);
+    });
+});
+
+// BASIC ignores what follows a complete instruction up to the next colon, so the first thing there that is not a
+// comment is red, and only that: the rest of the statement is ignored with it.
+describe("Junk after a complete instruction", () => {
+    const stricter = text => programProblems(text).filter(problem => problem.stricter);
+    it.each([
+        ["[OPT0:LDA #1 hello:]", "hello"],
+        ["[OPT0:NOP 5 6:]", "5"],
+        ["[OPT0:LDA #1 ,X:]", ","],
+        ["[OPT0:NOP =1:]", "="],
+        ["[OPT0:LDA #1 PRINT 2:]", "PRINT"],
+        ["[OPT0:NOP]:NOP", "]"],
+        ["[OPT0:LDA #1]]", "]"],
+    ])("%s should be red on its first junk token only", (text, junk) => {
+        assert.deepStrictEqual(red(text), [junk]);
+    });
+    it.each([
+        "[OPT0:LDA #1 ;comment:]",
+        "[OPT0:LDA #1 \\comment:]",
+        "[OPT0:LDA #1:]:tax=1",
+        "[OPT0:NOP:]:P%=P%+5",
+        "[OPT0:LDA #1:LDX #2 ;c:NOP:]",
+    ])("%s should not be red", text => {
+        assert.deepStrictEqual(red(text), []);
+    });
+    it("should mark the second ] of NOP]:] as closing the block, not as junk", () => {
+        assert.deepStrictEqual(red("[OPT0:NOP]:]:P%=P%+5"), ["]"]);
+        assert.deepStrictEqual(stricter("[OPT0:NOP]:]:P%=P%+5").length, 1);
+    });
+    it.each([
+        ["[OPT0:NOP]", "]", "BASIC ignores this ] and goes on assembling"],
+        ["[OPT0:NOP 5", "5", "BASIC ignores everything after a complete instruction"],
+    ])("%s should say what BASIC does and what was probably meant", (text, junk, begins) => {
+        const [problem] = stricter(text);
+        assert.strictEqual(text.slice(problem.start, problem.end), junk);
+        assert.strictEqual(problem.code, "junk-after-instruction");
+        assert.ok(problem.message.startsWith(begins), problem.message);
+        assert.match(problem.message, junk === "]" ? /a : is missing/ : /a ; is missing/);
+    });
+    it("should leave the block open after a ] that is ignored, so the next line is assembled", () => {
+        const [first, second] = programProblems("[LDA #1]\ntax=1\n]").filter(p => p.stricter);
+        assert.deepStrictEqual([first.line, first.start], [1, 7]);
+        assert.deepStrictEqual([second.line, second.start], [2, 3]);
     });
 });

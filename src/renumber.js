@@ -1,39 +1,86 @@
 import {editor, Selection} from "monaco-editor/esm/vs/editor/editor.api";
-import {LanguageId} from "./bbcbasic";
+import {abbreviatedKeyword, LanguageId} from "./bbcbasic";
+import {keywords, tokenChar} from "./tokens";
 
 const LineNumberType = `constant.linenum.${LanguageId}`;
 const WhiteType = `white.${LanguageId}`;
-const ImplicitLineNumberStep = 10;
+export const ImplicitLineNumberStep = 10;
 const ExplicitLineNumberRegex = /^\s*\d/;
 
-// The line numbers the program refers to, as the tokeniser reads them: {lineNumber, startColumn, endColumn, target},
-// where lineNumber is the editor's line and target is the BASIC line number referred to.
-export function lineNumberReferences(text) {
+// Every number the tokeniser reads as a line number: {lineNumber, startColumn, endColumn, target, own, keyword}, where
+// lineNumber is the editor's line, target is the number, own says it starts its line and so is that line's own number,
+// and keyword is the BASIC keyword a reference follows (GOTO, THEN...), undefined for an own number.
+export function lineNumberTokens(text) {
     const lines = text.split("\n");
     return editor.tokenize(text, LanguageId).flatMap((lineTokens, index) =>
         lineTokens.flatMap((token, tokenIndex) => {
-            // A number that starts a line is that line's own number.
-            const ownNumber = lineTokens.slice(0, tokenIndex).every(t => t.type === WhiteType);
-            if (token.type !== LineNumberType || ownNumber) return [];
+            if (token.type !== LineNumberType) return [];
             const end =
                 tokenIndex + 1 < lineTokens.length
                     ? lineTokens[tokenIndex + 1].offset
                     : lines[index].length;
+            const own = lineTokens.slice(0, tokenIndex).every(t => t.type === WhiteType);
             return [
                 {
                     lineNumber: index + 1,
                     startColumn: token.offset + 1,
                     endColumn: end + 1,
                     target: Number(lines[index].slice(token.offset, end)),
+                    own,
+                    keyword: own
+                        ? undefined
+                        : precedingKeyword(lines[index], lineTokens, tokenIndex),
                 },
             ];
         }),
     );
 }
 
-function renumberEdits(references, oldToNew) {
+// The keyword in full, as the table has it, from how the program spells it: whole, abbreviated or as its token.
+function precedingKeyword(line, lineTokens, tokenIndex) {
+    const index = lineTokens.findLastIndex(
+        (token, i) => i < tokenIndex && token.type.startsWith("keyword"),
+    );
+    if (index < 0) return undefined;
+    const text = line.slice(lineTokens[index].offset, lineTokens[index + 1].offset).trim();
+    const byToken = keywords.find(kw => tokenChar(kw) === text);
+    if (byToken) return byToken.keyword;
+    return text.endsWith(".")
+        ? abbreviatedKeyword(text.toUpperCase())?.keyword
+        : text.toUpperCase();
+}
+
+// The line numbers the program refers to, as the tokeniser reads them: {lineNumber, startColumn, endColumn, target,
+// keyword}, where lineNumber is the editor's line and target is the BASIC line number referred to.
+export function lineNumberReferences(text) {
+    return lineNumberTokens(text)
+        .filter(token => !token.own)
+        .map(({lineNumber, startColumn, endColumn, target, keyword}) => ({
+            lineNumber,
+            startColumn,
+            endColumn,
+            target,
+            keyword,
+        }));
+}
+
+// A TRACE limit that is not a line stays between the same two lines, as the number just above the line below it, or
+// where it was if it is above the last line and still is.
+function traceLimit(target, oldToNew) {
+    const lines = [...oldToNew.keys()];
+    const below = Math.max(...lines.filter(line => line < target));
+    if (below === -Infinity) return target;
+    const above = oldToNew.get(below) + ImplicitLineNumberStep / 2;
+    return below === Math.max(...lines) ? Math.max(target, above) : above;
+}
+
+function renumberEdits(references, oldToNew, movesTraceLimits = false) {
+    const newNumber = ref =>
+        movesTraceLimits && ref.keyword === "TRACE" && !oldToNew.has(ref.target)
+            ? traceLimit(ref.target, oldToNew)
+            : (oldToNew.get(ref.target) ?? ref.target);
     return references
-        .filter(ref => oldToNew.has(ref.target) && oldToNew.get(ref.target) !== ref.target)
+        .filter(ref => newNumber(ref) !== ref.target)
         .map(ref => ({
             range: {
                 startLineNumber: ref.lineNumber,
@@ -41,7 +88,7 @@ function renumberEdits(references, oldToNew) {
                 endLineNumber: ref.lineNumber,
                 endColumn: ref.endColumn,
             },
-            text: `${oldToNew.get(ref.target)}`,
+            text: `${newNumber(ref)}`,
         }));
 }
 
@@ -94,8 +141,8 @@ const isImplicit = lines => !lines.some(line => ExplicitLineNumberRegex.test(lin
 
 // The edits that keep a program's line-number references pointing at the same lines when the changes add or remove
 // lines and the program has no line numbers, so that its lines are numbered 10, 20, 30... by position. A line is the
-// same line while what starts it does, and a reference to a line that no longer is one is left as it is. References
-// in the text the changes insert are left as they are.
+// same line while what starts it does, and a reference to a line that no longer is one is left as it is (except for
+// TRACE, see traceLimit). References in the text the changes insert are left as they are.
 export function implicitRenumberEdits(oldText, newText, changes) {
     if (!changes.some(changesLines)) return [];
     const oldLines = oldText.split("\n");
@@ -137,7 +184,7 @@ export function implicitRenumberEdits(oldText, newText, changes) {
         };
         return start.lineNumber === end.lineNumber && newReferences.has(key(moved)) ? [moved] : [];
     });
-    return renumberEdits(references, oldToNew);
+    return renumberEdits(references, oldToNew, true);
 }
 
 // Rewrites the references as lines are added and removed in the editor's program (see implicitRenumberEdits). The

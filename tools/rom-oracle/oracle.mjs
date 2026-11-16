@@ -217,7 +217,17 @@ async function main() {
     );
     marks.forEach((list, i) => (marks[i] = list.filter(mark => !onPurpose[i].includes(mark))));
     await dropMarksNeverRead(results, marks, "invalid");
+    // Text the ROM ignores on purpose cannot be tested by cutting the statement there, as the cut is ignored too.
+    const ignored = onPurpose.map((list, i) =>
+        list.filter(mark => isCovered(highlighted[i].ignored, mark)),
+    );
+    onPurpose.forEach(
+        (list, i) => (onPurpose[i] = list.filter(mark => !ignored[i].includes(mark))),
+    );
     await dropMarksNeverRead(results, onPurpose, "stricter");
+    results.forEach((r, i) => {
+        if (!r.stricter && ignored[i].length) r.stricter = r.text.slice(...ignored[i][0]);
+    });
     results.forEach((r, i) => {
         r.unfinished =
             !r.invalid && readMarks(r.text, highlighted[i].unfinished, romTokens(i)).length > 0;
