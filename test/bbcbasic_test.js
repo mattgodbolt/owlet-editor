@@ -1252,6 +1252,23 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Warning, "Expected a comma before ) (BASIC: Missing ,)", 1, 12, 13],
         ]);
     });
+    it("should say too many arguments where a call has more than it takes, not that a ) is expected at a )", () => {
+        for (const [text, column] of [
+            ["A$=LEFT$(X$,1,2)", 16],
+            ["PRINT TAB(1,2,3)", 16],
+            ["A$=MID$(X$,1,2,3)", 17],
+        ]) {
+            assert.deepStrictEqual(markers(text), [
+                [
+                    MarkerSeverity.Error,
+                    "Too many arguments before ) (BASIC: Missing ))",
+                    1,
+                    column,
+                    column + 1,
+                ],
+            ]);
+        }
+    });
     it("should not mark the line the cursor is on as unfinished, only the others", () => {
         const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";
         const at = line => getSyntaxMarkers(text, line).map(m => [m.severity, m.startLineNumber]);
@@ -1298,7 +1315,7 @@ describe("Syntax markers", () => {
         ["X=1+*", "Expected a value after * (BASIC: No such variable)", 5, 6],
         ["X=(1+:Y=2", "Expected a value after + (BASIC: No such variable)", 5, 6],
         ["FOR I=1:NEXT", "Expected TO after 1 (BASIC: No TO)", 7, 8],
-        ["A$=LEFT$(X$,1,2)", "Expected a closing ) here, not ) (BASIC: Missing ))", 16, 17],
+        ["A$=LEFT$(X$,1,2)", "Too many arguments before ) (BASIC: Missing ))", 16, 17],
         ["A=1'", "' is not expected here (BASIC: Syntax error)", 4, 5],
         [
             "10 FO I%=1 TO 10",

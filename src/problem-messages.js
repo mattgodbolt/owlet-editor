@@ -42,6 +42,8 @@ export function problemMessage(
         plain = needed ? `Expected ${needed} before ${at}` : `Unfinished before ${at}`;
     } else if (needed && atEnd && at !== ")") {
         plain = `Expected ${needed} after ${at}`;
+    } else if (message === "Missing )" && at === ")") {
+        plain = "Too many arguments before )";
     } else if (statementName) {
         const keyword = keywordStartingWith(previous);
         plain = `${previous} is read as a variable, so ${at} is not expected here${keyword ? `; did you mean ${keyword}?` : ""}`;
