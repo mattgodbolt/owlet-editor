@@ -30,3 +30,8 @@ export function machineOf(state) {
 export function withMachine(state, machine) {
     return machine === DefaultMachine ? state : {...state, model: machine};
 }
+
+/** The query suffix that tells an export site which machine to run, left out for a Model B as its links always were. */
+export function modelQuery(machine) {
+    return machine === DefaultMachine ? "" : `&model=${machine}`;
+}
