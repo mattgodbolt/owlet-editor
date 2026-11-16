@@ -15,11 +15,29 @@ const statementWords = new Set(
         .map(kw => kw.keyword),
 );
 const StatementLabels = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
-const ExpressionLabels = labels(programKeywords.filter(kw => kw.token < FirstStatementToken));
-const AllLabels = labels(programKeywords);
+const ExpressionLabels = labels(
+    programKeywords.filter(kw => kw.flags & Flags.Expr || kw.keyword === "ELSE"),
+);
 const AssemblerLabels = labels(keywords.filter(kw => kw.flags & Flags.Expr));
-// Statements in which a statement keyword can follow an expression: IF X PRINT, ON X GOTO, TRACE ON, DEF PROC.
-const MixedStatements = new Set(["IF", "ON", "TRACE", "DEF"]);
+// The words besides values that BBC BASIC II reads in each statement (tools/rom-oracle), by the statement's first
+// keyword; "ON ERROR" is what follows ON ERROR, which is read as a statement.
+const SpcAndTab = ["SPC", "TAB("];
+const StatementWords = new Map([
+    ["PRINT", SpcAndTab],
+    ["INPUT", [...SpcAndTab, "LINE"]],
+    ["FOR", ["TO", "STEP"]],
+    ["IF", ["THEN", ...StatementLabels]],
+    ["ON", ["ERROR", "GOTO", "GOSUB"]],
+    ["ON ERROR", ["OFF"]],
+    ["TRACE", ["ON", "OFF"]],
+    ["DEF", StatementLabels],
+]);
+// Statements that a statement can follow without a colon: IF X FOR, DEF PROCa FOR. The PROC after DEF is its name.
+const HoldsStatement = new Set(["IF", "DEF"]);
+const startsNestedStatement = token =>
+    token.kind === "keyword" &&
+    token.kw.token >= FirstStatementToken &&
+    token.kw.keyword !== "PROC";
 const NameKinds = new Map([
     ["FN", Kind.Fn],
     ["PROC", Kind.Proc],
@@ -43,11 +61,15 @@ function statementState(tokens, inAssembler) {
             state.atStart = true;
         } else if (startsStatement(token)) {
             state.atStart = true;
-            // ON ERROR is followed by a statement or OFF.
-            if (token.kind === "keyword" && token.kw.keyword === "ERROR") continue;
-            state.statement = null;
+            const onError =
+                token.kind === "keyword" &&
+                token.kw.keyword === "ERROR" &&
+                state.statement === "ON";
+            state.statement = onError ? "ON ERROR" : null;
         } else {
             if (state.atStart) state.statement = token.kind === "keyword" ? token.kw.keyword : "";
+            else if (HoldsStatement.has(state.statement) && startsNestedStatement(token))
+                state.statement = token.kw.keyword;
             state.atStart = false;
         }
     }
@@ -103,8 +125,11 @@ export function completionContext(text) {
         return afterDef ? null : {startColumn, nameKind: nameKind(last)};
     }
     if (state.inAssembler) return state.atStart ? null : {startColumn, labels: AssemblerLabels};
-    if (MixedStatements.has(state.statement)) return {startColumn, labels: AllLabels};
-    return {startColumn, labels: state.atStart ? StatementLabels : ExpressionLabels};
+    const base = state.atStart ? StatementLabels : ExpressionLabels;
+    return {
+        startColumn,
+        labels: [...new Set([...base, ...(StatementWords.get(state.statement) ?? [])])],
+    };
 }
 
 function programNames(model, kind, position, startColumn) {
