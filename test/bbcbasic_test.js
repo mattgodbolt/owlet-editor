@@ -1,6 +1,7 @@
 import {
     codeActionProvider,
     getSyntaxMarkers,
+    withoutCodes,
     getWarnings,
     LanguageId,
     registerBbcBasicLanguage,
@@ -1210,7 +1211,7 @@ describe("Quick fixes and syntax markers", () => {
 });
 
 describe("Syntax markers", () => {
-    const Unfinished = rom => `Unfinished line: BASIC would stop with "${rom}" if it ended here`;
+    const Unfinished = (needed, after, rom) => `Expected ${needed} after ${after} (BASIC: ${rom})`;
     const markers = text =>
         getSyntaxMarkers(text).map(m => [
             m.severity,
@@ -1221,16 +1222,16 @@ describe("Syntax markers", () => {
         ]);
     it("should show a line that ends too soon as information at its end", () => {
         assert.deepStrictEqual(markers("GOTO"), [
-            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 1, 5],
+            [MarkerSeverity.Warning, Unfinished("a value", "GOTO", "No such variable"), 1, 1, 5],
         ]);
         assert.deepStrictEqual(markers("10 FOR I=1 TO "), [
-            [MarkerSeverity.Warning, Unfinished("No such variable"), 1, 12, 15],
+            [MarkerSeverity.Warning, Unfinished("a value", "TO", "No such variable"), 1, 12, 15],
         ]);
         assert.deepStrictEqual(markers('X=1\nPRINT "HI'), [
-            [MarkerSeverity.Warning, Unfinished('Missing "'), 2, 7, 10],
+            [MarkerSeverity.Warning, Unfinished("a closing quote", '"HI', 'Missing "'), 2, 7, 10],
         ]);
         assert.deepStrictEqual(markers("A$=LEFT$(X$"), [
-            [MarkerSeverity.Warning, Unfinished("Missing ,"), 1, 10, 12],
+            [MarkerSeverity.Warning, Unfinished("a comma", "X$", "Missing ,"), 1, 10, 12],
         ]);
     });
     it("should say plainly what BASIC does where a marker is stricter than the ROM, as an error", () => {
@@ -1246,9 +1247,8 @@ describe("Syntax markers", () => {
         ]);
     });
     it("should show something missing from the middle of a statement at the token where it stops", () => {
-        const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
         assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
-            [MarkerSeverity.Warning, Hole("Missing ,"), 1, 12, 13],
+            [MarkerSeverity.Warning, "Expected a comma before ) (BASIC: Missing ,)", 1, 12, 13],
         ]);
     });
     it("should not mark the line the cursor is on as unfinished, only the others", () => {
@@ -1291,21 +1291,57 @@ describe("Syntax markers", () => {
             closed.length > 1 && closed.every(([, message]) => !message.startsWith("Assembler")),
         );
     });
-    it("should show a statement BASIC stops at with the error BASIC gives", () => {
-        const stop = rom => `${rom}: BASIC would stop at this statement`;
-        for (const [text, rom, start, end] of [
-            ["GOTO 20 30", "Syntax error", 9, 11],
-            ["PRINT )", "No such variable", 7, 8],
-            ["X=1+*", "No such variable", 5, 6],
-            ["FOR I=1:NEXT", "No TO", 7, 8],
-            ["A$=LEFT$(X$,1,2)", "Missing )", 16, 17],
-            ["A=1'", "Syntax error", 4, 5],
-        ])
+    it.each([
+        ["GOTO 20 30", "30 is not expected here (BASIC: Syntax error)", 9, 11],
+        ["PRINT )", "Expected a value here, not ) (BASIC: No such variable)", 7, 8],
+        ["X=1+*", "Expected a value after * (BASIC: No such variable)", 5, 6],
+        ["X=(1+:Y=2", "Expected a value after + (BASIC: No such variable)", 5, 6],
+        ["FOR I=1:NEXT", "Expected TO after 1 (BASIC: No TO)", 7, 8],
+        ["A$=LEFT$(X$,1,2)", "Expected a closing ) here, not ) (BASIC: Missing ))", 16, 17],
+        ["A=1'", "' is not expected here (BASIC: Syntax error)", 4, 5],
+        [
+            "10 FO I%=1 TO 10",
+            "FO is read as a variable, so I% is not expected here; did you mean FOR? (BASIC: Mistake)",
+            7,
+            17,
+        ],
+    ])(
+        "should say in plain words where BASIC stops, with its own error in brackets: %s",
+        (text, message, start, end) => {
             assert.deepStrictEqual(
                 markers(text),
-                [[MarkerSeverity.Error, stop(rom), 1, start, end]],
+                [[MarkerSeverity.Error, message, 1, start, end]],
                 text,
             );
+        },
+    );
+    it("should end each message with the ROM's own error for every row of the ROM table", () => {
+        const wrong = [...verdicts].flatMap(([text, verdict]) =>
+            verdict === "ok"
+                ? []
+                : getSyntaxMarkers(text)
+                      .filter(marker => marker.message.includes("(BASIC: "))
+                      .filter(marker => !marker.message.endsWith(`(BASIC: ${verdict})`))
+                      .map(marker => [text, verdict, marker.message]),
+        );
+        assert.deepStrictEqual(wrong, []);
+    });
+    it("should keep the code out of what the editor shows, and still find the fix from the text", () => {
+        const text = "[OPT0:NOP hello:]";
+        const shown = withoutCodes(getSyntaxMarkers(text));
+        assert.ok(shown.length > 0 && shown.every(marker => marker.code === undefined));
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const {actions} = codeActionProvider.provideCodeActions(model, shown[0], {
+                markers: shown,
+            });
+            assert.deepStrictEqual(
+                actions.map(action => action.title),
+                ["Insert ; before the junk"],
+            );
+        } finally {
+            model.dispose();
+        }
     });
     it("should show nothing for a line that is complete", () => {
         for (const text of ["GOTO 20", "FOR I=1 TO 10", "IF A=1 THEN PRINT 2", "REM GOTO 20 30"])
@@ -1313,7 +1349,7 @@ describe("Syntax markers", () => {
     });
     it("should follow an assembler block over the lines", () => {
         assert.deepStrictEqual(markers("[\nLDA #\n]"), [
-            [MarkerSeverity.Warning, Unfinished("No such variable"), 2, 5, 6],
+            [MarkerSeverity.Warning, Unfinished("a value", "#", "No such variable"), 2, 5, 6],
         ]);
     });
 });
