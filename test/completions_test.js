@@ -8,7 +8,7 @@ import {readFileSync} from "fs";
 import {env} from "process";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
-registerBbcBasicLanguage("new");
+registerBbcBasicLanguage();
 
 const Cursor = "‸";
 

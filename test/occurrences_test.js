@@ -4,7 +4,7 @@ import {describe, it, vi, afterEach} from "vitest";
 import assert from "assert";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
-registerBbcBasicLanguage("new");
+registerBbcBasicLanguage();
 registerOccurrences();
 
 const Cursor = "‸";

@@ -13,7 +13,7 @@ import {describe, it} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
 
-registerBbcBasicLanguage("new");
+registerBbcBasicLanguage();
 
 // Each line's tokens as {offset, type}, neighbours of the same type joined, an open assembler block carrying on.
 function tokenLines(text) {

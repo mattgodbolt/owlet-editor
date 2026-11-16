@@ -1,5 +1,4 @@
-// The recogniser's tokens as Monaco token types, the same names the Monarch grammar in bbcbasic.js uses, so that
-// everything that reads tokens works with either.
+// The recogniser's tokens as Monaco token types, the names the editor's theme colours.
 import {BracketCollisions} from "./lexer.js";
 import {Recogniser} from "./recogniser.js";
 
@@ -193,7 +192,6 @@ const States = [new State(false), new State(true)];
 export function tokensProvider(languageId, metadata) {
     return {
         getInitialState: () => States[0],
-        // What the editor shows.
         tokenizeEncoded(line, state) {
             const {tokens, inAssembler} = highlightLine(line, state.inAssembler);
             return {

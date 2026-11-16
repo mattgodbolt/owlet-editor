@@ -8,7 +8,7 @@ import {
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {editor} from "monaco-editor/esm/vs/editor/editor.api";
 
-registerBbcBasicLanguage("new");
+registerBbcBasicLanguage();
 
 describe("renumberReferences", () => {
     const oldToNew = new Map([

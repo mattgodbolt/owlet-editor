@@ -51,7 +51,7 @@ Owlet Editor uses Vite as its build system. The project was migrated from webpac
 Red means that BBC BASIC II would stop with an error at that statement if it ran it, and that no more typing at the end
 of the line could change that. The colours are a function of the text alone, wherever the cursor is.
 
-- **Red runs to the end of the statement** (`?parser=new`): BASIC stops at the first token that cannot continue a
+- **Red runs to the end of the statement**: BASIC stops at the first token that cannot continue a
   statement and never reads the rest of it, so that token and everything after it up to the end of the statement is red.
   `I am a badger` is `I` as a variable and `am a badger` red; `GOTO 20 30:PRINT 5`
   is red on `30` only, since the statement ends at the colon and `PRINT 5` is judged on its own. A statement ends at a
@@ -64,7 +64,7 @@ of the line could change that. The colours are a function of the text alone, whe
 - **Text that is not code is never red:** a comment after `REM`, the items after `DATA`, a `*` command, and the rest
   of a line after an `ELSE` that starts a statement or a `DEF` that is not `DEF FN` or `DEF PROC`, and an `ON ... GOTO`
   list after its first target, all of which BASIC skips.
-- **Unfinished is not red** (`?parser=new`): a line that BASIC rejects only because something is still to be typed keeps
+- **Unfinished is not red**: a line that BASIC rejects only because something is still to be typed keeps
   its ordinary colours, so a line can be typed a key at a time. Something is still to be typed where the line ends:
   `G`, `GOTO`, `GOTO `, `FOR I=1 TO`, `PRINT (1+`, `PRINT "HI` (a string with no closing quote yet) and `[LDA` are
   unfinished, including a name or keyword that could grow into a longer keyword (`FOR I=1 T`, `X=1 AN`, `ENDP`, `MOD`
@@ -81,7 +81,7 @@ of the line could change that. The colours are a function of the text alone, whe
   statement is not yet finished (`FOR I=1 TO 10` in front of `:PRINT I:NEXT` is red from `F` to `FOR I=1 TO `, and not
   red once the `10` is there). Words typed straight against the word after them with no space (`IF A=1 TPRINT 2`,
   which is a name, `TPRINT`, and a number) are red until the space is typed.
-- **Markers** (`?parser=new`): about half a second after the last edit (the old markers stay, and move with the text,
+- **Markers**: about half a second after the last edit (the old markers stay, and move with the text,
   until then), a statement BASIC would stop at gets an error squiggle on its red text, and a line that is unfinished gets a warning
   squiggle: at its end, or at the token where the statement stopped when something is missing from the middle. Both
   come from the recogniser that colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`,
@@ -92,7 +92,7 @@ of the line could change that. The colours are a function of the text alone, whe
   leaves it. An assembler block that is never closed is one error on its `[` in place of one per later line (the
   later lines are coloured as before). A syntax marker is left out where a warning already covers the same text
   (`x == 3` has the warning about `==`), and quick fixes are offered only for the warnings, never for a syntax marker.
-- **Line number markers** (both tokenizers): after the same delay, an error squiggle on a `GOTO`, `GOSUB`, `THEN`,
+- **Line number markers**: after the same delay, an error squiggle on a `GOTO`, `GOSUB`, `THEN`,
   `ELSE` (and so `ON ... GOTO` lists) or `RESTORE` that names a line the program does not have (BASIC's `No such line`),
   and on any line number above 32767, which BASIC cannot have: the program ends at the first such line, so BASIC never
   runs it. That includes a line without a number that the editor would number above 32767, which takes a program of
@@ -147,10 +147,9 @@ message that says what BASIC does, and shows as an error.
   meant. Where the character is not the third (`J-P`, `3EC`, `O2A`), no prefix is to blame, so just that character
   is red. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89).
 
-Adding `?parser=new` to the address tries the tokenizer in `src/parser` in place of the Monarch grammar in
-`src/bbcbasic.js`: a port of the ROM's tokeniser, a recogniser that marks the token at which BASIC would stop with an
-error and the rest of that statement, and the assembler. The default is still the Monarch grammar. Bracket colouring and matching work with it as they do
-with Monarch (an unclosed `(` is not red while its line is unfinished).
+The highlighter is the tokenizer in `src/parser`: a port of the ROM's tokeniser, a recogniser that marks the token at
+which BASIC would stop with an error and the rest of that statement, and the assembler. Bracket colouring and matching
+work as for any Monaco language (an unclosed `(` is not red while its line is unfinished).
 
 Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
 statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
@@ -161,6 +160,5 @@ generated statements (see the comment at its top).
 
 ## Known Issues
 
-- With the default tokenizer (not `?parser=new`), an abbreviated function opener typed straight after another keyword, such as `PRINTLE.A$,1)` (`LE.` is `LEFT$(`), leaves its closing `)` painted red, though the line is valid. Monaco merges neighbouring same-coloured tokens and then misses the opener. Adding a space (`PRINT LE.A$,1)`) or spelling the keyword out avoids it.
 - In assembler, anything but a `;` or `\` comment after a complete instruction, as in `LDA #1 FOR`, `NOP 5` or `LDA #1]`, is highlighted as invalid on purpose. BBC BASIC ignores the rest of the statement, but this is almost always a mistake, such as a comment missing its `;` or a `:` missing before the `]`.
 - When running tests, you may see warnings about missing source maps for Monaco Editor. This is a [known issue with Monaco Editor 0.52.0+](https://github.com/microsoft/monaco-editor/issues/4712) and doesn't affect functionality.
