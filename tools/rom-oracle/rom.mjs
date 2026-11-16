@@ -48,6 +48,8 @@ const TimeoutSecs = 0.3;
 const MaxInputs = 3;
 
 const tokenNames = new Map(keywords.map(kw => [kw.token, kw.keyword]));
+// BASIC IV stores "Missing " in its error messages as a token.
+const MissingToken = 0x8d;
 const word = bytes => bytes[0] + 256 * bytes[1];
 
 export async function createRom(model = "B-DFS1.2") {
@@ -108,7 +110,9 @@ export async function createRom(model = "B-DFS1.2") {
         const bytes = [...session.readMemory(block, 64)];
         const message = bytes
             .slice(1, bytes.indexOf(0, 1))
-            .map(b => tokenNames.get(b) || String.fromCharCode(b))
+            .map(b =>
+                b === MissingToken ? "Missing " : tokenNames.get(b) || String.fromCharCode(b),
+            )
             .join("");
         return {error: bytes[0], message};
     };

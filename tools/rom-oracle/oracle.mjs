@@ -1,14 +1,14 @@
-// A differential test of the highlighter against BBC BASIC II: generated statements are run on the real ROM (in
+// A differential test of the highlighter against BBC BASIC II (or, with --master, the Master's BASIC IV): generated statements are run on the real ROM (in
 // jsbeeb, from the jsbeeb dependency's ROMs) and highlighted by src/parser, and the statements where the two
 // disagree about whether there is a syntax error are reported, grouped by the shape of statement they came from.
 //
-//   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json]
+//   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json] [--master]
 //
 // --count is the number of random statements on top of the fixed set (every keyword at the start of a statement,
 // abbreviated, misspelt...). --input adds statements from a JSON list of {shape, text}. --summary prints only the
 // counts. Results go to .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a
 // change to src/parser only runs the highlighter (delete the directory after changing rom.mjs); results.json has every
-// statement's verdicts.
+// statement's verdicts. --master runs BASIC IV and the parser's BASIC IV rules; its files are in .cache/rom-oracle/master/.
 //
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
@@ -21,12 +21,16 @@ import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
 import {highlightLine, programProblems} from "../../src/parser/highlight.js";
+import {setBasicIV} from "../../src/parser/dialect.js";
 import {generate} from "./generate.mjs";
+import {generateBasicIV} from "./generate-iv.mjs";
 import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
 import {isUnread, unreadRanges} from "./unread.mjs";
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const OutDir = path.join(Root, ".cache/rom-oracle");
+const Master = option("master", false);
+const OutDir = path.join(Root, ".cache/rom-oracle", Master ? "master" : "");
+setBasicIV(Master);
 
 function option(name, fallback) {
     const index = process.argv.indexOf(`--${name}`);
@@ -56,7 +60,7 @@ async function romVerdicts(texts) {
     const cache = readJson(cacheFile, {});
     const missing = [...new Set(texts.filter(text => !(text in cache)))];
     if (missing.length) {
-        const rom = await createRom();
+        const rom = await createRom(Master ? "Master" : undefined);
         const start = Date.now();
         for (const text of missing) {
             cache[text] = runnable(text)
@@ -195,6 +199,13 @@ async function main() {
         seed: Number(option("seed", 1)),
         count: Number(option("count", 3000)),
     });
+    if (Master)
+        statements.push(
+            ...generateBasicIV({
+                seed: Number(option("seed", 1)),
+                count: Number(option("count", 3000)),
+            }),
+        );
     const extra = option("input", null);
     if (extra) statements.push(...readJson(extra, []));
     const texts = statements.map(s => s.text);
