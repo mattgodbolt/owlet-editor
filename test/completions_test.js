@@ -32,7 +32,9 @@ function offered(textWithCursor) {
     }
 }
 
-const keywordTokens = recogniser => recogniser.tokens.filter(token => token.kind === "keyword");
+// A keyword where BASIC would stop (a lone LOG at the start of a line) is not somewhere to offer it.
+const keywordTokens = recogniser =>
+    recogniser.tokens.filter(token => token.kind === "keyword" && !token.invalid);
 
 const isMachineCode = token =>
     !["string", "comment", "data", "oscli"].includes(token.kind) &&
@@ -87,6 +89,29 @@ describe("Completions", () => {
             ["TI‸", ["TIME"]],
             ["X=TI‸", ["TIME"]],
             ["X=INS‸", ["INSTR("]],
+            // An E straight after a number starts a word: 7ELSE is 7 then ELSE.
+            ["X=E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["X=7E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["GCOL0,7E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["X=1.5E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]],
+            ["PRINT 7EL‸", ["ELSE"]],
+            [
+                "IF0E‸",
+                [
+                    "ELSE",
+                    "END",
+                    "ENDPROC",
+                    "ENVELOPE",
+                    "EOF",
+                    "EOR",
+                    "ERL",
+                    "ERR",
+                    "ERROR",
+                    "EVAL",
+                    "EXP",
+                    "EXT",
+                ],
+            ],
             ["LIS‸", []],
             ["REPEAT PRI‸", ["PRINT"]],
             ["IFX THENPRI‸", ["PRINT"]],
