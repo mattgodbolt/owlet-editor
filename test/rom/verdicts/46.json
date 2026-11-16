@@ -1,0 +1,9 @@
+[
+  ["A$=STR$~(12)", "ok", "#46"],
+  ["B$=STR$~12", "ok", "#46"],
+  ["C$=STR$(~12)", "No such variable", "#46"],
+  ["B=1:A=~B", "No such variable", "#46"],
+  ["A=1'", "Syntax error", "#46"],
+  ["A=1;", "Syntax error", "#46"],
+  ["A=#1", "No such variable", "#46"]
+]

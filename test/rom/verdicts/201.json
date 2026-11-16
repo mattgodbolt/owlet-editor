@@ -1,0 +1,8 @@
+[
+  ["FOR I:PRINT I:NEXT", "Mistake", "#201"],
+  ["FOR I:", "Mistake", "#201"],
+  ["FOR I", "Mistake", "#201"],
+  ["IF A THEN PRINT:FOR I:NEXT", "Mistake", "#201"],
+  ["A=1:FOR I:NEXT", "Mistake", "#201"],
+  ["FOR I:PRINT I", "Mistake", "#201"]
+]

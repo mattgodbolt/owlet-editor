@@ -1,10 +1,15 @@
 import {highlightLine, programProblems} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
-import {invalidSpans, verdicts, wrongMessages, wrongRows} from "./rom-tables";
+import {
+    invalidSpans,
+    RomTokens,
+    RomVerdicts,
+    verdicts,
+    wrongMessages,
+    wrongRows,
+} from "./rom-tables";
 import {describe, it} from "vitest";
 import assert from "assert";
-import RomTokens from "./rom-tokens.json";
-import RomVerdicts from "./rom-verdicts.json";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 
@@ -424,7 +429,7 @@ const PrefixMessage = (prefix, kind, char, word, tail, meant) =>
     `${prefix} is not an instruction: the ${kind} letter is missing. BASIC reads the ${char} as ${word[2]} (${word})${tail}; probably ${meant} was meant`;
 const Address = ", so what follows is the address";
 
-// BASIC compares only the low five bits of each character of a mnemonic (the ROM rows in test/rom-verdicts.json), so
+// BASIC compares only the low five bits of each character of a mnemonic (the ROM rows in test/rom/verdicts), so
 // it reads a non-letter as a letter, which is marked on purpose. Where that is the third character, the two letters
 // before it are marked, as they are not an instruction on their own (Olly Betts, #174).
 describe("A character in a mnemonic that BASIC reads as a letter", () => {

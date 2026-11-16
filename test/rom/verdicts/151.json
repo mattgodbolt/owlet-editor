@@ -1,0 +1,6 @@
+[
+  ["STEP1", "Syntax error", "#151"],
+  ["ERROR5,\"x\"", "Syntax error", "#151"],
+  ["RND(-TIME)", "Syntax error", "#151"],
+  ["TOOMUCH=1", "Syntax error", "#151"]
+]

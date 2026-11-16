@@ -6,9 +6,14 @@ import {completionContext} from "../src/completions";
 import {setBasicIV} from "../src/parser/dialect";
 import {programProblems} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
-import {masterVerdicts, verdicts, wrongMessages, wrongRows} from "./rom-tables";
-import MasterTokens from "./rom-tokens-master.json";
-import MasterVerdicts from "./rom-verdicts-master.json";
+import {
+    MasterTokens,
+    MasterVerdicts,
+    masterVerdicts,
+    verdicts,
+    wrongMessages,
+    wrongRows,
+} from "./rom-tables";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 // Whether the recogniser says BASIC stops at the line, or would if the line ended there.

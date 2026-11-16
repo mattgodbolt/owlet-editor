@@ -1,0 +1,1 @@
+[["a=2:IF a=2 THEN a=(3=-1) ELSE GOTO 0", "ok", "#102"]]
