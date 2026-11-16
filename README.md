@@ -195,7 +195,9 @@ after being written on one, should still work.
   - Not taken: `COLORS=7`, `COLOR=7`, `COLOR(1)=7` and `COLOR?1=7` (assignments, valid as written), `LETCOLOR=3`,
     `PRINT COLOR`, `X=COLOR` (not the start of a statement), `COLOR 1,2` and `COLOR 7 7` (not one expression, which
     BASIC II rejects as ever), `color 7` (keywords are upper case, on the Master too), and anything in a string, `REM`,
-    `DATA` or `*` command. A `COLOR` alone at the end of the line is a variable still being typed and is not red.
+    `DATA` or `*` command, or on a line of an assembler block that an earlier line opened (the ROM tokenises each line on its
+    own, and in a block `COLOR` is assembled text, so the tokeniser carries the block from line to line as the highlighter does).
+    A `COLOR` alone at the end of the line is a variable still being typed and is not red.
     `COLORS` alone is read as `COLOUR S`, since that is a whole statement, and goes back to a variable at `COLORS=`.
   - The same reading makes the Model B's tokeniser write `&FB` for it, so the program that runs is the program that
     is shown. The Master is unchanged: there `COLOR` is a keyword everywhere, as its ROM has it.
@@ -215,6 +217,9 @@ statement on the Master's ROM in jsbeeb, and the rows are in `test/rom/verdicts-
 - **Keywords:** `COLOR` is `COLOUR` (the same token) and `EDIT` is a command (token `&CE`, which BASIC II does not have).
   The tokeniser is otherwise BASIC II's, which `lexfuzz.mjs --master` checks, apart from dropping the spaces at the end
   of a line as it stores it.
+  It is a command only to the prompt: wherever a program starts a statement with it (`EDITED=FALSE` reads as `EDIT`
+  then `ED=FALSE`, and `ED.` and `EDIT 10` are the same), BASIC stops with `Syntax error`, so that is red; in an
+  expression (`PRINT EDIT`) it is a missing variable, as for any keyword.
 - **`VDU`:** a `|` ends an item as `,` and `;` do, and sends nine zeros, so `VDU 23,255,255|` is valid. A `|` straight
   after `VDU`, `,`, `;` or another `|` is still an error, as is a `,` or `;` after one, and a `|` anywhere else.
 - **`EXT#`** is a statement (`EXT#X=0`), read as `PTR#` is; `EXT` without the `#` says `Missing #`.
@@ -228,8 +233,7 @@ statement on the Master's ROM in jsbeeb, and the rows are in `test/rom/verdicts-
   (the aliasing rule above), so it needs an operand. `RMB`, `SMB`, `BBR`, `BBS`, `WAI` and `STP` are not there.
 - **Errors:** `Bad Hex` for BASIC IV's `Bad HEX`. `ERROR 5,"x"` is a syntax error, as on BASIC II.
 
-Not covered: `LIST IF` and `EDIT`'s arguments (`EDIT X` is a syntax error, which the recogniser does not see, as it does
-not read the arguments of `LIST` either), and BASIC IV's own message wording beyond `Bad Hex`. `node
+Not covered: `LIST IF`, and BASIC IV's own message wording beyond `Bad Hex`. `node
 tools/rom-oracle/oracle.mjs --master` runs the oracle on the Master with extra statements for BASIC IV
 (`generate-iv.mjs`); `record.mjs --master` and `lexfuzz.mjs --master` do the same for the tables and the tokeniser.
 
