@@ -281,6 +281,9 @@ describe("Text that is wrong, not unfinished", () => {
         ["X=RND(1,", [","]],
         ["GOTO:PRINT", ["GOTO"]],
         ["FOR I=1 TO:NEXT", ["TO"]],
+        ["FOR I:PRINT I:NEXT", ["I"]],
+        ["A=1:FOR I:NEXT", ["I"]],
+        ["IF A THEN PRINT:FOR I:NEXT", ["I"]],
     ])("%s should be red", (text, expected) => {
         assert.deepStrictEqual(red(text), expected);
     });

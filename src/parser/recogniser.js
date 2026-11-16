@@ -63,7 +63,8 @@ const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
-const Completions = [...new Set([...keywords.map(kw => kw.keyword), ...Mnemonics, "TOP"])];
+const KeywordCompletions = [...new Set([...keywords.map(kw => kw.keyword), "TOP"])];
+const AssemblerCompletions = [...new Set([...KeywordCompletions, ...Mnemonics])];
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
@@ -167,9 +168,9 @@ export class Recogniser {
     }
 
     // Marks the statement that failed, and skips what is left of it.
-    recover(e, statementStart, atEnd) {
+    recover(e, statementStart, atEnd, assembling = false) {
         if (!(e instanceof Failure)) throw e;
-        const problem = this.mark(e, statementStart);
+        const problem = this.mark(e, statementStart, assembling);
         while (!atEnd()) this.next();
         this.redden(problem);
     }
@@ -181,10 +182,10 @@ export class Recogniser {
 
     // An error at the end of a statement is shown on its last token, and one straight after a name that BASIC did not
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
-    mark(failure, statementStart) {
+    mark(failure, statementStart, assembling) {
         let {token} = failure;
         const {message} = failure;
-        const ended = failure.unfinished || this.completable(token, statementStart);
+        const ended = failure.unfinished || this.completable(token, statementStart, assembling);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
         const atEnd = token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE";
@@ -228,8 +229,9 @@ export class Recogniser {
     }
 
     // Whether the name or keyword at the end of the line, or the keyword before a name that follows it with no space
-    // (END, P), starts a longer keyword or mnemonic that makes the statement valid (MOD is MODE, TO is TOP).
-    completable(token, statementStart) {
+    // (END, P), starts a longer keyword, or a mnemonic in an assembler block, that makes the statement valid (MOD is
+    // MODE, TO is TOP).
+    completable(token, statementStart, assembling) {
         const {text} = this.lexer;
         if (
             this.probing ||
@@ -243,7 +245,7 @@ export class Recogniser {
         if (before?.kind === "keyword" && before.end === token.start) starts.push(before.start);
         return starts.some(start => {
             const typed = text.slice(start).toUpperCase();
-            return Completions.some(word => {
+            return (assembling ? AssemblerCompletions : KeywordCompletions).some(word => {
                 if (word.length <= typed.length || !word.startsWith(typed)) return false;
                 return this.valid(text.slice(0, start) + word, statementStart, text.length);
             });

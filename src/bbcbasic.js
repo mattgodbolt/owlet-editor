@@ -200,7 +200,7 @@ function lineWarnings(line, lineTokens) {
     const warn = (start, length, details) =>
         warnings.push({start, end: start + length, ...details});
 
-    const isName = token => token.invalid || token.kind === "name" || token.kind === "fnname";
+    const isName = token => token.kind !== "fnname" && (token.invalid || token.kind === "name");
     for (const token of lineTokens.filter(isName)) {
         const keyword = upperCaseKeyword(line, token);
         // Don't warn about lower case versions of immediate commands, e.g. `new`.

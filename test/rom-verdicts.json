@@ -1103,5 +1103,11 @@
   ["PRINT ERROR 1", "No such variable", "#172"],
   ["ERROR 1,\"a\"", "Syntax error", "#172"],
   ["IF X THEN ERROR 2,\"b\"", "Syntax error", "#172"],
-  ["ON ERROR PRINT 1", "ok", "#172"]
+  ["ON ERROR PRINT 1", "ok", "#172"],
+  ["FOR I:PRINT I:NEXT", "Mistake", "#201"],
+  ["FOR I:", "Mistake", "#201"],
+  ["FOR I", "Mistake", "#201"],
+  ["IF A THEN PRINT:FOR I:NEXT", "Mistake", "#201"],
+  ["A=1:FOR I:NEXT", "Mistake", "#201"],
+  ["FOR I:PRINT I", "Mistake", "#201"]
 ]
