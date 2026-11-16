@@ -176,6 +176,15 @@ describe("BASIC IV", () => {
         setBasicIV(false);
         expect(getSyntaxMarkers("X=&G")[0].message).toContain("Bad HEX");
     });
+    it.each([
+        ["ON 1 PRINT", false, "Expected GOTO or GOSUB after PRINT (BASIC: ON syntax)"],
+        ["ON 1 PRINT", true, "Expected GOTO, GOSUB or PROC after PRINT (BASIC: ON syntax)"],
+        ["ON 1 PROCp", false, "Expected GOTO or GOSUB here, not PROC (BASIC: ON syntax)"],
+        ["ON 1 PROCp", true, null],
+    ])("should name only what ON accepts: %j on BASIC IV %j", (text, basicIV, expected) => {
+        setBasicIV(basicIV);
+        expect(getSyntaxMarkers(text)[0]?.message ?? null).toBe(expected);
+    });
 });
 
 describe("Each BASIC's own recorded rows", () => {

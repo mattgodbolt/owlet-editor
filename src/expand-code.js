@@ -10,7 +10,9 @@ export function debbreviate(text) {
         .map(line =>
             lexLine(line)
                 .map(token =>
-                    token.kind === "keyword" && !token.raw ? token.kw.keyword : token.text,
+                    token.kind === "keyword" && !token.raw
+                        ? token.kw.keyword
+                        : line.slice(token.start, token.end),
                 )
                 .join(""),
         )

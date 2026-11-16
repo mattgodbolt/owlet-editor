@@ -1,0 +1,10 @@
+[
+  ["ON 1 GOTO 10", "ok", "#237"],
+  ["ON 1 GOSUB 10", "ok", "#237"],
+  ["ON 1 PROCp,PROCq", "ok", "#237"],
+  ["ON X GOTO 10,20 ELSE PRINT", "ok", "#237"],
+  ["ON ERROR PRINT", "ok", "#237"],
+  ["ON ERROR OFF", "ok", "#237"],
+  ["ON 1 THEN 10", "ON syntax", "#237"],
+  ["ON 1 PRINT", "ON syntax", "#237"]
+]

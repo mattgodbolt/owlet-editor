@@ -1,7 +1,7 @@
 // BBC BASIC II's tokeniser, ported: it finds keywords where the ROM does, with the ROM's start-of-statement and
 // line-number flags, so that each token is what BASIC will see when it runs the line. It also splits the text BASIC
 // leaves alone (names, numbers, strings, punctuation) into the pieces the interpreter reads.
-import {Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
+import {byteChar, Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
 import {currentDialect} from "./dialect.js";
 
 // Typed text matches the first entry of the table with each spelling; PAGE, PTR, TIME, LOMEM and HIMEM come again at
@@ -50,6 +50,22 @@ const Pattern = {
 };
 const isNameChar = c => c !== undefined && /[\w`]/.test(c);
 
+// The line as BASIC reads it. The bot and the emulator's tokeniser keep only the low eight bits of each UTF-16 code
+// unit, so U+0141 is A, U+0122 is a quote and U+01A2 and U+00A2 are both the byte &A2, and other programs choose
+// other spellings. A character from U+0080 up becomes the one Owlet writes for its byte, or the ASCII character it
+// stands for; the length is unchanged, so offsets in this view are offsets in the text. A control byte stays as it
+// is: U+010A is data, not a line break.
+const NotAscii = /[\u0080-\uffff]/;
+const PrintableAscii = /[ -~]/;
+export function byteView(text) {
+    if (!NotAscii.test(text)) return text;
+    return text.replace(/[\u0080-\uffff]/g, char => {
+        const byte = char.charCodeAt(0) & 0xff;
+        if (byte >= 0x80) return byteChar(byte);
+        return PrintableAscii.test(String.fromCharCode(byte)) ? String.fromCharCode(byte) : char;
+    });
+}
+
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
 export function matchKeyword(text, i, dialect = currentDialect()) {
@@ -75,8 +91,9 @@ function isUnreadAbbreviation(text, start, end, dialect) {
 // statement token's) for a keyword. Kinds: white, linenum, keyword, name, fnname, number, hex, string, punct, comment
 // (after REM), data (after DATA), oscli (a * command). A string has `closed`, a token after white space `spaced`.
 export class Lexer {
-    constructor(text, dialect = currentDialect()) {
-        this.text = text;
+    constructor(source, dialect = currentDialect()) {
+        this.source = source;
+        this.text = byteView(source);
         this.dialect = dialect;
         this.pos = 0;
         // BASIC reads a number at the start of a line as a line number, and so one after a keyword that leaves the
