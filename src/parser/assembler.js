@@ -9,7 +9,10 @@
 //   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9. Where
 //   it is the third character, the two letters before it are marked instead (LD is not an instruction).
 
+import {matchKeyword} from "./lexer.js";
+
 export const JunkAfterInstructionCode = "junk-after-instruction";
+export const SpaceAfterMnemonicCode = "space-after-mnemonic";
 
 const words = text => new Set(text.split(" "));
 const Implied = words(
@@ -82,21 +85,43 @@ export class Assembler {
         if (this.comment("\\")) return;
         this.labels();
         if (r.is("end") || r.isPunct(":", "]") || this.comment("\\")) return;
-        this.operand(this.mnemonic());
+        const first = r.peek();
+        const mnemonic = this.mnemonic();
+        const operand = r.peek();
+        this.operand(mnemonic);
         if (this.comment(";", "\\")) return;
         let junk = null;
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (junk) continue;
             junk = token;
-            this.stricter(
-                token,
-                token.text === "]"
-                    ? "BASIC ignores this ] and goes on assembling, as it ignores everything after a complete instruction; probably a : is missing before it"
-                    : "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
-                JunkAfterInstructionCode,
-            );
+            const space = this.keywordAfterMnemonic(first, mnemonic, operand);
+            if (space) this.stricter(token, space, SpaceAfterMnemonicCode, operand);
+            else
+                this.stricter(
+                    token,
+                    token.text === "]"
+                        ? "BASIC ignores this ] and goes on assembling, as it ignores everything after a complete instruction; probably a : is missing before it"
+                        : "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
+                    JunkAfterInstructionCode,
+                );
         }
+    }
+
+    // The message for junk after an instruction whose operand begins with a name that spells a keyword, straight after
+    // a mnemonic that takes an operand, where a space before it would leave no junk; otherwise null. BASIC tokenises a
+    // keyword only at the start of a word, so STAH.,X is STA, the variable H, and junk.
+    keywordAfterMnemonic(first, mnemonic, operand) {
+        const r = this.recogniser;
+        const {text} = r.lexer;
+        const keyword =
+            operand.kind === "name" && !operand.spaced && matchKeyword(text, operand.start);
+        if (!keyword || Implied.has(mnemonic) || r.probing) return null;
+        const spaced = `${text.slice(0, operand.start)} ${text.slice(operand.start)}`;
+        if (!r.valid(spaced, first, operand.start)) return null;
+        const written = text.slice(first.start, operand.start);
+        const spelling = text.slice(operand.start, keyword.end);
+        return `${spelling} here is read as the variable ${operand.text}, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows ${written} with no space, so the rest of the instruction is ignored; probably a space was meant after ${written}`;
     }
 
     // A comment runs to the next colon, whatever the tokeniser made of it.
@@ -203,12 +228,12 @@ export class Assembler {
         }
     }
 
-    // Marks a token that BASIC accepts but that is almost certainly a mistake.
-    stricter(token, message, code) {
+    // Marks a token that BASIC accepts but that is almost certainly a mistake; the problem's text starts at `from`.
+    stricter(token, message, code, from = token) {
         token.invalid = true;
         this.recogniser.problems.push({
             message,
-            token,
+            token: from,
             end: token.end,
             unfinished: false,
             hole: false,

@@ -6,7 +6,7 @@ import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/lan
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {ForeignOperators} from "./parser/recogniser";
-import {JunkAfterInstructionCode} from "./parser/assembler";
+import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
 
@@ -89,6 +89,18 @@ export const codeActionProvider = {
                 };
                 return quickFix(model, marker, `Insert a space after ${abbreviation}`, at, " ");
             }
+            if (marker.code === SpaceAfterMnemonicCode) {
+                const before = model
+                    .getLineContent(marker.startLineNumber)
+                    .slice(0, marker.startColumn - 1);
+                const [mnemonic] = before.match(/EQU[BDSW]$|.{3}$/i);
+                const at = {
+                    ...marker,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn,
+                };
+                return quickFix(model, marker, `Insert a space after ${mnemonic}`, at, " ");
+            }
             if (marker.code === JunkAfterInstructionCode) {
                 const at = {
                     ...marker,
@@ -124,6 +136,7 @@ const QuickFixCodes = new Set([
     LowerCaseKeywordCode,
     ForeignOperatorCode,
     JunkAfterInstructionCode,
+    SpaceAfterMnemonicCode,
 ]);
 
 const marker = (severity, line, start, end, details) => ({

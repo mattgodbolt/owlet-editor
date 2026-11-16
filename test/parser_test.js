@@ -31,6 +31,20 @@ const KnownGaps = ["X=FNf (1)", "PROCp (1)"];
 // Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
 // instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
 const StricterThanRom = [
+    "[OPT0:STAH.,X:]",
+    "[OPT0:LDAUSR@%+GET:]",
+    "[OPT0:LDAH.:]",
+    "[OPT0:EQUBH.:]",
+    "[OPT0:ORAH.:]",
+    "[OPT0:JMPH.:]",
+    "[OPT0:ASLH.:]",
+    "[OPT0:LDAP.,X:]",
+    "[OPT0:LDAPRINT 5:]",
+    "[OPT0:staH.,x:]",
+    "[OPT0:LDAGETX 5:]",
+    "[OPT0:NOP PAGE:]",
+    "[OPT0:INXH.:]",
+    "[OPT0:NOPPAGE:]",
     "[OPT0:NOP PRINT:]",
     "[OPT0:LDA #1 FOR:]",
     "[OPT0:LDA #1 hello:]",
@@ -534,6 +548,37 @@ describe("Junk after a complete instruction", () => {
         assert.ok(problem.message.startsWith(begins), problem.message);
         assert.match(problem.message, junk === "]" ? /a : is missing/ : /a ; is missing/);
     });
+    // BASIC tokenises a keyword only at the start of a word, so one straight after a mnemonic is a variable's name.
+    it.each([
+        ["[OPT0:STAH.,X:]", "H.", ".", "H. here is read as the variable H, not the keyword"],
+        ["[OPT0:LDAUSR@%+GET:]", "USR@%", "@%", "USR here is read as the variable USR"],
+        ["[OPT0:EQUBH.:]", "H.", ".", "H. here is read as the variable H"],
+    ])(
+        "%s should show %j as one problem, red on %j, that says a space was probably meant",
+        (text, shown, junk, begins) => {
+            const [problem] = stricter(text);
+            assert.deepStrictEqual(red(text), [junk]);
+            assert.strictEqual(text.slice(problem.start, problem.end), shown);
+            assert.strictEqual(problem.code, "space-after-mnemonic");
+            assert.ok(problem.message.startsWith(begins), problem.message);
+            assert.match(problem.message, /follows (?:STA|LDA|EQUB) with no space/);
+            assert.match(problem.message, /probably a space was meant after (?:STA|LDA|EQUB)$/);
+        },
+    );
+    it.each([
+        ["[OPT0:NOPPAGE:]", "PAGE"],
+        ["[OPT0:INXH.:]", "H"],
+        ["[OPT0:LDAP.,X:]", "."],
+        ["[OPT0:LDAPRINT 5:]", "5"],
+        ["[OPT0:LDAGETX 5:]", "5"],
+    ])(
+        "%s should still say a ; is probably missing, as a space would not mend it",
+        (text, junk) => {
+            const [problem] = stricter(text);
+            assert.strictEqual(text.slice(problem.start, problem.end), junk);
+            assert.strictEqual(problem.code, "junk-after-instruction");
+        },
+    );
     it("should leave the block open after a ] that is ignored, so the next line is assembled", () => {
         const [first, second] = programProblems("[LDA #1]\ntax=1\n]").filter(p => p.stricter);
         assert.deepStrictEqual([first.line, first.start], [1, 7]);

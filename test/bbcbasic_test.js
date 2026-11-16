@@ -1164,6 +1164,9 @@ describe("Quick fixes and syntax markers", () => {
         ]);
         assert.deepStrictEqual(offered("[OPT0:NOP hello:]"), ["Insert ; before the junk"]);
     });
+    it("should offer only the space for a keyword straight after a mnemonic", () => {
+        assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
+    });
     // The fixes offered for the junk markers of the text, applied one at a time, with the text each leaves.
     function fixed(text) {
         const model = editor.createModel(text, LanguageId);
@@ -1189,6 +1192,13 @@ describe("Quick fixes and syntax markers", () => {
         ["[LDA #1]\ntax=1\n]", "Insert : before ]", "[LDA #1:]\ntax=1\n]"],
         ["[OPT0:NOP hello:]", "Insert ; before the junk", "[OPT0:NOP ;hello:]"],
         ["[OPT0:LDA #1 ,X:]", "Insert ; before the junk", "[OPT0:LDA #1 ;,X:]"],
+        ["[OPT0:STAH.,X:]", "Insert a space after STA", "[OPT0:STA H.,X:]"],
+        ["[OPT0:LDAUSR@%+GET:]", "Insert a space after LDA", "[OPT0:LDA USR@%+GET:]"],
+        ["[OPT0:LDAH.:]", "Insert a space after LDA", "[OPT0:LDA H.:]"],
+        ["[OPT0:EQUBH.:]", "Insert a space after EQUB", "[OPT0:EQUB H.:]"],
+        ["[OPT0:.lab STAH.,X:]", "Insert a space after STA", "[OPT0:.lab STA H.,X:]"],
+        ["[OPT0:NOPPAGE:]", "Insert ; before the junk", "[OPT0:NOP;PAGE:]"],
+        ["[OPT0:LDAP.,X:]", "Insert ; before the junk", "[OPT0:LDAP;.,X:]"],
     ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
         const [offer] = fixed(text).filter(([name]) => name === title);
         assert.deepStrictEqual(offer, [title, result]);
@@ -1227,6 +1237,13 @@ describe("Syntax markers", () => {
         const reads =
             "LD is not an instruction: the register letter is missing. BASIC reads the 8 as X (LDX), so what follows is the address; probably LDA, LDX or LDY was meant";
         assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 2, 4]]);
+    });
+    it("should say that a keyword straight after a mnemonic is read as a variable, and a space was meant", () => {
+        const message =
+            "H. here is read as the variable H, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows STA with no space, so the rest of the instruction is ignored; probably a space was meant after STA";
+        assert.deepStrictEqual(markers("[OPT0:STAH.,X:]"), [
+            [MarkerSeverity.Error, message, 1, 10, 12],
+        ]);
     });
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         const Hole = rom => `Unfinished statement: BASIC would stop with "${rom}" here`;
