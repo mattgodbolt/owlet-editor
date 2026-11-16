@@ -1,6 +1,5 @@
-import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {getLineNumberMarkers} from "../src/line-numbers";
-import {beforeAll, describe, expect, it} from "vitest";
+import {describe, expect, it} from "vitest";
 
 const Missing = target => `No line ${target} (BASIC: No such line)`;
 const CannotExist = (target, error = "No such line") =>
@@ -24,9 +23,7 @@ function problems(text, cursorLine) {
 
 const messages = (text, cursorLine) => problems(text, cursorLine).map(([, , message]) => message);
 
-describe.each(["monarch", "new"])("Line number markers with the %s parser", parser => {
-    beforeAll(() => registerBbcBasicLanguage(parser));
-
+describe("Line number markers", () => {
     it("should mark a missing line for each keyword that BASIC looks the line up for", () => {
         const cases = [
             ["GOTO 11", [Missing(11)]],

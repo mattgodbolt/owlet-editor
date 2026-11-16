@@ -1,28 +1,26 @@
 // A differential test of the highlighter against BBC BASIC II: generated statements are run on the real ROM (in
-// jsbeeb, from the jsbeeb dependency's ROMs) and highlighted by src/bbcbasic.js, and the statements where the two
+// jsbeeb, from the jsbeeb dependency's ROMs) and highlighted by src/parser, and the statements where the two
 // disagree about whether there is a syntax error are reported, grouped by the shape of statement they came from.
 //
 //   node tools/rom-oracle/oracle.mjs [--seed N] [--count N] [--examples N] [--summary] [--input extra.json]
-//                                    [--parser new]
 //
 // --count is the number of random statements on top of the fixed set (every keyword at the start of a statement,
 // abbreviated, misspelt...). --input adds statements from a JSON list of {shape, text}. --summary prints only the
-// counts. --parser new tries the tokenizer in src/parser instead of the Monarch grammar. Results go to
-// .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a grammar change only runs the
-// highlighter (delete the directory after changing rom.mjs); results.json has every statement's verdicts.
+// counts. Results go to .cache/rom-oracle/: the ROM's verdicts are cached there by statement, so a rerun after a
+// change to src/parser only runs the highlighter (delete the directory after changing rom.mjs); results.json has every
+// statement's verdicts.
 //
 // FALSE-VALID: the ROM reports a syntax error and nothing is highlighted as invalid. FALSE-INVALID: the ROM runs the
 // statement without error and something is highlighted as invalid. A statement that stops with any other error (or
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
 // nothing about what BASIC skips (see unread.mjs and dropMarksNeverRead), so invalid tokens there are left out. A
-// disagreement is per statement: it does not say where the error is. With --parser new a statement can also be
-// UNFINISHED or STRICTER, and only a mark's first token is evidence; the README ("Highlighting: what red means")
-// has the policy for both.
+// disagreement is per statement: it does not say where the error is. A statement can also be UNFINISHED or STRICTER,
+// and only a mark's first token is evidence; the README ("Highlighting: what red means") has the policy for both.
 // Not run by npm test.
-import {spawnSync} from "child_process";
 import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
+import {highlightLine, programProblems} from "../../src/parser/highlight.js";
 import {generate} from "./generate.mjs";
 import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
 import {isUnread, unreadRanges} from "./unread.mjs";
@@ -75,29 +73,27 @@ async function romVerdicts(texts) {
     return texts.map(text => cache[text]);
 }
 
+// For each text: its invalid tokens as [start, end], and the spans of its problems that are unfinished, stricter than
+// the ROM on purpose, or text the ROM ignores (junk after an assembler instruction).
 function highlighterVerdicts(texts) {
-    const input = path.join(OutDir, "highlight.in.json");
-    const output = path.join(OutDir, "highlight.out.json");
-    fs.writeFileSync(input, JSON.stringify(texts));
-    const vitest = path.join(Root, "node_modules/vitest/vitest.mjs");
-    const config = path.join(Root, "tools/rom-oracle/vitest.config.mjs");
-    const result = spawnSync(
-        process.execPath,
-        [vitest, "run", "--config", config, "tools/rom-oracle/highlight.mjs"],
-        {
-            cwd: Root,
-            env: {
-                ...process.env,
-                ORACLE_IN: input,
-                ORACLE_OUT: output,
-                ORACLE_PARSER: option("parser", ""),
-            },
-            encoding: "utf8",
-        },
-    );
-    if (result.status !== 0)
-        throw new Error(`Highlighting failed:\n${result.stdout}${result.stderr}`);
-    return JSON.parse(fs.readFileSync(output, "utf8"));
+    return texts.map(text => {
+        const tokens = highlightLine(text).tokens.filter(
+            (token, i, all) => i === 0 || token.type !== all[i - 1].type,
+        );
+        const invalid = tokens.flatMap((token, i) =>
+            token.type.includes("invalid")
+                ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
+                : [],
+        );
+        const problems = programProblems(text);
+        const spans = field => problems.flatMap(p => (p[field] ? [[p.start, p.end]] : []));
+        return {
+            invalid,
+            unfinished: spans("unfinished"),
+            stricter: spans("stricter"),
+            ignored: spans("code"),
+        };
+    });
 }
 
 // The invalid tokens outside the text that BASIC skipped, if given its tokenisation.
