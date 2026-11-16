@@ -1,0 +1,4 @@
+[
+  ["[OPT0:LDA#ERROR1:]", "No such variable", "#57"],
+  ["X=FNf+1", "ok", "#57"]
+]

@@ -9,8 +9,7 @@ import {
 import {problemCount} from "../src/problem-count";
 import {highlightLine, readLines} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
-import {falseInvalid, verdicts} from "./rom-tables";
-import RomTokens from "./rom-tokens.json";
+import {falseInvalid, RomTokens, verdicts} from "./rom-tables";
 import {describe, it} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/editor/editor.api";
@@ -399,7 +398,7 @@ describe("Tokenisation", () => {
 
     describe("examples from the issues", () => {
         // Each is a line someone reported (the number is the issue or pull request), with its tokens; the ROM's
-        // verdict on it, or on the statement it comes from, is a row of test/rom-verdicts.json with the same number.
+        // verdict on it, or on the statement it comes from, is a row of test/rom/verdicts with the same number.
         it("should read each as reported", () => {
             const cases = [
                 ["#26", "Z%=2E4", "0:variable 2:operator 3:number.float"],

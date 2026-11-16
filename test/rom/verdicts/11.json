@@ -1,0 +1,5 @@
+[
+  ["A=&3000:P.\"moo\";:?A=1:MO.2", "ok", "#11"],
+  ["A=&3000:I.\"moo\":?A=1:MO.2", "ok", "#11"],
+  ["PRINTASNSINACSCOSPI:PRINTASNSINACSCOSPI", "ok", "#11"]
+]

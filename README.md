@@ -96,7 +96,7 @@ rest of this section holds for either. The colours are a function of the text al
   squiggle: at its end, or at the token where the statement stopped when something is missing from the middle. Both
   come from the recogniser that colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`,
   `No TO`, `Missing ,`, `Missing "` and so on) where the recogniser knows it; the recorded rows in
-  `test/rom-verdicts.json` are checked against it, and where a site is worded differently by context (a call's
+  `test/rom/verdicts` are checked against it, and where a site is worded differently by context (a call's
   arguments) there is no text rather than a guess. Markers may depend on the cursor, unlike the colours: the line the
   cursor is on is not marked as unfinished (it would blink with every key), and is marked as soon as the cursor
   leaves it. An assembler block that is never closed is one error on its `[` in place of one per later line (the
@@ -172,8 +172,8 @@ message that says what BASIC does, and shows as an error.
 With the Master chosen the parser follows BASIC IV, which differs from BASIC II in these ways (`src/parser/dialect.js`
 holds the setting, which the lexer, recogniser and assembler read as each line is made; highlighting, markers, warnings
 and completions all follow it, and a change of machine colours the text again). Each was checked by running the
-statement on the Master's ROM in jsbeeb, and the rows are in `test/rom-verdicts-master.json` and
-`test/rom-tokens-master.json`; the tests check each row against the rules of its own machine.
+statement on the Master's ROM in jsbeeb, and the rows are in `test/rom/verdicts-master` and
+`test/rom/tokens-master`; the tests check each row against the rules of its own machine.
 
 - **Keywords:** `COLOR` is `COLOUR` (the same token) and `EDIT` is a command (token `&CE`, which BASIC II does not have).
   The tokeniser is otherwise BASIC II's, which `lexfuzz.mjs --master` checks, apart from dropping the spaces at the end
@@ -201,13 +201,15 @@ which BASIC would stop with an error and the rest of that statement, and the ass
 work as for any Monaco language (an unclosed `(` is not red while its line is unfinished).
 
 Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
-statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
-`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict. A byte of 0x80
+statement on BBC BASIC II and records its verdict (the error's name or `ok`) in `test/rom/verdicts`, and
+`--tokens` records the ROM's tokenisation of a line in `test/rom/tokens`; nobody types a verdict. A byte of 0x80
 or above cannot go through the shell, so `--hex '53 54 8d 20 39'` takes the statement as hex bytes (also for each
 `--file` line); the row's text is those bytes as Owlet shows them, U+0100 plus the byte below 0xA0.
 `--source '#149'` ends each row with the issue it comes from, so that a report seen before is one search of the tables
-away. Before a change to highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on
-generated statements (see the comment at its top).
+away, and keeps the row in that table's `149.json` (rows without a source go in `unsourced.json`): each table is a
+directory with a file per source, so pull requests that record rows do not conflict. Always give `--source`, and do
+not edit the files by hand; a test fails if a row is in the wrong file. Before a change to
+highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on generated statements (see the comment at its top).
 
 ## Known Issues
 

@@ -1,0 +1,13 @@
+[
+  ["IF1THEN*H.", "ok", "#112"],
+  ["IF0ELSE*H.", "ok", "#112"],
+  ["ONERROR*HELP", "ok", "#112"],
+  ["IF0EL.*H.", "ok", "#112"],
+  ["IF0TH.*H.", "ok", "#112"],
+  ["IF0ELS.*H.", "ok", "#112"],
+  ["IF0THE.*H.", "ok", "#112"],
+  ["ONERRO.*HELP", "ok", "#112"],
+  ["ONERR.*HELP", "ok", "#112"],
+  ["LET*HELP", "Syntax error", "#112"],
+  ["ELSE*HELP", "ok", "#112"]
+]

@@ -1,0 +1,5 @@
+[
+  ["P.~~42", "ok", "#152"],
+  ["P.STR$~~42", "No such variable", "#152"],
+  ["A$=STR$~~42", "No such variable", "#152"]
+]

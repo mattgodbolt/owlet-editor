@@ -1,6 +1,6 @@
 import {debbreviate, expandCode} from "../src/expand-code";
 import {detokenise, forEachBasicLine, partialDetokenise} from "../src/tokens";
-import RomTokens from "./rom-tokens.json";
+import {RomTokens} from "./rom-tables";
 import {describe, it} from "vitest";
 import assert from "assert";
 

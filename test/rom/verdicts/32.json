@@ -1,0 +1,14 @@
+[
+  ["B=1:C=1:A+=B", "Mistake", "#32"],
+  ["B=1:C=1:A-=B", "Mistake", "#32"],
+  ["B=1:C=1:A/=B", "Mistake", "#32"],
+  ["B=1:C=1:A*=B", "Mistake", "#32"],
+  ["B=1:C=1:A^=B", "Mistake", "#32"],
+  ["B=1:C=1:A=B<<C", "No such variable", "#32"],
+  ["B=1:C=1:A=B>>C", "No such variable", "#32"],
+  ["B=1:C=1:IFA==B:P.", "No such variable", "#32"],
+  ["B=1:C=1:IFA!=B:P.", "No such variable", "#32"],
+  ["B=1:C=1:IFA=>B:P.", "No such variable", "#32"],
+  ["B=1:C=1:IFA=<B:P.", "No such variable", "#32"],
+  ["B=1:C=1:IFA><B:P.", "No such variable", "#32"]
+]

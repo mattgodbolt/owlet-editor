@@ -1,0 +1,5 @@
+[
+  ["ERROR 5,\"x\"", "Syntax error", "#144"],
+  ["FOR I=AB. TOP TO 9:N.", "ok", "#144"],
+  ["PRINT \"abc", "Missing \"", "#144"]
+]

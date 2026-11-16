@@ -1,0 +1,7 @@
+[
+  ["[OPT0:ROR A ; Anagram of ROAR:]", "ok", "6a", "#78"],
+  ["[OPT0:ROR A | Anagram of ROAR:]", "ok", "6a", "#78"],
+  ["[OPT0:ROR A Anagram of ROAR:]", "ok", "6a", "#78"],
+  ["[OPT0:\\ comment:]", "ok", "", "#78"],
+  ["[OPT0:; comment:]", "Syntax error", "#78"]
+]

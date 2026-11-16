@@ -1,27 +1,27 @@
-// Records what BBC BASIC II does with each statement given, as rows appended to a table the tests read, so that no
-// expected value is typed by hand.
+// Records what BBC BASIC II does with each statement given, as rows added to a table the tests read, so that no
+// expected value is typed by hand. A table is a directory under test/rom with a file per --source, so that pull
+// requests recording different rows change different files (see tables.mjs).
 //
 //   node tools/rom-oracle/record.mjs [--tokens] [--hex] [--master] [--source '#123'] [--file statements.txt] [statement ...]
 //
-// --master runs them on the Master's BASIC IV and keeps the rows in test/rom-verdicts-master.json and
-// test/rom-tokens-master.json, the tables for the parser's BASIC IV rules.
+// --master runs them on the Master's BASIC IV and keeps the rows in test/rom/verdicts-master and
+// test/rom/tokens-master, the tables for the parser's BASIC IV rules.
 //
-// By default each row is [text, verdict] in test/rom-verdicts.json, where the verdict is the name of the syntax error
+// By default each row is [text, verdict] in test/rom/verdicts, where the verdict is the name of the syntax error
 // the ROM stops with (as in rom.mjs) or "ok". A statement in [ ] is run as assembler after DIM P% 100:Q%=P%: and its
 // row also has the bytes it assembled. A statement that stops with any other error, or runs too long, says nothing
 // about syntax and is not recorded, nor is one that starts with a digit (BASIC would store it as a line). With
 // --hex gives each statement (and each --file line) as the hex bytes BASIC is to read, such as '53 54 8d 20 39', for
 // bytes of 0x80 and above, which the shell would turn into U+FFFD; the row's text is those bytes as Owlet shows them
 // (U+0100 plus the byte for a control, DEL or token byte below 0xA0), which the ROM reads back as the same bytes. With
-// --tokens each row is [text, bytes] in test/rom-tokens.json: the ROM's tokenisation of the text as a line of a
-// program, in hex. --file reads one statement per line. --source ends each row with the issue or pull request it comes
-// from, so that a report seen again is found as a row; a row already in the table keeps its verdict, and gets the
-// source if it has none.
+// --tokens each row is [text, bytes] in test/rom/tokens: the ROM's tokenisation of the text as a line of a
+// program, in hex. --file reads one statement per line. --source '#123' ends each row with the issue or pull
+// request it comes from and keeps it in 123.json, so that a report seen again is found as a row and rows from
+// different pull requests do not conflict; give one. A row already in the table keeps its verdict, and gets the source
+// if it has none.
 import fs from "fs";
-import path from "path";
-import {fileURLToPath} from "url";
-import prettier from "prettier";
 import {createRom, SyntaxErrors} from "./rom.mjs";
+import {nameForSource, readTable, rowSource, writeTable} from "./tables.mjs";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 const owletRawByte = b => (b < 0x20 || (b >= 0x7f && b < 0xa0) ? b + 0x100 : b);
@@ -32,7 +32,6 @@ const fromHex = text => {
     return String.fromCharCode(...digits.map(digit => owletRawByte(parseInt(digit, 16))));
 };
 
-const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
 const tokens = args.includes("--tokens");
 const master = args.includes("--master");
@@ -40,6 +39,8 @@ const asHex = args.includes("--hex");
 const fileIndex = args.indexOf("--file");
 const sourceIndex = args.indexOf("--source");
 const source = sourceIndex < 0 ? null : args[sourceIndex + 1];
+if (source !== null && !/^#\d+$/.test(source))
+    throw new Error(`--source is an issue or pull request such as '#123': ${source}`);
 const isOptionValue = i => [fileIndex, sourceIndex].some(index => index >= 0 && i === index + 1);
 const texts = args.filter((arg, i) => !arg.startsWith("--") && !isOptionValue(i));
 if (fileIndex >= 0)
@@ -50,11 +51,7 @@ if (fileIndex >= 0)
             .filter(Boolean),
     );
 if (asHex) texts.forEach((text, i) => (texts[i] = fromHex(text)));
-const tableFile = path.join(
-    Root,
-    "test",
-    `${tokens ? "rom-tokens" : "rom-verdicts"}${master ? "-master" : ""}.json`,
-);
+const table = `${tokens ? "tokens" : "verdicts"}${master ? "-master" : ""}`;
 
 async function record(rom, text) {
     if (tokens) return [text, hex(await rom.tokenise(text))];
@@ -68,13 +65,23 @@ async function record(rom, text) {
 }
 
 async function main() {
-    const table = fs.existsSync(tableFile) ? JSON.parse(fs.readFileSync(tableFile, "utf8")) : [];
-    const known = new Map(table.map(row => [row[0], row]));
+    const files = readTable(table);
+    const known = new Map(
+        [...files].flatMap(([name, rows]) => rows.map(row => [row[0], {name, row}])),
+    );
     const rom = await createRom(master ? "Master" : undefined);
+    const add = (name, row) => files.set(name, [...(files.get(name) ?? []), row]);
     for (const text of texts) {
         if (known.has(text)) {
-            const row = known.get(text);
-            if (source && !row.slice(1).some(cell => cell.startsWith("#"))) row.push(source);
+            const {name, row} = known.get(text);
+            if (source && !rowSource(row)) {
+                files.set(
+                    name,
+                    files.get(name).filter(other => other !== row),
+                );
+                row.push(source);
+                add(nameForSource(source), row);
+            }
             console.log(`already recorded: ${JSON.stringify(row)}`);
             continue;
         }
@@ -85,12 +92,11 @@ async function main() {
         }
         if (source) row.push(source);
         console.log(JSON.stringify(row));
-        table.push(row);
-        known.set(text, row);
+        add(nameForSource(source), row);
+        known.set(text, {name: nameForSource(source), row});
     }
     rom.destroy();
-    const options = {...(await prettier.resolveConfig(tableFile)), filepath: tableFile};
-    fs.writeFileSync(tableFile, await prettier.format(JSON.stringify(table), options));
+    await writeTable(table, files);
 }
 
 main().catch(e => {

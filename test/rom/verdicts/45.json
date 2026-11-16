@@ -1,0 +1,5 @@
+[
+  ["PRINT TOP", "ok", "#45"],
+  ["F.P=TOP TOP:P.P:N.", "ok", "#45"],
+  ["FORP=TOP-TOP TOP+TOP/TOP:N.", "ok", "#45"]
+]

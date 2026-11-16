@@ -3,14 +3,18 @@
 import {highlightLine, programProblems} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
 import {isUnread, unreadRanges} from "../tools/rom-oracle/unread.mjs";
-import MasterVerdicts from "./rom-verdicts-master.json";
-import RomVerdicts from "./rom-verdicts.json";
+import {readRows} from "../tools/rom-oracle/tables.mjs";
+
+export const RomVerdicts = readRows("verdicts");
+export const MasterVerdicts = readRows("verdicts-master");
+export const RomTokens = readRows("tokens");
+export const MasterTokens = readRows("tokens-master");
 
 export const verdicts = new Map(RomVerdicts.map(([text, verdict]) => [text, verdict]));
 export const masterVerdicts = new Map(MasterVerdicts.map(([text, verdict]) => [text, verdict]));
 
 // The invalid spans, as [start, end], that the ROM says are wrong to show as invalid: it ran the line without error
-// and read them. Our lexer's bytes are the ROM's tokenisation (test/rom-tokens.json checks that).
+// and read them. Our lexer's bytes are the ROM's tokenisation (test/rom/tokens checks that).
 export function falseInvalid(text, invalid, table = verdicts) {
     if (table.get(text) !== "ok") return [];
     const ranges = unreadRanges(text, romBytes(lexLine(text)));
