@@ -1,6 +1,8 @@
 import {configDefaults, defineConfig} from "vitest/config";
+import yaml from "@rollup/plugin-yaml";
 
 export default defineConfig({
+    plugins: [yaml()],
     test: {
         include: [...configDefaults.include, "test/**/*_test.js"],
         // Use browser environment for all tests that need browser APIs
