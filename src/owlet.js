@@ -12,8 +12,8 @@ import {Emulator} from "./emulator";
 import Examples from "./examples.yaml";
 import {expandCode} from "./expand-code";
 import {partialDetokenise} from "./tokens";
+import {createTokenisers, tokeniserFor} from "./tokeniser";
 import {encode} from "base2048";
-import * as tokenise from "jsbeeb/src/basic-tokenise";
 import "./owlet-editor.less";
 import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV, withoutCodes} from "./bbcbasic";
 import {problemCount} from "./problem-count";
@@ -48,7 +48,7 @@ export class OwletEditor {
         $("#version").append(
             build.url ? $("<a>").attr("href", build.url).text(build.label) : build.label,
         );
-        this.tokeniser = null;
+        this.tokenisers = null;
         this.onChangeHandler = onChangeHandler;
         this.onMachineChangeHandler = onMachineChangeHandler;
 
@@ -342,6 +342,11 @@ export class OwletEditor {
             .join("\n");
     }
 
+    /** The tokeniser of the chosen machine's BASIC, or null until they are created at startup. */
+    get tokeniser() {
+        return this.tokenisers && tokeniserFor(this.tokenisers, this.emulator.model);
+    }
+
     tryGetTokenisedText() {
         try {
             return this.tokeniser.tokenise(this.getBasicText());
@@ -563,7 +568,7 @@ export class OwletEditor {
     async initialise(initialState) {
         await this.emulator.initialise();
 
-        this.tokeniser = await tokenise.create();
+        this.tokenisers = await createTokenisers();
 
         const {sound} = this.emulator;
         sound.onChange = state => this.showSound(state);

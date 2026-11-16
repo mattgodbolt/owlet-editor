@@ -1,0 +1,23 @@
+[
+  ["COLORS=7", "43 4f 4c 4f 52 53 3d 37", "#245"],
+  ["LETCOLOR=3", "e9 43 4f 4c 4f 52 3d 33", "#245"],
+  ["COLOR7", "43 4f 4c 4f 52 37", "#245"],
+  [
+    "IFC%COLORC%ELSECOLORD%:NEXT",
+    "e7 43 25 43 4f 4c 4f 52 43 25 8b 43 4f 4c 4f 52 44 25 3a ed",
+    "#245"
+  ],
+  [
+    "X=1:REP.COLORX:P.;X:X=X+1:U.X>7",
+    "58 3d 31 3a f5 43 4f 4c 4f 52 58 3a f1 3b 58 3a 58 3d 58 2b 31 3a fd 58 3e 37",
+    "#245"
+  ],
+  ["ONERRORCOLOR7:GOTO1000", "ee 85 43 4f 4c 4f 52 37 3a e5 8d 64 68 43", "#245"],
+  ["LETCOLOR=3:COLORCOLOR", "e9 43 4f 4c 4f 52 3d 33 3a 43 4f 4c 4f 52 43 4f 4c 4f 52", "#245"],
+  ["color 1", "63 6f 6c 6f 72 20 31", "#245"],
+  ["EDITED=FALSE", "45 44 49 54 45 44 3d a3", "#245"],
+  ["COLOR 7:COLOR 1", "43 4f 4c 4f 52 20 37 3a 43 4f 4c 4f 52 20 31", "#245"],
+  ["COLORS", "43 4f 4c 4f 52 53", "#245"],
+  ["COLOR(1)=3", "43 4f 4c 4f 52 28 31 29 3d 33", "#245"],
+  ["COLOR X", "43 4f 4c 4f 52 20 58", "#245"]
+]

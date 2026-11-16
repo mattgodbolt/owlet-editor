@@ -133,6 +133,8 @@ rest of this section holds for either. The colours are a function of the text al
   check it by hand with the ROM when the fillers in `src/parser/recogniser.js` change.
 - **Stricter than the ROM only on purpose.** The exceptions are the list below; each is a row of the recorded table
   listed as stricter than the ROM in its test, and the oracle reports them as STRICTER, apart from the false-invalids.
+  The one place it is more lenient is `COLOR` on a Model B ([below](#the-other-way-lenient-on-purpose)), which the
+  oracle reports as LENIENT.
 
 ### Characters above U+007F
 
@@ -176,6 +178,31 @@ message that says what BASIC does, and shows as an error.
   rejects it in a mnemonic (`ST` and byte 0x81), except the tokens AND (0x80), EOR (0x82) and OR (0x84) as the first,
   second or third character, which it reads as the mnemonic itself, dropping what comes before (`ST` and byte 0x80
   assembles `AND`). The dropped characters are red, with a hover that says so (recorded for #202).
+
+#### The other way: lenient on purpose
+
+One deviation goes the other way, accepting what a Model B's ROM rejects (and so is not red, and has no marker).
+Olly Betts suggested it on #245: a program written for the Master with the US spelling `COLOR`, or run on a Model B
+after being written on one, should still work.
+
+- **`COLOR` is `COLOUR` on a Model B where that is all it can be.** BASIC II has no `COLOR` (`COLOR 7` is the variable
+  `COLOR` and then a Mistake), and BASIC IV makes it the `COLOUR` token (`&FB`) wherever it is. On a Model B, Owlet reads a
+  `COLOR` as `COLOUR` only when it starts a statement (after a colon, `THEN`, `ELSE`, `REPEAT`, `ON ERROR` or at the start
+  of the line), what follows is one expression and then the end of the statement (the end of the line, a colon or
+  `ELSE`), and the statement is not already valid as it is written. Anywhere else it stays the characters of a name.
+  - Taken: `COLOR7`, `COLOR X`, `COLOR(1)`, `IFC%COLORC%ELSECOLORD%:NEXT`, `X=1:REP.COLORX:P.;X:X=X+1:U.X>7`,
+    `ONERRORCOLOR7:GOTO1000`, and in `LETCOLOR=3:COLORCOLOR` only the second `COLOR`, which is a variable as the operand.
+  - Not taken: `COLORS=7`, `COLOR=7`, `COLOR(1)=7` and `COLOR?1=7` (assignments, valid as written), `LETCOLOR=3`,
+    `PRINT COLOR`, `X=COLOR` (not the start of a statement), `COLOR 1,2` and `COLOR 7 7` (not one expression, which
+    BASIC II rejects as ever), `color 7` (keywords are upper case, on the Master too), and anything in a string, `REM`,
+    `DATA` or `*` command. A `COLOR` alone at the end of the line is a variable still being typed and is not red.
+    `COLORS` alone is read as `COLOUR S`, since that is a whole statement, and goes back to a variable at `COLORS=`.
+  - The same reading makes the Model B's tokeniser write `&FB` for it, so the program that runs is the program that
+    is shown. The Master is unchanged: there `COLOR` is a keyword everywhere, as its ROM has it.
+  - The recorded rows for BASIC II are still the ROM's answer, and are checked against `BasicIIDialect`; the editor's
+    Model B is `ModelBDialect`, BASIC II plus this, and the rows it is lenient on are `LenientThanRom` in
+    `test/rom-tables.js`, which must have no mark. The oracle lists them apart as LENIENT, not as false-valids, wherever
+    a `COLOR` was read as `COLOUR`.
 
 ### BASIC IV (the Master)
 

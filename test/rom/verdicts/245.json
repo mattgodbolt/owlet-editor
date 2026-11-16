@@ -1,0 +1,14 @@
+[
+  ["COLORS=7", "ok", "#245"],
+  ["LETCOLOR=3", "ok", "#245"],
+  ["COLOR7", "Mistake", "#245"],
+  ["IFC%COLORC%ELSECOLORD%:NEXT", "Mistake", "#245"],
+  ["X=1:REP.COLORX:P.;X:X=X+1:U.X>7", "Mistake", "#245"],
+  ["ONERRORCOLOR7:GOTO1000", "ok", "#245"],
+  ["LETCOLOR=3:COLORCOLOR", "Mistake", "#245"],
+  ["color 1", "Mistake", "#245"],
+  ["EDITED=FALSE", "ok", "#245"],
+  ["COLOR 7:COLOR 1", "Mistake", "#245"],
+  ["COLORS", "Mistake", "#245"],
+  ["COLOR X", "Mistake", "#245"]
+]

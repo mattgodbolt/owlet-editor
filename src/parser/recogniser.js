@@ -3,8 +3,8 @@
 // the first. Where there is no rule for a statement, anything is accepted.
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {FirstStatementToken} from "../tokens.js";
-import {currentKeywords, isBasicIV} from "./dialect.js";
-import {Lexer} from "./lexer.js";
+import {BasicIIDialect, currentDialect} from "./dialect.js";
+import {byteView, Lexer, lexLine} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
@@ -69,13 +69,13 @@ const BadHexIV = "Bad Hex";
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
 const CompletionWords = new Map();
-function completions(assembling) {
-    const key = `${isBasicIV()} ${assembling}`;
+function completions(assembling, dialect) {
+    const key = `${dialect.basicIV} ${assembling}`;
     if (!CompletionWords.has(key)) {
-        const keywords = [...new Set([...currentKeywords().map(kw => kw.keyword), "TOP"])];
+        const keywords = [...new Set([...dialect.keywords.map(kw => kw.keyword), "TOP"])];
         CompletionWords.set(
             key,
-            assembling ? [...new Set([...keywords, ...mnemonicsFor()])] : keywords,
+            assembling ? [...new Set([...keywords, ...mnemonicsFor(dialect)])] : keywords,
         );
     }
     return CompletionWords.get(key);
@@ -83,6 +83,9 @@ function completions(assembling) {
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
+
+const ColorSpelling = "COLOR";
+const ColourSpelling = "COLOUR";
 
 // `at` is the token that was next when BASIC stopped.
 class Failure {
@@ -94,10 +97,31 @@ class Failure {
     }
 }
 
+// Whether the text starts with one statement that BASIC reads to its end, with no error and not too soon.
+function readsStatement(text, dialect) {
+    const probe = new Recogniser(text, false, true, dialect);
+    try {
+        probe.statement();
+        return probe.atEnd();
+    } catch (e) {
+        if (e instanceof Failure) return false;
+        throw e;
+    }
+}
+
+// The line's tokens as the dialect's tokeniser makes them, the lexer's with each COLOR that is COLOUR as such.
+export function tokenise(text, dialect) {
+    if (!dialect.usColor || !byteView(text).includes(ColorSpelling)) return lexLine(text, dialect);
+    const recogniser = new Recogniser(text, false, true, dialect);
+    recogniser.line();
+    return lexLine(text, dialect, recogniser.colors);
+}
+
 export class Recogniser {
-    constructor(text, inAssembler, probing = false) {
-        this.lexer = new Lexer(text);
-        this.basicIV = isBasicIV();
+    constructor(text, inAssembler, probing = false, dialect = currentDialect()) {
+        this.dialect = dialect;
+        this.lexer = new Lexer(text, dialect);
+        this.basicIV = dialect.basicIV;
         this.assembler = new Assembler(this);
         this.inAssembler = inAssembler;
         this.startsInAssembler = inAssembler;
@@ -108,6 +132,8 @@ export class Recogniser {
         this.opener = null;
         // Each statement's error: {message, token, unfinished}, in the order of the line.
         this.problems = [];
+        // Where the names that were read as COLOR (the Model B's alias for COLOUR) start.
+        this.colors = [];
     }
 
     get tokens() {
@@ -261,7 +287,7 @@ export class Recogniser {
         if (before?.kind === "keyword" && before.end === token.start) starts.push(before.start);
         return starts.some(start => {
             const typed = text.slice(start).toUpperCase();
-            return completions(assembling).some(word => {
+            return completions(assembling, this.dialect).some(word => {
                 if (word.length <= typed.length || !word.startsWith(typed)) return false;
                 return this.valid(text.slice(0, start) + word, statementStart, text.length);
             });
@@ -271,7 +297,7 @@ export class Recogniser {
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
     // up to the next colon or ELSE after `from`, or that is not itself unfinished.
     valid(candidate, statementStart, from) {
-        const probe = new Recogniser(candidate, this.startsInAssembler, true);
+        const probe = new Recogniser(candidate, this.startsInAssembler, true, this.dialect);
         probe.line();
         const stop =
             probe.tokens.find(
@@ -341,6 +367,7 @@ export class Recogniser {
             // After the block's "]" a statement can follow with no colon.
             return this.inAssembler || this.statement();
         }
+        if (token.kind === "name" && this.readsAsColor(token)) return this.statement();
         if (token.kind !== "keyword") return this.assignment();
         const {keyword} = token.kw;
         // BASIC IV also starts a statement with EXT#, which sets the length of a file.
@@ -352,6 +379,20 @@ export class Recogniser {
         if (keyword in ExpressionCount) return this.expressions(ExpressionCount[keyword]);
         if (this[keyword]) return this[keyword]();
         while (!this.atEnd()) this.next();
+    }
+
+    // Whether the name that starts a statement is COLOR and an expression, which the dialect then reads as the keyword
+    // (and the next statement() reads on from). That is only so where the name could not be read as itself: COLORS=7
+    // assigns to a variable, and COLOR alone is a variable still to be typed.
+    readsAsColor(name) {
+        if (!this.dialect.usColor || !name.text.startsWith(ColorSpelling)) return false;
+        const rest = this.lexer.source.slice(name.start);
+        if (readsStatement(rest, BasicIIDialect)) return false;
+        const colour = ColourSpelling + rest.slice(ColorSpelling.length);
+        if (!readsStatement(colour, this.dialect)) return false;
+        this.colors.push(name.start);
+        this.lexer.relex(name);
+        return true;
     }
 
     pseudoVariable(keyword) {

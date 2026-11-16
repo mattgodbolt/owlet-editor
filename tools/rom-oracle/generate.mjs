@@ -222,3 +222,13 @@ export function generate({seed = 1, count = 3000} = {}) {
     }
     return out;
 }
+
+// The Model B's editor reads COLOR that starts a statement as COLOUR where it can only be that (the README), which the
+// ROM rejects: Olly Betts's examples on #245, and the variables and operands that must stay what they are.
+export const generateColor = () =>
+    `COLOR 1 | COLOR7 | COLOR X | COLOR(1) | COLOR 1:COLOR 2 | X=1:COLOR X | IF X THEN COLOR 1 ELSE COLOR 2
+    | IF X COLOR 1 | IFX COLORX ELSE COLORX | REPEAT COLOR 1 | ON ERROR COLOR 7:GOTO 1000 | ONERRORCOLOR7:GOTO1000
+    | COLORS=7 | COLOR=7 | COLOR(1)=7 | COLOR?1=7 | LET COLOR=3 | LETCOLOR=3:COLORCOLOR | COLOR | COLOR 1,2
+    | COLOR 1 2 | PRINT COLOR | X=COLOR | PRINT COLOR 1 | color 1 | GCOLOR 1`
+        .split(/\s*\|\s*/)
+        .map(text => ({shape: "COLOR, the US spelling", text}));

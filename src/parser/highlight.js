@@ -94,8 +94,8 @@ function parts(token) {
 // The line's tokens as {offset, type, bracket}, and whether an assembler block is open at its end. `bracket` is set on
 // a "(" and the ")" that closes it on the same line, where neither is invalid, and on a valid "[" or "]": those are
 // the only text Monaco is to match brackets in. Neighbours of the same type and `bracket` are joined.
-export function highlightLine(text, inAssembler = false) {
-    const recogniser = new Recogniser(text, inAssembler);
+export function highlightLine(text, inAssembler = false, dialect) {
+    const recogniser = new Recogniser(text, inAssembler, false, dialect);
     const open = recogniser.line();
     const tokens = [];
     const unclosed = [];
@@ -119,10 +119,10 @@ export function highlightLine(text, inAssembler = false) {
 }
 
 // The recogniser's reading of each line of the program, an assembler block open at the end of one carrying into the next.
-export function readLines(text) {
+export function readLines(text, dialect) {
     let inAssembler = false;
     return text.split(/\r?\n/).map(lineText => {
-        const recogniser = new Recogniser(lineText, inAssembler);
+        const recogniser = new Recogniser(lineText, inAssembler, false, dialect);
         inAssembler = recogniser.line();
         return recogniser;
     });
