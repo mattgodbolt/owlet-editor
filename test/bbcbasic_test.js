@@ -4,6 +4,7 @@ import {
     withoutCodes,
     getWarnings,
     LanguageId,
+    rebuildBracketPairs,
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
 import {problemCount} from "../src/problem-count";
@@ -1430,5 +1431,44 @@ describe("Problem count", () => {
         [{syntax: [marker(MarkerSeverity.Error)], lineNumbers: [], warnings: []}, "1 error"],
     ])("should summarise %j as %j", (markers, summary) => {
         assert.strictEqual(problemCount(markers), summary);
+    });
+});
+
+describe("Bracket pairs", () => {
+    // The line's pairs as "opener~closer", in the model Monaco keeps, where "." opens only for an abbreviated opener.
+    const pairsOfLine = (model, line) =>
+        model.bracketPairs
+            .getBracketPairsInRange(new Range(line, 1, line, model.getLineMaxColumn(line)))
+            .toArray()
+            .map(
+                pair =>
+                    `${model.getValueInRange(pair.openingBracketRange)}~${model.getValueInRange(pair.closingBracketRange)}`,
+            );
+    const program = "A=1\nREP.IFb?-1<>90N.EL.?(PA.+3)=b\nQ$=MID.Q$,2)+STR.(Q%)";
+
+    // An empty model whose tokenizing has completed, as the editor is while the page loads its saved program.
+    function loadedModel() {
+        const model = editor.createModel("", LanguageId);
+        pairsOfLine(model, 1);
+        model.tokenization.forceTokenization(1);
+        // Reading the indentation of the new text is what has Monaco build its pairs before there are tokens.
+        model.setValue(program);
+        model.updateOptions({insertSpaces: !model.getOptions().insertSpaces});
+        return model;
+    }
+
+    it("should pair a parenthesis once the program is loaded", () => {
+        const model = loadedModel();
+        rebuildBracketPairs(model);
+        assert.deepStrictEqual(pairsOfLine(model, 2), ["(~)"]);
+        assert.deepStrictEqual(pairsOfLine(model, 3), [".~)", "(~)"]);
+        model.dispose();
+    });
+    it("should pair a parenthesis after the language is registered again", () => {
+        const model = loadedModel();
+        rebuildBracketPairs(model);
+        registerBbcBasicLanguage();
+        assert.deepStrictEqual(pairsOfLine(model, 2), ["(~)"]);
+        model.dispose();
     });
 });

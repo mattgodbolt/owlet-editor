@@ -15,7 +15,14 @@ import {partialDetokenise} from "./tokens";
 import {createTokenisers, tokeniserFor} from "./tokeniser";
 import {encode} from "base2048";
 import "./owlet-editor.less";
-import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV, withoutCodes} from "./bbcbasic";
+import {
+    getSyntaxMarkers,
+    getWarnings,
+    LanguageId,
+    rebuildBracketPairs,
+    useBasicIV,
+    withoutCodes,
+} from "./bbcbasic";
 import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
@@ -224,8 +231,14 @@ export class OwletEditor {
             );
             this.editor.pushUndoStop();
         } else {
-            this.editor.getModel().setValue(newText);
+            this.setProgram(newText);
         }
+    }
+
+    setProgram(text) {
+        const model = this.editor.getModel();
+        model.setValue(text);
+        rebuildBracketPairs(model);
     }
 
     addExample(example) {
@@ -264,7 +277,7 @@ export class OwletEditor {
                 return String.fromCharCode(c.charCodeAt(0) | 0x100);
             })
             .replace(/[\u201c\u201d]/g, '"'); // BBCMicrobot normalises smartquotes like this.
-        this.editor.getModel().setValue(basic);
+        this.setProgram(basic);
         this.selectView("screen");
 
         if (state.mode > 1) {
