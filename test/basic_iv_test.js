@@ -167,7 +167,7 @@ describe("BASIC IV", () => {
     });
     it("should word a bad hexadecimal number as BASIC IV does", () => {
         const [{message}] = getSyntaxMarkers("X=&G");
-        expect(message).toContain("Bad Hex");
+        expect(message).toMatch(/^Expected a hex digit .*\(BASIC: Bad Hex\)$/);
         setBasicIV(false);
         expect(getSyntaxMarkers("X=&G")[0].message).toContain("Bad HEX");
     });
