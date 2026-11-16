@@ -20,6 +20,7 @@ import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
+import {fitMarkerWidgetToWrappedMessage} from "./marker-widget";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 import {createVduReference} from "./vdu-reference";
@@ -118,6 +119,7 @@ export class OwletEditor {
         ]);
 
         followImplicitLineNumbers(this.editor);
+        fitMarkerWidgetToWrappedMessage(this.editor);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
         this.editor.onDidChangeCursorPosition(({position}) => {
