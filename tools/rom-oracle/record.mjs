@@ -21,12 +21,12 @@ import prettier from "prettier";
 import {createRom, SyntaxErrors} from "./rom.mjs";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
-const OwletRawByte = b => (b < 0x20 || (b >= 0x7f && b < 0xa0) ? b + 0x100 : b);
+const owletRawByte = b => (b < 0x20 || (b >= 0x7f && b < 0xa0) ? b + 0x100 : b);
 const fromHex = text => {
     const digits = text.trim().split(/\s+/);
     if (!digits.every(digit => /^[0-9a-f]{2}$/i.test(digit)))
         throw new Error(`Not two-digit hex bytes: ${text}`);
-    return String.fromCharCode(...digits.map(digit => OwletRawByte(parseInt(digit, 16))));
+    return String.fromCharCode(...digits.map(digit => owletRawByte(parseInt(digit, 16))));
 };
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
