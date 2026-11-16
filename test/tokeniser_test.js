@@ -6,7 +6,6 @@ import {RomTokens} from "./rom-tables";
 const hex = text => [...text].map(c => c.charCodeAt(0).toString(16).padStart(2, "0")).join(" ");
 // The bytes of a one-line program after its header (CR, line number, length) and before its end (CR, &FF).
 const lineBytes = program => hex(program).split(" ").slice(4, -2).join(" ");
-const trimmed = bytes => bytes.replace(/( 20)+$/, "");
 
 describe("Tokeniser", () => {
     afterEach(() => setBasicIV(false));
@@ -27,7 +26,7 @@ describe("Tokeniser", () => {
                     recorded,
                     ours: lineBytes(tokeniseBasicII(text)),
                 }))
-                .filter(({recorded, ours}) => trimmed(ours) !== trimmed(recorded));
+                .filter(({recorded, ours}) => ours !== recorded);
             expect(wrong).toEqual([]);
         },
     );
