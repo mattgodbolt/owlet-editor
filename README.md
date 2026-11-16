@@ -139,6 +139,12 @@ message that says what BASIC does, and shows as an error.
   and the two quick fixes, "Insert : before ]" for a `]` and "Insert ; before the junk" for the rest, were suggested by
   Olly Betts on #174. The oracle takes these marks on trust as ignored text (cutting the statement there changes
   nothing, so it cannot test them) and lists them as STRICTER.
+  - **A keyword straight after a mnemonic** (`STAH.,X`, `LDAUSR@%+GET`). BASIC tokenises a keyword only at the start of
+    a word, so `STAH.` is the word `STAH`: `STA`, then the variable `H` (an undefined one reads as `P%` unless `OPT` has
+    bit 1 set, when it is "No such variable"), and `.,X` is ignored; the same text with a space, `STA H.,X`, is
+    `STA HIMEM,X`. Where a space would leave nothing red, the junk is red as before but the hover says that, and the
+    fix is "Insert a space after STA" in place of the `;`. A mnemonic that takes no operand (`NOPPAGE`) keeps the `;`
+    fix. `STAPAGE` and `LDAGET` have no junk after the variable, so they are not red. Suggested by Olly Betts on #174.
 - **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`). BASIC compares only
   the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A` and so on: `LD89` is `LDX 9`, but
   is an easy typo for `LDA89`, `LDX89` or `LDY89`. Olly Betts suggested on #174 marking this, and marking the `LD` (in

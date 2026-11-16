@@ -42,7 +42,7 @@ const isNameChar = c => c !== undefined && /[\w`]/.test(c);
 
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
-function matchKeyword(text, i) {
+export function matchKeyword(text, i) {
     for (const kw of byFirstLetter.get(text[i]) || []) {
         const word = kw.keyword;
         let length = 1;
