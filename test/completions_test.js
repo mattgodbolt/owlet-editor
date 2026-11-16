@@ -9,7 +9,7 @@ import {describe, it} from "vitest";
 import assert from "assert";
 import {readFileSync} from "fs";
 import {env} from "process";
-import {editor} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor} from "monaco-editor/editor/editor.api";
 
 registerBbcBasicLanguage();
 

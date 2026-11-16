@@ -13,7 +13,7 @@ import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
 import {describe, it} from "vitest";
 import assert from "assert";
-import {editor, MarkerSeverity, Range} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor, MarkerSeverity, Range} from "monaco-editor/editor/editor.api";
 
 registerBbcBasicLanguage();
 

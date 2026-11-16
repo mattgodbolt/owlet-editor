@@ -1,5 +1,5 @@
-import {languages} from "monaco-editor/esm/vs/editor/editor.api";
-import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController";
+import {languages} from "monaco-editor/editor/editor.api";
+import "monaco-editor/editor/contrib/suggest/browser/suggestController";
 import {FirstStatementToken, Flags} from "./tokens";
 import {currentImmediateCommands, currentKeywords, isBasicIV} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";

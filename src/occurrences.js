@@ -1,6 +1,6 @@
-import {editor, KeyCode, KeyMod, languages} from "monaco-editor/esm/vs/editor/editor.api";
-import "monaco-editor/esm/vs/editor/contrib/rename/browser/rename";
-import "monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter";
+import {editor, KeyCode, KeyMod, languages} from "monaco-editor/editor/editor.api";
+import "monaco-editor/editor/contrib/rename/browser/rename";
+import "monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter";
 import {LanguageId} from "./bbcbasic";
 import {readLines} from "./parser/highlight";
 

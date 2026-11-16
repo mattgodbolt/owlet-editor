@@ -1,4 +1,4 @@
-import {MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {MarkerSeverity} from "monaco-editor/editor/editor.api";
 
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 

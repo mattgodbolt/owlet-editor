@@ -6,7 +6,7 @@ import {
     renumberReferences,
 } from "../src/renumber";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-import {editor} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor} from "monaco-editor/editor/editor.api";
 
 registerBbcBasicLanguage();
 

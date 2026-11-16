@@ -2,7 +2,7 @@ import $ from "jquery";
 import {registerBbcBasicLanguage} from "./bbcbasic";
 import {registerOccurrences} from "./occurrences";
 import {registerCompletions} from "./completions";
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 import rootHtml from "./root.html?raw";
 import {OwletEditor} from "./owlet";
 import {backwardCompat} from "./tokens";
