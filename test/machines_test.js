@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {machineOf, withMachine} from "../src/machines";
+import {machineOf, modelQuery, withMachine} from "../src/machines";
 
 describe("Machine in a state", () => {
     it.each([
@@ -20,5 +20,14 @@ describe("Machine in a state", () => {
         const state = withMachine({v: 1, program: "P."}, "Master");
         expect(state).toEqual({v: 1, program: "P.", model: "Master"});
         expect(machineOf(JSON.parse(JSON.stringify(state)))).toBe("Master");
+    });
+});
+
+describe("Model in an export link", () => {
+    it.each([
+        ["B", ""],
+        ["Master", "&model=Master"],
+    ])("for %s is %j", (machine, query) => {
+        expect(modelQuery(machine)).toBe(query);
     });
 });

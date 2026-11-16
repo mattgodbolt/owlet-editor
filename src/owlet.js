@@ -18,7 +18,7 @@ import "./owlet-editor.less";
 import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV, withoutCodes} from "./bbcbasic";
 import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
-import {DefaultMachine, Machines, machineOf, withMachine} from "./machines";
+import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
@@ -586,21 +586,17 @@ export class OwletEditor {
                 window.open(
                     `https://virtual.bbcmic.ro/?embedBasic=${encodeURIComponent(
                         this.getBasicText(),
-                    )}${gxr}`,
+                    )}${gxr}${modelQuery(this.emulator.machine)}`,
                     "_blank",
                 );
                 this.closeModal();
             },
             jsbeeb: () => {
                 const gxr = this.emulator.hasGxr ? "&rom=gxr.rom" : "";
-                const model =
-                    this.emulator.machine === DefaultMachine
-                        ? ""
-                        : `&model=${this.emulator.machine}`;
                 window.open(
                     `https://bbc.xania.org/?embedBasic=${encodeURIComponent(
                         this.getBasicText(),
-                    )}${gxr}${model}`,
+                    )}${gxr}${modelQuery(this.emulator.machine)}`,
                     "_blank",
                 );
                 this.closeModal();
