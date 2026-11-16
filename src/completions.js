@@ -9,6 +9,7 @@ import {readLines} from "./parser/highlight";
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
+const SpcAndTab = ["SPC", "TAB("];
 // The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
 const labelSets = new Map();
 function labelSetsFor(table) {
@@ -26,18 +27,35 @@ function labelSetsFor(table) {
                 )
                 .map(kw => kw.keyword),
         );
+        const statement = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
         labelSets.set(table, {
-            statement: labels(programKeywords.filter(kw => statementWords.has(kw.keyword))),
-            expression: labels(programKeywords.filter(kw => kw.token < FirstStatementToken)),
-            all: labels(programKeywords),
+            statement,
+            expression: labels(
+                programKeywords.filter(kw => kw.flags & Flags.Expr || kw.keyword === "ELSE"),
+            ),
             assembler: labels(table.filter(kw => kw.flags & Flags.Expr)),
+            // The words besides values that BBC BASIC reads in each statement (tools/rom-oracle), by the statement's
+            // first keyword; "ON ERROR" is what follows ON ERROR, which is read as a statement.
+            inStatement: new Map([
+                ["PRINT", SpcAndTab],
+                ["INPUT", [...SpcAndTab, "LINE"]],
+                ["FOR", ["TO", "STEP"]],
+                ["IF", ["THEN", ...statement]],
+                ["ON", ["ERROR", "GOTO", "GOSUB", ...(isBasicIV() ? ["PROC"] : [])]],
+                ["ON ERROR", ["OFF"]],
+                ["TRACE", ["ON", "OFF"]],
+                ["DEF", statement],
+            ]),
         });
     }
     return labelSets.get(table);
 }
-
-// Statements in which a statement keyword can follow an expression: IF X PRINT, ON X GOTO, TRACE ON, DEF PROC.
-const MixedStatements = new Set(["IF", "ON", "TRACE", "DEF"]);
+// Statements that a statement can follow without a colon: IF X FOR, DEF PROCa FOR. The PROC after DEF is its name.
+const HoldsStatement = new Set(["IF", "DEF"]);
+const startsNestedStatement = token =>
+    token.kind === "keyword" &&
+    token.kw.token >= FirstStatementToken &&
+    token.kw.keyword !== "PROC";
 const NameKinds = new Map([
     ["FN", Kind.Fn],
     ["PROC", Kind.Proc],
@@ -61,11 +79,15 @@ function statementState(tokens, inAssembler) {
             state.atStart = true;
         } else if (startsStatement(token)) {
             state.atStart = true;
-            // ON ERROR is followed by a statement or OFF.
-            if (token.kind === "keyword" && token.kw.keyword === "ERROR") continue;
-            state.statement = null;
+            const onError =
+                token.kind === "keyword" &&
+                token.kw.keyword === "ERROR" &&
+                state.statement === "ON";
+            state.statement = onError ? "ON ERROR" : null;
         } else {
             if (state.atStart) state.statement = token.kind === "keyword" ? token.kw.keyword : "";
+            else if (HoldsStatement.has(state.statement) && startsNestedStatement(token))
+                state.statement = token.kw.keyword;
             state.atStart = false;
         }
     }
@@ -122,8 +144,11 @@ export function completionContext(text) {
     }
     const sets = labelSetsFor(currentKeywords());
     if (state.inAssembler) return state.atStart ? null : {startColumn, labels: sets.assembler};
-    if (MixedStatements.has(state.statement)) return {startColumn, labels: sets.all};
-    return {startColumn, labels: state.atStart ? sets.statement : sets.expression};
+    const base = state.atStart ? sets.statement : sets.expression;
+    return {
+        startColumn,
+        labels: [...new Set([...base, ...(sets.inStatement.get(state.statement) ?? [])])],
+    };
 }
 
 function programNames(model, kind, position, startColumn) {

@@ -10,6 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Lint & fix: `npm run lint-fix` or `make lint-fix`
 - Run all tests: `npm run test` or `make test`
 - Run specific test: `npx vitest run test/file_name_test.js`
+- Run the completions test over a corpus of saved programs that cannot be checked in (a JSON array of `{id, text}`):
+  `OWLET_CORPUS=programs.json npx vitest run test/completions_test.js`. CI runs the same check over our own programs
+  (the examples and the ROM oracle's generator with a fixed seed) without it
 - Run all checks: `make check` (tests + lint-fix)
 - What CI runs: `make ci-check` (tests, lint, `prettier --check` and the build, failing rather than fixing)
 

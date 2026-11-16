@@ -261,5 +261,9 @@ describe("The editor on the Master", () => {
         expect(offered("")).toContain("EXT");
         expect(offered("X=")).toContain("EXT");
         expect(offered("").concat(offered("X="))).not.toContain("EDIT");
+        useBasicIV(false);
+        expect(offered("ON X ")).not.toContain("PROC");
+        useBasicIV(true);
+        expect(offered("ON X ")).toContain("PROC");
     });
 });

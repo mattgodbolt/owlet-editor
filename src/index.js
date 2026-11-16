@@ -2,6 +2,7 @@ import $ from "jquery";
 import {registerBbcBasicLanguage} from "./bbcbasic";
 import {registerOccurrences} from "./occurrences";
 import {registerCompletions} from "./completions";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import rootHtml from "./root.html?raw";
 import {OwletEditor} from "./owlet";
 import {backwardCompat} from "./tokens";
@@ -11,6 +12,8 @@ import logo from "/assets/images/monster.png";
 import "./owlet-editor.less";
 import {saveMachine, saveProgram, savedMachine, savedProgram} from "./saved-program";
 import {machineOf} from "./machines";
+
+self.MonacoEnvironment = {getWorker: () => new EditorWorker()};
 
 function programUrl(id) {
     //if (window.location.hostname !== "localhost")
