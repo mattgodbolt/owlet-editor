@@ -158,8 +158,19 @@ export const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
 // LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV also starts one with EXT#.
 export const FirstStatementToken = 0xc6;
 export const LineNumberToken = 0x8d;
-// The character Owlet uses for a raw token byte.
-export const tokenChar = kw => String.fromCodePoint(kw.token < 0xa0 ? kw.token + 0x100 : kw.token);
+// The character Owlet writes for a byte that is not text: its own code point where that is a visible character, else
+// the one 0x100 above it. That covers the control bytes, &7F-&9F, and &A0 and &AD, which would be a non-breaking space
+// and a soft hyphen (invisible, and trim() removes the first). BASIC and the bot keep only the low eight bits, so
+// either reads as the same byte.
+const NoBreakSpaceByte = 0xa0;
+const SoftHyphenByte = 0xad;
+const needsOffset = byte =>
+    (byte < 32 && byte !== 10) ||
+    (byte >= 127 && byte < 160) ||
+    byte === NoBreakSpaceByte ||
+    byte === SoftHyphenByte;
+export const byteChar = byte => String.fromCodePoint(needsOffset(byte) ? byte + 0x100 : byte);
+export const tokenChar = kw => byteChar(kw.token);
 
 export const immediateCommands = keywords
     .filter(kw => kw.token >= FirstStatementToken && kw.token <= 0xcd)
@@ -181,10 +192,7 @@ class StringHandler {
     }
 
     onCharCode(charCode) {
-        if ((charCode >= 127 && charCode < 160) || (charCode < 32 && charCode !== 10)) {
-            charCode += 0x100;
-        }
-        this.output += String.fromCodePoint(charCode);
+        this.output += byteChar(charCode);
     }
 
     onCharacter(ch) {

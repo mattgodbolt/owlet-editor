@@ -202,6 +202,47 @@ const invalid = invalidSpans;
 // Lines where BASIC's error is not the one the recogniser gives for that kind of mistake: H.TO8 is not read as HIMEM.
 const OtherWording = ["F.A=H.TO8^5:?A=42:N."];
 
+describe("A raw token byte", () => {
+    // The bot and BASIC keep the low eight bits of a character, so other programs pick other characters for a byte.
+    it.each([
+        ["EVAL", 0xa0],
+        ["OPENUP", 0xad],
+        ["PRINT", 0xf1],
+        ["AND", 0x80],
+    ])("%s is read from any character whose low eight bits are its byte", (keyword, byte) => {
+        const chars = [byte, byte + 0x100, byte + 0x200, byte + 0x300].map(code =>
+            String.fromCharCode(code),
+        );
+        const bytes = chars.map(char => romBytes(lexLine(`10 X=${char}`)));
+        assert.deepStrictEqual(
+            bytes.map(line => line.at(-1)),
+            chars.map(() => byte),
+        );
+        for (const char of chars) {
+            const token = lexLine(`10 ${char}`).find(token => token.kind === "keyword");
+            assert.strictEqual(token?.kw.keyword, keyword);
+            assert.strictEqual(token.raw, true);
+        }
+    });
+    // The ROM tokenises each of these pairs to the same bytes: every UTF-16 code unit is kept to its low eight bits.
+    it.each([
+        ['10 \u0141$="x"', '10 A$="x"'],
+        ["10 A$=\u0122x\u0122", '10 A$="x"'],
+        ["10 P\u0152INT 1", "10 PRINT 1"],
+        ["10 PRINT\u01201", "10 PRINT 1"],
+        ["10 PRINT \u0131\u0132", "10 PRINT 12"],
+    ])("%j is %j", (alias, plain) => {
+        assert.deepStrictEqual(romBytes(lexLine(alias)), romBytes(lexLine(plain)));
+        assert.deepStrictEqual(highlightLine(alias).tokens, highlightLine(plain).tokens);
+    });
+    it("leaves a control byte alone, since U+010A is data and not a line break", () => {
+        assert.strictEqual(
+            lexLine('10 A$="\u010a"').find(token => token.kind === "string").closed,
+            true,
+        );
+    });
+});
+
 describe("Recogniser", () => {
     it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
         assert.deepStrictEqual(
