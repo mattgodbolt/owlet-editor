@@ -42,7 +42,16 @@ const ExpressionCount = {
 };
 const NotCode = names("comment data oscli");
 const TextKeyword = names("REM DATA");
-const ForeignOperator = /^(?:[=!]=|\*\*|><|=[<>]|[-+/*^]=|<<|>>)$/;
+// Operators from other languages, with what BASIC calls those it has (null for the rest).
+export const ForeignOperators = new Map([
+    ["==", "="],
+    ["!=", "<>"],
+    ["**", "^"],
+    ["><", "<>"],
+    ["=<", "<="],
+    ["=>", ">="],
+    ...["-=", "+=", "/=", "*=", "^=", "<<", ">>"].map(operator => [operator, null]),
+]);
 const Relations = names("= < > <= >= <>");
 const Arithmetic = names("+ - * / ^");
 
@@ -194,7 +203,7 @@ export class Recogniser {
             [before, token],
             [token, after],
         ]) {
-            if (adjacent(first, second) && ForeignOperator.test(first.text + second.text))
+            if (adjacent(first, second) && ForeignOperators.has(first.text + second.text))
                 first.invalid = second.invalid = true;
         }
         return problem;

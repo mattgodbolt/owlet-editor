@@ -1,7 +1,8 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {completionContext, completionItems} from "../src/completions";
 import {readLines} from "../src/parser/highlight";
-import {expandCode, immediateCommands, keywords} from "../src/tokens";
+import {expandCode} from "../src/expand-code";
+import {immediateCommands, keywords} from "../src/tokens";
 import {describe, it} from "vitest";
 import assert from "assert";
 import {readFileSync} from "fs";
