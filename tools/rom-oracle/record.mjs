@@ -1,12 +1,15 @@
 // Records what BBC BASIC II does with each statement given, as rows appended to a table the tests read, so that no
 // expected value is typed by hand.
 //
-//   node tools/rom-oracle/record.mjs [--tokens] [--source '#123'] [--file statements.txt] [statement ...]
+//   node tools/rom-oracle/record.mjs [--tokens] [--hex] [--source '#123'] [--file statements.txt] [statement ...]
 //
 // By default each row is [text, verdict] in test/rom-verdicts.json, where the verdict is the name of the syntax error
 // the ROM stops with (as in rom.mjs) or "ok". A statement in [ ] is run as assembler after DIM P% 100:Q%=P%: and its
 // row also has the bytes it assembled. A statement that stops with any other error, or runs too long, says nothing
 // about syntax and is not recorded, nor is one that starts with a digit (BASIC would store it as a line). With
+// --hex gives each statement (and each --file line) as the hex bytes BASIC is to read, such as '53 54 8d 20 39', for
+// bytes of 0x80 and above, which the shell would turn into U+FFFD; the row's text is those bytes as Owlet shows them
+// (U+0100 plus the byte for a control, DEL or token byte below 0xA0), which the ROM reads back as the same bytes. With
 // --tokens each row is [text, bytes] in test/rom-tokens.json: the ROM's tokenisation of the text as a line of a
 // program, in hex. --file reads one statement per line. --source ends each row with the issue or pull request it comes
 // from, so that a report seen again is found as a row; a row already in the table keeps its verdict, and gets the
@@ -18,10 +21,18 @@ import prettier from "prettier";
 import {createRom, SyntaxErrors} from "./rom.mjs";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
+const OwletRawByte = b => (b < 0x20 || (b >= 0x7f && b < 0xa0) ? b + 0x100 : b);
+const fromHex = text => {
+    const digits = text.trim().split(/\s+/);
+    if (!digits.every(digit => /^[0-9a-f]{2}$/i.test(digit)))
+        throw new Error(`Not two-digit hex bytes: ${text}`);
+    return String.fromCharCode(...digits.map(digit => OwletRawByte(parseInt(digit, 16))));
+};
 
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
 const tokens = args.includes("--tokens");
+const asHex = args.includes("--hex");
 const fileIndex = args.indexOf("--file");
 const sourceIndex = args.indexOf("--source");
 const source = sourceIndex < 0 ? null : args[sourceIndex + 1];
@@ -34,6 +45,7 @@ if (fileIndex >= 0)
             .split("\n")
             .filter(Boolean),
     );
+if (asHex) texts.forEach((text, i) => (texts[i] = fromHex(text)));
 const tableFile = path.join(Root, "test", tokens ? "rom-tokens.json" : "rom-verdicts.json");
 
 async function record(rom, text) {
