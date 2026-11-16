@@ -1,7 +1,7 @@
 import {languages} from "monaco-editor/editor/editor.api";
 import "monaco-editor/editor/contrib/suggest/browser/suggestController";
 import {FirstStatementToken, Flags} from "./tokens";
-import {currentImmediateCommands, currentKeywords, isBasicIV} from "./parser/dialect";
+import {ModelBDialect} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
@@ -14,23 +14,22 @@ const SpcAndTab = ["SPC", "TAB("];
 const Top = "TOP";
 // The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
 const labelSets = new Map();
-function labelSetsFor(table) {
-    if (!labelSets.has(table)) {
-        const programKeywords = table.filter(
-            kw => !currentImmediateCommands().includes(kw.keyword),
-        );
+function labelSetsFor(dialect) {
+    if (!labelSets.has(dialect)) {
+        const table = dialect.keywords;
+        const programKeywords = table.filter(kw => !dialect.immediateCommands.includes(kw.keyword));
         const statementWords = new Set(
             table
                 .filter(
                     kw =>
                         kw.token >= FirstStatementToken ||
                         kw.keyword === "ELSE" ||
-                        (isBasicIV() && kw.keyword === "EXT"),
+                        (dialect.basicIV && kw.keyword === "EXT"),
                 )
                 .map(kw => kw.keyword),
         );
         const statement = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
-        labelSets.set(table, {
+        labelSets.set(dialect, {
             statement,
             expression: [
                 ...labels(
@@ -46,14 +45,14 @@ function labelSetsFor(table) {
                 ["INPUT", [...SpcAndTab, "LINE"]],
                 ["FOR", ["TO", "STEP"]],
                 ["IF", ["THEN", ...statement]],
-                ["ON", ["ERROR", "GOTO", "GOSUB", ...(isBasicIV() ? ["PROC"] : [])]],
+                ["ON", ["ERROR", "GOTO", "GOSUB", ...(dialect.basicIV ? ["PROC"] : [])]],
                 ["ON ERROR", ["OFF"]],
                 ["TRACE", ["ON", "OFF"]],
                 ["DEF", statement],
             ]),
         });
     }
-    return labelSets.get(table);
+    return labelSets.get(dialect);
 }
 // Statements that a statement can follow without a colon: IF X FOR, DEF PROCa FOR. The PROC after DEF is its name.
 const HoldsStatement = new Set(["IF", "DEF"]);
@@ -124,8 +123,8 @@ function splitBareExponent(tokens, length) {
 
 // What can be typed at the end of the text: {startColumn, labels} for keywords, {startColumn, nameKind} after FN or
 // PROC, or null for nothing (in a string, REM, DATA, * command or number, or after DEF PROC or DEF FN).
-export function completionContext(text) {
-    const recogniser = readLines(text).at(-1);
+export function completionContext(text, dialect = ModelBDialect) {
+    const recogniser = readLines(text, dialect).at(-1);
     const line = recogniser.lexer.text;
     const tokens = splitBareExponent(
         recogniser.tokens.filter(token => token.kind !== "white"),
@@ -147,7 +146,7 @@ export function completionContext(text) {
         const afterDef = tokens.at(-2)?.kw?.keyword === "DEF";
         return afterDef ? null : {startColumn, nameKind: nameKind(last)};
     }
-    const sets = labelSetsFor(currentKeywords());
+    const sets = labelSetsFor(dialect);
     if (state.inAssembler) return state.atStart ? null : {startColumn, labels: sets.assembler};
     const base = state.atStart ? sets.statement : sets.expression;
     return {
@@ -156,8 +155,8 @@ export function completionContext(text) {
     };
 }
 
-function programNames(model, kind, position, startColumn) {
-    const names = programSymbols(model.getValue())
+function programNames(model, kind, position, startColumn, dialect) {
+    const names = programSymbols(model.getValue(), dialect)
         .filter(
             s =>
                 s.kind === kind &&
@@ -167,7 +166,7 @@ function programNames(model, kind, position, startColumn) {
     return [...new Set(names)];
 }
 
-export function completionItems(model, position) {
+export function completionItems(model, position, dialect = ModelBDialect) {
     const context = completionContext(
         model.getValueInRange({
             startLineNumber: 1,
@@ -175,6 +174,7 @@ export function completionItems(model, position) {
             endLineNumber: position.lineNumber,
             endColumn: position.column,
         }),
+        dialect,
     );
     if (!context) return [];
     const range = {
@@ -185,18 +185,22 @@ export function completionItems(model, position) {
     };
     const [labels, kind] = context.nameKind
         ? [
-              programNames(model, context.nameKind, position, context.startColumn),
+              programNames(model, context.nameKind, position, context.startColumn, dialect),
               languages.CompletionItemKind.Function,
           ]
         : [context.labels, languages.CompletionItemKind.Keyword];
     return labels.map(label => ({label, kind, insertText: label, range}));
 }
 
-export function registerCompletions() {
-    languages.registerCompletionItemProvider(LanguageId, {
+let registration = null;
+
+/** Has the editor complete by the dialect, in place of the one it was completing by. */
+export function registerCompletions(dialect = ModelBDialect) {
+    registration?.dispose();
+    registration = languages.registerCompletionItemProvider(LanguageId, {
         // Incomplete, so that Monaco asks again when a word ends and another starts without a space, as in PROCd.
         provideCompletionItems: (model, position) => ({
-            suggestions: completionItems(model, position),
+            suggestions: completionItems(model, position, dialect),
             incomplete: true,
         }),
     });

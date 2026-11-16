@@ -12,7 +12,7 @@
 //   that is marked.
 
 import {keywords, tokenChar} from "../tokens.js";
-import {currentDialect} from "./dialect.js";
+import {ModelBDialect} from "./dialect.js";
 import {matchKeyword} from "./lexer.js";
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
@@ -84,7 +84,7 @@ const MnemonicLists = new Map([
     [BasicII, [...new Set(mnemonicsOf(BasicII))]],
     [BasicIV, [...new Set(mnemonicsOf(BasicIV))]],
 ]);
-export const mnemonicsFor = (dialect = currentDialect()) =>
+export const mnemonicsFor = (dialect = ModelBDialect) =>
     MnemonicLists.get(dialect.basicIV ? BasicIV : BasicII);
 const ThirdCharacter = 2;
 const LogicalTokenChars = new Set(
@@ -268,7 +268,7 @@ export class Assembler {
         const prefix = word.slice(0, ThirdCharacter);
         const meant = [
             ...new Set(
-                mnemonicsFor()
+                mnemonicsFor(this.recogniser.dialect)
                     .filter(m => m.startsWith(prefix))
                     .map(m => m.slice(0, 3)),
             ),

@@ -1,9 +1,9 @@
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import assert from "assert";
 import {editor} from "monaco-editor/editor/editor.api";
-import {getSyntaxMarkers, getWarnings, registerBbcBasicLanguage, useBasicIV} from "../src/bbcbasic";
+import {getSyntaxMarkers, getWarnings, registerBbcBasicLanguage} from "../src/bbcbasic";
 import {completionContext} from "../src/completions";
-import {BasicIIDialect, BasicIVDialect, setBasicIV} from "../src/parser/dialect";
+import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {programProblems, readLines} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
 import {
@@ -156,9 +156,6 @@ const OnNeitherBasic = [
 ];
 
 describe("BASIC IV", () => {
-    beforeEach(() => setBasicIV(true));
-    afterEach(() => setBasicIV(false));
-
     it("should tokenise each line as the Master's BASIC does", () => {
         const wrong = MasterTokens.flatMap(([text, recorded]) => {
             const ours = hex(romBytes(lexLine(text, BasicIVDialect)));
@@ -180,10 +177,9 @@ describe("BASIC IV", () => {
         assert.deepStrictEqual(wrongMessages(MasterVerdicts, [], BasicIVDialect), []);
     });
     it("should word a bad hexadecimal number as BASIC IV does", () => {
-        const [{message}] = getSyntaxMarkers("X=&G");
+        const [{message}] = getSyntaxMarkers("X=&G", 0, BasicIVDialect);
         expect(message).toMatch(/^Expected a hex digit .*\(BASIC: Bad Hex\)$/);
-        setBasicIV(false);
-        expect(getSyntaxMarkers("X=&G")[0].message).toContain("Bad HEX");
+        expect(getSyntaxMarkers("X=&G", 0, ModelBDialect)[0].message).toContain("Bad HEX");
     });
     it.each([
         ["ON 1 PRINT", false, "Expected GOTO or GOSUB after PRINT (BASIC: ON syntax)"],
@@ -191,14 +187,12 @@ describe("BASIC IV", () => {
         ["ON 1 PROCp", false, "Expected GOTO or GOSUB here, not PROC (BASIC: ON syntax)"],
         ["ON 1 PROCp", true, null],
     ])("should name only what ON accepts: %j on BASIC IV %j", (text, basicIV, expected) => {
-        setBasicIV(basicIV);
-        expect(getSyntaxMarkers(text)[0]?.message ?? null).toBe(expected);
+        const dialect = basicIV ? BasicIVDialect : ModelBDialect;
+        expect(getSyntaxMarkers(text, 0, dialect)[0]?.message ?? null).toBe(expected);
     });
 });
 
 describe("Each BASIC's own recorded rows", () => {
-    afterEach(() => setBasicIV(false));
-
     it.each(OnlyOnBasicIV)("%j is red for BASIC II and runs on BASIC IV", text => {
         expect(verdicts.get(text)).not.toBe("ok");
         expect(masterVerdicts.get(text)).toBe("ok");
@@ -211,8 +205,7 @@ describe("Each BASIC's own recorded rows", () => {
             expect(verdicts.get(text)).toBe("Index");
             expect(masterVerdicts.get(text)).toBe("ok");
             expect(stops(text)).toBe(true);
-            setBasicIV(true);
-            expect(stops(text)).toBe(false);
+            expect(stops(text, BasicIVDialect)).toBe(false);
         },
     );
     // A ( after JMP is indirect addressing: what follows the ) is ignored on both BASICs.
@@ -228,32 +221,32 @@ describe("Each BASIC's own recorded rows", () => {
     ])("%j is %s on BASIC II and %s on BASIC IV", (text, basicII, basicIV) => {
         expect(verdicts.get(text)).toBe(basicII);
         expect(masterVerdicts.get(text)).toBe(basicIV);
-        const message = () => programProblems(text).find(problem => !problem.stricter)?.message;
+        const message = dialect =>
+            programProblems(text, readLines(text, dialect)).find(problem => !problem.stricter)
+                ?.message;
         expect(stops(text)).toBe(basicII !== "ok");
         if (basicII !== "ok") expect(message()).toBe(basicII);
-        setBasicIV(true);
-        expect(stops(text)).toBe(basicIV !== "ok");
-        if (basicIV !== "ok") expect(message()).toBe(basicIV);
+        expect(stops(text, BasicIVDialect)).toBe(basicIV !== "ok");
+        if (basicIV !== "ok") expect(message(BasicIVDialect)).toBe(basicIV);
     });
     it.each(OnBothBasics)("%j runs on both", text => {
         expect(masterVerdicts.get(text)).toBe("ok");
         expect(stops(text)).toBe(false);
-        setBasicIV(true);
-        expect(stops(text)).toBe(false);
+        expect(stops(text, BasicIVDialect)).toBe(false);
     });
     it.each(OnNeitherBasic)("%j stops both", text => {
         expect(verdicts.get(text) ?? masterVerdicts.get(text)).not.toBe("ok");
         expect(masterVerdicts.get(text)).not.toBe("ok");
-        const marked = text => stops(text) || getSyntaxMarkers(text).length > 0;
+        const marked = (text, dialect) =>
+            stops(text, dialect) || getSyntaxMarkers(text, 0, dialect).length > 0;
         expect(marked(text)).toBe(true);
-        setBasicIV(true);
-        expect(marked(text)).toBe(true);
+        expect(marked(text, BasicIVDialect)).toBe(true);
     });
 });
 
 describe("The editor on the Master", () => {
     beforeEach(() => registerBbcBasicLanguage());
-    afterEach(() => useBasicIV(false));
+    afterEach(() => registerBbcBasicLanguage());
 
     // The colour of the character at the offset in the editor's own reading of the line.
     const colourAt = (text, offset) => {
@@ -271,44 +264,43 @@ describe("The editor on the Master", () => {
     it("should colour a line again when the machine changes", () => {
         expect(redAt("V.23,255,255|", 12)).toBe(true);
         expect(redAt("[BRA P%", 1)).toBe(true);
-        useBasicIV(true);
+        registerBbcBasicLanguage(BasicIVDialect);
         expect(redAt("V.23,255,255|", 12)).toBe(false);
         expect(redAt("[BRA P%", 1)).toBe(false);
-        useBasicIV(false);
+        registerBbcBasicLanguage();
         expect(redAt("V.23,255,255|", 12)).toBe(true);
     });
     it("should read COLOR as the keyword on the Master wherever it is, and on a Model B only where it is COLOUR", () => {
         const keyword = colourAt("COLOUR 1", 0);
         expect(colourAt("COLOR 1", 0)).toBe(keyword);
         expect(colourAt("COLORS=7", 0)).not.toBe(keyword);
-        useBasicIV(true);
+        registerBbcBasicLanguage(BasicIVDialect);
         expect(colourAt("COLOR 1", 0)).toBe(keyword);
         expect(colourAt("COLORS=7", 0)).toBe(keyword);
     });
     it("should mark the lines BASIC IV stops at, not those BASIC II does", () => {
         const text = "V.7|\nVDU|";
-        expect(getSyntaxMarkers(text).map(marker => marker.startLineNumber)).toEqual([1, 2]);
-        useBasicIV(true);
-        expect(getSyntaxMarkers(text).map(marker => marker.startLineNumber)).toEqual([2]);
+        const lines = dialect =>
+            getSyntaxMarkers(text, 0, dialect).map(marker => marker.startLineNumber);
+        expect(lines(ModelBDialect)).toEqual([1, 2]);
+        expect(lines(BasicIVDialect)).toEqual([2]);
     });
     it("should warn about lower case keywords BASIC IV has", () => {
-        expect(getWarnings("color 1")).toEqual([]);
-        useBasicIV(true);
-        expect(getWarnings("color 1").map(warning => warning.message)).toEqual([
+        expect(getWarnings("color 1", ModelBDialect)).toEqual([]);
+        expect(getWarnings("color 1", BasicIVDialect).map(warning => warning.message)).toEqual([
             "BASIC keywords should be upper case, did you mean COLOR?",
         ]);
     });
     it("should offer the keywords BASIC IV has", () => {
-        const offered = text => completionContext(text).labels;
-        expect(offered("")).not.toContain("EXT");
-        expect(offered("X=")).not.toContain("EDIT");
-        useBasicIV(true);
-        expect(offered("")).toContain("EXT");
-        expect(offered("X=")).toContain("EXT");
-        expect(offered("").concat(offered("X="))).not.toContain("EDIT");
-        useBasicIV(false);
-        expect(offered("ON X ")).not.toContain("PROC");
-        useBasicIV(true);
-        expect(offered("ON X ")).toContain("PROC");
+        const offered = (text, dialect) => completionContext(text, dialect).labels;
+        expect(offered("", ModelBDialect)).not.toContain("EXT");
+        expect(offered("X=", ModelBDialect)).not.toContain("EDIT");
+        expect(offered("", BasicIVDialect)).toContain("EXT");
+        expect(offered("X=", BasicIVDialect)).toContain("EXT");
+        expect(offered("", BasicIVDialect).concat(offered("X=", BasicIVDialect))).not.toContain(
+            "EDIT",
+        );
+        expect(offered("ON X ", ModelBDialect)).not.toContain("PROC");
+        expect(offered("ON X ", BasicIVDialect)).toContain("PROC");
     });
 });

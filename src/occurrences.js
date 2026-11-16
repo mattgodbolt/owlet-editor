@@ -2,6 +2,7 @@ import {editor, KeyCode, KeyMod, languages} from "monaco-editor/editor/editor.ap
 import "monaco-editor/editor/contrib/rename/browser/rename";
 import "monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter";
 import {LanguageId} from "./bbcbasic";
+import {ModelBDialect} from "./parser/dialect";
 import {readLines} from "./parser/highlight";
 
 const MessageControllerId = "editor.contrib.messageController";
@@ -15,8 +16,8 @@ function symbol(kind, name, lineNumber, offset) {
 
 // Every name in the program that BASIC looks up as a variable, array, FN or PROC. A variable, an array, a FN and a
 // PROC with the same name are different things, as are A, A% and A$; an assembler label is a variable.
-export function programSymbols(text) {
-    return readLines(text).flatMap((recogniser, lineIndex) => {
+export function programSymbols(text, dialect = ModelBDialect) {
+    return readLines(text, dialect).flatMap((recogniser, lineIndex) => {
         const lineNumber = lineIndex + 1;
         const {text: line} = recogniser.lexer;
         return recogniser.tokens.flatMap((token, i) => {
@@ -42,12 +43,12 @@ export function programSymbols(text) {
 
 const symbolsCache = new WeakMap();
 
-function modelSymbols(model) {
+function modelSymbols(model, dialect) {
     const version = model.getVersionId();
     const cached = symbolsCache.get(model);
-    if (cached && cached.version === version) return cached.symbols;
-    const symbols = programSymbols(model.getValue());
-    symbolsCache.set(model, {version, symbols});
+    if (cached && cached.version === version && cached.dialect === dialect) return cached.symbols;
+    const symbols = programSymbols(model.getValue(), dialect);
+    symbolsCache.set(model, {version, dialect, symbols});
     return symbols;
 }
 
@@ -75,8 +76,8 @@ function range(s) {
 
 // The occurrences of the variable, array, FN or PROC at the position, the one at the position first; null if there
 // is none there.
-export function occurrencesAt(model, position) {
-    const symbols = modelSymbols(model);
+export function occurrencesAt(model, position, dialect = ModelBDialect) {
+    const symbols = modelSymbols(model, dialect);
     const target = symbolAt(symbols, position);
     if (!target) return null;
     return [target, ...symbols.filter(s => s !== target && sameSymbol(s, target))].map(range);
@@ -98,9 +99,9 @@ const ProbeLine = {
     [Kind.Proc]: name => `PROC${name}`,
 };
 
-function renameError(model, target, newName) {
+function renameError(model, target, newName, dialect) {
     const renamed = {...target, name: newName};
-    const probe = programSymbols(ProbeLine[target.kind](newName));
+    const probe = programSymbols(ProbeLine[target.kind](newName), dialect);
     if (probe.length !== 1 || !sameSymbol(probe[0], renamed)) {
         return `${newName} is not a valid name for ${displayName(target)}`;
     }
@@ -110,20 +111,20 @@ function renameError(model, target, newName) {
     if (typeSuffix(newName) !== typeSuffix(target.name)) {
         return `Renaming ${target.name} to ${newName} would change its type`;
     }
-    if (modelSymbols(model).some(s => sameSymbol(s, renamed))) {
+    if (modelSymbols(model, dialect).some(s => sameSymbol(s, renamed))) {
         return `${displayName(renamed)} is already used in this program`;
     }
     return null;
 }
 
-const highlightProvider = {
+const highlightProviderFor = dialect => ({
     provideDocumentHighlights(model, position) {
-        return (occurrencesAt(model, position) || []).map(r => ({
+        return (occurrencesAt(model, position, dialect) || []).map(r => ({
             range: r,
             kind: languages.DocumentHighlightKind.Text,
         }));
     },
-};
+});
 
 // The standalone editor only logs a rename's rejectReason to the console.
 function showMessage(model, position, message) {
@@ -132,31 +133,37 @@ function showMessage(model, position, message) {
     if (messages) messages.showMessage(message, position);
 }
 
-export const renameProvider = {
+export const renameProviderFor = dialect => ({
     resolveRenameLocation(model, position) {
-        const target = symbolAt(modelSymbols(model), position);
+        const target = symbolAt(modelSymbols(model, dialect), position);
         if (!target) return {range: null, text: "", rejectReason: NotANameReason};
         return {range: range(target), text: target.name};
     },
     provideRenameEdits(model, position, newName) {
-        const error = renameError(model, symbolAt(modelSymbols(model), position), newName);
+        const error = renameError(
+            model,
+            symbolAt(modelSymbols(model, dialect), position),
+            newName,
+            dialect,
+        );
         if (error) {
             showMessage(model, position, error);
             return {edits: [], rejectReason: error};
         }
         const versionId = model.getVersionId();
         return {
-            edits: occurrencesAt(model, position).map(r => ({
+            edits: occurrencesAt(model, position, dialect).map(r => ({
                 resource: model.uri,
                 versionId,
                 textEdit: {range: r, text: newName},
             })),
         };
     },
-};
+});
+export const renameProvider = renameProviderFor(ModelBDialect);
 
-function selectOccurrences(codeEditor) {
-    const ranges = occurrencesAt(codeEditor.getModel(), codeEditor.getPosition());
+const selectOccurrences = dialect => codeEditor => {
+    const ranges = occurrencesAt(codeEditor.getModel(), codeEditor.getPosition(), dialect);
     if (!ranges) return;
     codeEditor.setSelections(
         ranges.map(r => ({
@@ -166,16 +173,22 @@ function selectOccurrences(codeEditor) {
             positionColumn: r.endColumn,
         })),
     );
-}
+};
 
-export function registerOccurrences() {
-    languages.registerDocumentHighlightProvider(LanguageId, highlightProvider);
-    languages.registerRenameProvider(LanguageId, renameProvider);
-    // Monaco's own "Change All Occurrences" finds the word's text wherever it appears, so Owlet has this one instead.
-    editor.addEditorAction({
-        id: "change-all-occurrences",
-        label: "Change All Occurrences",
-        keybindings: [KeyMod.CtrlCmd | KeyCode.F2],
-        run: selectOccurrences,
-    });
+let registrations = [];
+
+/** Has the editor find a name's occurrences by the dialect, in place of the one it was finding them by. */
+export function registerOccurrences(dialect = ModelBDialect) {
+    for (const registration of registrations) registration.dispose();
+    registrations = [
+        languages.registerDocumentHighlightProvider(LanguageId, highlightProviderFor(dialect)),
+        languages.registerRenameProvider(LanguageId, renameProviderFor(dialect)),
+        // Monaco's own "Change All Occurrences" finds the word's text wherever it appears, so Owlet has this one instead.
+        editor.addEditorAction({
+            id: "change-all-occurrences",
+            label: "Change All Occurrences",
+            keybindings: [KeyMod.CtrlCmd | KeyCode.F2],
+            run: selectOccurrences(dialect),
+        }),
+    ];
 }

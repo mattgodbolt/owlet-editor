@@ -15,7 +15,16 @@ import {partialDetokenise} from "./tokens";
 import {createTokenisers, tokeniserFor} from "./tokeniser";
 import {encode} from "base2048";
 import "./owlet-editor.less";
-import {getSyntaxMarkers, getWarnings, LanguageId, useBasicIV, withoutCodes} from "./bbcbasic";
+import {
+    getSyntaxMarkers,
+    getWarnings,
+    LanguageId,
+    registerBbcBasicLanguage,
+    withoutCodes,
+} from "./bbcbasic";
+import {registerCompletions} from "./completions";
+import {registerOccurrences} from "./occurrences";
+import {dialectFor, ModelBDialect} from "./parser/dialect";
 import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
@@ -51,6 +60,10 @@ export class OwletEditor {
         this.tokenisers = null;
         this.onChangeHandler = onChangeHandler;
         this.onMachineChangeHandler = onMachineChangeHandler;
+
+        // The emulator starts on the default machine, a Model B; setMachine changes the dialect if it is not.
+        this.dialect = ModelBDialect;
+        this.registerLanguage();
 
         monacoEditor.defineTheme("bbcbasicTheme", {
             base: "vs-dark",
@@ -117,7 +130,7 @@ export class OwletEditor {
             {keybinding: KeyCode.F8, command: "editor.action.marker.next", when: "editorFocus"},
         ]);
 
-        followImplicitLineNumbers(this.editor);
+        this.followLineNumbers = followImplicitLineNumbers(this.editor, this.dialect);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
         this.editor.onDidChangeCursorPosition(({position}) => {
@@ -175,7 +188,7 @@ export class OwletEditor {
         monacoEditor.setModelMarkers(
             model,
             "warnings",
-            withoutCodes(getWarnings(model.getValue())),
+            withoutCodes(getWarnings(model.getValue(), this.dialect)),
         );
     }
 
@@ -193,11 +206,11 @@ export class OwletEditor {
         const model = this.editor.getModel();
         this.syntaxCursorLine = this.editor.getPosition().lineNumber;
         const text = model.getValue();
-        const syntax = getSyntaxMarkers(text, this.syntaxCursorLine);
-        const lineNumbers = getLineNumberMarkers(text, this.syntaxCursorLine);
+        const syntax = getSyntaxMarkers(text, this.syntaxCursorLine, this.dialect);
+        const lineNumbers = getLineNumberMarkers(text, this.syntaxCursorLine, this.dialect);
         monacoEditor.setModelMarkers(model, "syntax", withoutCodes(syntax));
         monacoEditor.setModelMarkers(model, "lineNumbers", lineNumbers);
-        const warnings = getWarnings(text);
+        const warnings = getWarnings(text, this.dialect);
         const summary = problemCount({syntax, lineNumbers, warnings});
         const [first] = [...syntax, ...lineNumbers, ...warnings].sort(
             (a, b) => a.startLineNumber - b.startLineNumber || a.startColumn - b.startColumn,
@@ -285,6 +298,21 @@ export class OwletEditor {
         }
     }
 
+    registerLanguage() {
+        registerBbcBasicLanguage(this.dialect);
+        registerOccurrences(this.dialect);
+        registerCompletions(this.dialect);
+    }
+
+    /** Has the editor read BBC BASIC as the chosen machine's BASIC does. */
+    useDialect(dialect) {
+        if (dialect === this.dialect) return;
+        this.dialect = dialect;
+        this.registerLanguage();
+        this.followLineNumbers.dispose();
+        this.followLineNumbers = followImplicitLineNumbers(this.editor, dialect);
+    }
+
     /** Chooses the machine the emulator builds next, and its BASIC for the editor; returns whether it changed. */
     setMachine(machine) {
         const changed = this.emulator.setMachine(machine);
@@ -293,7 +321,7 @@ export class OwletEditor {
         $("#rocket")
             .prop("disabled", !sendable)
             .attr("title", sendable ? "send to beebjit" : "bbcmicrobot snapshots are of a Model B");
-        useBasicIV(this.emulator.model.isMaster);
+        this.useDialect(dialectFor(this.emulator.model));
         this.updateWarnings();
         this.showSyntaxMarkers();
         this.onMachineChangeHandler(machine);
@@ -443,7 +471,7 @@ export class OwletEditor {
                 return false;
             }
         };
-        this.updateEditorText(expandCode(this.getBasicText(), fits), "expand code");
+        this.updateEditorText(expandCode(this.getBasicText(), fits, this.dialect), "expand code");
     }
 
     tokenise() {

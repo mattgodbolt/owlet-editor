@@ -1,6 +1,7 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
+import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {occurrencesAt, registerOccurrences, renameProvider} from "../src/occurrences";
-import {describe, it, vi, afterEach} from "vitest";
+import {describe, expect, it, vi, afterEach} from "vitest";
 import assert from "assert";
 import {editor} from "monaco-editor/editor/editor.api";
 
@@ -82,6 +83,16 @@ describe("Occurrences", () => {
         ];
         for (const [text, expected] of cases)
             assert.strictEqual(replaceAll(text, "X", occurrencesAt), expected, text);
+    });
+
+    it("should read a model by the dialect it is asked for, whatever it was last read by", () => {
+        withModel("COLORS=7", model => {
+            const position = {lineNumber: 1, column: 6};
+            const start = dialect => occurrencesAt(model, position, dialect)?.[0].startColumn;
+            expect(start(ModelBDialect)).toBe(1);
+            expect(start(BasicIVDialect)).toBe(6);
+            expect(start(ModelBDialect)).toBe(1);
+        });
     });
 
     // Monaco's word highlighter only asks for the occurrences where it finds a word.

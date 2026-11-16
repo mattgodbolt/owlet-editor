@@ -3,7 +3,7 @@
 // the first. Where there is no rule for a statement, anything is accepted.
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {FirstStatementToken} from "../tokens.js";
-import {BasicIIDialect, currentDialect} from "./dialect.js";
+import {BasicIIDialect, ModelBDialect} from "./dialect.js";
 import {byteView, Lexer, lexLine} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -118,7 +118,7 @@ export function tokenise(text, dialect) {
 }
 
 export class Recogniser {
-    constructor(text, inAssembler, probing = false, dialect = currentDialect()) {
+    constructor(text, inAssembler, probing = false, dialect = ModelBDialect) {
         this.dialect = dialect;
         this.lexer = new Lexer(text, dialect);
         this.basicIV = dialect.basicIV;

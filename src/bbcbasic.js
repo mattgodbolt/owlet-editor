@@ -7,7 +7,7 @@ import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
 import {ForeignOperators} from "./parser/recogniser";
-import {currentImmediateCommands, isBasicIV, setBasicIV} from "./parser/dialect";
+import {ModelBDialect} from "./parser/dialect";
 import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
@@ -34,14 +34,8 @@ function tokenMetadata(scopes, bracket) {
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
 let registrations = [];
 
-/** Follows the Master's BASIC IV rather than BASIC II, and has the editor read its text again. */
-export function useBasicIV(enabled) {
-    if (Boolean(enabled) === isBasicIV()) return;
-    setBasicIV(enabled);
-    if (registrations.length) registerBbcBasicLanguage();
-}
-
-export function registerBbcBasicLanguage() {
+/** Has the editor read its BBC BASIC by the dialect, in place of the one it was reading by. */
+export function registerBbcBasicLanguage(dialect = ModelBDialect) {
     if (registrations.length === 0) languages.register({id: LanguageId});
     for (const registration of registrations) registration.dispose();
 
@@ -74,14 +68,14 @@ export function registerBbcBasicLanguage() {
     });
 
     registrations = [
-        languages.setTokensProvider(LanguageId, tokensProvider(LanguageId, tokenMetadata)),
+        languages.setTokensProvider(LanguageId, tokensProvider(LanguageId, tokenMetadata, dialect)),
         configuration,
-        languages.registerCodeActionProvider(LanguageId, codeActionProvider),
+        languages.registerCodeActionProvider(LanguageId, codeActionProviderFor(dialect)),
     ];
 }
 
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
-export const codeActionProvider = {
+export const codeActionProviderFor = dialect => ({
     provideCodeActions(model, range, context) {
         // Only the warnings above come with a fix; the text under any other marker is not to be rewritten. The editor's
         // markers carry no code (Monaco would show it in the hover), so it is found from the text again.
@@ -89,7 +83,7 @@ export const codeActionProvider = {
         const codeOf = marker => {
             if (marker.code) return marker.code;
             const text = model.getValue();
-            known = known || [...getWarnings(text), ...getSyntaxMarkers(text)];
+            known = known || [...getWarnings(text, dialect), ...getSyntaxMarkers(text, 0, dialect)];
             return known.find(
                 found =>
                     found.message === marker.message &&
@@ -140,7 +134,8 @@ export const codeActionProvider = {
         });
         return {actions, dispose: () => {}};
     },
-};
+});
+export const codeActionProvider = codeActionProviderFor(ModelBDialect);
 
 function quickFix(model, marker, title, range, text) {
     return {
@@ -176,9 +171,9 @@ const marker = (severity, line, start, end, details) => ({
 });
 
 // The warnings for each line of the program.
-export function getWarnings(text) {
-    return readLines(text).flatMap(({lexer, tokens}, i) =>
-        lineWarnings(lexer.text, tokens).map(({start, end, ...details}) =>
+export function getWarnings(text, dialect = ModelBDialect) {
+    return readLines(text, dialect).flatMap(({lexer, tokens}, i) =>
+        lineWarnings(lexer.text, tokens, dialect).map(({start, end, ...details}) =>
             marker(MarkerSeverity.Warning, i + 1, start, end, details),
         ),
     );
@@ -186,9 +181,11 @@ export function getWarnings(text) {
 
 // The markers for the lines BASIC would stop at, and for those that end too soon or have something missing. A line is unfinished while the cursor is on it (`cursorLine`) and so is not marked then,
 // and a warning that covers the same text says enough.
-export function getSyntaxMarkers(text, cursorLine = 0) {
-    const recognisers = readLines(text);
-    const warnings = recognisers.map(({lexer, tokens}) => lineWarnings(lexer.text, tokens));
+export function getSyntaxMarkers(text, cursorLine = 0, dialect = ModelBDialect) {
+    const recognisers = readLines(text, dialect);
+    const warnings = recognisers.map(({lexer, tokens}) =>
+        lineWarnings(lexer.text, tokens, dialect),
+    );
     return programProblems(text, recognisers).flatMap(problem => {
         const {line, start, end, unfinished, code} = problem;
         const covered = warnings[line - 1].some(
@@ -204,12 +201,16 @@ export function getSyntaxMarkers(text, cursorLine = 0) {
         );
         const atEnd = !next || next.text === ":" || next.kw?.keyword === "ELSE";
         const statementStart = before.slice(0, -1).every(token => token.kind === "linenum");
-        const message = problemMessage(problem, {
-            at: stopped?.text ?? lexer.text.slice(start, end).trim(),
-            previous: previous?.text,
-            atEnd,
-            statementName: previous?.kind === "name" && statementStart,
-        });
+        const message = problemMessage(
+            problem,
+            {
+                at: stopped?.text ?? lexer.text.slice(start, end).trim(),
+                previous: previous?.text,
+                atEnd,
+                statementName: previous?.kind === "name" && statementStart,
+            },
+            dialect,
+        );
         const severity = unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error;
         return [marker(severity, line, start, end, {message, ...(code && {code})})];
     });
@@ -217,25 +218,25 @@ export function getSyntaxMarkers(text, cursorLine = 0) {
 
 // The keyword that a name, typed in capitals, would be read as in full (with the ( that ends LEFT$( and the like), or
 // null: a name BASIC reads as a variable with the lower case letters it has.
-function upperCaseKeyword(line, token) {
+function upperCaseKeyword(line, token, dialect) {
     const name = line.slice(token.start, token.end);
     if (name !== name.toLowerCase()) return null;
-    const [first] = lexLine(name.toUpperCase() + line.slice(token.end, token.end + 1));
+    const [first] = lexLine(name.toUpperCase() + line.slice(token.end, token.end + 1), dialect);
     return first.kind === "keyword" && first.text === first.kw.keyword && first.end >= name.length
         ? first
         : null;
 }
 
-function lineWarnings(line, lineTokens) {
+function lineWarnings(line, lineTokens, dialect) {
     const warnings = [];
     const warn = (start, length, details) =>
         warnings.push({start, end: start + length, ...details});
 
     const isName = token => token.kind !== "fnname" && (token.invalid || token.kind === "name");
     for (const token of lineTokens.filter(isName)) {
-        const keyword = upperCaseKeyword(line, token);
+        const keyword = upperCaseKeyword(line, token, dialect);
         // Don't warn about lower case versions of immediate commands, e.g. `new`.
-        if (!keyword || currentImmediateCommands().includes(keyword.text)) continue;
+        if (!keyword || dialect.immediateCommands.includes(keyword.text)) continue;
         warn(token.start, keyword.end, {
             message: `BASIC keywords should be upper case, did you mean ${keyword.text}?`,
             code: LowerCaseKeywordCode,

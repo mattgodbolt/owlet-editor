@@ -2,7 +2,7 @@
 // line-number flags, so that each token is what BASIC will see when it runs the line. It also splits the text BASIC
 // leaves alone (names, numbers, strings, punctuation) into the pieces the interpreter reads.
 import {byteChar, Flags, keywordByToken, keywords, LineNumberToken, tokenChar} from "../tokens.js";
-import {ColorKeyword, currentDialect} from "./dialect.js";
+import {ColorKeyword, ModelBDialect} from "./dialect.js";
 
 // Typed text matches the first entry of the table with each spelling; PAGE, PTR, TIME, LOMEM and HIMEM come again at
 // the end of the table with their statement tokens, which the tokeniser makes by adding 0x40.
@@ -68,7 +68,7 @@ export function byteView(text) {
 
 // The first keyword the text at i spells in full or abbreviates, with the end of its spelling; null if there is none,
 // or it is Conditional and a name character follows (then BASIC reads a name).
-export function matchKeyword(text, i, dialect = currentDialect()) {
+export function matchKeyword(text, i, dialect = ModelBDialect) {
     for (const kw of tablesFor(dialect).byFirstLetter.get(text[i]) || []) {
         const word = kw.keyword;
         let length = 1;
@@ -91,7 +91,7 @@ function isUnreadAbbreviation(text, start, end, dialect) {
 // statement token's) for a keyword. Kinds: white, linenum, keyword, name, fnname, number, hex, string, punct, comment
 // (after REM), data (after DATA), oscli (a * command). A string has `closed`, a token after white space `spaced`.
 export class Lexer {
-    constructor(source, dialect = currentDialect()) {
+    constructor(source, dialect = ModelBDialect) {
         this.source = source;
         this.text = byteView(source);
         this.dialect = dialect;
@@ -262,7 +262,7 @@ export class Lexer {
 }
 
 // Every token of a line, white space included; the names that start at an offset of `colors` are read as COLOR.
-export function lexLine(text, dialect = currentDialect(), colors = []) {
+export function lexLine(text, dialect = ModelBDialect, colors = []) {
     const lexer = new Lexer(text, dialect);
     for (let token = lexer.next(); token.kind !== "end"; token = lexer.next())
         if (token.kind === "name" && colors.includes(token.start)) lexer.relex(token);

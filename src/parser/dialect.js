@@ -1,6 +1,6 @@
 // Which BASIC the parser follows: BASIC II (the Model B's) or BASIC IV (the Master's). Each of the lexer, recogniser and
-// assembler takes a dialect to read a line by; without one they use the editor's, which `setBasicIV` changes, so a
-// change shows in the next line read.
+// assembler takes the dialect to read a line by, and the editor passes that of the machine it is on; the default where
+// one is optional is the Model B's, and nothing here changes with the editor's machine.
 import {Flags, immediateCommands, keywords} from "../tokens.js";
 
 // BASIC IV's keyword table is BASIC II's with COLOR (the same token as COLOUR, which BASIC reads first) and EDIT
@@ -30,13 +30,5 @@ export const BasicIVDialect = Object.freeze({
     usColor: false,
 });
 
-let current = ModelBDialect;
-
-export const currentDialect = () => current;
-export const isBasicIV = () => current.basicIV;
-export const currentKeywords = () => current.keywords;
-export const currentImmediateCommands = () => current.immediateCommands;
-
-export function setBasicIV(enabled) {
-    current = enabled ? BasicIVDialect : ModelBDialect;
-}
+/** The dialect of the BASIC that the model runs. */
+export const dialectFor = model => (model.isMaster ? BasicIVDialect : ModelBDialect);

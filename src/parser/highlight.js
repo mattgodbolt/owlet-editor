@@ -1,5 +1,6 @@
 // The recogniser's tokens as Monaco token types, the names the editor's theme colours.
 import {BracketCollisions} from "./lexer.js";
+import {ModelBDialect} from "./dialect.js";
 import {Recogniser} from "./recogniser.js";
 
 const Operators = new Set("+ - * / ^ = <> < > <= >= $ ? ; , ! '".split(" "));
@@ -94,7 +95,7 @@ function parts(token) {
 // The line's tokens as {offset, type, bracket}, and whether an assembler block is open at its end. `bracket` is set on
 // a "(" and the ")" that closes it on the same line, where neither is invalid, and on a valid "[" or "]": those are
 // the only text Monaco is to match brackets in. Neighbours of the same type and `bracket` are joined.
-export function highlightLine(text, inAssembler = false, dialect) {
+export function highlightLine(text, inAssembler = false, dialect = ModelBDialect) {
     const recogniser = new Recogniser(text, inAssembler, false, dialect);
     const open = recogniser.line();
     const tokens = [];
@@ -119,7 +120,7 @@ export function highlightLine(text, inAssembler = false, dialect) {
 }
 
 // The recogniser's reading of each line of the program, an assembler block open at the end of one carrying into the next.
-export function readLines(text, dialect) {
+export function readLines(text, dialect = ModelBDialect) {
     let inAssembler = false;
     return text.split(/\r?\n/).map(lineText => {
         const recogniser = new Recogniser(lineText, inAssembler, false, dialect);
@@ -188,11 +189,11 @@ const States = [new State(false), new State(true)];
 
 // `metadata(scopes, bracket)` is Monaco's encoding of a token: the theme's colours for the scopes, and whether Monaco
 // looks for brackets in its text.
-export function tokensProvider(languageId, metadata) {
+export function tokensProvider(languageId, metadata, dialect = ModelBDialect) {
     return {
         getInitialState: () => States[0],
         tokenizeEncoded(line, state) {
-            const {tokens, inAssembler} = highlightLine(line, state.inAssembler);
+            const {tokens, inAssembler} = highlightLine(line, state.inAssembler, dialect);
             return {
                 tokens: Uint32Array.from(
                     tokens.flatMap(({offset, type, bracket}) => [
