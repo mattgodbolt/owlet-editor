@@ -225,6 +225,7 @@ export class Emulator {
 
     async beebjit(tokenised) {
         this.pause();
+        const processor = this.cpu;
 
         beebjitIncoming = true;
 
@@ -247,6 +248,11 @@ export class Emulator {
         );
         beebjitIncoming = false;
         this.state = await response.json();
+        // The machine may have been replaced meanwhile, and the snapshot is of a Model B, not the new one's to load.
+        if (processor !== this.cpu) {
+            clearInterval(counterInterval);
+            return;
+        }
         const t0 = performance.now();
         this.snapshot.load(this.state, this.cpu);
         this.loopStart = this.cyclesPerSecond * 60 * 60 * 3; // 3 hours
