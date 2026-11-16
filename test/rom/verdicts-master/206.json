@@ -511,5 +511,6 @@
   ["[OPT0:WAI:]", "Syntax error", "#206"],
   ["[OPT0:STP:]", "Syntax error", "#206"],
   ["[OPT0:BBR0 &70,P%:]", "Syntax error", "#206"],
-  ["[OPT0:STAH.,X:]", "ok", "8d e8 0e", "#206"]
+  ["[OPT0:STAH.,X:]", "ok", "8d e8 0e", "#206"],
+  ["PRINT TOP", "ok", "#218"]
 ]

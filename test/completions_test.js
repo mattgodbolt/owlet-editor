@@ -126,7 +126,7 @@ describe("Completions", () => {
             ["GOTO 10 A‸", ["AND", "ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
             ["TRACE O‸", ["OFF", "ON", "OPENIN", "OPENOUT", "OPENUP", "OR"]],
             ["DEF PR‸", ["PRINT", "PROC"]],
-            ["FORI=1T‸", ["TAN", "TIME", "TO", "TRUE"]],
+            ["FORI=1T‸", ["TAN", "TIME", "TO", "TOP", "TRUE"]],
             ["IFA%THE‸", ["THEN"]],
             ['PRINT"A"TA‸', ["TAN", "TAB("]],
             ["[OPT 0:LDA #AS‸", ["ASC", "ASN"]],
@@ -140,11 +140,15 @@ describe("Completions", () => {
     });
 
     // Each word that is not a value is offered only in the statements BBC BASIC II reads it in (see StatementWords).
-    it("should offer SPC, TAB(, LINE, TO, STEP, THEN, ON, OFF and ERROR only where the ROM reads them", () => {
+    it("should offer TOP, SPC, TAB(, LINE, TO, STEP, THEN, ON, OFF and ERROR only where the ROM reads them", () => {
         const cases = [
             // [text, offered, not offered]
             ["A=S‸", ["SQR", "STR$", "STRING$("], ["SPC", "STEP", "STOP", "SOUND"]],
-            ["A=T‸", ["TAN", "TIME", "TRUE"], ["TAB(", "TO", "THEN", "TRACE"]],
+            ["A=T‸", ["TAN", "TIME", "TOP", "TRUE"], ["TAB(", "TO", "THEN", "TRACE"]],
+            ["PRINT T‸", ["TAB(", "TOP"], ["TO"]],
+            ["[LDA #T‸", ["TOP"], ["TO"]],
+            ["T‸", [], ["TOP"]],
+            ["FOR I=1 T‸", ["TO"], []],
             ["PRINT S‸", ["SPC", "SQR"], ["STEP", "STOP"]],
             ["PRINT 1;T‸", ["TAB(", "TAN"], ["TO", "THEN"]],
             ["PRINT 1:A=S‸", ["SQR"], ["SPC"]],
