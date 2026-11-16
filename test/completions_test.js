@@ -2,6 +2,8 @@ import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {completionContext, completionItems} from "../src/completions";
 import {readLines} from "../src/parser/highlight";
 import {expandCode} from "../src/expand-code";
+import Examples from "../src/examples.yaml";
+import {generate} from "../tools/rom-oracle/generate.mjs";
 import {immediateCommands, keywords} from "../src/tokens";
 import {describe, it} from "vitest";
 import assert from "assert";
@@ -220,7 +222,44 @@ describe("Completions", () => {
         assert.deepStrictEqual(hiddenKeywords(everyKeyword), []);
     });
 
-    // A file of saved programs, as a JSON array of {id, text}.
+    // Programs of our own: the bundled examples, the oracle generator's random statements with a fixed seed (not its
+    // exhaustive probes or assembler, which are not what a person types), and every keyword that starts with E run
+    // into the end of a number (7ELSE reads as 7 then ELSE).
+    const ownPrograms = () => {
+        const chunk = (lines, size) =>
+            Array.from({length: Math.ceil(lines.length / size)}, (_, i) =>
+                lines.slice(i * size, (i + 1) * size).join("\n"),
+            );
+        const afterNumber = keywords
+            .map(kw => kw.keyword)
+            .filter(kw => kw.startsWith("E"))
+            .flatMap(kw =>
+                ["X=7", "GCOL0,7", "A=16", "IF0", "X=1.5", "?s=12", "PRINT .5"].map(
+                    lead => lead + kw,
+                ),
+            );
+        return [
+            ...Examples.examples.map(({basic}) => basic).filter(Boolean),
+            ...chunk(
+                generate({seed: 1, count: 1500})
+                    .slice(generate({count: 0}).length)
+                    .filter(({shape}) => !shape.startsWith("assembler"))
+                    .map(({text}) => text),
+                100,
+            ),
+            afterNumber.join("\n"),
+        ];
+    };
+
+    it("should not hide any keyword in our own programs", () => {
+        const hidden = ownPrograms().flatMap((text, i) =>
+            hiddenKeywords(text).map(where => `program ${i} ${where}`),
+        );
+        assert.deepStrictEqual(hidden, []);
+    });
+
+    // A file of saved programs as a JSON array of {id, text}, for a corpus that cannot be checked in:
+    // OWLET_CORPUS=programs.json npx vitest run test/completions_test.js
     const corpus = env.OWLET_CORPUS;
     it.runIf(corpus)("should not hide any keyword in the corpus of saved programs", () => {
         const hidden = JSON.parse(readFileSync(corpus, "utf8")).flatMap(({id, text}) =>
