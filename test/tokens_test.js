@@ -1,10 +1,6 @@
-import {
-    debbreviate,
-    detokenise,
-    expandCode,
-    forEachBasicLine,
-    partialDetokenise,
-} from "../src/tokens";
+import {debbreviate, expandCode} from "../src/expand-code";
+import {detokenise, forEachBasicLine, partialDetokenise} from "../src/tokens";
+import RomTokens from "./rom-tokens.json";
 import {describe, it} from "vitest";
 import assert from "assert";
 
@@ -118,8 +114,33 @@ describe("Debbreviation", () => {
             debbreviate("ONERR.*K.0PA.=4608|MO.|MRU.|M"),
             "ONERROR*K.0PA.=4608|MO.|MRU.|M",
         );
-        assert.strictEqual(debbreviate("IFCOU.TH.*LO. P.DATA"), "IFCOUNTTHEN*LO. P.DATA");
+        assert.strictEqual(debbreviate("IFCOU.TH.*LO. P.DATA"), "IFCOU.THEN*LO. P.DATA");
         assert.strictEqual(debbreviate("P.\n*H.\nP."), "PRINT\n*H.\nPRINT");
+    });
+});
+
+describe("Debbreviation and the ROM", () => {
+    const romTokens = new Map(RomTokens);
+    it("should expand what the ROM reads as an abbreviation, and leave what it does not read as one", () => {
+        // Each pair is recorded on the ROM, and the expansion is the same bytes as the text: nothing the ROM would not
+        // read is expanded (COU. before TH. is not COUNT, and a name, REM or DATA text is not code), and nothing it
+        // would read is left (MID$. is MID$( and R. after a number is RETURN).
+        const cases = [
+            ["IFCOU.TH.*LO. P.DATA", "IFCOU.THEN*LO. P.DATA"],
+            ["REM P. is print", "REM P. is print"],
+            ["DATA P.,L.", "DATA P.,L."],
+            ["xP.", "xP."],
+            ["A1P.", "A1P."],
+            ["&FFR.", "&FFRETURN"],
+            ["A=MID$.A$,1)", "A=MID$(A$,1)"],
+        ];
+        for (const [text, expanded] of cases) {
+            assert.strictEqual(debbreviate(text), expanded, text);
+            for (const row of [text, expanded])
+                assert.ok(romTokens.has(row), `${row} is not a row`);
+            assert.strictEqual(romTokens.get(expanded), romTokens.get(text), text);
+        }
+        assert.notStrictEqual(romTokens.get("IFCOUNTTHEN*LO. P.DATA"), romTokens.get(cases[0][0]));
     });
 });
 
