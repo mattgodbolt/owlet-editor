@@ -185,6 +185,24 @@ canvas.screen {
   justify-content: left;
 }
 
+#problems,
+#problems:active {
+  height: auto;
+  margin: 0 0 0 12px;
+  padding: 0;
+  background: none;
+  color: Tomato;
+  text-decoration: underline;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:not([hidden]) {
+    display: inline;
+  }
+}
+
 #emu_status {
   padding-left: 16px;
   justify-content: right;
