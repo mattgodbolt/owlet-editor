@@ -76,7 +76,7 @@ export class Assembler {
                 this.statement();
             } catch (e) {
                 const atEnd = () => r.is("end") || r.isPunct(":", "]") || this.isBranchElse();
-                r.recover(e, start, atEnd);
+                r.recover(e, start, atEnd, true);
             }
         }
     }

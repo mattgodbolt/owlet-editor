@@ -1364,5 +1364,11 @@
   ["[OPT0:EQƂB 9:]", "ok", "4d e8 19", "#202"],
   ["[OPT0:EQƄB 9:]", "Syntax error", "#202"],
   ["[OPT0:EQ B 9:]", "Syntax error", "#202"],
-  ["[OPT0:EQÿB 9:]", "Syntax error", "#202"]
+  ["[OPT0:EQÿB 9:]", "Syntax error", "#202"],
+  ["FOR I:PRINT I:NEXT", "Mistake", "#201"],
+  ["FOR I:", "Mistake", "#201"],
+  ["FOR I", "Mistake", "#201"],
+  ["IF A THEN PRINT:FOR I:NEXT", "Mistake", "#201"],
+  ["A=1:FOR I:NEXT", "Mistake", "#201"],
+  ["FOR I:PRINT I", "Mistake", "#201"]
 ]
