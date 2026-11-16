@@ -375,15 +375,16 @@ input {
     grid-row: 8;
   }
 
-  // Only the views that suit a phone: the emulator and the reference.
   #editor_toolbar {
     grid-column: 1;
     grid-row: 3;
+  }
 
-    #examples-button,
-    #about-button {
-      display: none;
-    }
+  // The pane is a fixed 80vw tall, so the panel scrolls inside it rather than being clipped.
+  #about {
+    padding: 16px;
+    overflow-y: auto;
+    box-sizing: border-box;
   }
 
   .kudos {

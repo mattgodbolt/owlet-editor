@@ -7,7 +7,7 @@ import {
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
 import {problemCount} from "../src/problem-count";
-import {highlightLine} from "../src/parser/highlight";
+import {highlightLine, readLines} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
 import {falseInvalid, verdicts} from "./rom-tables";
 import RomTokens from "./rom-tokens.json";
@@ -1071,6 +1071,44 @@ describe("Line warnings", () => {
             romTokens.get("A=FNO.X1"),
         );
     });
+    it("should not warn about a lower case name after PROC, FN or DEF", () => {
+        // The ROM keeps what follows PROC or FN as text, so PROCmove is the keyword PROC and the name move; procmove
+        // is no keyword at all.
+        for (const text of [
+            "PROCmove",
+            "DEFPROCdraw",
+            "X=FNend",
+            "PROCprint:PROCinput",
+            "procmove",
+            "X=fnend",
+        ]) {
+            assert.ok(romTokens.has(text), `${text} is not a recorded row`);
+            checkWarnings(text);
+        }
+        // Also where the recogniser has marked the name invalid (a PROC where a value was wanted).
+        checkWarnings("X=PROCprint");
+        checkWarnings("DEFPROCdraw(x):print", caseWarning("PRINT", 16));
+    });
+    it("should warn about an abbreviation after a number only where the ROM reads it differently", () => {
+        const rows = ["A=1ER.a$", "A=1ER. a$", "A=1.5ER.a$", "A=&1ER.a$", "A=1er.a$"];
+        for (const row of rows) assert.ok(romTokens.has(row), `${row} is not a recorded row`);
+        checkWarnings("A=1ER.a$", {
+            message:
+                'ER. is not read as an abbreviation when followed directly by letters or digits, did you mean "ER. a"?',
+            code: "space-after-abbreviation",
+            startColumn: 4,
+            endColumn: 8,
+        });
+        checkWarnings("A=1ER. a$");
+    });
+    it("should keep a bare E as the exponent of a number even when a dot follows", () => {
+        const numbers = readLines("PRINT 1E.5")
+            .at(-1)
+            .tokens.filter(token => token.kind === "number")
+            .map(token => token.text);
+        assert.deepStrictEqual(numbers, ["1E", ".5"]);
+        checkWarnings("PRINT 1E.5");
+    });
     it("should warn on invalid operators from other languages", () => {
         const cases = [
             ["==", "=", 1],
@@ -1131,6 +1169,12 @@ describe("Quick fixes", () => {
         assert.deepStrictEqual(applyQuickFix("F.A=1 TO H.TO8"), {
             title: "Insert a space after H.",
             result: "F.A=1 TO H. TO8",
+        });
+    });
+    it("should put the space after an abbreviation that follows a number", () => {
+        assert.deepStrictEqual(applyQuickFix("A=1ER.a$"), {
+            title: "Insert a space after ER.",
+            result: "A=1ER. a$",
         });
     });
     it("should replace a keyword typed in lower case, or an operator from another language", () => {
