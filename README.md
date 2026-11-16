@@ -58,7 +58,8 @@ Owlet Editor uses Vite as its build system. The project was migrated from webpac
 ## Highlighting: what red means
 
 Red means that BBC BASIC II would stop with an error at that statement if it ran it, and that no more typing at the end
-of the line could change that. The colours are a function of the text alone, wherever the cursor is.
+of the line could change that. On a Master 128 it is BASIC IV that is meant ([below](#basic-iv-the-master)), and the
+rest of this section holds for either. The colours are a function of the text alone, wherever the cursor is.
 
 - **Red runs to the end of the statement**: BASIC stops at the first token that cannot continue a
   statement and never reads the rest of it, so that token and everything after it up to the end of the statement is red.
@@ -161,6 +162,35 @@ message that says what BASIC does, and shows as an error.
   letter was probably left out; the hover says what BASIC reads the character as and which letters were probably
   meant. Where the character is not the third (`J-P`, `3EC`, `O2A`), no prefix is to blame, so just that character
   is red. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89).
+
+### BASIC IV (the Master)
+
+With the Master chosen the parser follows BASIC IV, which differs from BASIC II in these ways (`src/parser/dialect.js`
+holds the setting, which the lexer, recogniser and assembler read as each line is made; highlighting, markers, warnings
+and completions all follow it, and a change of machine colours the text again). Each was checked by running the
+statement on the Master's ROM in jsbeeb, and the rows are in `test/rom-verdicts-master.json` and
+`test/rom-tokens-master.json`; the tests check each row against the rules of its own machine.
+
+- **Keywords:** `COLOR` is `COLOUR` (the same token) and `EDIT` is a command (token `&CE`, which BASIC II does not have).
+  The tokeniser is otherwise BASIC II's, which `lexfuzz.mjs --master` checks, apart from dropping the spaces at the end
+  of a line as it stores it.
+- **`VDU`:** a `|` ends an item as `,` and `;` do, and sends nine zeros, so `VDU 23,255,255|` is valid. A `|` straight
+  after `VDU`, `,`, `;` or another `|` is still an error, as is a `,` or `;` after one, and a `|` anywhere else.
+- **`EXT#`** is a statement (`EXT#X=0`), read as `PTR#` is; `EXT` without the `#` says `Missing #`.
+- **`TIME$`**, with the `$` straight after `TIME`, is a string value and can be assigned to (`TIME$="..."`).
+- **`ON ... PROC`:** the list can name procedures as well as lines.
+- **Assembler:** the 65C12's `BRA`, `PHX`, `PHY`, `PLX`, `PLY`, `INA`, `DEA`, `STZ` (zero page or absolute, with `,X`),
+  `TRB` and `TSB` (no index); `BIT` takes `#` and `,X`; `INC A` and `DEC A`; `(&70)` as a zero page address for
+  `ADC AND CMP EOR LDA ORA SBC STA` (BASIC ignores what follows the `)` unless it is a comma, which must be `Y`), and
+  `JMP (&1234,X)`. The index register, the `a` of an accumulator operand, the `a` of `ORa` and the size of an `EQU`
+  are read in either case. `ST:` reads as `STZ`, as the third character of a mnemonic is compared in its low five bits
+  (the aliasing rule above), so it needs an operand. `RMB`, `SMB`, `BBR`, `BBS`, `WAI` and `STP` are not there.
+- **Errors:** `Bad Hex` for BASIC IV's `Bad HEX`. `ERROR 5,"x"` is a syntax error, as on BASIC II.
+
+Not covered: `LIST IF` and `EDIT`'s arguments (`EDIT X` is a syntax error, which the recogniser does not see, as it does
+not read the arguments of `LIST` either), and BASIC IV's own message wording beyond `Bad Hex`. `node
+tools/rom-oracle/oracle.mjs --master` runs the oracle on the Master with extra statements for BASIC IV
+(`generate-iv.mjs`); `record.mjs --master` and `lexfuzz.mjs --master` do the same for the tables and the tokeniser.
 
 The highlighter is the tokenizer in `src/parser`: a port of the ROM's tokeniser, a recogniser that marks the token at
 which BASIC would stop with an error and the rest of that statement, and the assembler. Bracket colouring and matching
