@@ -1,0 +1,4 @@
+[
+  ["[OPT0:CLR 0:]", "Syntax error", "#240"],
+  ["[OPT0:CLR &1234,X:]", "Syntax error", "#240"]
+]

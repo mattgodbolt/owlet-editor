@@ -48,22 +48,23 @@ const BasicII = {
     indexRegister: (mnemonic, registers, register) =>
         registers.includes(register) || register === BasicII.lowerCaseIndex[mnemonic],
 };
-// BASIC IV adds the 65C12's instructions to BASIC II's, reads an index register or the accumulator in either case, and
-// reads a zero page indirect address (LDA (&70)) and JMP (&1234,X).
+// BASIC IV adds the 65C12's instructions to BASIC II's (and CLR as another name for STZ), reads an index register or
+// the accumulator in either case, and reads a zero page indirect address (LDA (&70)) and JMP (&1234,X).
 const BasicIV = {
     ...BasicII,
     implied: new Set([...BasicII.implied, ..."DEA INA PHX PHY PLX PLY".split(" ")]),
     accumulator: new Set([...BasicII.accumulator, "DEC", "INC"]),
-    addressed: new Set([...BasicII.addressed, "STZ", "TRB", "TSB"]),
+    addressed: new Set([...BasicII.addressed, "STZ", "CLR", "TRB", "TSB"]),
     address: new Set([...BasicII.address, "BRA"]),
     noImmediate: new Set([
         ...[...BasicII.noImmediate].filter(m => m !== "BIT"),
-        ...["STZ", "TRB", "TSB"],
+        ...["STZ", "CLR", "TRB", "TSB"],
     ]),
     indexRegisters: {
         ...BasicII.indexRegisters,
         BIT: ["X"],
         STZ: ["X"],
+        CLR: ["X"],
         TRB: [],
         TSB: [],
     },
