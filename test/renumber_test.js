@@ -37,8 +37,8 @@ describe("renumberReferences", () => {
 
     it("should say where each reference is", () => {
         expect(lineNumberReferences("PRINT\nON X GOTO 10,200")).toEqual([
-            {lineNumber: 2, startColumn: 11, endColumn: 13, target: 10},
-            {lineNumber: 2, startColumn: 14, endColumn: 17, target: 200},
+            {lineNumber: 2, startColumn: 11, endColumn: 13, target: 10, keyword: "GOTO"},
+            {lineNumber: 2, startColumn: 14, endColumn: 17, target: 200, keyword: "GOTO"},
         ]);
     });
 
@@ -158,6 +158,36 @@ describe("followImplicitLineNumbers", () => {
                 "GOTO 30\n15 A\nPRINT\nEND",
             ],
             ["GOTO 30\n20PRINT\nEND", [[2, 1, 3, 1]], ["deleteLeft"], "GOTO 30\nEND"],
+        ];
+        for (const [text, selections, [command, args], expected] of cases) {
+            expect(
+                edit(text, selections, command, args),
+                `${command} at ${selections} in ${text}`,
+            ).toBe(expected);
+        }
+    });
+
+    it("should keep a TRACE limit that is not a line between the same two lines", () => {
+        const enter = ["type", {text: "\n"}];
+        const cases = [
+            // Olly's example from #191: TRACE35 limits line 30, and still does.
+            ["TRACE20\nTRACE35\nTRACE30", [[1, 1]], enter, "\nTRACE30\nTRACE45\nTRACE40"],
+            ["PRINT\nTRACE 15\nPRINT", [[1, 1]], enter, "\nPRINT\nTRACE 25\nPRINT"],
+            ["PRINT\nTRACE 15\nPRINT", [[1, 1, 2, 1]], ["deleteLeft"], "TRACE 15\nPRINT"],
+            [
+                "PRINT\nPRINT\nTRACE 25\nPRINT",
+                [[1, 1, 2, 1]],
+                ["deleteLeft"],
+                "PRINT\nTRACE 15\nPRINT",
+            ],
+            // Above the last line it is moved up with it, but not down to it.
+            ["PRINT\nTRACE 25", [[1, 1]], enter, "\nPRINT\nTRACE 35"],
+            ["PRINT\nTRACE 40000", [[1, 1]], enter, "\nPRINT\nTRACE 40000"],
+            // Below the first line, on or off, or a number that is a line, there is nothing more to do.
+            ["PRINT\nTRACE 5", [[1, 1]], enter, "\nPRINT\nTRACE 5"],
+            ["TRACE ON\nTRACE 20\nTRACE OFF", [[1, 1]], enter, "\nTRACE ON\nTRACE 30\nTRACE OFF"],
+            // Other references to lines that are not there are left as they are.
+            ["PRINT\nGOTO 15", [[1, 1]], enter, "\nPRINT\nGOTO 15"],
         ];
         for (const [text, selections, [command, args], expected] of cases) {
             expect(

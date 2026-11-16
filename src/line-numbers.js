@@ -5,6 +5,12 @@ const MaxLineNumber = 32767;
 // BASIC looks the number up when it runs these; LIST, DELETE, AUTO and RENUMBER take numbers that need not be lines, and
 // TRACE's is a limit.
 const LookedUpBy = new Set(["GOTO", "GOSUB", "THEN", "ELSE", "RESTORE"]);
+// THEN and ELSE give Syntax error for a number above MaxLineNumber, where the others look it up and say No such line.
+const SyntaxErrorAbove = new Set(["THEN", "ELSE"]);
+// Verified on the BBC BASIC II and Master ROMs: GOTO, GOSUB, RESTORE and TRACE keep the bottom 16 bits of a number up to
+// 2147483647 and say Too big above that.
+const WrapsAt = 65536;
+const TooBigAt = 2147483648;
 
 const tooBig = `BASIC cannot have line numbers above ${MaxLineNumber}`;
 
@@ -64,17 +70,42 @@ export function getLineNumberMarkers(text, cursorLine = 0) {
         }
     });
     for (const {lineNumber, startColumn, endColumn, target, own, keyword} of tokens) {
-        if (own || !LookedUpBy.has(keyword)) continue;
-        if (target > MaxLineNumber) {
+        const looksUp = LookedUpBy.has(keyword);
+        if (own || !(looksUp || keyword === "TRACE")) continue;
+        if (target >= TooBigAt) {
             markers.push(
                 marker(
                     lineNumber,
                     startColumn,
                     endColumn,
-                    `There cannot be a line ${target}: ${tooBig} (BASIC: No such line)`,
+                    `Line number ${target} is too big (BASIC: Too big)`,
                 ),
             );
-        } else if (!existing.has(target) && lineNumber !== cursorLine) {
+        } else if (target >= WrapsAt && !SyntaxErrorAbove.has(keyword)) {
+            markers.push(
+                marker(
+                    lineNumber,
+                    startColumn,
+                    endColumn,
+                    `Line number ${target} is too big: BASIC keeps only the bottom 16 bits of it, so it means ${target % WrapsAt}`,
+                ),
+            );
+        } else if (target > MaxLineNumber && looksUp) {
+            const error = SyntaxErrorAbove.has(keyword) ? "Syntax error" : "No such line";
+            markers.push(
+                marker(
+                    lineNumber,
+                    startColumn,
+                    endColumn,
+                    `There cannot be a line ${target}: ${tooBig} (BASIC: ${error})`,
+                ),
+            );
+        } else if (
+            looksUp &&
+            target <= MaxLineNumber &&
+            !existing.has(target) &&
+            lineNumber !== cursorLine
+        ) {
             markers.push(
                 marker(
                     lineNumber,

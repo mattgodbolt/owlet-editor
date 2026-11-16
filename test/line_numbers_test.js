@@ -3,8 +3,11 @@ import {getLineNumberMarkers} from "../src/line-numbers";
 import {beforeAll, describe, expect, it} from "vitest";
 
 const Missing = target => `No line ${target} (BASIC: No such line)`;
-const CannotExist = target =>
-    `There cannot be a line ${target}: BASIC cannot have line numbers above 32767 (BASIC: No such line)`;
+const CannotExist = (target, error = "No such line") =>
+    `There cannot be a line ${target}: BASIC cannot have line numbers above 32767 (BASIC: ${error})`;
+const Wraps = (target, means) =>
+    `Line number ${target} is too big: BASIC keeps only the bottom 16 bits of it, so it means ${means}`;
+const TooBig = target => `Line number ${target} is too big (BASIC: Too big)`;
 const ExplicitTooBig = number =>
     `Line number ${number} is too big: BASIC cannot have line numbers above 32767, and the program ends at the first line that has one (BASIC: Syntax error if typed in)`;
 const ImplicitTooBig = number =>
@@ -102,6 +105,37 @@ describe.each(["monarch", "new"])("Line number markers with the %s parser", pars
             CannotExist(32768),
             ExplicitTooBig(32768),
         ]);
+    });
+
+    it("should mark a reference of 65536 or more with what BASIC makes of it, which the ROM does not reject", () => {
+        const cases = [
+            ["GOTO 65535", [CannotExist(65535)]],
+            ["GOTO 65536", [Wraps(65536, 0)]],
+            ["GOTO 70000", [Wraps(70000, 4464)]],
+            ["GOSUB 70000", [Wraps(70000, 4464)]],
+            ["RESTORE 70000", [Wraps(70000, 4464)]],
+            ["ON X GOTO 10,65546", [Wraps(65546, 10)]],
+            ["GOTO 2147483647", [Wraps(2147483647, 65535)]],
+            ["TRACE 65535", []],
+            ["TRACE 65536", [Wraps(65536, 0)]],
+            ["TRACE 65546", [Wraps(65546, 10)]],
+            ["IF X THEN 65535", [CannotExist(65535, "Syntax error")]],
+            ["IF X THEN 70000", [CannotExist(70000, "Syntax error")]],
+            ["IF X THEN PRINT ELSE 70000", [CannotExist(70000, "Syntax error")]],
+            ["IF X THEN 32768", [CannotExist(32768, "Syntax error")]],
+        ];
+        for (const [statement, expected] of cases) {
+            const text = `10 ${statement}\n20 END`;
+            expect(messages(text), text).toEqual(expected);
+        }
+    });
+
+    it("should mark a reference BASIC says Too big to, from 2147483648", () => {
+        for (const statement of ["GOTO", "GOSUB", "RESTORE", "TRACE", "ON X GOTO"]) {
+            const text = `10 ${statement} 3333333333\n20 END`;
+            expect(messages(text), text).toEqual([TooBig(3333333333)]);
+        }
+        expect(messages("10 TRACE 2147483648\n20 END")).toEqual([TooBig(2147483648)]);
     });
 
     it("should mark each explicit line number above 32767 and none up to it", () => {
