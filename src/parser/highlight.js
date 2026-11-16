@@ -193,19 +193,6 @@ const States = [new State(false), new State(true)];
 export function tokensProvider(languageId, metadata) {
     return {
         getInitialState: () => States[0],
-        // What editor.tokenize() returns, with neighbours of the same type joined as the Monarch grammar joins them.
-        tokenize(line, state) {
-            const {tokens, inAssembler} = highlightLine(line, state.inAssembler);
-            return {
-                tokens: tokens
-                    .filter(({type}, i) => i === 0 || type !== tokens[i - 1].type)
-                    .map(({offset, type}) => ({
-                        startIndex: offset,
-                        scopes: `${type}.${languageId}`,
-                    })),
-                endState: States[Number(inAssembler)],
-            };
-        },
         // What the editor shows.
         tokenizeEncoded(line, state) {
             const {tokens, inAssembler} = highlightLine(line, state.inAssembler);
