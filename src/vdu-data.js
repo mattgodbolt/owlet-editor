@@ -59,7 +59,7 @@ export const VduCodes = [
         syntax: "VDU 23,char,b1,b2,b3,b4,b5,b6,b7,b8",
         name: "Define a character: eight rows of pixels, top to bottom, one bit per pixel",
         example: ["VDU 23,224,255,129,129,129,129,129,129,255", "makes CHR$(224) a hollow square"],
-        note: "VDU 23,0,reg,value,0,0,0,0,0,0 sets a 6845 register, and VDU 23,1,0;0;0;0; hides the cursor. The Master, or a BBC B with GXR, also has VDU 23,6 line patterns.",
+        note: "VDU 23,0,reg,value,0,0,0,0,0,0 sets a 6845 register. VDU 23,1,0;0;0;0; hides the cursor and VDU 23,1,1;0;0;0; shows it again. The Master, or a BBC B with GXR, also has VDU 23,6 line patterns, and VDU 23,2 to 23,5 set the fill patterns for GCOL 16, 32, 48 and 64 (23,12 to 23,15 set the same four, reading the eight bytes differently). VDU 23,11,0,0,0,0,0,0,0,0 or a MODE change resets them.",
     },
     {
         code: 24,
