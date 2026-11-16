@@ -134,6 +134,16 @@ rest of this section holds for either. The colours are a function of the text al
 - **Stricter than the ROM only on purpose.** The exceptions are the list below; each is a row of the recorded table
   listed as stricter than the ROM in its test, and the oracle reports them as STRICTER, apart from the false-invalids.
 
+### Characters above U+007F
+
+BASIC keeps only the low eight bits of each character the bot or the emulator's tokeniser gives it, so a character is
+the byte it ends in: U+00A2 and U+01A2 are both `&A2`, U+0141 is `A` and U+0122 is a quote. The highlighter reads each
+line that way (`byteView` in `src/parser/lexer.js`), so programs that spell a token byte differently still highlight
+as they run. Offsets do not change, since the view is the same length, and a control byte (U+0100 to U+011F) is left
+alone because U+010A is data and not a line break. Shrink writes each token byte as one visible character: the byte
+itself, or the one 0x100 above it for the control bytes, `&7F` to `&9F`, and `&A0` and `&AD`, which would otherwise be
+a non-breaking space and a soft hyphen.
+
 ### Deliberate deviations from the ROM
 
 Text the ROM runs without error that is red on purpose, because it is almost always a mistake. Each has a hover
