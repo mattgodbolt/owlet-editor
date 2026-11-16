@@ -49,12 +49,38 @@ function statementState(tokens, inAssembler) {
     return state;
 }
 
+// An E with no exponent digits after it ends a number token (7E), but what is being typed is a word that starts with
+// it (7ELSE is 7 then ELSE), so the word is split off.
+function splitBareExponent(tokens, length) {
+    const bareExponent = token => token && token.kind === "number" && /e$/i.test(token.text);
+    const withoutE = number => ({...number, text: number.text.slice(0, -1), end: number.end - 1});
+    const last = tokens.at(-1);
+    const before = tokens.at(-2);
+    if (bareExponent(last) && last.end === length) {
+        const e = {kind: "name", text: last.text.slice(-1), start: last.end - 1, end: last.end};
+        return [...tokens.slice(0, -1), withoutE(last), e];
+    }
+    if (
+        bareExponent(before) &&
+        before.end === last.start &&
+        last.end === length &&
+        last.kind === "name"
+    ) {
+        const word = {...last, text: before.text.slice(-1) + last.text, start: before.end - 1};
+        return [...tokens.slice(0, -2), withoutE(before), word];
+    }
+    return tokens;
+}
+
 // What can be typed at the end of the text: {startColumn, labels} for keywords, {startColumn, nameKind} after FN or
 // PROC, or null for nothing (in a string, REM, DATA, * command or number, or after DEF PROC or DEF FN).
 export function completionContext(text) {
     const recogniser = readLines(text).at(-1);
     const line = recogniser.lexer.text;
-    const tokens = recogniser.tokens.filter(token => token.kind !== "white");
+    const tokens = splitBareExponent(
+        recogniser.tokens.filter(token => token.kind !== "white"),
+        line.length,
+    );
     let last = tokens.at(-1);
     const lastAtEnd = last && last.end === line.length;
     if (lastAtEnd && (TextKinds.has(last.kind) || last.kind === "hex")) return null;
