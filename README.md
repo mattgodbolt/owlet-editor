@@ -161,7 +161,11 @@ message that says what BASIC does, and shows as an error.
   `LD89`, `ST!76`, `CP8 5`) rather than the character, since `LD` on its own is not an instruction and the register
   letter was probably left out; the hover says what BASIC reads the character as and which letters were probably
   meant. Where the character is not the third (`J-P`, `3EC`, `O2A`), no prefix is to blame, so just that character
-  is red. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89).
+  is red. Upper and lower case letters stay valid, and so does `LDA89` (`LDA` and the number 89). A control character
+  (below 32) is read by its low five bits too, so U+0101 (byte 1) is an `A`. A byte of 0x80 or above is not: the ROM
+  rejects it in a mnemonic (`ST` and byte 0x81), except the tokens AND (0x80), EOR (0x82) and OR (0x84) as the first,
+  second or third character, which it reads as the mnemonic itself, dropping what comes before (`ST` and byte 0x80
+  assembles `AND`). The dropped characters are red, with a hover that says so (recorded for #202).
 
 ### BASIC IV (the Master)
 
@@ -198,7 +202,9 @@ work as for any Monaco language (an unclosed `(` is not red while its line is un
 
 Expected values come from the ROM, not from beliefs about it. `node tools/rom-oracle/record.mjs 'X=Y.5'` runs a
 statement on BBC BASIC II and appends its verdict (the error's name or `ok`) to `test/rom-verdicts.json`, and
-`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict.
+`--tokens` appends the ROM's tokenisation of a line to `test/rom-tokens.json`; nobody types a verdict. A byte of 0x80
+or above cannot go through the shell, so `--hex '53 54 8d 20 39'` takes the statement as hex bytes (also for each
+`--file` line); the row's text is those bytes as Owlet shows them, U+0100 plus the byte below 0xA0.
 `--source '#149'` ends each row with the issue it comes from, so that a report seen before is one search of the tables
 away. Before a change to highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on
 generated statements (see the comment at its top).
