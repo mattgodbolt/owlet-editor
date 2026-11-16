@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import assert from "assert";
-import {editor} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor} from "monaco-editor/editor/editor.api";
 import {getSyntaxMarkers, getWarnings, registerBbcBasicLanguage, useBasicIV} from "../src/bbcbasic";
 import {completionContext} from "../src/completions";
 import {setBasicIV} from "../src/parser/dialect";

@@ -2,7 +2,7 @@ import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {occurrencesAt, registerOccurrences, renameProvider} from "../src/occurrences";
 import {describe, it, vi, afterEach} from "vitest";
 import assert from "assert";
-import {editor} from "monaco-editor/esm/vs/editor/editor.api";
+import {editor} from "monaco-editor/editor/editor.api";
 
 registerBbcBasicLanguage();
 registerOccurrences();

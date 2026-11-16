@@ -1,6 +1,9 @@
 // Setup file to configure the JSDOM environment for Monaco Editor
 
 // Mock browser APIs needed by Monaco
+if (!globalThis.CSS)
+    globalThis.CSS = {escape: s => String(s).replace(/[^a-zA-Z0-9_-]/g, c => `\\${c}`)};
+
 window.matchMedia = () => ({
     matches: false,
     addEventListener: () => {},

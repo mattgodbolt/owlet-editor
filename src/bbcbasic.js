@@ -1,8 +1,8 @@
-import {languages, MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {languages, MarkerSeverity} from "monaco-editor/editor/editor.api";
 import {Flags, keywords, tokenChar} from "./tokens";
-import {StandaloneServices} from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices";
-import {IStandaloneThemeService} from "monaco-editor/esm/vs/editor/standalone/common/standaloneTheme";
-import {ILanguageService} from "monaco-editor/esm/vs/editor/common/languages/language";
+import {StandaloneServices} from "monaco-editor/editor/standalone/browser/standaloneServices";
+import {IStandaloneThemeService} from "monaco-editor/editor/standalone/common/standaloneTheme";
+import {ILanguageService} from "monaco-editor/editor/common/languages/language";
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";

@@ -1,4 +1,4 @@
-import {MarkerSeverity} from "monaco-editor/esm/vs/editor/editor.api";
+import {MarkerSeverity} from "monaco-editor/editor/editor.api";
 import {ImplicitLineNumberStep, lineNumberTokens} from "./renumber";
 
 const MaxLineNumber = 32767;

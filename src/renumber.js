@@ -1,4 +1,4 @@
-import {Selection} from "monaco-editor/esm/vs/editor/editor.api";
+import {Selection} from "monaco-editor/editor/editor.api";
 import {readLines} from "./parser/highlight";
 
 export const ImplicitLineNumberStep = 10;
