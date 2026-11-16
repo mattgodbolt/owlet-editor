@@ -3,13 +3,13 @@
 // instruction; either runs to the next colon.
 //
 // Stricter than the ROM, on purpose (the problems that say so have `stricter` set):
-// - BASIC ignores the rest of a statement after a complete instruction, but a keyword there that an expression cannot
-//   use is marked, since it is almost always a mistake (NOP PRINT);
+// - BASIC ignores the rest of a statement after a complete instruction, but the first thing there that is not a
+//   comment is marked, since it is almost always a mistake (NOP PRINT, LDA #1 hello, LDA #1] with a : missing);
 // - BASIC compares only the low five bits of each character of a mnemonic, so it reads 8 as X and ! as A, but a
 //   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9. Where
 //   it is the third character, the two letters before it are marked instead (LD is not an instruction).
 
-import {Flags} from "../tokens.js";
+export const JunkAfterInstructionCode = "junk-after-instruction";
 
 const words = text => new Set(text.split(" "));
 const Implied = words(
@@ -84,13 +84,18 @@ export class Assembler {
         if (r.is("end") || r.isPunct(":", "]") || this.comment("\\")) return;
         this.operand(this.mnemonic());
         if (this.comment(";", "\\")) return;
+        let junk = null;
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
-            if (token.kind === "keyword" && !(token.kw.flags & Flags.Expr || token.top))
-                this.stricter(
-                    token,
-                    "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
-                );
+            if (junk) continue;
+            junk = token;
+            this.stricter(
+                token,
+                token.text === "]"
+                    ? "BASIC ignores this ] and goes on assembling, as it ignores everything after a complete instruction; probably a : is missing before it"
+                    : "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
+                JunkAfterInstructionCode,
+            );
         }
     }
 
@@ -199,7 +204,7 @@ export class Assembler {
     }
 
     // Marks a token that BASIC accepts but that is almost certainly a mistake.
-    stricter(token, message) {
+    stricter(token, message, code) {
         token.invalid = true;
         this.recogniser.problems.push({
             message,
@@ -208,6 +213,7 @@ export class Assembler {
             unfinished: false,
             hole: false,
             stricter: true,
+            code,
         });
     }
 
