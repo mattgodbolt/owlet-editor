@@ -603,3 +603,25 @@ input {
     color: #999;
   }
 }
+
+.monaco-editor .marker-widget {
+  .descriptioncontainer .message {
+    white-space: pre-wrap;
+  }
+
+  .descriptioncontainer {
+    height: auto !important;
+    position: relative;
+    top: auto !important;
+  }
+
+  &,
+  div[style*="height"] {
+    height: auto !important;
+  }
+}
+
+.monaco-editor .zone-widget:has(.marker-widget),
+.monaco-editor .zone-widget:has(.marker-widget) .zone-widget-container {
+  height: auto !important;
+}
