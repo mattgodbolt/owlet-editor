@@ -1,6 +1,5 @@
 // The tables recorded from BBC BASIC II by tools/rom-oracle/record.mjs, and how a line's invalid tokens are judged
 // against them.
-import {BasicIIDialect} from "../src/parser/dialect";
 import {highlightLine, programProblems, readLines} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
 import {isUnread, unreadRanges} from "../tools/rom-oracle/unread.mjs";
@@ -35,15 +34,15 @@ export const masterVerdicts = new Map(MasterVerdicts.map(([text, verdict]) => [t
 // The invalid spans, as [start, end], that the ROM says are wrong to show as invalid: it ran the line without error
 // and read them. Our lexer's bytes are the ROM's tokenisation (test/rom/tokens checks that). The recorded rows are
 // the ROM's, so they are read by the ROM's own dialect: the editor's can be more lenient (the README says where).
-export function falseInvalid(text, invalid, table = verdicts, dialect = BasicIIDialect) {
+export function falseInvalid(text, invalid, table, dialect) {
     if (table.get(text) !== "ok") return [];
     const ranges = unreadRanges(text, romBytes(lexLine(text, dialect)));
     return invalid.filter(([start, end]) => !isUnread(ranges, start, end));
 }
 
 // The spans of the line, as [start, end], that are marked invalid.
-export const invalidSpans = (text, dialect = BasicIIDialect) => {
-    const {tokens} = highlightLine(text, false, dialect);
+export const invalidSpans = (text, dialect) => {
+    const {tokens} = highlightLine(text, dialect);
     return tokens.flatMap((token, i) =>
         token.type.startsWith("invalid")
             ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
@@ -54,14 +53,11 @@ export const invalidSpans = (text, dialect = BasicIIDialect) => {
 // The rows of a recorded table where the recogniser is wrong: a line the ROM runs has red the ROM read that is not on
 // purpose (`stricter` lists the lines where it is), or a line it stops at has none (`gaps` lists the lines the
 // recogniser misses, and `lenient` those it accepts on purpose, which must have none). A line that only ends too soon is not marked, which is what lets it be typed.
-export function wrongRows(
-    rows,
-    {stricter = [], gaps = [], lenient = [], dialect = BasicIIDialect} = {},
-) {
+export function wrongRows(rows, {stricter = [], gaps = [], lenient = [], dialect} = {}) {
     const table = new Map(rows.map(([text, verdict]) => [text, verdict]));
     return rows.flatMap(([text, verdict]) => {
         const marked = invalidSpans(text, dialect);
-        const problems = programProblems(text, readLines(text, dialect));
+        const problems = programProblems(readLines(text, dialect));
         if (verdict === "ok") {
             // Text BASIC skips can be unfinished, as it can be wrong (see the README).
             const unfinished = problems.filter(problem => problem.unfinished);
@@ -86,11 +82,10 @@ export function wrongRows(
 }
 
 // The rows where the recogniser words the error differently from the ROM, with both; it may give none.
-export function wrongMessages(rows, otherWording = [], dialect = BasicIIDialect) {
+export function wrongMessages(rows, otherWording, dialect) {
     return rows.flatMap(([text, verdict]) => {
         const {message} =
-            programProblems(text, readLines(text, dialect)).find(problem => !problem.stricter) ||
-            {};
+            programProblems(readLines(text, dialect)).find(problem => !problem.stricter) || {};
         return verdict === "ok" || !message || message === verdict || otherWording.includes(text)
             ? []
             : [[text, verdict, message]];

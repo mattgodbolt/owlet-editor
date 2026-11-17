@@ -1,11 +1,12 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
-import {occurrencesAt, registerOccurrences, renameProvider} from "../src/occurrences";
-import {describe, it, vi, afterEach} from "vitest";
+import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
+import {occurrencesAt, registerOccurrences, renameProviderFor} from "../src/occurrences";
+import {describe, expect, it, vi, afterEach} from "vitest";
 import assert from "assert";
 import {editor} from "monaco-editor/editor/editor.api";
 
-registerBbcBasicLanguage();
-registerOccurrences();
+registerBbcBasicLanguage(ModelBDialect);
+registerOccurrences(ModelBDialect);
 
 const Cursor = "‸";
 
@@ -45,7 +46,11 @@ function replaceAll(textWithCursor, newText, find) {
 
 function rename(textWithCursor, newName) {
     return replaceAll(textWithCursor, newName, (model, position) => {
-        const {edits, rejectReason} = renameProvider.provideRenameEdits(model, position, newName);
+        const {edits, rejectReason} = renameProviderFor(ModelBDialect).provideRenameEdits(
+            model,
+            position,
+            newName,
+        );
         return rejectReason ? {rejectReason} : edits.map(edit => edit.textEdit.range);
     });
 }
@@ -81,7 +86,23 @@ describe("Occurrences", () => {
             ["F‸.I=1 TO 2", null],
         ];
         for (const [text, expected] of cases)
-            assert.strictEqual(replaceAll(text, "X", occurrencesAt), expected, text);
+            assert.strictEqual(
+                replaceAll(text, "X", (model, position) =>
+                    occurrencesAt(model, position, ModelBDialect),
+                ),
+                expected,
+                text,
+            );
+    });
+
+    it("should read a model by the dialect it is asked for, whatever it was last read by", () => {
+        withModel("COLORS=7", model => {
+            const position = {lineNumber: 1, column: 6};
+            const start = dialect => occurrencesAt(model, position, dialect)?.[0].startColumn;
+            expect(start(ModelBDialect)).toBe(1);
+            expect(start(BasicIVDialect)).toBe(6);
+            expect(start(ModelBDialect)).toBe(1);
+        });
     });
 
     // Monaco's word highlighter only asks for the occurrences where it finds a word.
@@ -118,15 +139,21 @@ describe("Rename", () => {
     });
 
     it("should only offer to rename names", () => {
-        assert.deepStrictEqual(at("P‸RINT F", renameProvider.resolveRenameLocation), {
-            range: null,
-            text: "",
-            rejectReason: "Only variables, arrays, FNs and PROCs can be renamed",
-        });
-        assert.deepStrictEqual(at("PRINT ‸F", renameProvider.resolveRenameLocation), {
-            range: {startLineNumber: 1, startColumn: 7, endLineNumber: 1, endColumn: 8},
-            text: "F",
-        });
+        assert.deepStrictEqual(
+            at("P‸RINT F", renameProviderFor(ModelBDialect).resolveRenameLocation),
+            {
+                range: null,
+                text: "",
+                rejectReason: "Only variables, arrays, FNs and PROCs can be renamed",
+            },
+        );
+        assert.deepStrictEqual(
+            at("PRINT ‸F", renameProviderFor(ModelBDialect).resolveRenameLocation),
+            {
+                range: {startLineNumber: 1, startColumn: 7, endLineNumber: 1, endColumn: 8},
+                text: "F",
+            },
+        );
     });
 });
 

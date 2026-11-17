@@ -1,5 +1,5 @@
 import {
-    codeActionProvider,
+    codeActionProviderFor,
     getSyntaxMarkers,
     withoutCodes,
     getWarnings,
@@ -7,6 +7,7 @@ import {
     rebuildBracketPairs,
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
+import {BasicIIDialect, ModelBDialect} from "../src/parser/dialect";
 import {problemCount} from "../src/problem-count";
 import {highlightLine, readLines} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
@@ -15,13 +16,13 @@ import {describe, it} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/editor/editor.api";
 
-registerBbcBasicLanguage();
+registerBbcBasicLanguage(ModelBDialect);
 
 // Each line's tokens as {offset, type}, neighbours of the same type joined, an open assembler block carrying on.
 function tokenLines(text) {
     let inAssembler = false;
     return text.split("\n").map(line => {
-        const result = highlightLine(line, inAssembler);
+        const result = highlightLine(line, ModelBDialect, inAssembler);
         inAssembler = result.inAssembler;
         return result.tokens.filter((t, i, all) => i === 0 || t.type !== all[i - 1].type);
     });
@@ -76,7 +77,7 @@ const openers = keywords.filter(kw => kw.keyword.endsWith("(")).map(tokenChar);
 
 function checkWarnings(text, ...expected) {
     assert.deepStrictEqual(
-        getWarnings(text),
+        getWarnings(text, ModelBDialect),
         expected.map(x => ({
             severity: MarkerSeverity.Warning,
             ...x,
@@ -98,7 +99,11 @@ function backedByRom(text, ...rows) {
         if (verdicts.get(row) === "ok") assert.strictEqual(row, text, `${row} runs on the ROM`);
     }
     if (verdicts.has(text))
-        assert.deepStrictEqual(falseInvalid(text, spanRanges(text, "invalid")), [], text);
+        assert.deepStrictEqual(
+            falseInvalid(text, spanRanges(text, "invalid"), verdicts, BasicIIDialect),
+            [],
+            text,
+        );
 }
 
 const caseWarning = (keyword, startColumn) => ({
@@ -1048,7 +1053,7 @@ describe("Line warnings", () => {
         // Both GET and GET$ are tokens - check that doesn't trip us up.
         checkWarnings("A$=get$", caseWarning("GET$", 4));
         // Each line of a program, wherever its text starts.
-        const where = getWarnings("  colour\nX=1:chr$").map(w => [
+        const where = getWarnings("  colour\nX=1:chr$", ModelBDialect).map(w => [
             w.startLineNumber,
             w.startColumn,
         ]);
@@ -1102,7 +1107,7 @@ describe("Line warnings", () => {
         checkWarnings("A=1ER. a$");
     });
     it("should keep a bare E as the exponent of a number even when a dot follows", () => {
-        const numbers = readLines("PRINT 1E.5")
+        const numbers = readLines("PRINT 1E.5", ModelBDialect)
             .at(-1)
             .tokens.filter(token => token.kind === "number")
             .map(token => token.text);
@@ -1149,8 +1154,12 @@ describe("Quick fixes", () => {
     function applyQuickFix(text) {
         const model = editor.createModel(text, LanguageId);
         try {
-            const markers = getWarnings(text);
-            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            const markers = getWarnings(text, ModelBDialect);
+            const {actions} = codeActionProviderFor(ModelBDialect).provideCodeActions(
+                model,
+                markers[0],
+                {markers},
+            );
             const {title, edit} = actions[0];
             const {range, text: inserted} = edit.edits[0].textEdit;
             const result =
@@ -1191,8 +1200,15 @@ describe("Quick fixes and syntax markers", () => {
     function offered(text) {
         const model = editor.createModel(text, LanguageId);
         try {
-            const markers = [...getWarnings(text), ...getSyntaxMarkers(text)];
-            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            const markers = [
+                ...getWarnings(text, ModelBDialect),
+                ...getSyntaxMarkers(text, ModelBDialect),
+            ];
+            const {actions} = codeActionProviderFor(ModelBDialect).provideCodeActions(
+                model,
+                markers[0],
+                {markers},
+            );
             return actions.map(action => action.title);
         } finally {
             model.dispose();
@@ -1217,8 +1233,12 @@ describe("Quick fixes and syntax markers", () => {
     function fixed(text) {
         const model = editor.createModel(text, LanguageId);
         try {
-            const markers = getSyntaxMarkers(text).filter(marker => marker.code);
-            const {actions} = codeActionProvider.provideCodeActions(model, markers[0], {markers});
+            const markers = getSyntaxMarkers(text, ModelBDialect).filter(marker => marker.code);
+            const {actions} = codeActionProviderFor(ModelBDialect).provideCodeActions(
+                model,
+                markers[0],
+                {markers},
+            );
             return actions.map(({title, edit}) => {
                 const {range, text: inserted} = edit.edits[0].textEdit;
                 const lines = text.split("\n");
@@ -1249,7 +1269,7 @@ describe("Quick fixes and syntax markers", () => {
         const [offer] = fixed(text).filter(([name]) => name === title);
         assert.deepStrictEqual(offer, [title, result]);
         assert.deepStrictEqual(
-            getSyntaxMarkers(result).filter(marker => marker.code),
+            getSyntaxMarkers(result, ModelBDialect).filter(marker => marker.code),
             [],
         );
     });
@@ -1258,7 +1278,7 @@ describe("Quick fixes and syntax markers", () => {
 describe("Syntax markers", () => {
     const Unfinished = (needed, after, rom) => `Expected ${needed} after ${after} (BASIC: ${rom})`;
     const markers = text =>
-        getSyntaxMarkers(text).map(m => [
+        getSyntaxMarkers(text, ModelBDialect).map(m => [
             m.severity,
             m.message,
             m.startLineNumber,
@@ -1315,7 +1335,8 @@ describe("Syntax markers", () => {
     });
     it("should not mark the line the cursor is on as unfinished, only the others", () => {
         const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";
-        const at = line => getSyntaxMarkers(text, line).map(m => [m.severity, m.startLineNumber]);
+        const at = line =>
+            getSyntaxMarkers(text, ModelBDialect, line).map(m => [m.severity, m.startLineNumber]);
         const error = [MarkerSeverity.Error, 2];
         assert.deepStrictEqual(at(0), [
             [MarkerSeverity.Warning, 1],
@@ -1381,7 +1402,7 @@ describe("Syntax markers", () => {
         const wrong = [...verdicts].flatMap(([text, verdict]) =>
             verdict === "ok"
                 ? []
-                : getSyntaxMarkers(text)
+                : getSyntaxMarkers(text, ModelBDialect)
                       .filter(marker => marker.message.includes("(BASIC: "))
                       .filter(marker => !marker.message.endsWith(`(BASIC: ${verdict})`))
                       .map(marker => [text, verdict, marker.message]),
@@ -1390,13 +1411,17 @@ describe("Syntax markers", () => {
     });
     it("should keep the code out of what the editor shows, and still find the fix from the text", () => {
         const text = "[OPT0:NOP hello:]";
-        const shown = withoutCodes(getSyntaxMarkers(text));
+        const shown = withoutCodes(getSyntaxMarkers(text, ModelBDialect));
         assert.ok(shown.length > 0 && shown.every(marker => marker.code === undefined));
         const model = editor.createModel(text, LanguageId);
         try {
-            const {actions} = codeActionProvider.provideCodeActions(model, shown[0], {
-                markers: shown,
-            });
+            const {actions} = codeActionProviderFor(ModelBDialect).provideCodeActions(
+                model,
+                shown[0],
+                {
+                    markers: shown,
+                },
+            );
             assert.deepStrictEqual(
                 actions.map(action => action.title),
                 ["Insert ; before the junk"],
@@ -1467,7 +1492,7 @@ describe("Bracket pairs", () => {
     it("should pair a parenthesis after the language is registered again", () => {
         const model = loadedModel();
         assert.notDeepStrictEqual(pairsOfLine(model, 2), ["(~)"]);
-        registerBbcBasicLanguage();
+        registerBbcBasicLanguage(ModelBDialect);
         assert.deepStrictEqual(pairsOfLine(model, 2), ["(~)"]);
         model.dispose();
     });

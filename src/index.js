@@ -1,7 +1,4 @@
 import $ from "jquery";
-import {registerBbcBasicLanguage} from "./bbcbasic";
-import {registerOccurrences} from "./occurrences";
-import {registerCompletions} from "./completions";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 import rootHtml from "./root.html?raw";
 import {OwletEditor} from "./owlet";
@@ -142,10 +139,6 @@ async function initialise() {
             window.location.href = "https://www.bbcmicrobot.com";
         });
     }
-
-    registerBbcBasicLanguage();
-    registerOccurrences();
-    registerCompletions();
 
     // Check if we reference a cached tweet on first load and convert it to URL hash
 

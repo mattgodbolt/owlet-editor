@@ -1,5 +1,6 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {completionContext, completionItems} from "../src/completions";
+import {ModelBDialect} from "../src/parser/dialect";
 import {readLines} from "../src/parser/highlight";
 import {expandCode} from "../src/expand-code";
 import Examples from "../src/examples.yaml";
@@ -11,7 +12,7 @@ import {readFileSync} from "fs";
 import {env} from "process";
 import {editor} from "monaco-editor/editor/editor.api";
 
-registerBbcBasicLanguage();
+registerBbcBasicLanguage(ModelBDialect);
 
 const Cursor = "‸";
 
@@ -22,7 +23,7 @@ function offered(textWithCursor) {
     const position = {lineNumber: lineIndex + 1, column: lines[lineIndex].indexOf(Cursor) + 1};
     const model = editor.createModel(textWithCursor.replace(Cursor, ""), "BBCBASIC");
     try {
-        return completionItems(model, position)
+        return completionItems(model, position, ModelBDialect)
             .filter(item =>
                 item.label
                     .toUpperCase()
@@ -49,7 +50,7 @@ const isMachineCode = token =>
 function hiddenKeywords(program) {
     const lines = program.split("\n");
     const hidden = [];
-    readLines(program).forEach(({tokens}, lineIndex) => {
+    readLines(program, ModelBDialect).forEach(({tokens}, lineIndex) => {
         const line = lines[lineIndex];
         if (tokens.some(isMachineCode)) return;
         for (const item of keywordTokens({tokens})) {
@@ -61,7 +62,7 @@ function hiddenKeywords(program) {
                 ? typed.length - 1
                 : typed.length;
             for (let length = 1; length <= lengths; length++) {
-                const context = completionContext(before + typed.slice(0, length));
+                const context = completionContext(before + typed.slice(0, length), ModelBDialect);
                 const shown = context && context.labels && context.startColumn === item.start + 1;
                 if (!(shown && context.labels.includes(item.kw.keyword))) {
                     hidden.push(
@@ -266,7 +267,7 @@ describe("Completions", () => {
 
     it("should not hide any keyword where it is used", () => {
         const used = new Set();
-        for (const recogniser of readLines(everyKeyword)) {
+        for (const recogniser of readLines(everyKeyword, ModelBDialect)) {
             for (const token of keywordTokens(recogniser)) used.add(token.kw.keyword);
         }
         const programKeywords = keywords
@@ -320,7 +321,7 @@ describe("Completions", () => {
     const corpus = env.OWLET_CORPUS;
     it.runIf(corpus)("should not hide any keyword in the corpus of saved programs", () => {
         const hidden = JSON.parse(readFileSync(corpus, "utf8")).flatMap(({id, text}) =>
-            [...hiddenKeywords(expandCode(text)), ...hiddenKeywords(text)].map(
+            [...hiddenKeywords(expandCode(text, ModelBDialect)), ...hiddenKeywords(text)].map(
                 where => `${id} ${where}`,
             ),
         );

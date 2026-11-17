@@ -21,7 +21,7 @@ import fs from "fs";
 import path from "path";
 import {fileURLToPath} from "url";
 import {highlightLine, programProblems, readLines} from "../../src/parser/highlight.js";
-import {setBasicIV} from "../../src/parser/dialect.js";
+import {BasicIVDialect, ModelBDialect} from "../../src/parser/dialect.js";
 import {generate, generateColor} from "./generate.mjs";
 import {generateBasicIV} from "./generate-iv.mjs";
 import {createRom, MaxLineLength, SyntaxErrors} from "./rom.mjs";
@@ -30,7 +30,7 @@ import {isUnread, unreadRanges} from "./unread.mjs";
 const Root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const Master = option("master", false);
 const OutDir = path.join(Root, ".cache/rom-oracle", Master ? "master" : "");
-setBasicIV(Master);
+const dialect = Master ? BasicIVDialect : ModelBDialect;
 
 function option(name, fallback) {
     const index = process.argv.indexOf(`--${name}`);
@@ -82,7 +82,7 @@ async function romVerdicts(texts) {
 // purpose, which is where it read a COLOR as COLOUR, which BASIC II does not.
 function highlighterVerdicts(texts) {
     return texts.map(text => {
-        const tokens = highlightLine(text).tokens.filter(
+        const tokens = highlightLine(text, dialect).tokens.filter(
             (token, i, all) => i === 0 || token.type !== all[i - 1].type,
         );
         const invalid = tokens.flatMap((token, i) =>
@@ -90,9 +90,9 @@ function highlighterVerdicts(texts) {
                 ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
                 : [],
         );
-        const problems = programProblems(text);
+        const problems = programProblems(readLines(text, dialect));
         const spans = field => problems.flatMap(p => (p[field] ? [[p.start, p.end]] : []));
-        const [reading] = readLines(text);
+        const [reading] = readLines(text, dialect);
         return {
             lenient: reading.colors.length > 0,
             invalid,

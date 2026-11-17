@@ -28,9 +28,9 @@ function marker(lineNumber, startColumn, endColumn, message) {
 // The markers for line numbers that cannot be right: those above 32767, which end the program where they are, and
 // references to lines the program does not have. The line the cursor (`cursorLine`) is on is still being typed, so a
 // reference on it is not marked as missing.
-export function getLineNumberMarkers(text, cursorLine = 0) {
+export function getLineNumberMarkers(text, dialect, cursorLine = 0) {
     const lines = text.split("\n");
-    const tokens = lineNumberTokens(text);
+    const tokens = lineNumberTokens(text, dialect);
     const ownNumbers = new Map(
         tokens.filter(token => token.own).map(token => [token.lineNumber, token]),
     );

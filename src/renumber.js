@@ -8,8 +8,8 @@ const ExplicitLineNumberRegex = /^\s*\d/;
 // startColumn, endColumn, target, own, keyword}, where lineNumber is the editor's line, target is the number, own says
 // it starts its line and so is that line's own number, and keyword is the BASIC keyword a reference follows (GOTO,
 // THEN...), undefined for an own number.
-export function lineNumberTokens(text) {
-    return readLines(text).flatMap(({tokens, problems}, index) => {
+export function lineNumberTokens(text, dialect) {
+    return readLines(text, dialect).flatMap(({tokens, problems}, index) => {
         const stoppedAt = problems.filter(problem => !problem.unfinished).map(({token}) => token);
         return tokens.flatMap((token, tokenIndex) => {
             if (token.kind !== "linenum" || stoppedAt.includes(token)) return [];
@@ -32,8 +32,8 @@ export function lineNumberTokens(text) {
 
 // The line numbers the program refers to, as the tokeniser reads them: {lineNumber, startColumn, endColumn, target,
 // keyword}, where lineNumber is the editor's line and target is the BASIC line number referred to.
-export function lineNumberReferences(text) {
-    return lineNumberTokens(text)
+export function lineNumberReferences(text, dialect) {
+    return lineNumberTokens(text, dialect)
         .filter(token => !token.own)
         .map(({lineNumber, startColumn, endColumn, target, keyword}) => ({
             lineNumber,
@@ -73,9 +73,9 @@ function renumberEdits(references, oldToNew, movesTraceLimits = false) {
 }
 
 // The program with each line number it refers to that is in the oldToNew map replaced by the new number.
-export function renumberReferences(text, oldToNew) {
+export function renumberReferences(text, oldToNew, dialect) {
     const lines = text.split("\n");
-    const edits = renumberEdits(lineNumberReferences(text), oldToNew);
+    const edits = renumberEdits(lineNumberReferences(text, dialect), oldToNew);
     for (const {range, text: newNumber} of edits.reverse()) {
         const line = lines[range.startLineNumber - 1];
         lines[range.startLineNumber - 1] =
@@ -123,7 +123,7 @@ const isImplicit = lines => !lines.some(line => ExplicitLineNumberRegex.test(lin
 // lines and the program has no line numbers, so that its lines are numbered 10, 20, 30... by position. A line is the
 // same line while what starts it does, and a reference to a line that no longer is one is left as it is (except for
 // TRACE, see traceLimit). References in the text the changes insert are left as they are.
-export function implicitRenumberEdits(oldText, newText, changes) {
+export function implicitRenumberEdits(oldText, newText, changes, dialect) {
     if (!changes.some(changesLines)) return [];
     const oldLines = oldText.split("\n");
     const newLines = newText.split("\n");
@@ -142,9 +142,9 @@ export function implicitRenumberEdits(oldText, newText, changes) {
     });
 
     const key = ref => `${ref.lineNumber}:${ref.startColumn}:${ref.endColumn}:${ref.target}`;
-    const newReferences = new Set(lineNumberReferences(newText).map(key));
+    const newReferences = new Set(lineNumberReferences(newText, dialect).map(key));
     // A reference survives where the same number is still read as a line number.
-    const references = lineNumberReferences(oldText).flatMap(ref => {
+    const references = lineNumberReferences(oldText, dialect).flatMap(ref => {
         const start = positionAfterAll(
             {lineNumber: ref.lineNumber, column: ref.startColumn},
             changes,
@@ -169,14 +169,14 @@ export function implicitRenumberEdits(oldText, newText, changes) {
 
 // Rewrites the references as lines are added and removed in the editor's program (see implicitRenumberEdits). The
 // rewrite joins the edit's own undo step, so undo and redo need nothing from here.
-export function followImplicitLineNumbers(codeEditor) {
+export function followImplicitLineNumbers(codeEditor, dialect) {
     const model = codeEditor.getModel();
     let previous = model.getValue();
     return model.onDidChangeContent(event => {
         const oldText = previous;
         previous = model.getValue();
         if (event.isFlush || event.isUndoing || event.isRedoing) return;
-        const edits = implicitRenumberEdits(oldText, previous, event.changes);
+        const edits = implicitRenumberEdits(oldText, previous, event.changes, dialect);
         if (edits.length === 0) return;
         // Redo puts the cursors where the undo step's last edit, this one, says. The editor moves them for the user's
         // edit only after this, so here they are moved by both edits.

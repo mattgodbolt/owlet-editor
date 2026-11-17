@@ -1,5 +1,6 @@
 import {getLineNumberMarkers} from "../src/line-numbers";
 import {describe, expect, it} from "vitest";
+import {ModelBDialect} from "../src/parser/dialect";
 
 const Missing = target => `No line ${target} (BASIC: No such line)`;
 const CannotExist = (target, error = "No such line") =>
@@ -14,7 +15,7 @@ const ImplicitTooBig = number =>
 
 // The line, columns and message of each marker.
 function problems(text, cursorLine) {
-    return getLineNumberMarkers(text, cursorLine).map(marker => [
+    return getLineNumberMarkers(text, ModelBDialect, cursorLine).map(marker => [
         marker.startLineNumber,
         `${marker.startColumn}-${marker.endColumn}`,
         marker.message,

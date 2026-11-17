@@ -3,7 +3,7 @@
 // the first. Where there is no rule for a statement, anything is accepted.
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {FirstStatementToken} from "../tokens.js";
-import {BasicIIDialect, currentDialect} from "./dialect.js";
+import {BasicIIDialect} from "./dialect.js";
 import {Lexer} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -99,7 +99,7 @@ class Failure {
 
 // Whether the text starts with one statement that BASIC reads to its end, with no error and not too soon.
 function readsStatement(text, dialect) {
-    const probe = new Recogniser(text, false, true, dialect);
+    const probe = new Recogniser(text, false, dialect, true);
     try {
         probe.statement();
         return probe.atEnd();
@@ -110,7 +110,7 @@ function readsStatement(text, dialect) {
 }
 
 export class Recogniser {
-    constructor(text, inAssembler, probing = false, dialect = currentDialect()) {
+    constructor(text, inAssembler, dialect, probing = false) {
         this.dialect = dialect;
         this.lexer = new Lexer(text, dialect);
         this.basicIV = dialect.basicIV;
@@ -289,7 +289,7 @@ export class Recogniser {
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
     // up to the next colon or ELSE after `from`, or that is not itself unfinished.
     valid(candidate, statementStart, from) {
-        const probe = new Recogniser(candidate, this.startsInAssembler, true, this.dialect);
+        const probe = new Recogniser(candidate, this.startsInAssembler, this.dialect, true);
         probe.line();
         const stop =
             probe.tokens.find(

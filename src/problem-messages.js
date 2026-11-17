@@ -1,5 +1,4 @@
 import {keywords} from "./tokens";
-import {isBasicIV} from "./parser/dialect.js";
 
 // What the ROM's error says is missing, in plain words.
 const Needed = {
@@ -14,7 +13,7 @@ const Needed = {
     Index: "an array index",
 };
 
-const neededAfterOn = () => (isBasicIV() ? "GOTO, GOSUB or PROC" : "GOTO or GOSUB");
+const neededAfterOn = dialect => (dialect.basicIV ? "GOTO, GOSUB or PROC" : "GOTO or GOSUB");
 
 const UnclosedBlock = "Assembler block not closed: there is no ] after this [";
 
@@ -33,11 +32,12 @@ function keywordStartingWith(name) {
 export function problemMessage(
     {message, unfinished, hole, unclosed, stricter},
     {at, previous, atEnd, statementName},
+    dialect,
 ) {
     if (unclosed) return UnclosedBlock;
     if (stricter) return message;
     const rom = message ? ` (BASIC: ${message})` : "";
-    const needed = message === "ON syntax" ? neededAfterOn() : Needed[message];
+    const needed = message === "ON syntax" ? neededAfterOn(dialect) : Needed[message];
     let plain;
     if (unfinished && !hole) {
         plain = needed ? `Expected ${needed} after ${at}` : `Unfinished after ${at}`;

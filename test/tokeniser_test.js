@@ -1,6 +1,6 @@
-import {afterEach, describe, expect, it} from "vitest";
+import {describe, expect, it} from "vitest";
 import {tokeniseBasicII, tokeniserFor} from "../src/tokeniser";
-import {BasicIIDialect, isBasicIV, ModelBDialect, setBasicIV} from "../src/parser/dialect";
+import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {romBytes} from "../src/parser/lexer";
 import {readLines, tokeniseLines} from "../src/parser/highlight";
 import {LenientThanRom, RomTokens} from "./rom-tables";
@@ -12,30 +12,24 @@ const bytesOf = (text, dialect) =>
     hex(String.fromCharCode(...romBytes(tokeniseLines([text], dialect)[0])));
 
 describe("Tokeniser", () => {
-    afterEach(() => setBasicIV(false));
-
     it("should choose the tokeniser of the machine's BASIC", () => {
         const tokenisers = {master: {name: "BASIC IV"}, b: {name: "BASIC II"}};
         expect(tokeniserFor(tokenisers, {isMaster: false})).toBe(tokenisers.b);
         expect(tokeniserFor(tokenisers, {isMaster: true})).toBe(tokenisers.master);
     });
 
-    it.each([false, true])(
-        "should tokenise each line as BASIC II does when the highlighter uses BASIC IV: %s",
-        basicIV => {
-            setBasicIV(basicIV);
-            const wrong = RomTokens.filter(([text]) => !/^\d/.test(text))
-                .map(([text, recorded]) => ({
-                    text,
-                    recorded,
-                    ours: lineBytes(tokeniseBasicII(text)),
-                }))
-                .filter(({recorded, ours}) => ours !== recorded);
-            expect(wrong.map(({text}) => text)).toEqual(
-                RomTokens.map(([text]) => text).filter(text => LenientThanRom.includes(text)),
-            );
-        },
-    );
+    it("should tokenise each line as BASIC II does", () => {
+        const wrong = RomTokens.filter(([text]) => !/^\d/.test(text))
+            .map(([text, recorded]) => ({
+                text,
+                recorded,
+                ours: lineBytes(tokeniseBasicII(text)),
+            }))
+            .filter(({recorded, ours}) => ours !== recorded);
+        expect(wrong.map(({text}) => text)).toEqual(
+            RomTokens.map(([text]) => text).filter(text => LenientThanRom.includes(text)),
+        );
+    });
 
     it("should give BASIC II's own bytes for every recorded row, as the ROM does", () => {
         const wrong = RomTokens.filter(([text]) => !/^\d/.test(text))
@@ -52,11 +46,11 @@ describe("Tokeniser", () => {
         expect(lineBytes(tokeniseBasicII(text))).toBe(bytes);
     });
 
-    it("should follow the Model B's BASIC whatever the editor is set to, and leave the setting alone", () => {
-        setBasicIV(true);
+    it("should follow the Model B's BASIC next to a reader of the Master's", () => {
+        expect(bytesOf("COLORS=7", BasicIVDialect)).toBe("fb 53 3d 37");
         expect(lineBytes(tokeniseBasicII("COLOR 1"))).toBe("fb 20 31");
         expect(lineBytes(tokeniseBasicII("COLORS=7"))).toBe("43 4f 4c 4f 52 53 3d 37");
-        expect(isBasicIV()).toBe(true);
+        expect(bytesOf("COLORS=7", BasicIVDialect)).toBe("fb 53 3d 37");
     });
 
     it("should lay a program out as BASIC stores it", () => {

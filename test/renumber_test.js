@@ -5,10 +5,11 @@ import {
     lineNumberTokens,
     renumberReferences,
 } from "../src/renumber";
+import {ModelBDialect} from "../src/parser/dialect";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {editor} from "monaco-editor/editor/editor.api";
 
-registerBbcBasicLanguage();
+registerBbcBasicLanguage(ModelBDialect);
 
 describe("renumberReferences", () => {
     const oldToNew = new Map([
@@ -31,12 +32,12 @@ describe("renumberReferences", () => {
             ["10 GOTO 20\n  20 GOTO 10", "10 GOTO 200\n  20 GOTO 100"],
         ];
         for (const [text, expected] of cases) {
-            expect(renumberReferences(text, oldToNew), text).toBe(expected);
+            expect(renumberReferences(text, oldToNew, ModelBDialect), text).toBe(expected);
         }
     });
 
     it("should say where each reference is", () => {
-        expect(lineNumberReferences("PRINT\nON X GOTO 10,200")).toEqual([
+        expect(lineNumberReferences("PRINT\nON X GOTO 10,200", ModelBDialect)).toEqual([
             {lineNumber: 2, startColumn: 11, endColumn: 13, target: 10, keyword: "GOTO"},
             {lineNumber: 2, startColumn: 14, endColumn: 17, target: 200, keyword: "GOTO"},
         ]);
@@ -45,7 +46,11 @@ describe("renumberReferences", () => {
     it("should say which keyword each reference follows, however it is spelled", () => {
         const text = "10 G.20:GOS.30:IF X TH.40 EL.50\n\xe560\nON X GOTO 70,80\nLIST 90";
         expect(
-            lineNumberTokens(text).map(({target, own, keyword}) => [target, own, keyword]),
+            lineNumberTokens(text, ModelBDialect).map(({target, own, keyword}) => [
+                target,
+                own,
+                keyword,
+            ]),
         ).toEqual([
             [10, true, undefined],
             [20, false, "GOTO"],
@@ -71,7 +76,7 @@ describe("followImplicitLineNumbers", () => {
         });
         element = document.body.appendChild(document.createElement("div"));
         codeEditor = editor.create(element, {language: "BBCBASIC", occurrencesHighlight: "off"});
-        followImplicitLineNumbers(codeEditor);
+        followImplicitLineNumbers(codeEditor, ModelBDialect);
     });
 
     afterEach(() => {
