@@ -219,7 +219,7 @@ export class Assembler {
         const {text} = r.lexer;
         const chars = [...text.slice(token.start, token.start + 3)];
         const word = chars.map(c => String.fromCharCode((c.charCodeAt(0) & 0x1f) | 0x40)).join("");
-        const size = word === "EQU" ? text[token.start + 3] : "";
+        const size = word === "EQU" ? (text[token.start + 3] ?? "") : "";
         if (word === "EQU" && !this.rules.equSize.test(size)) r.fail("Syntax error");
         const directive = word === "OPT" || word === "EQU";
         const {implied, accumulator, addressed, address} = this.rules;

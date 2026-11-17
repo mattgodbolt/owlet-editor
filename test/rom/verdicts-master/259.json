@@ -1,0 +1,6 @@
+[
+  ["[EQU", "Syntax error", "#259"],
+  ["[equ", "Syntax error", "#259"],
+  ["[OPT0:EQU:]", "Syntax error", "#259"],
+  ["[EQU 1", "Syntax error", "#259"]
+]
