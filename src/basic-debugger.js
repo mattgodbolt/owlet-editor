@@ -1,4 +1,5 @@
 import {editor as monacoEditor, Range} from "monaco-editor/editor/editor.api";
+import ResizeObserver from "resize-observer-polyfill";
 import {BasicWatch} from "./basic-watch";
 import {programStatements, statementAt} from "./statement-map";
 
