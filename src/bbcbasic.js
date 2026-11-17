@@ -11,13 +11,35 @@ import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembl
 
 export const LanguageId = "BBCBASIC";
 
-const ConditionalWords = new Set(
-    keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword),
-);
-const KeywordWord = [...new Set(keywords.map(kw => kw.keyword))]
-    .sort((x, y) => y.length - x.length)
-    .map(word => word.replace(/[$(]/g, "\\$&") + (ConditionalWords.has(word) ? "\\b" : ""))
-    .join("|");
+// The spellings of the dialect's keywords, longest first so that the longer of PRINT and PRINT# wins, with a Conditional
+// one (which BASIC reads as a name when a name character follows) ending where no name character follows.
+function keywordWordPattern(dialect) {
+    const conditional = new Set(
+        dialect.keywords.filter(kw => kw.flags & Flags.Conditional).map(kw => kw.keyword),
+    );
+    return [...new Set(dialect.keywords.map(kw => kw.keyword))]
+        .sort((x, y) => y.length - x.length)
+        .map(word => word.replace(/[$(]/g, "\\$&") + (conditional.has(word) ? "(?![\\w`])" : ""))
+        .join("|");
+}
+
+// Separates 10PRINT into "10" "PRINT" and PRINTLN12 into "PRINT" "LN" "12", where Monaco's default would not. What
+// follows a "&" or the FN or PROC before it is read as hex digits or a name, so that no keyword starts inside it
+// (&FFTO, PROCPRINT), as the lexer reads it; a "$" ends a name (A$TAN). It is tried against the lexer's keywords in
+// test/word_pattern_test.js.
+export const wordPatternFor = dialect =>
+    new RegExp(
+        [
+            "(?<=&)[0-9A-F]+",
+            "(?<=FN|PROC)[\\w`]+[$%]?",
+            `(?<keyword>${keywordWordPattern(dialect)})`,
+            "@%",
+            "-?\\d*\\.\\d+",
+            "-?\\d+",
+            "[^~!@#$%^&*()\\-=+[{\\]}\\\\|;:'\",.<>/?\\s]+[$%]?",
+        ].join("|"),
+        "g",
+    );
 
 // Monaco's MetadataConsts.BALANCED_BRACKETS_MASK: it looks for brackets only in the text of tokens that have it, and
 // keeps neighbours that differ in it apart, so an opener such as LE. is found though the keyword before it touches it.
@@ -69,13 +91,7 @@ export function registerBbcBasicLanguage(dialect) {
             {open: "(", close: ")"},
             {open: '"', close: '"'},
         ],
-        // In order to separate 10PRINT into "10" "PRINT" and
-        // PRINTLN12 into "PRINT" "LN" "12", we override the default word pattern.
-        wordPattern: new RegExp(
-            KeywordWord +
-                "|" +
-                /(@%)|(-?\d*\.\d+)|(-?\d+)|([^`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+%?)/g.source,
-        ),
+        wordPattern: wordPatternFor(dialect),
     });
 
     registrations = [
