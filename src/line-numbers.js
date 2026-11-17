@@ -1,6 +1,7 @@
 import {MarkerSeverity} from "monaco-editor/editor/editor.api";
 import {LimitKeyword} from "./parser/dialect";
-import {ImplicitLineNumberStep, lineNumberTokens} from "./renumber";
+import {lineNumberTokens} from "./renumber";
+import {ImplicitLineNumberStep} from "./tokeniser";
 
 const MaxLineNumber = 32767;
 // THEN and ELSE give Syntax error for a number above MaxLineNumber, where the others look it up and say No such line.

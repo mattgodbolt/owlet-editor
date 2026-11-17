@@ -41,6 +41,8 @@ class ScreenResizer {
         this.desiredAspectRatio = origWidth / origHeight;
         this.minHeight = origHeight / 4;
         this.minWidth = origWidth / 4;
+        // The height at the bottom of the parent that a panel under the screen takes.
+        this.reserved = 0;
         this.observer = new ResizeObserver(() => this.resizeScreen());
         this.observer.observe(this.screen.parent()[0]);
         this.resizeScreen();
@@ -49,7 +51,10 @@ class ScreenResizer {
     resizeScreen() {
         const InnerBorder = 0;
         let width = Math.max(this.minWidth, this.screen.parent().innerWidth() - InnerBorder);
-        let height = Math.max(this.minHeight, this.screen.parent().innerHeight() - InnerBorder);
+        let height = Math.max(
+            this.minHeight,
+            this.screen.parent().innerHeight() - InnerBorder - this.reserved,
+        );
         if (width / height <= this.desiredAspectRatio) {
             height = width / this.desiredAspectRatio;
         } else {
@@ -106,6 +111,10 @@ export class Emulator {
         screen.blur(() => this.clearKeys());
         setInterval(this.timer.bind(this), 1000);
         this.lastFrameTime = 0;
+        // Called after each animation frame's run, while something watches the machine.
+        this.onFrame = null;
+        // Called when a program is about to start on a machine that has just booted, or has been given a saved state.
+        this.onProgramStart = null;
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
         this.rebuilding = false;
@@ -251,6 +260,7 @@ export class Emulator {
         }
         const t0 = performance.now();
         this.snapshot.load(this.state, this.cpu);
+        this.onProgramStart?.();
         this.loopStart = this.cyclesPerSecond * 60 * 60 * 3; // 3 hours
         this.setTotalCycles(this.loopStart);
         this.loopLength = 6000000 + 320000;
@@ -273,6 +283,7 @@ export class Emulator {
         await processor.execute(this.cpuMachine.startCycles);
         // The machine may have been replaced meanwhile, and the program is not the new one's to run.
         if (processor !== this.cpu) return;
+        this.onProgramStart?.();
         const page = processor.readmem(0x18) << 8;
         for (let i = 0; i < tokenised.length; ++i) {
             processor.writemem(page + i, tokenised.charCodeAt(i));
@@ -337,6 +348,16 @@ export class Emulator {
             }
         }
         this.lastFrameTime = now;
+        if (this.onFrame) this.onFrame();
+    }
+
+    /** Shrinks the screen to leave `height` pixels under it, for a panel there. */
+    reserveBelowScreen(height) {
+        if (height === this.resizer.reserved) return;
+        this.resizer.reserved = height;
+        // The screen is centred in what is left.
+        this.root.css("padding-bottom", height ? `${height}px` : "");
+        this.resizer.resizeScreen();
     }
 
     paint(video, minx, miny, maxx, maxy) {

@@ -15,6 +15,23 @@ jobs:
           path: .cache/roms
           key: roms-${{ hashFiles('Makefile') }}
       - run: make ci-check
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install the Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests (against the page ci-check built)
+        run: make e2e
+        env:
+          E2E_SKIP_BUILD: "1"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 7
   deploy-code:
     needs: build-and-test
     if: github.ref == 'refs/heads/main'

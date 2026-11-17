@@ -4,6 +4,8 @@ import {romBytes} from "./parser/lexer";
 import {tokeniseLines} from "./parser/highlight";
 
 const MaxTokenisedLength = 251;
+/** The step between the numbers the tokenisers give lines that have none, each the line's place in the text times it. */
+export const ImplicitLineNumberStep = 10;
 
 // jsbeeb's tokeniser runs the Master's BASIC IV ROM, so a Model B's program is tokenised by the parser's BASIC II
 // lexer, which lexfuzz checks against the B's own ROM, and the highlighter's reading of COLOR.
@@ -16,7 +18,7 @@ export function tokeniseBasicII(text) {
     );
     lines.forEach(([line, number], i) => {
         if (!line) return;
-        const lineNumber = number ? parseInt(number) : 10 + i * 10;
+        const lineNumber = number ? parseInt(number) : ImplicitLineNumberStep * (i + 1);
         const tokens = String.fromCharCode(...romBytes(lineTokens[i]));
         if (tokens.length > MaxTokenisedLength)
             throw new Error(

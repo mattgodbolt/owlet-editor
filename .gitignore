@@ -4,3 +4,5 @@
 /dist
 .eslintcache
 /.cache
+/test-results
+/playwright-report

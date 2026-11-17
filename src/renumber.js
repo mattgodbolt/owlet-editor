@@ -1,8 +1,8 @@
 import {Selection} from "monaco-editor/editor/editor.api";
 import {LimitKeyword} from "./parser/dialect";
 import {readLines} from "./parser/highlight";
+import {ImplicitLineNumberStep} from "./tokeniser";
 
-export const ImplicitLineNumberStep = 10;
 const ExplicitLineNumberRegex = /^\s*\d/;
 
 // Every number the tokeniser reads as a line number, but for one that BASIC stops at (REPEAT 10): {lineNumber,

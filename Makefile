@@ -61,6 +61,10 @@ test: prereqs  ## Runs the tests
 	$(NPM) run test
 	@echo Tests pass
 
+.PHONY: e2e
+e2e: prereqs  ## Builds the page and drives it in a browser (Playwright; npx playwright install chromium first)
+	$(NPM) run e2e
+
 .PHONY: check
 check: test lint-fix  ## Runs all checks required before committing (fixing trivial things automatically)
 
@@ -69,7 +73,7 @@ ci-check: test lint format-check build  ## What CI runs: the pre-commit checks, 
 
 .PHONY: clean
 clean:  ## Cleans up everything
-	rm -rf node_modules .*-updated .*-bin .cache dist
+	rm -rf node_modules .*-updated .*-bin .cache dist test-results playwright-report
 
 .PHONY: run
 run: prereqs  ## Runs a local version on port 8080

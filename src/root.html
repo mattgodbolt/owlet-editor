@@ -42,6 +42,11 @@
 
         </div>
         <div id="reference"></div>
+        <div id="debugger" hidden>
+            <div class="debug-status"></div>
+            <div class="debug-variables"></div>
+            <div class="debug-routines"></div>
+        </div>
         <div id="examples">
             <div class="template example" style="cursor: pointer;">
                 <img class="thumb" height="100%"
@@ -68,6 +73,10 @@
         <button data-action="sound" id="sound" data-state="off" aria-label="Sound off" title="Turn sound on">
             <i class="fa-solid fa-volume-xmark sound-icon-off"></i><i class="fa-solid fa-volume-high sound-icon-on"></i>
             <span id="sound-label">Sound off</span>
+        </button>
+        <button data-action="debug" id="debug" aria-pressed="false" aria-label="Debug BASIC" title="Show BASIC's variables under the screen, and the statement it is running in the editor">
+            <i class="fa-solid fa-bug"></i>
+            <span id="debug-label">Debug</span>
         </button>
         <select id="machine" aria-label="Machine" title="The machine the program runs on"></select>
         <button data-action="rocket" id="rocket" title="send to beebjit" style="display:none;"><i class="fa-solid fa-rocket" style="pointer-events: none;"></i></button>

@@ -9,6 +9,7 @@ import "monaco-editor/editor/contrib/hover/browser/hoverContribution";
 import "monaco-editor/editor/contrib/codeAction/browser/codeActionContributions";
 
 import {Emulator} from "./emulator";
+import {BasicDebugger} from "./basic-debugger";
 import Examples from "./examples.yaml";
 import {expandCode} from "./expand-code";
 import {partialDetokenise} from "./detokenise";
@@ -159,6 +160,7 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
+        this.basicDebugger = new BasicDebugger(this.editor, this.emulator, () => this.dialect);
 
         this.examples = {};
         for (const example of Examples.examples) this.addExample(example);
@@ -462,6 +464,7 @@ export class OwletEditor {
             $(`#${element}`).toggle(element === selected);
             $(`#${element}-button`).toggleClass("selected", element === selected);
         }
+        this.basicDebugger.setScreenShown(selected === "screen");
     }
 
     share() {
@@ -666,6 +669,7 @@ export class OwletEditor {
             },
             rocket: () => this.rocket(),
             sound: () => this.toggleSound(),
+            debug: () => this.basicDebugger.toggle(),
             copy: () => {
                 this.copy();
                 this.closeModal();

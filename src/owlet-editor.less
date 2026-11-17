@@ -97,6 +97,8 @@ h1 {
 }
 
 .emulator {
+  // The debugger's panel sits at its bottom.
+  position: relative;
   background: var(--color-editor-bg);
   justify-content: center;
   align-content: center;
@@ -169,11 +171,83 @@ canvas.screen {
   }
 }
 
+#debug {
+  white-space: nowrap;
+
+  * {
+    pointer-events: none;
+  }
+
+  &[aria-pressed="true"] {
+    background-color: var(--color-highlight);
+  }
+}
+
 // On a phone the icon alone has to do, as the footer has no room for its words.
 @media (orientation: portrait) {
-  #sound-label {
+  #sound-label,
+  #debug-label {
     display: none;
   }
+}
+
+#debugger {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 35%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 4px 8px;
+  border-top: 1px solid var(--color-toolbar);
+  background: var(--color-background);
+
+  &[hidden] {
+    display: none;
+  }
+
+  .debug-status {
+    color: var(--color-highlight);
+    margin-bottom: 4px;
+  }
+
+  .debug-variables {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16ch, 1fr));
+    column-gap: 16px;
+  }
+
+  .debug-variable {
+    display: flex;
+    gap: 1ch;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .debug-name {
+    color: #bb8844;
+  }
+
+  .debug-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #eee;
+  }
+
+  .debug-routines {
+    margin-top: 4px;
+    color: #999;
+  }
+}
+
+.monaco-editor .debug-running-line {
+  background-color: rgba(94, 128, 64, 0.2);
+}
+
+.monaco-editor .debug-running-statement {
+  background-color: rgba(94, 128, 64, 0.55);
+  outline: 1px solid var(--color-highlight);
 }
 
 @keyframes soundPrompt {
