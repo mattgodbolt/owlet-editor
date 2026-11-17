@@ -1,6 +1,7 @@
 import {getLineNumberMarkers} from "../src/line-numbers";
 import {describe, expect, it} from "vitest";
-import {ModelBDialect} from "../src/parser/dialect";
+import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
+import {Flags} from "../src/tokens";
 
 const Missing = target => `No line ${target} (BASIC: No such line)`;
 const CannotExist = (target, error = "No such line") =>
@@ -23,6 +24,30 @@ function problems(text, cursorLine) {
 }
 
 const messages = (text, cursorLine) => problems(text, cursorLine).map(([, , message]) => message);
+
+describe.each([
+    ["BASIC II", ModelBDialect],
+    ["BASIC IV", BasicIVDialect],
+])("The keywords of %s that take a line number", (_, dialect) => {
+    const LookedUp = ["ELSE", "GOSUB", "GOTO", "RESTORE", "THEN"];
+    const After = {THEN: "IF X THEN 5000", ELSE: "IF X THEN PRINT ELSE 5000"};
+    it("should mark a missing line after those BASIC looks up and after no other", () => {
+        const flagged = [
+            ...new Set(
+                dialect.keywords.filter(kw => kw.flags & Flags.LineNumber).map(kw => kw.keyword),
+            ),
+        ];
+        const marked = flagged.filter(
+            word =>
+                getLineNumberMarkers(After[word] ?? `${word} 5000`, dialect).filter(marker =>
+                    marker.message.startsWith("No line 5000"),
+                ).length === 1,
+        );
+        expect(marked.sort()).toEqual(LookedUp);
+        expect(flagged).toContain("TRACE");
+        expect(flagged.includes("EDIT")).toBe(dialect.basicIV);
+    });
+});
 
 describe("Line number markers", () => {
     it("should mark a missing line for each keyword that BASIC looks the line up for", () => {

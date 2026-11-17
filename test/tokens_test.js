@@ -11,6 +11,7 @@ import {
 import {
     BasicIIDialect,
     BasicIVDialect,
+    LimitKeyword,
     ModelBDialect,
     canStartStatement,
 } from "../src/parser/dialect";
@@ -18,7 +19,7 @@ import {RomTokens} from "./rom-tables";
 import {describe, expect, it} from "vitest";
 import assert from "assert";
 import {Buffer} from "buffer";
-import {existsSync, readFileSync} from "fs";
+import {existsSync, readdirSync, readFileSync} from "fs";
 
 // The ROM images jsbeeb ships: BASIC II's on its own, and BASIC IV's inside the Master's 128K MOS image.
 const RomDirectory = "node_modules/jsbeeb/public/roms";
@@ -186,10 +187,63 @@ describe.each([
             "THEN",
         ]);
     });
+    it("should put each keyword that takes a line number in exactly one of the commands, the lookups and the limit", () => {
+        const expected = {
+            AUTO: ["command"],
+            DELETE: ["command"],
+            ELSE: ["lookup"],
+            GOSUB: ["lookup"],
+            GOTO: ["lookup"],
+            LIST: ["command"],
+            RENUMBER: ["command"],
+            RESTORE: ["lookup"],
+            THEN: ["lookup"],
+            TRACE: ["limit"],
+            ...(dialect.basicIV ? {EDIT: ["command"]} : {}),
+        };
+        const classesOf = word =>
+            [
+                dialect.immediateCommands.includes(word) && "command",
+                dialect.lineNumberLookups.has(word) && "lookup",
+                word === LimitKeyword && "limit",
+            ].filter(Boolean);
+        const flagged = spellings(dialect.keywords, kw => kw.flags & Flags.LineNumber).sort();
+        expect(flagged).toEqual(Object.keys(expected).sort());
+        expect(Object.fromEntries(flagged.map(word => [word, classesOf(word)]))).toEqual(expected);
+        expect([...dialect.lineNumberLookups].every(word => flagged.includes(word))).toBe(true);
+    });
     it("should branch an ON to GOTO and GOSUB, and on BASIC IV PROC", () => {
         expect(dialect.onBranches).toEqual(
             dialect.basicIV ? ["GOTO", "GOSUB", "PROC"] : ["GOTO", "GOSUB"],
         );
+    });
+});
+
+describe("The spellings the code compares keywords by", () => {
+    const SourceDirectory = "src";
+    const sourceFiles = directory =>
+        readdirSync(directory, {withFileTypes: true}).flatMap(entry =>
+            entry.isDirectory()
+                ? sourceFiles(`${directory}/${entry.name}`)
+                : entry.name.endsWith(".js")
+                  ? [`${directory}/${entry.name}`]
+                  : [],
+        );
+    // keyword === "X" and isKeyword("X", "Y"): the code that names a keyword by its spelling.
+    const named = text => [
+        ...[...text.matchAll(/keyword\s*[!=]==\s*"([^"]+)"/g)].map(match => match[1]),
+        ...[...text.matchAll(/isKeyword\(((?:\s*"[^"]+",?)+)\)/g)].flatMap(match =>
+            [...match[1].matchAll(/"([^"]+)"/g)].map(word => word[1]),
+        ),
+    ];
+    it("should all be in a keyword table", () => {
+        const table = new Set(BasicIVDialect.keywords.map(kw => kw.keyword));
+        const spelled = sourceFiles(SourceDirectory).flatMap(file =>
+            named(readFileSync(file, "utf8")).map(word => ({file, word})),
+        );
+        // Enough to show the patterns still find the code that does it.
+        expect(spelled.length).toBeGreaterThan(30);
+        expect(spelled.filter(({word}) => !table.has(word))).toEqual([]);
     });
 });
 
