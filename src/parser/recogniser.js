@@ -10,14 +10,16 @@ import {Lexer} from "./lexer.js";
 const MaxDepth = 64;
 
 const names = text => new Set(text.split(" "));
-const NoArgument = names("PI TRUE FALSE POS VPOS COUNT ERL ERR TIME PAGE LOMEM HIMEM GET GET$");
-const OneArgument = names(
+export const NoArgument = names(
+    "PI TRUE FALSE POS VPOS COUNT ERL ERR TIME PAGE LOMEM HIMEM GET GET$",
+);
+export const OneArgument = names(
     "ABS ACS ADVAL ASC ASN ATN CHR$ COS DEG EVAL EXP INKEY INKEY$ INT LEN LN LOG NOT RAD SGN SIN SQR TAN USR VAL " +
         "OPENIN OPENOUT OPENUP",
 );
-const ChannelFunction = names("BGET EOF EXT PTR");
+export const ChannelFunction = names("BGET EOF EXT PTR");
 // The fewest and most arguments of the functions whose keyword ends in "(".
-const BracketFunction = {
+export const BracketFunction = {
     "INSTR(": [2, 3],
     "LEFT$(": [2, 2],
     "MID$(": [2, 3],
@@ -26,7 +28,7 @@ const BracketFunction = {
     "POINT(": [2, 2],
 };
 // The number of expressions each of these statements takes.
-const ExpressionCount = {
+export const ExpressionCount = {
     ...Object.fromEntries(
         "CLEAR CLG CLS END ENDPROC NEW OLD REPORT RETURN RUN STOP"
             .split(" ")
@@ -43,7 +45,7 @@ const ExpressionCount = {
     ENVELOPE: 14,
 };
 const NotCode = names("comment data oscli");
-const TextKeyword = names("REM DATA");
+export const TextKeyword = names("REM DATA");
 // Operators from other languages, with what BASIC calls those it has (null for the rest).
 export const ForeignOperators = new Map([
     ["==", "="],
