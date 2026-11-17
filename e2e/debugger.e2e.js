@@ -14,6 +14,21 @@ const Statement60 = 'PRINT TAB(0,0);I%;" ";Y$';
 // X% is only ever written to the value BASIC starts it with; Z% is never written.
 const ResidentProgram = ["10 X%=1:X%=0", "20 Y%=5", "30 PRINT Z%", "40 END"].join("\n");
 const ErrorProgram = 'A=1:B$="X"\nPRINT 1/0';
+// Stops with an error whose message BASIC prints at the graphics cursor, which is then above the top of the screen.
+const HiddenErrorProgram = [
+    "MODE 1",
+    "VDU 5",
+    "FOR N%=1 TO 12",
+    "  X=N%*140",
+    "  DRAW X,FNheight(N%)",
+    "NEXT",
+    "END",
+    "DEF FNheight(n)=500+4000/(10-n)",
+].join("\n");
+const HiddenErrorStatus =
+    "Division by zero (ERR 18) at line 80. The variables are as the program left them.";
+// Waits a second before it stops with an error, so that a run can be seen before it.
+const SlowErrorProgram = ["10 T%=TIME:REPEAT UNTIL TIME>T%+100", "20 X=1:PRINT 1/0:Y=2"].join("\n");
 
 const Machines = [
     {name: "Model B", state: {}},
@@ -65,8 +80,8 @@ const variables = page =>
  * The text of the editor line under the running-statement mark, which Monaco draws as an empty box behind the text, so
  * the text is whatever characters lie within the box; empty when nothing is marked.
  */
-const readMarkedText = () => {
-    const marks = [...document.querySelectorAll(".debug-running-statement")];
+const readMarkedText = (mark = "running") => {
+    const marks = [...document.querySelectorAll(`.debug-${mark}-statement`)];
     if (!marks.length) return "";
     const boxes = marks.map(mark => mark.getBoundingClientRect());
     const left = Math.min(...boxes.map(box => box.left));
@@ -93,7 +108,7 @@ const readMarkedText = () => {
     return text.replaceAll("\u00a0", " ").trim();
 };
 
-const markedText = page => page.evaluate(readMarkedText);
+const markedText = (page, mark) => page.evaluate(readMarkedText, mark);
 
 /** Starts noting, on every animation frame, each status and marked text the page shows. */
 const recordEveryFrame = page =>
@@ -115,7 +130,7 @@ const recorded = page =>
         marks: [...window.recorded.marks],
     }));
 
-const markedLines = page => page.locator(".debug-running-line").count();
+const markedLines = (page, mark = "running") => page.locator(`.debug-${mark}-line`).count();
 
 const runningLine = async page => {
     const match = /^Running line (\d+)$/.exec(await status(page).textContent());
@@ -306,15 +321,85 @@ for (const {name, state} of Machines) {
             expect(problems).toEqual([]);
         });
 
-        test("a program that ends in an error is at BASIC's prompt, with its variables", async ({
+        test("a program that stops with an error shows it, marks its statement, and keeps its variables", async ({
             page,
             baseURL,
         }) => {
             const problems = await open(page, baseURL, ErrorProgram, state);
             await debugButton(page).click();
-            await expect(status(page)).toHaveText("At BASIC's prompt");
+            // Run again, now that Debug is watching from the start.
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText(
+                "Division by zero (ERR 18) at line 20. The variables are as the program left them.",
+            );
+            await expect(status(page)).toHaveAttribute("data-mark", "error");
             await expect.poll(() => variables(page)).toMatchObject({A: "1", B$: '"X"'});
-            expect(await markedText(page)).toBe("");
+            await expect.poll(() => markedText(page, "error")).toBe("PRINT 1/0");
+            expect(await markedLines(page, "error")).toBe(1);
+            expect(await markedLines(page, "running")).toBe(0);
+            expect(problems).toEqual([]);
+        });
+
+        test("the panel carries an error the screen does not show", async ({page, baseURL}) => {
+            const problems = await open(page, baseURL, HiddenErrorProgram, state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText(HiddenErrorStatus);
+            await expect.poll(() => markedText(page, "error")).toBe("=500+4000/(10-n)");
+            await expect.poll(() => variables(page)).toMatchObject({"N%": "10", X: "1400"});
+            // It stays while the machine sits at the prompt.
+            await settle(page);
+            await expect(status(page)).toHaveText(HiddenErrorStatus);
+            expect(await markedText(page, "error")).toBe("=500+4000/(10-n)");
+            expect(problems).toEqual([]);
+        });
+
+        test("switched on after the error, Debug shows it and marks its line", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, ErrorProgram, state);
+            // Wait for the program to stop, with nothing watching it.
+            await page.waitForTimeout(3000);
+            await debugButton(page).click();
+            await expect(status(page)).toHaveText(
+                "Division by zero (ERR 18) at line 20. The variables are as the program left them.",
+            );
+            await expect.poll(() => markedText(page, "error")).toBe("PRINT 1/0");
+            expect(problems).toEqual([]);
+        });
+
+        test("the error mark stays through an edit of another line, and goes on an edit of its own and on a new run", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, SlowErrorProgram, state);
+            await debugButton(page).click();
+            await expect(status(page)).toHaveText(/^Division by zero \(ERR 18\) at line 20\./);
+            await expect.poll(() => markedText(page, "error")).toBe("PRINT 1/0");
+
+            await editorLine(page, 10).click();
+            await page.keyboard.press("End");
+            await page.keyboard.type(" ");
+            await settle(page);
+            expect(await markedText(page, "error")).toBe("PRINT 1/0");
+
+            await editorLine(page, 20).click();
+            await page.keyboard.press("End");
+            await page.keyboard.press("Shift+Home");
+            await page.keyboard.type("20 X=1:Y=2");
+            await expect(status(page)).toHaveText(
+                "Division by zero (ERR 18) at line 20, which has changed since the error. " +
+                    "The variables are as the program left them.",
+            );
+            expect(await markedLines(page, "error")).toBe(0);
+
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText("Running line 10");
+            expect(await markedLines(page, "error")).toBe(0);
+            await expect(status(page)).toHaveText("At BASIC's prompt");
+            await expect(status(page)).toHaveAttribute("data-mark", "");
+            expect(await markedLines(page, "error")).toBe(0);
             expect(problems).toEqual([]);
         });
     });

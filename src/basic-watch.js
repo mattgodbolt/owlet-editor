@@ -1,6 +1,8 @@
 // What BBC BASIC is doing, read from the emulated machine's memory with jsbeeb's reading of BASIC's workspace.
 import {
     basicRom,
+    findLine,
+    holds,
     LanguageRomNumber,
     lineHolding,
     readPointers,
@@ -10,6 +12,22 @@ import {
 } from "jsbeeb/src/basic-state";
 
 const LineHeaderBytes = 4;
+// BASIC's workspace beyond what jsbeeb reads: https://8bs.com/basic/memory.htm
+const ErrorLine = 0x08;
+const ExpressionPointerBase = 0x19;
+const ExpressionPointerOffset = 0x1b;
+// The OS's BRK handler leaves the address of the error block (its number, then its message up to a zero) here, writing
+// the low byte first.
+const ErrorBlock = 0xfd;
+const ErrorBlockHigh = 0xfe;
+const RomStart = 0x8000;
+const RomEnd = 0xc000;
+const MostMessageBytes = 255;
+const FirstToken = 0x80;
+// BASIC IV keeps "Missing " in its messages as a token of its own, which is not a keyword.
+const MissingToken = 0x8d;
+const Colon = 0x3a;
+const Space = 0x20;
 const DefaultPrintFormat = "&0000090A";
 const ResidentFirstByte = 0x400;
 const ResidentLastByte = 0x46b;
@@ -27,27 +45,96 @@ const residentBit = address => 1 << (((address - ResidentFirstByte) / ResidentBy
 export const writtenResidentIntegers = (residents, written) =>
     residents.filter((_, index) => written & (1 << index));
 
+const word = (peek, address) => peek(address) | (peek(address + 1) << 8);
+const reading = (peek, base, offset) => (word(peek, base) + peek(offset) - 1) & 0xffff;
+
+/** The message of the error block at `block`, with its tokens spelt out as REPORT prints them. */
+function errorMessage(peek, block, keywords) {
+    let message = "";
+    for (let at = block + 1; at <= block + MostMessageBytes; ++at) {
+        const code = peek(at & 0xffff);
+        if (code === 0) break;
+        if (code >= FirstToken)
+            message += code === MissingToken ? "Missing " : (keywords.get(code) ?? ".");
+        else message += code >= Space ? String.fromCharCode(code) : ".";
+    }
+    return message;
+}
+
+/**
+ * The error BASIC has come back to its prompt from: its own error handler, which reports an error that no ON ERROR
+ * has taken (or any error numbered 0, such as STOP), is BASIC text in its ROM, and the last text BASIC read until the
+ * next command is typed. Its line is 0 for an error in a command typed at the prompt.
+ */
+function reportedError(peek, keywords) {
+    const expression = word(peek, ExpressionPointerBase);
+    if (expression < RomStart || expression >= RomEnd) return null;
+    const block = word(peek, ErrorBlock);
+    return {
+        number: peek(block),
+        message: errorMessage(peek, block, keywords),
+        lineNumber: word(peek, ErrorLine),
+    };
+}
+
+/** Where BASIC's two text pointers are reading: the statement's, and the expression's within it. */
+const textPointers = peek => ({
+    statement: readPointers(peek).reading,
+    expression: reading(peek, ExpressionPointerBase, ExpressionPointerOffset),
+});
+
+/**
+ * The offset into `line`'s text of the statement BASIC raised an error in, from its text pointers as they were then,
+ * or null where they do not show it. The statement pointer can be on the colon between two statements: BASIC reads it
+ * before a statement that does not start with a keyword, as an assignment does not, and then reads that through the
+ * expression pointer; and after one it has finished, with the expression pointer left behind it. After an EVAL, the
+ * expression pointer is not in the program at all.
+ */
+function errorOffset(peek, line, {statement, expression}) {
+    if (!holds(line, statement)) return null;
+    const text = line.start + LineHeaderBytes;
+    let colon = statement;
+    while (peek(colon) === Space && colon > text) --colon;
+    if (peek(colon) !== Colon) return statement - text;
+    if (!holds(line, expression)) return null;
+    if (expression < colon) return colon - text;
+    let next = colon + 1;
+    while (peek(next) === Space) ++next;
+    return next - text;
+}
+
+function lineBytes(peek, line) {
+    const bytes = [];
+    for (let at = line.start + LineHeaderBytes; at < line.end; ++at) bytes.push(peek(at));
+    return bytes;
+}
+
 export class BasicWatch {
     constructor() {
         this.language = null;
         this.cpu = null;
         this.hook = null;
         this.written = 0;
+        this.raised = null;
+        this.stopped = null;
     }
 
     /**
      * Starts noting which resident integers get written, on `cpu`'s write hook (jsbeeb's own, which sends every write
      * the machine makes through a slower path while it is attached). A write to a resident integer is the program's:
      * the OS or BASIC set them all before the program starts, and RUN, CLEAR, NEW and CHAIN leave them be. Those
-     * written before this call are unknown, so those not at their start value stand in for them (see restart).
+     * written before this call are unknown, so those not at their start value stand in for them (see restart). It also
+     * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text.
      */
     track(cpu) {
         if (this.cpu === cpu) return;
         this.untrack();
         this.cpu = cpu;
+        const peek = address => cpu.peekmemAsLanguage(address);
         this.hook = cpu.debugWrite.add(address => {
             if (address >= ResidentFirstByte && address <= ResidentLastByte)
                 this.written |= residentBit(address);
+            else if (address === ErrorBlockHigh) this.raised = textPointers(peek);
         });
         this.restart();
     }
@@ -58,11 +145,18 @@ export class BasicWatch {
         this.cpu = null;
         this.hook = null;
         this.written = 0;
+        this.forgetErrors();
+    }
+
+    forgetErrors() {
+        this.raised = null;
+        this.stopped = null;
     }
 
     /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
     restart() {
         this.written = 0;
+        this.forgetErrors();
         if (!this.cpu) return;
         const residents = readResidentIntegers(address => this.cpu.peekmemAsLanguage(address));
         residents.forEach((resident, index) => {
@@ -77,36 +171,56 @@ export class BasicWatch {
         const rom = cpu.romBank(bank);
         const title = romTitle(rom);
         const known = this.language;
-        if (known?.cpu !== cpu || known.bank !== bank || known.title !== title)
-            this.language = {cpu, bank, title, basic: basicRom(rom) !== null};
+        if (known?.cpu !== cpu || known.bank !== bank || known.title !== title) {
+            const basic = basicRom(rom);
+            this.language = {cpu, bank, title, basic: basic !== null, keywords: basic?.keywords};
+        }
         return this.language;
     }
 
     /**
      * What BASIC is doing: {basic: false, title} when the language is not a BASIC; otherwise the line it is reading
      * ({number, bytes, offset}, the offset being into the line's bytes after its header) or null when it is not in the
-     * program (at the prompt), and its variables.
+     * program (at the prompt), the error it is at the prompt after (see errorAtPrompt) or null, and its variables.
      */
     read(cpu) {
         this.track(cpu);
-        const {basic, title} = this.currentLanguage(cpu);
+        const {basic, title, keywords} = this.currentLanguage(cpu);
         if (!basic) return {basic, title};
         const peek = address => cpu.peekmemAsLanguage(address);
         const {page, reading} = readPointers(peek);
         const line = lineHolding(peek, page, reading);
-        let running = null;
-        if (line) {
-            const text = line.start + LineHeaderBytes;
-            const bytes = [];
-            for (let at = text; at < line.end; ++at) bytes.push(peek(at));
-            running = {number: line.number, bytes, offset: reading - text};
-        }
+        if (line) this.stopped = null;
         return {
             basic,
             title,
-            line: running,
+            line: line && {
+                number: line.number,
+                bytes: lineBytes(peek, line),
+                offset: reading - line.start - LineHeaderBytes,
+            },
+            error: line ? null : this.errorAtPrompt(peek, page, keywords),
             residents: writtenResidentIntegers(readResidentIntegers(peek), this.written),
             ...readVariables(peek),
         };
+    }
+
+    /**
+     * At the prompt, the error the program last stopped with, which is kept until the program runs again, or else an
+     * error in a command typed at the prompt while it is the last thing BASIC did: {number, message, line}, the line
+     * being as the running one is, with a null offset where the statement is not known, or null at the prompt.
+     */
+    errorAtPrompt(peek, page, keywords) {
+        const error = reportedError(peek, keywords);
+        if (!error) return this.stopped;
+        const {lineNumber, ...shown} = error;
+        if (!lineNumber) return this.stopped ?? {...shown, line: null};
+        const found = findLine(peek, page, lineNumber);
+        const offset = found && this.raised ? errorOffset(peek, found, this.raised) : null;
+        this.stopped = {
+            ...shown,
+            line: {number: lineNumber, bytes: found ? lineBytes(peek, found) : [], offset},
+        };
+        return this.stopped;
     }
 }
