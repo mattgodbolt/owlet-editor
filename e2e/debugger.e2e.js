@@ -14,19 +14,21 @@ const Statement60 = 'PRINT TAB(0,0);I%;" ";Y$';
 // X% is only ever written to the value BASIC starts it with; Z% is never written.
 const ResidentProgram = ["10 X%=1:X%=0", "20 Y%=5", "30 PRINT Z%", "40 END"].join("\n");
 const ErrorProgram = 'A=1:B$="X"\nPRINT 1/0';
-// Stops with an error whose message BASIC prints at the graphics cursor, which is then above the top of the screen.
+// Stops with an error while drawing in black, which is the colour BASIC then prints its message in, after VDU 5.
 const HiddenErrorProgram = [
     "MODE 1",
     "VDU 5",
     "FOR N%=1 TO 12",
-    "  X=N%*140",
-    "  DRAW X,FNheight(N%)",
+    "  GCOL 0,1+N% MOD 3",
+    "  MOVE 640,0:DRAW N%*100,FNheight(N%)",
+    "  GCOL 0,0",
+    "  MOVE 640,0:DRAW N%*100+50,FNheight(N%+0.5)",
     "NEXT",
     "END",
-    "DEF FNheight(n)=500+4000/(10-n)",
+    "DEF FNheight(n)=200+3000/(9.5-n)",
 ].join("\n");
 const HiddenErrorStatus =
-    "Division by zero (ERR 18) at line 80. The variables are as the program left them.";
+    "Division by zero (ERR 18) at line 100. The variables are as the program left them.";
 // Waits a second before it stops with an error, so that a run can be seen before it.
 const SlowErrorProgram = ["10 T%=TIME:REPEAT UNTIL TIME>T%+100", "20 X=1:PRINT 1/0:Y=2"].join("\n");
 
@@ -345,12 +347,12 @@ for (const {name, state} of Machines) {
             await debugButton(page).click();
             await page.locator('[data-action="run"]').click();
             await expect(status(page)).toHaveText(HiddenErrorStatus);
-            await expect.poll(() => markedText(page, "error")).toBe("=500+4000/(10-n)");
-            await expect.poll(() => variables(page)).toMatchObject({"N%": "10", X: "1400"});
+            await expect.poll(() => markedText(page, "error")).toBe("=200+3000/(9.5-n)");
+            await expect.poll(() => variables(page)).toEqual({"N%": "9", n: "9.5"});
             // It stays while the machine sits at the prompt.
             await settle(page);
             await expect(status(page)).toHaveText(HiddenErrorStatus);
-            expect(await markedText(page, "error")).toBe("=500+4000/(10-n)");
+            expect(await markedText(page, "error")).toBe("=200+3000/(9.5-n)");
             expect(problems).toEqual([]);
         });
 

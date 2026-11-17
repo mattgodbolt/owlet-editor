@@ -85,6 +85,8 @@ Switch Debug on before running the program (the run button runs it again) to see
 
 ![The Debug panel on a Model B, with the running statement marked in the editor](docs/images/debugger-model-b.png)
 
+![A program stopped with an error that BASIC printed in black, after VDU 5: the panel shows it, and the statement is marked in red](docs/images/debugger-hidden-error.png)
+
 While Debug is off nothing is read from the machine and nothing is hooked, so it costs nothing. While it is on, the
 emulator notes writes to the resident integers, and where BASIC was when the OS takes an error, through jsbeeb's write
 hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
