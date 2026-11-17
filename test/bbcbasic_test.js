@@ -1106,6 +1106,40 @@ describe("Line warnings", () => {
         });
         checkWarnings("A=1ER. a$");
     });
+    it("should warn about an abbreviation after a number where the ROM runs the line", () => {
+        const rows = [
+            [
+                '@%=1:R=5:a$="x":P.1ER.a$',
+                'ER. is not read as an abbreviation when followed directly by letters or digits, did you mean "ER. a"?',
+                20,
+                24,
+            ],
+            [
+                "@%=1:R=5:P.1ER.1",
+                'ER. is not read as an abbreviation when followed directly by letters or digits, did you mean "ER. 1"?',
+                13,
+                17,
+            ],
+        ];
+        for (const [text, message, startColumn, endColumn] of rows) {
+            assert.strictEqual(verdicts.get(text), "ok", `${text} is not a recorded row`);
+            checkWarnings(text, {
+                message,
+                code: "space-after-abbreviation",
+                startColumn,
+                endColumn,
+            });
+        }
+        for (const text of [
+            '@%=1:R=5:a$="x":P.1ER. a$',
+            "@%=1:R=5:P.1ER. 1",
+            "@%=1:R=5:P.1ER.(1)",
+            "@%=1:R=5:P.1ER.-1",
+        ]) {
+            assert.strictEqual(verdicts.get(text), "ok", `${text} is not a recorded row`);
+            checkWarnings(text);
+        }
+    });
     it("should keep a bare E as the exponent of a number even when a dot follows", () => {
         const numbers = readLines("PRINT 1E.5", ModelBDialect)
             .at(-1)
@@ -1184,6 +1218,12 @@ describe("Quick fixes", () => {
         assert.deepStrictEqual(applyQuickFix("A=1ER.a$"), {
             title: "Insert a space after ER.",
             result: "A=1ER. a$",
+        });
+    });
+    it("should offer the space for an abbreviation after a number in a line that runs", () => {
+        assert.deepStrictEqual(applyQuickFix("@%=1:R=5:P.1ER.1"), {
+            title: "Insert a space after ER.",
+            result: "@%=1:R=5:P.1ER. 1",
         });
     });
     it("should replace a keyword typed in lower case, or an operator from another language", () => {
