@@ -14,7 +14,7 @@ Try the beta now at [bbcmic.ro](https://bbcmic.ro) and get coding!
 
 * Integrated with JSbeeb emulator
 * Sound, which starts off: use the Sound button under the emulator to turn it on
-* A BBC Micro Model B (with the GXR graphics ROM) or a BBC Master 128: choose with the menu under the emulator
+* A BBC Micro Model B (with the GXR graphics ROM, or without), or a BBC Master 128: choose with the menu under the emulator
 * Share your entire program as a URL
 * Export to external emulator for interactive use
 
@@ -32,7 +32,12 @@ The menu under the emulator runs the program on a Model B or a Master 128 (BASIC
 `MODE 128`, `PAGE` at `&E00`), and the editor checks the program against that machine's BASIC. The choice is kept with
 the program in the browser, and a shared link records it: a link made for the Master has `"model":"Master"` in its
 state, and a link without one, as every link made before there was a choice, runs on the Model B. The GXR ROM is only
-fitted to the Model B.
+fitted to the Model B, and "Model B" has it, as it always has; "Model B (no GXR)" leaves it out, for checking what a
+program does on a Model B without the graphics extension. That choice is kept as `"gxr":false` in the state (and
+as `B-no-GXR` in the browser), written only for it, so every other link is what it was; an older Owlet ignores the
+field and runs the Model B with the GXR. The GXR is a fitting, not a different BASIC: the editor reads a Model B the
+same either way. `?experimental` only shows the send to beebjit button, as it always has, and that button works on
+either Model B.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 
