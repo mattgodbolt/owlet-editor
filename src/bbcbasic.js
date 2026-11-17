@@ -254,7 +254,11 @@ function lineWarnings(line, lineTokens, dialect) {
             code: LowerCaseKeywordCode,
         });
     }
-    for (const token of lineTokens.filter(token => token.invalid)) {
+    // BASIC reads 1ER.a$ as 1E, R and .a$, which can be valid (so it is not marked), but is rarely what was meant.
+    const followsNumber = (token, i) =>
+        lineTokens[i - 1]?.kind === "number" && lineTokens[i - 1].end === token.start;
+    for (const [i, token] of lineTokens.entries()) {
+        if (!token.invalid && !followsNumber(token, i)) continue;
         const rest = token.abbreviation && /^\w+/.exec(line.slice(token.end + 1));
         if (rest) {
             const abbreviation = `${token.text}.`;
