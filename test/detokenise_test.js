@@ -108,6 +108,14 @@ describe.each([
     },
 );
 
+describe("The dialect's token table", () => {
+    it("should spell a token from the dialect it is read in", () => {
+        assert.strictEqual(detokenise("\xce 10", ModelBDialect), "\u00ce 10");
+        assert.strictEqual(detokenise("\xce 10", BasicIVDialect), "EDIT 10");
+        assert.strictEqual(detokenise("\xfb1", BasicIVDialect), "COLOUR1");
+    });
+});
+
 describe("For each basic line", () => {
     it("should handle an empty program", () => {
         forEachBasicLine("\x0d\xff", () => assert.fail("Shouldn't call me"));

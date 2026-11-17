@@ -1,4 +1,4 @@
-import {byteChar, Flags, keywordByToken, LineNumberToken} from "./tokens.js";
+import {byteChar, Flags, LineNumberToken} from "./tokens.js";
 import {lexLine} from "./parser/lexer.js";
 
 const FirstTokenByte = 0x80;
@@ -7,9 +7,23 @@ const LineNumberBytes = 3;
 // What BASIC leaves as it is to the end of the line.
 const RestOfLineKinds = new Set(["comment", "data", "oscli"]);
 
+const keywordTables = new WeakMap();
+
+// The first keyword of a token wins, so a token with two spellings (COLOUR and COLOR) expands to the first.
+function keywordByToken(dialect) {
+    let table = keywordTables.get(dialect);
+    if (!table) {
+        table = new Map();
+        for (const kw of dialect.keywords) if (!table.has(kw.token)) table.set(kw.token, kw);
+        keywordTables.set(dialect, table);
+    }
+    return table;
+}
+
 class StringHandler {
-    constructor() {
+    constructor(dialect) {
         this.output = "";
+        this.keywords = keywordByToken(dialect);
     }
 
     onLineNumber(lineNumber) {
@@ -29,7 +43,7 @@ class StringHandler {
     }
 
     onToken(token) {
-        const kw = keywordByToken.get(token);
+        const kw = this.keywords.get(token);
         if (kw) this.output += kw.keyword;
         else this.onCharCode(token);
     }
@@ -105,7 +119,7 @@ function detokeniseLine(line, handler, dialect) {
                 identifier = undefined;
             }
             handler.onToken(charCode);
-            if (keywordByToken.get(charCode)?.flags & Flags.Conditional)
+            if (handler.keywords.get(charCode)?.flags & Flags.Conditional)
                 afterConditionalToken = true;
         } else if (charCode < 32 || charCode === 127) {
             identifier = undefined;
@@ -139,7 +153,7 @@ function detokeniseInternal(text, handler, dialect) {
 }
 
 export function detokenise(text, dialect) {
-    const handler = new StringHandler();
+    const handler = new StringHandler(dialect);
     detokeniseInternal(text, handler, dialect);
     return handler.output;
 }
@@ -169,7 +183,7 @@ class PartialHandler extends StringHandler {
 export function partialDetokenise(rawText, dialect) {
     const lines = [];
     forEachBasicLine(rawText, (lineNum, line) => {
-        const handler = new PartialHandler();
+        const handler = new PartialHandler(dialect);
         detokeniseInternal(line, handler, dialect);
         lines.push({num: lineNum, line: handler.output});
     });
