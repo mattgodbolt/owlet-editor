@@ -1,8 +1,9 @@
 import {languages} from "monaco-editor/editor/editor.api";
 import "monaco-editor/editor/contrib/suggest/browser/suggestController";
-import {FirstStatementToken, Flags} from "./tokens";
+import {Flags, isFnProc, isStatementKeyword} from "./tokens";
+import {canStartStatement} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
-import {Kind, programSymbols} from "./occurrences";
+import {programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
 
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
@@ -18,14 +19,7 @@ function labelSetsFor(dialect) {
         const table = dialect.keywords;
         const programKeywords = table.filter(kw => !dialect.immediateCommands.includes(kw.keyword));
         const statementWords = new Set(
-            table
-                .filter(
-                    kw =>
-                        kw.token >= FirstStatementToken ||
-                        kw.keyword === "ELSE" ||
-                        (dialect.basicIV && kw.keyword === "EXT"),
-                )
-                .map(kw => kw.keyword),
+            table.filter(kw => canStartStatement(dialect, kw)).map(kw => kw.keyword),
         );
         const statement = labels(programKeywords.filter(kw => statementWords.has(kw.keyword)));
         labelSets.set(dialect, {
@@ -44,7 +38,7 @@ function labelSetsFor(dialect) {
                 ["INPUT", [...SpcAndTab, "LINE"]],
                 ["FOR", ["TO", "STEP"]],
                 ["IF", ["THEN", ...statement]],
-                ["ON", ["ERROR", "GOTO", "GOSUB", ...(dialect.basicIV ? ["PROC"] : [])]],
+                ["ON", ["ERROR", ...dialect.onBranches]],
                 ["ON ERROR", ["OFF"]],
                 ["TRACE", ["ON", "OFF"]],
                 ["DEF", statement],
@@ -56,15 +50,11 @@ function labelSetsFor(dialect) {
 // Statements that a statement can follow without a colon: IF X FOR, DEF PROCa FOR. The PROC after DEF is its name.
 const HoldsStatement = new Set(["IF", "DEF"]);
 const startsNestedStatement = token =>
-    token.kind === "keyword" &&
-    token.kw.token >= FirstStatementToken &&
-    token.kw.keyword !== "PROC";
-const NameKinds = new Map([
-    ["FN", Kind.Fn],
-    ["PROC", Kind.Proc],
-]);
+    token.kind === "keyword" && isStatementKeyword(token.kw) && token.kw.keyword !== "PROC";
 
-const nameKind = token => token && token.kind === "keyword" && NameKinds.get(token.kw.keyword);
+// The kind of name the keyword takes after it, which is its spelling.
+const nameKind = token =>
+    token && token.kind === "keyword" && isFnProc(token.kw) && token.kw.keyword;
 
 // A label starts an assembler statement as a colon does. Only the line's own number starts one; the others are the
 // targets of GOTO, THEN and the like.

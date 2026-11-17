@@ -1,4 +1,5 @@
 import {Selection} from "monaco-editor/editor/editor.api";
+import {LimitKeyword} from "./parser/dialect";
 import {readLines} from "./parser/highlight";
 
 export const ImplicitLineNumberStep = 10;
@@ -56,7 +57,7 @@ function traceLimit(target, oldToNew) {
 
 function renumberEdits(references, oldToNew, movesTraceLimits = false) {
     const newNumber = ref =>
-        movesTraceLimits && ref.keyword === "TRACE" && !oldToNew.has(ref.target)
+        movesTraceLimits && ref.keyword === LimitKeyword && !oldToNew.has(ref.target)
             ? traceLimit(ref.target, oldToNew)
             : (oldToNew.get(ref.target) ?? ref.target);
     return references

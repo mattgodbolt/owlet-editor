@@ -1,10 +1,8 @@
 import {MarkerSeverity} from "monaco-editor/editor/editor.api";
+import {LimitKeyword} from "./parser/dialect";
 import {ImplicitLineNumberStep, lineNumberTokens} from "./renumber";
 
 const MaxLineNumber = 32767;
-// BASIC looks the number up when it runs these; LIST, DELETE, AUTO and RENUMBER take numbers that need not be lines, and
-// TRACE's is a limit.
-const LookedUpBy = new Set(["GOTO", "GOSUB", "THEN", "ELSE", "RESTORE"]);
 // THEN and ELSE give Syntax error for a number above MaxLineNumber, where the others look it up and say No such line.
 const SyntaxErrorAbove = new Set(["THEN", "ELSE"]);
 // Verified on the BBC BASIC II and Master ROMs: GOTO, GOSUB, RESTORE and TRACE keep the bottom 16 bits of a number up to
@@ -70,8 +68,8 @@ export function getLineNumberMarkers(text, dialect, cursorLine = 0) {
         }
     });
     for (const {lineNumber, startColumn, endColumn, target, own, keyword} of tokens) {
-        const looksUp = LookedUpBy.has(keyword);
-        if (own || !(looksUp || keyword === "TRACE")) continue;
+        const looksUp = dialect.lineNumberLookups.has(keyword);
+        if (own || !(looksUp || keyword === LimitKeyword)) continue;
         if (target >= TooBigAt) {
             markers.push(
                 marker(

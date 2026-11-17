@@ -1,6 +1,19 @@
 import {debbreviate, expandCode} from "../src/expand-code";
-import {Flags, detokenise, forEachBasicLine, keywords, partialDetokenise} from "../src/tokens";
-import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
+import {
+    Flags,
+    detokenise,
+    forEachBasicLine,
+    isFnProc,
+    keywords,
+    partialDetokenise,
+    pseudoVariables,
+} from "../src/tokens";
+import {
+    BasicIIDialect,
+    BasicIVDialect,
+    ModelBDialect,
+    canStartStatement,
+} from "../src/parser/dialect";
 import {RomTokens} from "./rom-tables";
 import {describe, expect, it} from "vitest";
 import assert from "assert";
@@ -116,6 +129,67 @@ describe("The keyword table", () => {
             "VAL",
             "VPOS",
         ]);
+    });
+});
+
+const FirstStatement = 0xc6;
+const spellings = (rows, wanted) => [...new Set(rows.filter(wanted).map(row => row.keyword))];
+
+// What each ROM's table says, by the ROM flag byte or the token range.
+describe.each([
+    ["BASIC II", BasicIIDialect, BasicIIRom, 0xcd],
+    ["BASIC IV", BasicIVDialect, MasterRom, 0xce],
+])("The facts derived from the table of %s", (_, dialect, rom, lastCommand) => {
+    const romRows = romKeywords(rom);
+    it("should have the pseudo-variables the ROM flags", () => {
+        expect([...pseudoVariables].sort()).toEqual(
+            spellings(romRows, row => row.flags & Flags.PseudoVariable).sort(),
+        );
+        expect([...pseudoVariables].sort()).toEqual(["HIMEM", "LOMEM", "PAGE", "PTR", "TIME"]);
+    });
+    it("should take FN and PROC as the keywords the ROM flags as taking a name", () => {
+        expect(spellings(dialect.keywords, isFnProc)).toEqual(
+            spellings(romRows, row => row.flags & Flags.FnProc),
+        );
+        expect(spellings(dialect.keywords, isFnProc)).toEqual(["FN", "PROC"]);
+    });
+    it("should start a statement with the statement tokens, ELSE and on BASIC IV EXT", () => {
+        const starters = spellings(dialect.keywords, kw => canStartStatement(dialect, kw));
+        const fromRom = spellings(
+            romRows,
+            row => row.token >= FirstStatement || row.keyword === "ELSE",
+        );
+        expect(starters.sort()).toEqual((dialect.basicIV ? [...fromRom, "EXT"] : fromRom).sort());
+    });
+    it("should take as commands the statements from AUTO up to the last the ROM has", () => {
+        const fromRom = spellings(
+            romRows,
+            row => row.token >= FirstStatement && row.token <= lastCommand,
+        );
+        expect(dialect.immediateCommands).toEqual(fromRom);
+        expect([...dialect.immediateCommands].sort()).toEqual(
+            ["AUTO", "DELETE", "LIST", "LOAD", "NEW", "OLD", "RENUMBER", "SAVE"]
+                .concat(dialect.basicIV ? ["EDIT"] : [])
+                .sort(),
+        );
+    });
+    it("should look up the line numbers of the keywords the ROM flags but for commands and TRACE", () => {
+        const flagged = spellings(romRows, row => row.flags & Flags.LineNumber);
+        expect(flagged.filter(word => !dialect.lineNumberLookups.has(word)).sort()).toEqual(
+            [...dialect.immediateCommands.filter(word => flagged.includes(word)), "TRACE"].sort(),
+        );
+        expect([...dialect.lineNumberLookups].sort()).toEqual([
+            "ELSE",
+            "GOSUB",
+            "GOTO",
+            "RESTORE",
+            "THEN",
+        ]);
+    });
+    it("should branch an ON to GOTO and GOSUB, and on BASIC IV PROC", () => {
+        expect(dialect.onBranches).toEqual(
+            dialect.basicIV ? ["GOTO", "GOSUB", "PROC"] : ["GOTO", "GOSUB"],
+        );
     });
 });
 

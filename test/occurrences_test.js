@@ -1,6 +1,7 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
-import {occurrencesAt, registerOccurrences, renameProviderFor} from "../src/occurrences";
+import {Kind, occurrencesAt, registerOccurrences, renameProviderFor} from "../src/occurrences";
+import {isFnProc, keywords} from "../src/tokens";
 import {describe, expect, it, vi, afterEach} from "vitest";
 import assert from "assert";
 import {editor} from "monaco-editor/editor/editor.api";
@@ -56,6 +57,9 @@ function rename(textWithCursor, newName) {
 }
 
 describe("Occurrences", () => {
+    it("should name the kinds of FN and PROC by the keywords the table says take a name", () => {
+        expect(keywords.filter(isFnProc).map(kw => kw.keyword)).toEqual([Kind.Fn, Kind.Proc]);
+    });
     it("should find the occurrences of the name at the cursor", () => {
         const cases = [
             // Olly's example from #61.
