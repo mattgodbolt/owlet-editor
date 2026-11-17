@@ -38,6 +38,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@fortawesome/fontawesome-free": "^7.3.1",
+    "@playwright/test": "1.63.0",
     "@rollup/plugin-yaml": "^5.0.1",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
@@ -63,6 +64,7 @@
     "lint-fix": "eslint --fix .",
     "format:check": "prettier --check .",
     "test": "vitest",
+    "e2e": "playwright test",
     "prepare": "husky"
   },
   "lint-staged": {

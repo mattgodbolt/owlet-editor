@@ -32,7 +32,13 @@ export default [
         },
     },
     {
-        files: ["**/vite.config.mjs", "**/test/setup.js", "**/vitest.config.mjs", "tools/**"],
+        files: [
+            "**/vite.config.mjs",
+            "**/test/setup.js",
+            "**/vitest.config.mjs",
+            "**/playwright.config.mjs",
+            "tools/**",
+        ],
 
         languageOptions: {
             globals: {

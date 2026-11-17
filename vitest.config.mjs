@@ -12,7 +12,7 @@ export default defineConfig({
         sourcemapIgnoreList: path => path.includes("node_modules"),
         // Only test files in our project, not in node_modules
         testTimeout: 20000,
-        exclude: ["**/node_modules/**"],
+        exclude: ["**/node_modules/**", "e2e/**"],
         // Setup a global browser environment for monaco tests
         setupFiles: ["./test/setup.js"],
     },

@@ -76,6 +76,7 @@ While Debug is off nothing is read from the machine, so it costs nothing. Debug 
 $ make run   # Starts the Vite development server
 $ npm run build   # Build for production
 $ npm run preview   # Preview the production build locally
+$ npm run e2e   # Build, then drive the built page in a browser (first: npx playwright install chromium)
 ```
 
 Then visit http://localhost:8080
