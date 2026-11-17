@@ -1,6 +1,6 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {completionContext, completionItems} from "../src/completions";
-import {ModelBDialect} from "../src/parser/dialect";
+import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {readLines} from "../src/parser/highlight";
 import {expandCode} from "../src/expand-code";
 import Examples from "../src/examples.yaml";
@@ -196,6 +196,38 @@ describe("Completions", () => {
             for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
             for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
         }
+    });
+
+    // What BASIC reads next is what the recogniser looks for where the text stops (#238, #260).
+    it("should offer a word only where the recogniser looks for it", () => {
+        const cases = [
+            // [text, offered, not offered]
+            ["IF X X=0 T‸", ["TAN", "TIME", "TOP", "TRUE"], ["THEN", "TRACE", "TO"]],
+            ["IF X X=T‸", ["TAN", "TIME", "TOP", "TRUE"], ["THEN", "TRACE"]],
+            ["IF X T‸", ["THEN", "TRACE"], []],
+            ["IF T‸", ["TAN", "TOP"], ["THEN", "TRACE"]],
+            ["IF X PRINT 1 T‸", ["TAN"], ["THEN"]],
+            ["FOR T‸", [], ["TO", "STEP"]],
+            ["FOR I=1 S‸", ["SQR"], ["STEP"]],
+            ["FOR I=1 T‸", ["TO"], ["STEP"]],
+            ["FOR I=1 TO 2 S‸", ["STEP"], []],
+            ["FOR I=1 TO 2 T‸", [], ["TO"]],
+            ["PRINT (1 T‸", ["TAN"], ["TAB("]],
+            ["INPUT LINE S‸", ["SPC"], ["LINE"]],
+            ["INPUT LINE L‸", [], ["LINE"]],
+            ["ON X S‸", [], ["STEP"]],
+            ["ON 1 E‸", [], ["ERROR"]],
+        ];
+        for (const [text, shown, hidden] of cases) {
+            const items = offered(text);
+            for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
+            for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
+        }
+    });
+
+    it("should not offer THEN after the EXT# statement that follows IF on BASIC IV", () => {
+        const {labels} = completionContext("IF X EXT#F=1 ", BasicIVDialect);
+        assert(!labels.includes("THEN"));
     });
 
     it("should offer nothing where no keyword can be typed", () => {
