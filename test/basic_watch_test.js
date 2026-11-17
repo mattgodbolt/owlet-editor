@@ -698,6 +698,16 @@ describe("BasicWatch handled errors", () => {
                     lines: ["ON ERROR END", "ON ERROR OFF", "X=Q"],
                 },
                 {name: "no error", lines: ["ON ERROR END", "X=1"]},
+                {
+                    // Only the OS's own write of the error block's address is an error being raised.
+                    name: "a program writing where the OS keeps the error block's address",
+                    lines: [
+                        "ON ERROR END",
+                        'DIM B% 8:?B%=99:$(B%+1)="Fake"',
+                        "!&FD=B%:?&FE=B% DIV 256",
+                        "X=1",
+                    ],
+                },
             ])("keeps nothing for $name", async ({lines}) => {
                 const {booted, watch} = await runWatched(machine, lines);
                 expect(watch.read(booted.cpu).handled).toEqual({total: 0, errors: []});

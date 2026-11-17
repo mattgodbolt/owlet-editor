@@ -87,7 +87,7 @@ so an error in a line numbered 0 is at line 0, and one in a command typed at the
 
 An error numbered 0 (`STOP`) never goes to an `ON ERROR` handler, so it is never listed: BASIC's own handler takes it.
 Only plain `ON ERROR` exists in BASIC II and BASIC IV; `ON ERROR LOCAL` is BASIC V's, and on these machines sets a
-handler that runs `LOCAL`, which fails with `Not LOCAL` and so loops for ever, as the list then shows. Handled errors
+handler that runs `LOCAL`, which fails with `Not LOCAL` and so loops forever, as the list then shows. Handled errors
 are caught as they are raised, so only those raised while Debug is on are listed.
 
 A program has stopped with an error when BASIC's own error handler, which is BASIC text in its ROM, is the last text it read; the

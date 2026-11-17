@@ -24,9 +24,10 @@ const ErrorLine = 0x08;
 const ExpressionPointerBase = 0x19;
 const ExpressionPointerOffset = 0x1b;
 // The OS's BRK handler leaves the address of the error block (its number, then its message up to a zero) here, writing
-// the low byte first.
+// the low byte first, from the MOS ROM (at &DC3A on the Model B and &E5BB on the Master), where a program cannot write.
 const ErrorBlock = 0xfd;
 const ErrorBlockHigh = 0xfe;
+const MosStart = 0xc000;
 // The text BASIC runs on an error: an ON ERROR's, or after ON ERROR OFF and at the prompt, its own handler in its ROM.
 const ErrorHandler = 0x16;
 const HandledErrorsKept = 8;
@@ -234,7 +235,7 @@ export class BasicWatch {
         this.hook = cpu.debugWrite.add((address, value) => {
             if (address >= ResidentFirstByte && address <= ResidentLastByte)
                 this.written |= residentBit(address);
-            else if (address === ErrorBlockHigh)
+            else if (address === ErrorBlockHigh && cpu.pc >= MosStart)
                 this.noteError(peek, peek(ErrorBlock) | (value << 8));
             else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
                 this.noteStatement(peek(TextPointerHigh));
