@@ -18,7 +18,9 @@ const neededAfterOn = ({onBranches}) =>
 
 const UnclosedBlock = "Assembler block not closed: there is no ] after this [";
 
-// The keyword a name is the start of, if only one is: BASIC reads FO as a variable, not as FOR.
+// The keyword a name is the start of, if only one is: BASIC reads FO as a variable, not as FOR. It reads BASIC II's
+// table on purpose: BASIC IV adds only EDIT (immediate mode only) and COLOR, which is the same token as COLOUR, so
+// COLOUR is the right suggestion for COLO on either.
 function keywordStartingWith(name) {
     const upper = name.toUpperCase();
     const found = keywords.filter(

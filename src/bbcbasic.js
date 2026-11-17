@@ -64,6 +64,7 @@ export function rebuildBracketPairs(model) {
     model.updateOptions({bracketColorizationOptions: options});
 }
 
+// BASIC IV adds no keyword that ends in "(", so BASIC II's table gives the same list for both dialects.
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
 let registrations = [];
 
