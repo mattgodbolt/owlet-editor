@@ -82,7 +82,7 @@ export class Emulator {
 
         window.theEmulator = this;
 
-        this.setMachine(DefaultMachine);
+        this.setMachine(DefaultMachine, true);
 
         this.audio = new AudioHandler({
             cpuSpeed: this.model.cyclesPerSecond,
@@ -95,7 +95,6 @@ export class Emulator {
         // wants and anything else does not.
         if (soundRequested(window.location.search)) this.sound.arm();
         this.sound.reconcile();
-        this.useGxr = false;
         this.cpu = null;
         this.cpuMachine = null;
         this.keyboard = null;
@@ -116,12 +115,13 @@ export class Emulator {
     }
 
     /**
-     * Chooses the machine the next initialise() builds; returns whether that is a change. Both run at 2MHz, so the
-     * audio, which is built for one speed, carries on.
+     * Chooses the machine, and whether it has the GXR ROM fitted, that the next initialise() builds; returns whether
+     * that is a change. Both run at 2MHz, so the audio, which is built for one speed, carries on.
      */
-    setMachine(machine) {
-        if (machine === this.machine) return false;
+    setMachine(machine, gxr) {
+        if (machine === this.machine && gxr === this.useGxr) return false;
         this.machine = machine;
+        this.useGxr = gxr;
         this.model = models.findModel(machine);
         // A snapshot to loop back to is of the machine it was taken on.
         this.state = null;
@@ -184,10 +184,6 @@ export class Emulator {
         } finally {
             this.rebuilding = false;
         }
-    }
-
-    gxr() {
-        this.useGxr = true;
     }
 
     get cyclesPerSecond() {

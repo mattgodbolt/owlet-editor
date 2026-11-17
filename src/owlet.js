@@ -29,7 +29,15 @@ import * as models from "jsbeeb/src/models";
 import {dialectFor} from "./parser/dialect";
 import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
-import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
+import {
+    Choices,
+    DefaultMachine,
+    choiceFor,
+    choiceOf,
+    labelOf,
+    modelQuery,
+    withMachine,
+} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
 import {fitMarkerWidgetToWrappedMessage} from "./marker-widget";
 import {makeUEF} from "./UEF";
@@ -156,8 +164,8 @@ export class OwletEditor {
         for (const example of Examples.examples) this.addExample(example);
     }
 
-    static stateForBasicProgram(program, machine = DefaultMachine) {
-        return withMachine({v: StateVersion, program: program}, machine);
+    static stateForBasicProgram(program, choice = DefaultMachine) {
+        return withMachine({v: StateVersion, program: program}, choice);
     }
 
     static decodeStateString(stateString, fixup = true) {
@@ -273,7 +281,7 @@ export class OwletEditor {
     }
 
     toStateString(basicText) {
-        const state = OwletEditor.stateForBasicProgram(basicText, this.emulator.machine);
+        const state = OwletEditor.stateForBasicProgram(basicText, this.choice);
         return encodeURIComponent(JSON.stringify(state))
             .replace(/[(]/g, "%28")
             .replace(/[)]/g, "%29");
@@ -301,8 +309,7 @@ export class OwletEditor {
             this.emulator.setTotalCycles(this.emulator.cyclesPerSecond * 60 * 60 * 3);
             this.emulator.start();
         } else {
-            this.setMachine(machineOf(state));
-            this.emulator.gxr();
+            this.setMachine(choiceOf(state));
             await this.emulator.initialise();
             this.updateProgram();
         }
@@ -323,10 +330,17 @@ export class OwletEditor {
         this.followLineNumbers = followImplicitLineNumbers(this.editor, dialect);
     }
 
+    /** The menu choice the emulator is on. */
+    get choice() {
+        return choiceFor(this.emulator.machine, this.emulator.useGxr);
+    }
+
     /** Chooses the machine the emulator builds next, and its BASIC for the editor; returns whether it changed. */
-    setMachine(machine) {
-        const changed = this.emulator.setMachine(machine);
-        $("#machine").val(machine);
+    setMachine(choice) {
+        const {machine, gxr} = Choices[choice];
+        const changed = this.emulator.setMachine(machine, gxr);
+        $("#machine").val(choice);
+        // The snapshot beebjit sends is of a Model B, with or without the GXR.
         const sendable = machine === DefaultMachine;
         $("#rocket")
             .prop("disabled", !sendable)
@@ -334,15 +348,15 @@ export class OwletEditor {
         this.useDialect(dialectFor(this.emulator.model));
         this.updateWarnings();
         this.showSyntaxMarkers();
-        this.onMachineChangeHandler(machine);
+        this.onMachineChangeHandler(choice);
         return changed;
     }
 
-    async chooseMachine(machine) {
+    async chooseMachine(choice) {
         const $machine = $("#machine").prop("disabled", true);
-        const previous = this.emulator.machine;
+        const previous = this.choice;
         try {
-            this.setMachine(machine);
+            this.setMachine(choice);
             await this.emulator.initialise();
             this.run();
         } catch (e) {
@@ -710,8 +724,8 @@ export class OwletEditor {
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());
         const $machine = $("#machine");
-        for (const [machine, {label}] of Object.entries(Machines))
-            $("<option>").val(machine).text(label).appendTo($machine);
+        for (const choice of Object.keys(Choices))
+            $("<option>").val(choice).text(labelOf(choice)).appendTo($machine);
         $machine.change(() => this.chooseMachine($machine.val()));
 
         createVduReference($("#reference")[0]);

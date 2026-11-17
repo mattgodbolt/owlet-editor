@@ -8,7 +8,7 @@ import "@fortawesome/fontawesome-free/css/all.css";
 import logo from "/assets/images/monster.png";
 import "./owlet-editor.less";
 import {saveMachine, saveProgram, savedMachine, savedProgram} from "./saved-program";
-import {machineOf} from "./machines";
+import {choiceNamed} from "./machines";
 
 self.MonacoEnvironment = {getWorker: () => new EditorWorker()};
 
@@ -92,7 +92,7 @@ async function getInitialState(id) {
     // If there's no state in the URL, look at the last program the user had in their browser.
     const lastProgram = savedProgram();
     if (lastProgram !== null)
-        return OwletEditor.stateForBasicProgram(lastProgram, machineOf({model: savedMachine()}));
+        return OwletEditor.stateForBasicProgram(lastProgram, choiceNamed(savedMachine()));
 
     // // Try loading an example program - TODO we will cache in s3
     // const ExampleProgramId = "toot.bas"; // This is the only way I toot now
