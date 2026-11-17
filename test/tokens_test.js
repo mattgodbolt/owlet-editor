@@ -286,6 +286,10 @@ describe("Debbreviation", () => {
             debbreviate("IFCOU.TH.*LO. P.DATA", ModelBDialect),
             "IFCOU.THEN*LO. P.DATA",
         );
+        assert.strictEqual(
+            debbreviate("IFCOU. TH.*LO. P.DATA", ModelBDialect),
+            "IFCOUNT THEN*LO. P.DATA",
+        );
         assert.strictEqual(debbreviate("P.\n*H.\nP.", ModelBDialect), "PRINT\n*H.\nPRINT");
     });
 });
@@ -298,6 +302,7 @@ describe("Debbreviation and the ROM", () => {
         // would read is left (MID$. is MID$( and R. after a number is RETURN).
         const cases = [
             ["IFCOU.TH.*LO. P.DATA", "IFCOU.THEN*LO. P.DATA"],
+            ["IFCOU. TH.*LO. P.DATA", "IFCOUNT THEN*LO. P.DATA"],
             ["REM P. is print", "REM P. is print"],
             ["DATA P.,L.", "DATA P.,L."],
             ["xP.", "xP."],
