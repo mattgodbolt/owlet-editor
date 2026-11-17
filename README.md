@@ -42,7 +42,7 @@ either Model B.
 ### Debug: watching BASIC run
 
 The Debug button under the emulator opens a panel under the screen with BASIC's variables (the resident integers
-`@%` and `A%` to `Z%` that are not as BASIC starts them, then every other variable, then the names of the procedures
+`@%` and `A%` to `Z%` that the program has written to, then every other variable, then the names of the procedures
 and functions it has found), and marks the statement BASIC is running in the editor: its line faintly, the
 statement itself more strongly, and the line in the scroll bar. Both follow the program as it runs, many times a
 second, and stay where they were while the emulator is paused, so pausing shows where the program had got to.
@@ -61,7 +61,17 @@ An abbreviation such as `P.` is marked as it is written. The panel says:
   them, as they do on a real BBC Micro.
 - **Not BASIC**: another language ROM has taken over.
 
-While Debug is off nothing is read from the machine, so it costs nothing. Debug is not remembered between visits.
+A resident integer is shown once the program has written to it, even if it wrote the value BASIC starts it with, so
+after `X%=1:X%=0` the panel shows `X%` as `0`. Running the program again starts afresh, with nothing written. Debug
+notes the writes from the moment it is switched on, so what the program wrote earlier is not known: for those, a
+resident integer is shown only if it is not as BASIC starts it (`@%` other than `&90A`, `A%` to `Z%` other than 0).
+Switch Debug on before running the program (the run button runs it again) to see them all.
+
+![The Debug panel on a Model B, with the running statement marked in the editor](docs/images/debugger-model-b.png)
+
+While Debug is off nothing is read from the machine and nothing is hooked, so it costs nothing. While it is on, the
+emulator notes writes to the resident integers through jsbeeb's write hook, which makes it do a little more work on each
+write the program makes. Debug is not remembered between visits.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 
