@@ -11,6 +11,8 @@ const Program = [
 ].join("\n");
 const Statement30 = 'Y$="N"+STR$(X)';
 const Statement60 = 'PRINT TAB(0,0);I%;" ";Y$';
+// X% is only ever written to the value BASIC starts it with; Z% is never written.
+const ResidentProgram = ["10 X%=1:X%=0", "20 Y%=5", "30 PRINT Z%", "40 END"].join("\n");
 const ErrorProgram = 'A=1:B$="X"\nPRINT 1/0';
 
 const Machines = [
@@ -268,6 +270,39 @@ for (const {name, state} of Machines) {
             // And it stays off while the program carries on.
             await settle(page);
             expect(await markedLines(page)).toBe(0);
+            expect(problems).toEqual([]);
+        });
+
+        test("resident integers the program wrote are shown, even at their start value, and those it did not are not", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, ResidentProgram, state);
+            await debugButton(page).click();
+            // Run again, now that Debug is watching from the start.
+            await page.locator('[data-action="run"]').click();
+            await expect.poll(() => variables(page)).toEqual({"X%": "0", "Y%": "5"});
+            await expect(status(page)).toHaveText("At BASIC's prompt");
+
+            // A new run starts with nothing written: the first program's X% is gone from the second's.
+            await page.locator(".monaco-editor").click();
+            await page.keyboard.press("ControlOrMeta+a");
+            await page.keyboard.type("Y%=7\nEND");
+            await page.locator('[data-action="run"]').click();
+            await expect.poll(() => variables(page)).toEqual({"Y%": "7"});
+            expect(problems).toEqual([]);
+        });
+
+        test("turning Debug on after the program has written shows what is not at its start value", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, ResidentProgram, state);
+            // Wait for the program to finish, with nothing watching it.
+            await page.waitForTimeout(3000);
+            await debugButton(page).click();
+            await expect(status(page)).toHaveText("At BASIC's prompt");
+            await expect.poll(() => variables(page)).toEqual({"Y%": "5"});
             expect(problems).toEqual([]);
         });
 

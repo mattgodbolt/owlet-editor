@@ -46,6 +46,7 @@ export class BasicDebugger {
         this.screenShown = true;
         this.program = null;
         this.shown = {status: null, variables: null, range: null};
+        emulator.onProgramStart = () => this.watch.restart();
         new ResizeObserver(() => this.reserveScreen()).observe(this.panel);
     }
 
@@ -53,6 +54,7 @@ export class BasicDebugger {
         this.on = !this.on;
         this.button.setAttribute("aria-pressed", String(this.on));
         this.emulator.onFrame = this.on ? () => this.update() : null;
+        if (!this.on) this.watch.untrack();
         this.shown = {status: null, variables: null, range: null};
         if (this.on) this.update();
         else this.decorations.clear();

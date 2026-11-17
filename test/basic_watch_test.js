@@ -62,6 +62,90 @@ async function statementsRun(machine) {
     return {seen, after: watch.read(cpu)};
 }
 
+// A machine that has booted, with the watch reading it (so tracking writes) before `lines` are run as Owlet runs them.
+async function bootedMachine(machine) {
+    const testMachine = new TestMachine(machine);
+    await testMachine.initialise();
+    await testMachine.runFor(Machines[machine].startCycles);
+    return {testMachine, cpu: testMachine.processor, tokenisers: await createTokenisers()};
+}
+
+async function run({testMachine, cpu, tokenisers}, lines) {
+    installBasic(tokeniserFor(tokenisers, cpu.model).tokenise(lines.join("\n")), {
+        readByte: address => testMachine.readbyte(address),
+        writeByte: (address, value) => testMachine.writebyte(address, value),
+    });
+    await testMachine.type("RUN");
+    await testMachine.runFor(CyclesPerRun * 5);
+}
+
+const shownResidents = watch =>
+    Object.fromEntries(watch.read(watch.cpu).residents.map(({name, value}) => [name, value]));
+
+describe("BasicWatch resident integers", () => {
+    for (const machine of ["B", "Master"]) {
+        describe(`on the ${machine}`, () => {
+            it("shows a variable the program wrote, even if it wrote the value BASIC starts with", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                watch.restart();
+                await run(booted, ["X%=1:X%=0", "Y%=5", "FOR I%=1 TO 2:NEXT", "@%=&20209", "END"]);
+                expect(shownResidents(watch)).toEqual({
+                    "@%": "&00020209",
+                    "I%": "3",
+                    "X%": "0",
+                    "Y%": "5",
+                });
+            });
+
+            it("does not show a variable the program did not write", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                watch.restart();
+                await run(booted, ["A%=1", "PRINT B%,C%", "END"]);
+                expect(Object.keys(shownResidents(watch))).toEqual(["A%"]);
+            });
+
+            it("forgets what was written when the machine starts again", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, ["X%=1:X%=0", "END"]);
+                expect(shownResidents(watch)).toEqual({"X%": "0"});
+                // The reset clears every resident integer, which is not the program's doing.
+                booted.cpu.reset(true);
+                await booted.testMachine.runFor(Machines[machine].startCycles);
+                watch.restart();
+                expect(shownResidents(watch)).toEqual({});
+                await run(booted, ["Y%=0", "END"]);
+                expect(shownResidents(watch)).toEqual({"Y%": "0"});
+            });
+
+            it("falls back to what is not at its start value for what was written before it started watching", async () => {
+                const booted = await bootedMachine(machine);
+                await run(booted, ["X%=1:X%=0:Y%=5", "END"]);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                expect(shownResidents(watch)).toEqual({"Y%": "5"});
+                await run(booted, ["Z%=0", "END"]);
+                expect(shownResidents(watch)).toEqual({"Y%": "5", "Z%": "0"});
+            });
+
+            it("leaves the machine on its fast path when it stops watching", async () => {
+                const {cpu} = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                expect(cpu.onFastPath).toBe(true);
+                watch.read(cpu);
+                expect(cpu.onFastPath).toBe(false);
+                watch.untrack();
+                expect(cpu.onFastPath).toBe(true);
+            });
+        });
+    }
+});
+
 describe("BasicWatch", () => {
     it("says when the language is not a BASIC", async () => {
         const testMachine = new TestMachine("B");

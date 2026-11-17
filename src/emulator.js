@@ -113,6 +113,8 @@ export class Emulator {
         this.lastFrameTime = 0;
         // Called after each animation frame's run, while something watches the machine.
         this.onFrame = null;
+        // Called when a program is about to start on a machine that has just booted, or has been given a saved state.
+        this.onProgramStart = null;
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
         this.rebuilding = false;
@@ -258,6 +260,7 @@ export class Emulator {
         }
         const t0 = performance.now();
         this.snapshot.load(this.state, this.cpu);
+        this.onProgramStart?.();
         this.loopStart = this.cyclesPerSecond * 60 * 60 * 3; // 3 hours
         this.setTotalCycles(this.loopStart);
         this.loopLength = 6000000 + 320000;
@@ -280,6 +283,7 @@ export class Emulator {
         await processor.execute(this.cpuMachine.startCycles);
         // The machine may have been replaced meanwhile, and the program is not the new one's to run.
         if (processor !== this.cpu) return;
+        this.onProgramStart?.();
         const page = processor.readmem(0x18) << 8;
         for (let i = 0; i < tokenised.length; ++i) {
             processor.writemem(page + i, tokenised.charCodeAt(i));
