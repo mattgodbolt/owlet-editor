@@ -207,3 +207,307 @@ describe("BasicWatch", () => {
         });
     }
 });
+
+// The text of the editor's `lines` that `line` (as the watch gives it) marks.
+function markedText(lines, machine, line) {
+    const range = statementAt(programStatements(lines, dialectFor(machine.cpu.model)), line);
+    return range && lines[range.lineNumber - 1].slice(range.startColumn - 1, range.endColumn - 1);
+}
+
+// The error the watch shows once `lines` have been run, as {number, message, line: number, marked: text}, or null.
+async function errorShown(machine, lines) {
+    const booted = await bootedMachine(machine);
+    const watch = new BasicWatch();
+    watch.read(booted.cpu);
+    await run(booted, lines);
+    return describeError(watch.read(booted.cpu).error, lines, booted);
+}
+
+function describeError(error, lines, machine) {
+    if (!error) return null;
+    const {number, message, line} = error;
+    return {
+        number,
+        message,
+        line: line?.number ?? 0,
+        marked: line && markedText(lines, machine, line),
+    };
+}
+
+describe("BasicWatch errors", () => {
+    for (const machine of ["B", "Master"]) {
+        describe(`on the ${machine}`, () => {
+            it.each([
+                {
+                    lines: ['A=1:B$="X":PRINT 1/0'],
+                    error: {number: 18, message: "Division by zero", line: 10, marked: "PRINT 1/0"},
+                },
+                {
+                    lines: ["B=C:A=1"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "B=C"},
+                },
+                {
+                    lines: ["PROCx", "END", "DEF PROCx", "A=1:  B=C", "ENDPROC"],
+                    error: {number: 26, message: "No such variable", line: 40, marked: "B=C"},
+                },
+                {
+                    lines: ["X=FNf", "END", "DEF FNf=1/0"],
+                    error: {number: 18, message: "Division by zero", line: 30, marked: "=1/0"},
+                },
+                {
+                    lines: [
+                        "VDU 5",
+                        "FOR N%=1 TO 12",
+                        "  DRAW N%*140,FNh(N%)",
+                        "NEXT",
+                        "DEF FNh(n)=500+4000/(10-n)",
+                    ],
+                    error: {
+                        number: 18,
+                        message: "Division by zero",
+                        line: 50,
+                        marked: "=500+4000/(10-n)",
+                    },
+                },
+                {
+                    lines: ["1000 A=1", "2000 B=1:C=D:E=1"],
+                    error: {number: 26, message: "No such variable", line: 2000, marked: "C=D"},
+                },
+                {
+                    lines: ["X=1:A$=1:Y=2"],
+                    error: {number: 6, message: "Type mismatch", line: 10, marked: "A$=1"},
+                },
+                {
+                    lines: ["ON ERROR OFF", "X=Q"],
+                    error: {number: 26, message: "No such variable", line: 20, marked: "X=Q"},
+                },
+                {
+                    lines: ["X=1:ENDPROC"],
+                    error: {number: 13, message: "No PROC", line: 10, marked: "ENDPROC"},
+                },
+                {
+                    lines: ["DIM C% 20", "P%=C%", "[OPT 2", "LDA #1", "JMP nowhere", "]"],
+                    error: {
+                        number: 26,
+                        message: "No such variable",
+                        line: 50,
+                        marked: "JMP nowhere",
+                    },
+                },
+                {
+                    lines: [
+                        "DIM C% 20",
+                        "P%=C%",
+                        "[OPT 0",
+                        'BRK:EQUB 100:EQUS "Mine":EQUB 0',
+                        "]",
+                        "X=1:CALL C%",
+                    ],
+                    error: {number: 100, message: "Mine", line: 60, marked: "CALL C%"},
+                },
+                {
+                    // Neither BASIC II nor BASIC IV has an ERROR statement, so the number is never more than a byte.
+                    lines: ['X=1:ERROR 100,"text"'],
+                    error: {
+                        number: 16,
+                        message: "Syntax error",
+                        line: 10,
+                        marked: 'ERROR 100,"text"',
+                    },
+                },
+                {
+                    // The filing system's error is copied to the bottom of the stack, and raised from there.
+                    lines: ["X=1", "*DRIVE 9"],
+                    error: {number: 205, message: "Bad drive", line: 20, marked: "*DRIVE 9"},
+                },
+                {
+                    // An EVAL leaves no sign of which statement it was in, so the line is marked.
+                    lines: ['X=1:Y=EVAL("ZZZ"):Z=2'],
+                    error: {
+                        number: 26,
+                        message: "No such variable",
+                        line: 10,
+                        marked: 'X=1:Y=EVAL("ZZZ"):Z=2',
+                    },
+                },
+                {
+                    // BASIC gives this line 0, as it does a command typed at the prompt.
+                    lines: ["0 PRINT 1/0"],
+                    error: {number: 18, message: "Division by zero", line: 0, marked: "PRINT 1/0"},
+                },
+                {
+                    lines: ["0 X=1:STOP"],
+                    error: {number: 0, message: "STOP", line: 0, marked: "STOP"},
+                },
+                {
+                    lines: ["A=1", "X=1:STOP:Y=2"],
+                    error: {number: 0, message: "STOP", line: 20, marked: "STOP"},
+                },
+            ])("shows the error, line and statement of $lines", async ({lines, error}) => {
+                expect(await errorShown(machine, lines)).toEqual(error);
+            });
+
+            it.each([
+                {name: "ended", lines: ["A=1", "END"]},
+                {name: "ran off its end", lines: ["A=1"]},
+                {name: "handled its error", lines: ['ON ERROR PRINT "handled":END', "PRINT 1/0"]},
+            ])("shows no error for a program that $name", async ({lines}) => {
+                expect(await errorShown(machine, lines)).toBeNull();
+            });
+
+            it("shows no error for a machine that has run nothing", async () => {
+                const {cpu} = await bootedMachine(machine);
+                expect(new BasicWatch().read(cpu).error).toBeNull();
+            });
+
+            it("shows Escape, at the line it was pressed in", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                const lines = ["REPEAT:A=A+1:UNTIL FALSE"];
+                await run(booted, lines);
+                booted.testMachine.keyDown("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                booted.testMachine.keyUp("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                expect(describeError(watch.read(booted.cpu).error, lines, booted)).toMatchObject({
+                    number: 17,
+                    message: "Escape",
+                    line: 10,
+                });
+            });
+
+            it("keeps the program's error through commands typed at the prompt, and shows one typed there otherwise", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                const lines = ["X=1", "PRINT 1/0"];
+                await run(booted, lines);
+                const stopped = describeError(watch.read(booted.cpu).error, lines, booted);
+                expect(stopped).toEqual({
+                    number: 18,
+                    message: "Division by zero",
+                    line: 20,
+                    marked: "PRINT 1/0",
+                });
+                for (const command of [
+                    "MODE 7",
+                    "MDOE 7",
+                    "PRINT X",
+                    "Q=5",
+                    "LIST",
+                    "PRINT FNnone",
+                ]) {
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun);
+                    expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual(
+                        stopped,
+                    );
+                }
+
+                watch.restart();
+                await booted.testMachine.type("MDOE 7");
+                await booted.testMachine.runFor(CyclesPerRun);
+                expect(watch.read(booted.cpu).error).toEqual({
+                    number: 4,
+                    message: "Mistake",
+                    line: null,
+                });
+                await booted.testMachine.type("MODE 7");
+                await booted.testMachine.runFor(CyclesPerRun);
+                expect(watch.read(booted.cpu).error).toBeNull();
+            });
+
+            it.each(["RUN", "GOTO 20", "PROCp"])(
+                "forgets the error once %s typed at the prompt runs the program, however soon it ends",
+                async command => {
+                    const booted = await bootedMachine(machine);
+                    const watch = new BasicWatch();
+                    watch.read(booted.cpu);
+                    await run(booted, [
+                        "IF A%=0 THEN A%=1:PRINT 1/0",
+                        "PROCp:END",
+                        "DEF PROCp:ENDPROC",
+                    ]);
+                    expect(watch.read(booted.cpu).error).toMatchObject({number: 18});
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun * 5);
+                    expect(watch.read(booted.cpu)).toMatchObject({line: null, error: null});
+                },
+            );
+
+            it("forgets the error once the program runs again", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, ["IF A%=0 THEN A%=1:PRINT 1/0", "FOR I%=1 TO 3000:NEXT", "END"]);
+                expect(watch.read(booted.cpu).error).toMatchObject({number: 18});
+                await booted.testMachine.type("RUN");
+                await booted.testMachine.runFor(CyclesPerRun);
+                expect(watch.read(booted.cpu)).toMatchObject({line: {number: 20}, error: null});
+                await booted.testMachine.runFor(CyclesPerRun * 20);
+                expect(watch.read(booted.cpu)).toMatchObject({line: null, error: null});
+            });
+
+            it("keeps an error in a line 0 through commands typed at the prompt", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                const lines = ["0 X=1:PRINT 1/0"];
+                await run(booted, lines);
+                const stopped = {
+                    number: 18,
+                    message: "Division by zero",
+                    line: 0,
+                    marked: "PRINT 1/0",
+                };
+                expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual(stopped);
+                for (const command of ["MODE 7", "PRINT 1/0"]) {
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun);
+                    expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual(
+                        stopped,
+                    );
+                }
+            });
+
+            it.each([
+                {name: "after a program that ended", lines: ["0 X=1", "END"]},
+                // BASIC gives this the line LIST had got to.
+                {name: "while it lists the program", lines: Array(300).fill("REM"), list: true},
+            ])("shows Escape pressed at the prompt $name as typed there", async ({lines, list}) => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, lines);
+                if (list) {
+                    await booted.testMachine.type("LIST");
+                    await booted.testMachine.runFor(CyclesPerRun * 3);
+                    expect(watch.read(booted.cpu).error).toBeNull();
+                }
+                booted.testMachine.keyDown("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                booted.testMachine.keyUp("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                expect(watch.read(booted.cpu).error).toEqual({
+                    number: 17,
+                    message: "Escape",
+                    line: null,
+                });
+            });
+
+            it("marks the line of an error raised before it started watching", async () => {
+                const booted = await bootedMachine(machine);
+                const lines = ["X=1:PRINT 1/0:Y=2"];
+                await run(booted, lines);
+                const watch = new BasicWatch();
+                expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual({
+                    number: 18,
+                    message: "Division by zero",
+                    line: 10,
+                    marked: "X=1:PRINT 1/0:Y=2",
+                });
+            });
+        });
+    }
+});

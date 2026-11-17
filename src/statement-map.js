@@ -102,16 +102,21 @@ const sameBytes = (a, b) => a.length === b.length && a.every((byte, i) => byte =
 
 /**
  * The editor's range of the statement BASIC reads at `offset` into line `number`, whose bytes in memory are `bytes`:
- * the last statement that starts at or before it. Null where no line of the editor tokenises to those bytes, as when
- * the line has been edited since the program was run.
+ * the last statement that starts at or before it, or with a null offset, every statement of the line. Null where no
+ * line of the editor tokenises to those bytes, as when the line has been edited since the program was run.
  */
 export function statementAt(program, {number, bytes, offset}) {
     const line = (program.get(number) || []).find(entry => sameBytes(entry.bytes, bytes));
     if (!line || line.statements.length === 0) return null;
-    const statement = line.statements.findLast(s => s.offset <= offset) || line.statements[0];
+    const {statements} = line;
+    const first =
+        offset === null
+            ? statements[0]
+            : statements.findLast(s => s.offset <= offset) || statements[0];
+    const last = offset === null ? statements.at(-1) : first;
     return {
         lineNumber: line.editorLine,
-        startColumn: statement.startColumn,
-        endColumn: statement.endColumn,
+        startColumn: first.startColumn,
+        endColumn: last.endColumn,
     };
 }

@@ -3,7 +3,14 @@ import ResizeObserver from "resize-observer-polyfill";
 import {BasicWatch} from "./basic-watch";
 import {programStatements, statementAt} from "./statement-map";
 
-const RunningColour = "#5e8040";
+// The classes and scroll bar colour of each kind of mark: the statement running, the one an error stopped the program
+// in, and the one Escape stopped it in, which people press on purpose.
+const Marks = {
+    running: {line: "debug-running-line", statement: "debug-running-statement", colour: "#5e8040"},
+    error: {line: "debug-error-line", statement: "debug-error-statement", colour: "#b03a3a"},
+    quiet: {line: "debug-quiet-line", statement: "debug-quiet-statement", colour: "#a08440"},
+};
+const EscapeError = 17;
 
 function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -19,8 +26,20 @@ function variable({name, value}) {
     return item;
 }
 
+const isStop = ({number, message}) => number === 0 && message === "STOP";
+
+const markFor = error => (error.number === EscapeError ? "quiet" : "error");
+
+function describeError(error, range) {
+    const what = isStop(error) ? "STOP" : `${error.message} (ERR ${error.number})`;
+    if (!error.line) return `${what} in a command typed at the prompt`;
+    const where = `at line ${error.line.number}${range ? "" : ", which has changed since the error"}`;
+    return `${what} ${where}. The variables are as the program left them.`;
+}
+
 function describe(state, range) {
     if (!state.basic) return `Not BASIC: the language is ${state.title || "an unnamed ROM"}`;
+    if (state.error) return describeError(state.error, range);
     if (!state.line) return "At BASIC's prompt";
     if (!range) return `Running line ${state.line.number}, which is not as in the editor`;
     return `Running line ${state.line.number}`;
@@ -28,7 +47,8 @@ function describe(state, range) {
 
 /**
  * Shows what BASIC is doing as the emulator runs: its variables in a panel under the screen, and the statement it is
- * running marked in the editor. Nothing is read from the machine while it is off.
+ * running, or the one an error stopped the program in, marked in the editor. Nothing is read from the machine while it
+ * is off.
  */
 export class BasicDebugger {
     constructor(editor, emulator, dialect) {
@@ -45,7 +65,7 @@ export class BasicDebugger {
         this.on = false;
         this.screenShown = true;
         this.program = null;
-        this.shown = {status: null, variables: null, range: null};
+        this.shown = {status: null, mark: null, variables: null, range: null};
         emulator.onProgramStart = () => this.watch.restart();
         new ResizeObserver(() => this.reserveScreen()).observe(this.panel);
     }
@@ -55,7 +75,7 @@ export class BasicDebugger {
         this.button.setAttribute("aria-pressed", String(this.on));
         this.emulator.onFrame = this.on ? () => this.update() : null;
         if (!this.on) this.watch.untrack();
-        this.shown = {status: null, variables: null, range: null};
+        this.shown = {status: null, mark: null, variables: null, range: null};
         if (this.on) this.update();
         else this.decorations.clear();
         this.showPanel();
@@ -89,41 +109,44 @@ export class BasicDebugger {
         const {cpu} = this.emulator;
         if (!cpu || this.emulator.rebuilding) return;
         const state = this.watch.read(cpu);
-        const range = state.basic && state.line ? statementAt(this.statements(), state.line) : null;
-        this.showRange(range);
-        this.showStatus(describe(state, range));
+        const line = state.line ?? state.error?.line;
+        const range = state.basic && line ? statementAt(this.statements(), line) : null;
+        const mark = state.error ? markFor(state.error) : "running";
+        this.showRange(range, mark);
+        this.showStatus(describe(state, range), state.error ? mark : null);
         this.showVariables(state.basic ? state : {residents: [], variables: [], routines: []});
     }
 
-    showRange(range) {
-        const shown = range && JSON.stringify(range);
+    showRange(range, mark) {
+        const shown = range && JSON.stringify([range, mark]);
         if (shown === this.shown.range) return;
         this.shown.range = shown;
         if (!range) return void this.decorations.clear();
         const {lineNumber, startColumn, endColumn} = range;
+        const {line, statement, colour} = Marks[mark];
         this.decorations.set([
             {
                 range: new Range(lineNumber, 1, lineNumber, 1),
                 options: {
                     isWholeLine: true,
-                    className: "debug-running-line",
-                    overviewRuler: {
-                        color: RunningColour,
-                        position: monacoEditor.OverviewRulerLane.Full,
-                    },
+                    className: line,
+                    overviewRuler: {color: colour, position: monacoEditor.OverviewRulerLane.Full},
                 },
             },
             {
                 range: new Range(lineNumber, startColumn, lineNumber, endColumn),
-                options: {className: "debug-running-statement"},
+                options: {className: statement},
             },
         ]);
     }
 
-    showStatus(text) {
-        if (text === this.shown.status) return;
+    /** Shows `text` as the status, in the colour of the error `mark` it is about, if it is about one. */
+    showStatus(text, mark) {
+        if (text === this.shown.status && mark === this.shown.mark) return;
         this.shown.status = text;
+        this.shown.mark = mark;
         this.status.textContent = text;
+        this.status.dataset.mark = mark ?? "";
     }
 
     showVariables({residents, variables, routines}) {

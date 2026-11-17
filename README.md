@@ -57,9 +57,28 @@ An abbreviation such as `P.` is marked as it is written. The panel says:
 - **Running line N, which is not as in the editor**: the editor's line N is not what BASIC has, as after an edit
   since the program ran. Nothing is marked until the program runs again; the variables still update. Lines that were
   not edited are still marked, so an edit to one line does not lose the others.
-- **At BASIC's prompt**: the program has ended, stopped with an error or not started; its variables stay as it left
-  them, as they do on a real BBC Micro.
+- **No such variable (ERR 26) at line N**: the program stopped with that error in line N, which is marked in red:
+  the statement the error was in, or the whole line where that is not known (see below). The variables are as the
+  program left them, as they are on a real BBC Micro. This stays, through anything typed at the prompt, until the
+  program runs again (from the run button, or a `RUN`, `GOTO` or `PROC` typed at the prompt; not a `LIST`), which is
+  the point: the message is often not on the emulated screen, after `VDU 5` with the graphics cursor off the screen
+  or in the background colour, or a `CLS`, or once a mistyped `REPORT` has replaced it.
+- **STOP at line N** is shown the same way: the program stopped where it should not have gone on.
+- **Escape (ERR 17) at line N** is shown the same way but in amber, as people press Escape on purpose.
+- **..., which has changed since the error**: the editor's line N is not what BASIC ran, so nothing is marked.
+- **Mistake (ERR 4) in a command typed at the prompt**: an error in a command typed at BASIC's prompt, shown only
+  until the next command, and never in place of the error the program stopped with. BASIC gives such an error line
+  0, as it does an error in a line numbered 0, so Debug tells them apart by whether a statement of the program had
+  started since the last command was typed; switched on after the error, it takes line 0 to be the prompt.
+- **At BASIC's prompt**: the program has ended, without an error, or not started; its variables stay as it left them.
 - **Not BASIC**: another language ROM has taken over.
+
+An error that an `ON ERROR` handler took is not shown (the program goes on, or its handler ends it). A program has
+stopped with an error when BASIC's own error handler, which is BASIC text in its ROM, is the last text it read; the
+number and message are those `ERR` and `REPORT` give, and the line is `ERL`. BASIC keeps no note of where in the line
+the error was: its error handler moves its text pointer to the `ON ERROR` text. So the statement is known only when
+Debug was on as the error was raised, and caught the pointer then; switched on later, Debug marks the whole line. An
+error inside an `EVAL` also marks the whole line.
 
 A resident integer is shown once the program has written to it, even if it wrote the value BASIC starts it with, so
 after `X%=1:X%=0` the panel shows `X%` as `0`. Running the program again starts afresh, with nothing written. Debug
@@ -69,9 +88,11 @@ Switch Debug on before running the program (the run button runs it again) to see
 
 ![The Debug panel on a Model B, with the running statement marked in the editor](docs/images/debugger-model-b.png)
 
+![A program stopped with an error that BASIC printed in black, after VDU 5: the panel shows it, and the statement is marked in red](docs/images/debugger-hidden-error.png)
+
 While Debug is off nothing is read from the machine and nothing is hooked, so it costs nothing. While it is on, the
-emulator notes writes to the resident integers through jsbeeb's write hook, which makes it do a little more work on each
-write the program makes. Debug is not remembered between visits.
+emulator notes writes to the resident integers, where BASIC was when the OS takes an error, and when a statement of
+the program starts, through jsbeeb's write hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 

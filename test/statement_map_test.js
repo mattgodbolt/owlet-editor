@@ -152,6 +152,12 @@ describe("statementAt", () => {
         expect([6, 7].map(offset => textAt(lines, 30, offset))).toEqual(["GOTO 100", "PRINT"]);
     });
 
+    it("finds every statement of the line where the byte is not known", () => {
+        const lines = ["  P.1 :P.2  ", "REM a:b"];
+        expect(textAt(lines, 10, null)).toBe("P.1 :P.2");
+        expect(textAt(lines, 20, null)).toBe("REM a:b");
+    });
+
     it("finds nothing for a line that is not the editor's", () => {
         const program = programStatements(["PRINT 1", "10 PRINT 2"], ModelBDialect);
         const print = 0xf1;
