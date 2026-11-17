@@ -48,9 +48,6 @@ const StricterThanRom = [
     ),
     "[OPT0:TSB &70,Y:]",
 ];
-// Lines BASIC IV rejects that the recogniser does not mark: false-valids are measured, not gated (see the README).
-const KnownGaps = ["EDIT=1"];
-
 // What BASIC II rejects and BASIC IV runs, each a row of both recorded tables.
 const OnlyOnBasicIV = [
     "VDU 23,255,255|",
@@ -170,7 +167,6 @@ describe("BASIC IV", () => {
         assert.deepStrictEqual(
             wrongRows(MasterVerdicts, {
                 stricter: StricterThanRom,
-                gaps: KnownGaps,
                 dialect: BasicIVDialect,
             }),
             [],
@@ -178,6 +174,22 @@ describe("BASIC IV", () => {
     });
     it("should give the error BASIC IV gives, or none where it does not know it", () => {
         assert.deepStrictEqual(wrongMessages(MasterVerdicts, [], BasicIVDialect), []);
+    });
+    it.each([["EDITED=FALSE"], ["EDIT 10"], ["A=1:ED."], ["IF A THEN EDIT"]])(
+        "should say Syntax error at %j, where a program starts a statement with EDIT",
+        text => {
+            setBasicIV(true);
+            expect(getSyntaxMarkers(text).map(m => m.message)).toEqual([
+                expect.stringContaining("(BASIC: Syntax error)"),
+            ]);
+        },
+    );
+    it("should not mark EDIT where BASIC IV does not stop at it", () => {
+        setBasicIV(true);
+        expect(getSyntaxMarkers("edited=FALSE")).toEqual([]);
+        expect(getSyntaxMarkers("REM EDIT 10")).toEqual([]);
+        setBasicIV(false);
+        expect(getSyntaxMarkers("EDITED=FALSE")).toEqual([]);
     });
     it("should word a bad hexadecimal number as BASIC IV does", () => {
         const [{message}] = getSyntaxMarkers("X=&G");
