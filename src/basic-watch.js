@@ -5,6 +5,7 @@ import {
     holds,
     LanguageRomNumber,
     lineHolding,
+    listStatements,
     readPointers,
     readResidentIntegers,
     readVariables,
@@ -26,6 +27,12 @@ const ExpressionPointerOffset = 0x1b;
 // the low byte first.
 const ErrorBlock = 0xfd;
 const ErrorBlockHigh = 0xfe;
+// The text BASIC runs on an error: an ON ERROR's, or after ON ERROR OFF and at the prompt, its own handler in its ROM.
+const ErrorHandler = 0x16;
+const HandledErrorsKept = 8;
+const PlacesKept = 64;
+// Only the extent of each statement listStatements finds is wanted, not its text.
+const NoKeywords = new Map();
 const RomStart = 0x8000;
 const RomEnd = 0xc000;
 const MostMessageBytes = 255;
@@ -54,18 +61,27 @@ export const writtenResidentIntegers = (residents, written) =>
 const word = (peek, address) => peek(address) | (peek(address + 1) << 8);
 const reading = (peek, base, offset) => (word(peek, base) + peek(offset) - 1) & 0xffff;
 
-/** The message of the error block at `block`, with its tokens spelt out as REPORT prints them. */
-function errorMessage(peek, block, keywords) {
-    let message = "";
+const inRom = address => address >= RomStart && address < RomEnd;
+
+function messageBytes(peek, block) {
+    const bytes = [];
     for (let at = block + 1; at <= block + MostMessageBytes; ++at) {
         const code = peek(at & 0xffff);
         if (code === 0) break;
-        if (code >= FirstToken)
-            message += code === MissingToken ? "Missing " : (keywords.get(code) ?? ".");
-        else message += code >= Space ? String.fromCharCode(code) : ".";
+        bytes.push(code);
     }
-    return message;
+    return bytes;
 }
+
+/** The message `bytes` of an error block, with their tokens spelt out as REPORT prints them. */
+const spelt = (bytes, keywords) =>
+    bytes
+        .map(code => {
+            if (code >= FirstToken)
+                return code === MissingToken ? "Missing " : (keywords.get(code) ?? ".");
+            return code >= Space ? String.fromCharCode(code) : ".";
+        })
+        .join("");
 
 /**
  * The error BASIC has come back to its prompt from: its own error handler, which reports an error that no ON ERROR
@@ -73,12 +89,11 @@ function errorMessage(peek, block, keywords) {
  * next command is typed. Its line is 0 for an error in a command typed at the prompt.
  */
 function reportedError(peek, keywords) {
-    const expression = word(peek, ExpressionPointerBase);
-    if (expression < RomStart || expression >= RomEnd) return null;
+    if (!inRom(word(peek, ExpressionPointerBase))) return null;
     const block = word(peek, ErrorBlock);
     return {
         number: peek(block),
-        message: errorMessage(peek, block, keywords),
+        message: spelt(messageBytes(peek, block), keywords),
         lineNumber: word(peek, ErrorLine),
     };
 }
@@ -121,6 +136,74 @@ function lineBytes(peek, line) {
     return bytes;
 }
 
+/** Which of the parts of `line` between colons holds the byte at `offset` into its text, or null for a null offset. */
+function part(peek, line, offset) {
+    if (offset === null) return null;
+    const at = line.start + LineHeaderBytes + offset;
+    return listStatements(peek, line, NoKeywords).findIndex(({to}) => at <= to);
+}
+
+/**
+ * The errors ON ERROR handlers have taken: the last few different ones, each kept once with the number of times it was
+ * raised, the latest last; and the number taken in all. Where each was raised is worked out once for each place, as
+ * BASIC's text pointers can be a byte apart for the same statement.
+ */
+class HandledErrors {
+    constructor() {
+        this.clear();
+    }
+
+    clear() {
+        this.kept = new Map();
+        this.places = new Map();
+        this.total = 0;
+    }
+
+    note(peek, {number, bytes, raised, handler}) {
+        const where = this.place(peek, raised, handler);
+        const key = `${number} ${bytes} ${where.key}`;
+        const known = this.kept.get(key) ?? {number, bytes, ...where, count: 0};
+        ++known.count;
+        ++this.total;
+        this.kept.delete(key);
+        this.kept.set(key, known);
+        if (this.kept.size > HandledErrorsKept) this.kept.delete(this.kept.keys().next().value);
+    }
+
+    /**
+     * Where an error was raised: its line, as the running one is, found from the text pointer as BASIC finds ERL (so a
+     * line numbered 0 is not taken for the prompt, where BASIC's own handler is always set); the line number of the ON
+     * ERROR that took it; each null where it is not in the program; and a key, the same for the same statement. The
+     * text pointer can be a byte further into a line reached by GOTO than one reached from the line before, so the
+     * key has the part of the line between colons rather than the offset.
+     */
+    place(peek, raised, handler) {
+        const at = `${raised.statement} ${raised.expression} ${handler}`;
+        const known = this.places.get(at);
+        if (known) return known;
+        const {page} = readPointers(peek);
+        const found = lineHolding(peek, page, raised.statement);
+        const line = found && {
+            number: found.number,
+            bytes: lineBytes(peek, found),
+            offset: errorOffset(peek, found, raised),
+        };
+        const handlerLine = lineHolding(peek, page, handler)?.number ?? null;
+        const where = {
+            line,
+            handler: handlerLine,
+            key: `${line?.number} ${line && part(peek, found, line.offset)} ${handlerLine}`,
+        };
+        if (this.places.size >= PlacesKept) this.places.clear();
+        this.places.set(at, where);
+        return where;
+    }
+
+    latestFirst() {
+        return [...this.kept.values()].reverse();
+    }
+}
+
 export class BasicWatch {
     constructor() {
         this.language = null;
@@ -130,6 +213,7 @@ export class BasicWatch {
         this.programLast = false;
         this.raised = null;
         this.stopped = null;
+        this.handled = new HandledErrors();
     }
 
     /**
@@ -139,7 +223,8 @@ export class BasicWatch {
      * written before this call are unknown, so those not at their start value stand in for them (see restart). It also
      * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text,
      * and whether a statement of the program had started since BASIC last pointed it at its input buffer, which tells an
-     * error in a line numbered 0 from one typed at the prompt.
+     * error in a line numbered 0 from one typed at the prompt; and keeps each error an ON ERROR handler takes, which is
+     * gone from BASIC's workspace once the handler runs.
      */
     track(cpu) {
         if (this.cpu === cpu) return;
@@ -150,7 +235,7 @@ export class BasicWatch {
             if (address >= ResidentFirstByte && address <= ResidentLastByte)
                 this.written |= residentBit(address);
             else if (address === ErrorBlockHigh)
-                this.raised = {...textPointers(peek), inProgram: this.programLast};
+                this.noteError(peek, peek(ErrorBlock) | (value << 8));
             else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
                 this.noteStatement(peek(TextPointerHigh));
             else if (address === TextPointerHigh && value === InputBufferPage)
@@ -168,16 +253,40 @@ export class BasicWatch {
         this.forgetErrors();
     }
 
-    /** A statement is starting in the page `high`. */
+    /**
+     * A statement is starting in the page `high`. The program running again after the prompt, as RUN, GOTO or a PROC
+     * typed there make it, is a new run.
+     */
     noteStatement(high) {
+        const wasProgram = this.programLast;
         this.programLast = inProgram(high);
-        if (this.programLast) this.stopped = null;
+        if (!this.programLast) return;
+        this.stopped = null;
+        if (!wasProgram) this.handled.clear();
+    }
+
+    /**
+     * The OS is handing BASIC the error whose block is at `block`. BASIC's own handler takes it when no ON ERROR is
+     * set, and takes every error numbered 0 (STOP) whatever is set; an ON ERROR handler takes the rest.
+     */
+    noteError(peek, block) {
+        this.raised = {...textPointers(peek), inProgram: this.programLast};
+        const number = peek(block);
+        const handler = word(peek, ErrorHandler);
+        if (number === 0 || inRom(handler)) return;
+        this.handled.note(peek, {
+            number,
+            bytes: messageBytes(peek, block),
+            raised: this.raised,
+            handler,
+        });
     }
 
     forgetErrors() {
         this.programLast = false;
         this.raised = null;
         this.stopped = null;
+        this.handled.clear();
     }
 
     /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
@@ -215,7 +324,8 @@ export class BasicWatch {
     /**
      * What BASIC is doing: {basic: false, title} when the language is not a BASIC; otherwise the line it is reading
      * ({number, bytes, offset}, the offset being into the line's bytes after its header) or null when it is not in the
-     * program (at the prompt), the error it is at the prompt after (see errorAtPrompt) or null, and its variables.
+     * program (at the prompt), the error it is at the prompt after (see errorAtPrompt) or null, the errors ON ERROR
+     * handlers have taken in this run (see handledErrors), and its variables.
      */
     read(cpu) {
         this.track(cpu);
@@ -233,6 +343,7 @@ export class BasicWatch {
                 offset: reading - line.start - LineHeaderBytes,
             },
             error: line ? null : this.errorAtPrompt(peek, page, keywords),
+            handled: this.handledErrors(keywords),
             residents: writtenResidentIntegers(readResidentIntegers(peek), this.written),
             ...readVariables(peek),
         };
@@ -257,5 +368,21 @@ export class BasicWatch {
             line: {number: lineNumber, bytes: found ? lineBytes(peek, found) : [], offset},
         };
         return this.stopped;
+    }
+
+    /**
+     * The errors ON ERROR handlers have taken since the program last started, as {total, errors}: the number taken,
+     * and the last few different ones, the latest first, each {number, message, line, handler, count}, the line and
+     * handler being as HandledErrors.place gives them and the count the times it was raised.
+     */
+    handledErrors(keywords) {
+        const errors = this.handled.latestFirst().map(({number, bytes, line, handler, count}) => ({
+            number,
+            message: spelt(bytes, keywords),
+            line,
+            handler,
+            count,
+        }));
+        return {total: this.handled.total, errors};
     }
 }
