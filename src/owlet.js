@@ -19,6 +19,7 @@ import {
     getSyntaxMarkers,
     getWarnings,
     LanguageId,
+    rebuildBracketPairs,
     registerBbcBasicLanguage,
     withoutCodes,
 } from "./bbcbasic";
@@ -29,6 +30,7 @@ import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
+import {fitMarkerWidgetToWrappedMessage} from "./marker-widget";
 import {makeUEF} from "./UEF";
 import {AcornDFSdisc} from "./DFS";
 import {createVduReference} from "./vdu-reference";
@@ -131,6 +133,7 @@ export class OwletEditor {
         ]);
 
         this.followLineNumbers = followImplicitLineNumbers(this.editor, this.dialect);
+        fitMarkerWidgetToWrappedMessage(this.editor);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
         this.editor.onDidChangeCursorPosition(({position}) => {
@@ -237,8 +240,14 @@ export class OwletEditor {
             );
             this.editor.pushUndoStop();
         } else {
-            this.editor.getModel().setValue(newText);
+            this.setProgram(newText);
         }
+    }
+
+    setProgram(text) {
+        const model = this.editor.getModel();
+        model.setValue(text);
+        rebuildBracketPairs(model);
     }
 
     addExample(example) {
@@ -277,7 +286,7 @@ export class OwletEditor {
                 return String.fromCharCode(c.charCodeAt(0) | 0x100);
             })
             .replace(/[\u201c\u201d]/g, '"'); // BBCMicrobot normalises smartquotes like this.
-        this.editor.getModel().setValue(basic);
+        this.setProgram(basic);
         this.selectView("screen");
 
         if (state.mode > 1) {

@@ -1,7 +1,7 @@
 // The recogniser's tokens as Monaco token types, the names the editor's theme colours.
-import {BracketCollisions} from "./lexer.js";
+import {BracketCollisions, byteView, lexLine} from "./lexer.js";
 import {ModelBDialect} from "./dialect.js";
-import {Recogniser} from "./recogniser.js";
+import {ColorSpelling, Recogniser} from "./recogniser.js";
 
 const Operators = new Set("+ - * / ^ = <> < > <= >= $ ? ; , ! '".split(" "));
 const PunctTypes = {
@@ -119,14 +119,24 @@ export function highlightLine(text, inAssembler = false, dialect = ModelBDialect
     return {tokens: joined, inAssembler: open};
 }
 
-// The recogniser's reading of each line of the program, an assembler block open at the end of one carrying into the next.
-export function readLines(text, dialect = ModelBDialect) {
+// The recogniser's reading of each line of a program, an assembler block open at the end of one carrying into the next.
+export function readEach(lines, dialect = ModelBDialect) {
     let inAssembler = false;
-    return text.split(/\r?\n/).map(lineText => {
+    return lines.map(lineText => {
         const recogniser = new Recogniser(lineText, inAssembler, false, dialect);
         inAssembler = recogniser.line();
         return recogniser;
     });
+}
+
+export const readLines = (text, dialect = ModelBDialect) => readEach(text.split(/\r?\n/), dialect);
+
+// Each line's tokens as the dialect's tokeniser makes them: the lexer's, with each COLOR that is COLOUR as such, which
+// is decided as the highlighter does, with the assembler block a line may be in.
+export function tokeniseLines(lines, dialect) {
+    if (!dialect.usColor || !lines.some(line => byteView(line).includes(ColorSpelling)))
+        return lines.map(line => lexLine(line, dialect));
+    return readEach(lines, dialect).map(({colors}, i) => lexLine(lines[i], dialect, colors));
 }
 
 // What each line's errors are, for editor markers: {line, start, end, message, unfinished, hole, stricter, code}. An unfinished line is

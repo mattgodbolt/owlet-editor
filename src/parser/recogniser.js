@@ -4,7 +4,7 @@
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {FirstStatementToken} from "../tokens.js";
 import {BasicIIDialect, ModelBDialect} from "./dialect.js";
-import {byteView, Lexer, lexLine} from "./lexer.js";
+import {Lexer} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
@@ -84,7 +84,7 @@ function completions(assembling, dialect) {
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
 
-const ColorSpelling = "COLOR";
+export const ColorSpelling = "COLOR";
 const ColourSpelling = "COLOUR";
 
 // `at` is the token that was next when BASIC stopped.
@@ -107,14 +107,6 @@ function readsStatement(text, dialect) {
         if (e instanceof Failure) return false;
         throw e;
     }
-}
-
-// The line's tokens as the dialect's tokeniser makes them, the lexer's with each COLOR that is COLOUR as such.
-export function tokenise(text, dialect) {
-    if (!dialect.usColor || !byteView(text).includes(ColorSpelling)) return lexLine(text, dialect);
-    const recogniser = new Recogniser(text, false, true, dialect);
-    recogniser.line();
-    return lexLine(text, dialect, recogniser.colors);
 }
 
 export class Recogniser {
@@ -372,7 +364,10 @@ export class Recogniser {
         const {keyword} = token.kw;
         // BASIC IV also starts a statement with EXT#, which sets the length of a file.
         const extStatement = this.basicIV && keyword === "EXT";
-        if (token.kw.token < FirstStatementToken && !extStatement) this.fail("Syntax error");
+        // EDIT is a command only to the prompt, so a program that reaches it stops there on BASIC IV, as on a line that
+        // starts with any other command.
+        if ((token.kw.token < FirstStatementToken && !extStatement) || keyword === "EDIT")
+            this.fail("Syntax error");
         this.next();
         // The lexer has made these the statement forms of the pseudo-variables.
         if (PseudoVariables.has(keyword) || extStatement) return this.pseudoVariable(keyword);

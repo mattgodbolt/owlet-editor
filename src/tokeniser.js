@@ -1,7 +1,7 @@
 import * as master from "jsbeeb/src/basic-tokenise";
 import {ModelBDialect} from "./parser/dialect";
 import {romBytes} from "./parser/lexer";
-import {tokenise} from "./parser/recogniser";
+import {tokeniseLines} from "./parser/highlight";
 
 const MaxTokenisedLength = 251;
 
@@ -9,11 +9,15 @@ const MaxTokenisedLength = 251;
 // lexer, which lexfuzz checks against the B's own ROM, and the highlighter's reading of COLOR.
 export function tokeniseBasicII(text) {
     let result = "";
-    text.split("\n").forEach((line, i) => {
+    const lines = text.split("\n").map(line => line.match(/^([0-9]+)?(.*)/));
+    const lineTokens = tokeniseLines(
+        lines.map(([, , rest]) => rest),
+        ModelBDialect,
+    );
+    lines.forEach(([line, number], i) => {
         if (!line) return;
-        const [, number, rest] = line.match(/^([0-9]+)?(.*)/);
         const lineNumber = number ? parseInt(number) : 10 + i * 10;
-        const tokens = String.fromCharCode(...romBytes(tokenise(rest, ModelBDialect)));
+        const tokens = String.fromCharCode(...romBytes(lineTokens[i]));
         if (tokens.length > MaxTokenisedLength)
             throw new Error(
                 `Line ${lineNumber} tokenised length ${tokens.length} > ${MaxTokenisedLength} bytes`,

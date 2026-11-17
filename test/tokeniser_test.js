@@ -2,13 +2,14 @@ import {describe, expect, it} from "vitest";
 import {tokeniseBasicII, tokeniserFor} from "../src/tokeniser";
 import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {romBytes} from "../src/parser/lexer";
-import {tokenise} from "../src/parser/recogniser";
+import {readLines, tokeniseLines} from "../src/parser/highlight";
 import {LenientThanRom, RomTokens} from "./rom-tables";
 
 const hex = text => [...text].map(c => c.charCodeAt(0).toString(16).padStart(2, "0")).join(" ");
 // The bytes of a one-line program after its header (CR, line number, length) and before its end (CR, &FF).
 const lineBytes = program => hex(program).split(" ").slice(4, -2).join(" ");
-const bytesOf = (text, dialect) => hex(String.fromCharCode(...romBytes(tokenise(text, dialect))));
+const bytesOf = (text, dialect) =>
+    hex(String.fromCharCode(...romBytes(tokeniseLines([text], dialect)[0])));
 
 describe("Tokeniser", () => {
     it("should choose the tokeniser of the machine's BASIC", () => {
@@ -114,5 +115,88 @@ describe("COLOR on a Model B", () => {
         expect(hex(tokeniseBasicII(program))).toBe(
             hex(tokeniseBasicII('10 COLOUR 1\n20 COLORS=7\n30 PRINT "OK"')),
         );
+    });
+});
+
+// The stored program's lines as the hex of their tokens, after each header (CR, line number, length) and the space
+// after the line number.
+function storedLines(program) {
+    const lines = [];
+    for (let at = 0; program.charCodeAt(at + 1) !== 0xff; at += program.charCodeAt(at + 3)) {
+        const length = program.charCodeAt(at + 3);
+        lines.push(hex(program.slice(at + 4, at + length)).replace(/^20 /, ""));
+    }
+    return lines;
+}
+const rom = text => RomTokens.find(([row]) => row === text)[1];
+const colour = "fb 20 31";
+
+// BASIC II's ROM tokenises each line on its own, so inside an assembler block COLOR is the characters that are there;
+// Owlet's own reading of COLOR as COLOUR is not taken where the highlighter has a block open, as it is not a statement.
+describe("COLOR in an assembler block on a Model B", () => {
+    it("should read COLOR as COLOUR outside a block", () => {
+        expect(storedLines(tokeniseBasicII("10 COLOR 1\n20 [OPT0:]\n30 COLOR 1"))).toEqual([
+            colour,
+            hex("[OPT0:]"),
+            colour,
+        ]);
+    });
+
+    it("should leave COLOR as the ROM tokenises it on a line in the middle of a block", () => {
+        expect(storedLines(tokeniseBasicII("10 [\n20 COLOR 1\n30 ]\n40 COLOR 1"))).toEqual([
+            hex("["),
+            rom("COLOR 1"),
+            rom("]"),
+            colour,
+        ]);
+    });
+
+    it("should read a block that is opened and closed on one line as closed for the next", () => {
+        expect(storedLines(tokeniseBasicII("10 [OPT0:LDA #1:]\n20 COLOR 1"))[1]).toBe(colour);
+        expect(storedLines(tokeniseBasicII("10 [OPT0:COLOR 1:]"))).toEqual([
+            rom("[OPT0:COLOR 1:]"),
+        ]);
+    });
+
+    it("should take COLOR after the ] that closes a block on the same line", () => {
+        expect(storedLines(tokeniseBasicII("10 [OPT0:]:COLOR 1"))[0]).toMatch(/3a fb 20 31$/);
+    });
+
+    it("should leave COLOR as it is in a block that is never closed", () => {
+        expect(storedLines(tokeniseBasicII("10 [\n20 COLOR 1\n30 COLOR 2")).slice(1)).toEqual([
+            rom("COLOR 1"),
+            hex("COLOR 2"),
+        ]);
+    });
+
+    it("should carry the block past blank lines and lines of its own", () => {
+        expect(storedLines(tokeniseBasicII("10 [\n\n20 .l COLOR 1\n30 COLOR 1\n40 ]"))[2]).toBe(
+            rom("COLOR 1"),
+        );
+    });
+
+    // What the highlighter decides for each line (a COLOR it reads as the keyword) and what the tokeniser writes (a
+    // COLOUR token) are the same, for programs that have no COLOUR of their own.
+    it.each([
+        "10 COLOR 1\n20 PRINT 1",
+        "10 [\n20 COLOR 1\n30 ]\n40 COLOR 2",
+        "10 [OPT0:LDA #1:]\n20 COLOR 1",
+        "10 [OPT0:]:COLOR 1",
+        "10 [COLOR 1\n20 COLOR 2:COLOR 3\n30 ]:COLOR 4",
+        "10 [\n20 COLOR 1\n30 COLOR 2",
+        "10 [\n\n20 COLOR 1\n30 ]\n\n40 COLOR 1",
+        '10 [\n20 \\ COLOR 1\n30 .COLOR\n40 EQUS "COLOR 1"\n50 ]\n60 COLOR 1',
+        "10 FOR O%=0 TO 3 STEP 3\n20 P%=&2000\n30 [OPT O%\n40 COLOR 1\n50 LDA #1\n60 ]\n70 NEXT\n80 COLOR 2",
+        "10 [:]\n20 [\n30 COLOR 1\n40 ]\n50 IFX THEN COLOR 1 ELSE COLOR 2",
+        '10 REM [\n20 COLOR 1\n30 PRINT "["\n40 COLOR 2',
+    ])("should decide each COLOR of %j as the highlighter does", program => {
+        const read = readLines(program, ModelBDialect).filter(({lexer}) => lexer.text);
+        const highlighted = read.map(
+            ({tokens}) => tokens.filter(t => t.kw?.keyword === "COLOR").length,
+        );
+        const written = storedLines(tokeniseBasicII(program)).map(
+            bytes => bytes.split(" ").filter(byte => byte === "fb").length,
+        );
+        expect(written).toEqual(highlighted);
     });
 });
