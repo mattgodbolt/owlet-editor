@@ -12,7 +12,6 @@
 //   that is marked.
 
 import {keywords, tokenChar} from "../tokens.js";
-import {ModelBDialect} from "./dialect.js";
 import {matchKeyword} from "./lexer.js";
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
@@ -84,8 +83,7 @@ const MnemonicLists = new Map([
     [BasicII, [...new Set(mnemonicsOf(BasicII))]],
     [BasicIV, [...new Set(mnemonicsOf(BasicIV))]],
 ]);
-export const mnemonicsFor = (dialect = ModelBDialect) =>
-    MnemonicLists.get(dialect.basicIV ? BasicIV : BasicII);
+export const mnemonicsFor = dialect => MnemonicLists.get(dialect.basicIV ? BasicIV : BasicII);
 const ThirdCharacter = 2;
 const LogicalTokenChars = new Set(
     keywords.filter(kw => ["AND", "EOR", "OR"].includes(kw.keyword)).map(tokenChar),

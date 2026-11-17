@@ -25,7 +25,7 @@ const disagreements = (rows, answer) =>
 describe("Lexer", () => {
     it("should tokenise each line as BASIC II does", () => {
         assert.deepStrictEqual(
-            disagreements(RomTokens, text => hex(romBytes(lexLine(text)))),
+            disagreements(RomTokens, text => hex(romBytes(lexLine(text, ModelBDialect)))),
             [],
         );
     });
@@ -204,7 +204,7 @@ const StricterThanRom = [
     "[OPT0:LDA (&70),Ya:]",
 ];
 
-const invalid = invalidSpans;
+const invalid = text => invalidSpans(text, BasicIIDialect);
 
 // Lines where BASIC's error is not the one the recogniser gives for that kind of mistake: H.TO8 is not read as HIMEM.
 const OtherWording = ["F.A=H.TO8^5:?A=42:N."];
@@ -220,13 +220,15 @@ describe("A raw token byte", () => {
         const chars = [byte, byte + 0x100, byte + 0x200, byte + 0x300].map(code =>
             String.fromCharCode(code),
         );
-        const bytes = chars.map(char => romBytes(lexLine(`10 X=${char}`)));
+        const bytes = chars.map(char => romBytes(lexLine(`10 X=${char}`, ModelBDialect)));
         assert.deepStrictEqual(
             bytes.map(line => line.at(-1)),
             chars.map(() => byte),
         );
         for (const char of chars) {
-            const token = lexLine(`10 ${char}`).find(token => token.kind === "keyword");
+            const token = lexLine(`10 ${char}`, ModelBDialect).find(
+                token => token.kind === "keyword",
+            );
             assert.strictEqual(token?.kw.keyword, keyword);
             assert.strictEqual(token.raw, true);
         }
@@ -239,12 +241,18 @@ describe("A raw token byte", () => {
         ["10 PRINT\u01201", "10 PRINT 1"],
         ["10 PRINT \u0131\u0132", "10 PRINT 12"],
     ])("%j is %j", (alias, plain) => {
-        assert.deepStrictEqual(romBytes(lexLine(alias)), romBytes(lexLine(plain)));
-        assert.deepStrictEqual(highlightLine(alias).tokens, highlightLine(plain).tokens);
+        assert.deepStrictEqual(
+            romBytes(lexLine(alias, ModelBDialect)),
+            romBytes(lexLine(plain, ModelBDialect)),
+        );
+        assert.deepStrictEqual(
+            highlightLine(alias, ModelBDialect).tokens,
+            highlightLine(plain, ModelBDialect).tokens,
+        );
     });
     it("leaves a control byte alone, since U+010A is data and not a line break", () => {
         assert.strictEqual(
-            lexLine('10 A$="\u010a"').find(token => token.kind === "string").closed,
+            lexLine('10 A$="\u010a"', ModelBDialect).find(token => token.kind === "string").closed,
             true,
         );
     });
@@ -253,16 +261,20 @@ describe("A raw token byte", () => {
 describe("Recogniser", () => {
     it("should mark an error in each line BASIC II stops at with one, and none where it runs", () => {
         assert.deepStrictEqual(
-            wrongRows(RomVerdicts, {stricter: StricterThanRom, gaps: KnownGaps}),
+            wrongRows(RomVerdicts, {
+                stricter: StricterThanRom,
+                gaps: KnownGaps,
+                dialect: BasicIIDialect,
+            }),
             [],
         );
     });
     it("should give the error BASIC II gives, or none where it does not know it", () => {
-        assert.deepStrictEqual(wrongMessages(RomVerdicts, OtherWording), []);
+        assert.deepStrictEqual(wrongMessages(RomVerdicts, OtherWording, BasicIIDialect), []);
     });
     it("should not let errors inside nested reads use up the nesting limit", () => {
         const text = `[${"LDA #(:".repeat(70)}LDA #1:]`;
-        const {tokens} = highlightLine(text);
+        const {tokens} = highlightLine(text, ModelBDialect);
         const marked = tokens.filter(token => token.type === "invalid");
         assert.strictEqual(marked.length, 70);
         assert.ok(marked.every(token => token.offset < text.lastIndexOf("LDA #1")));
@@ -271,7 +283,9 @@ describe("Recogniser", () => {
         for (const text of KnownGaps) {
             assert.notStrictEqual(verdicts.get(text), "ok", text);
             assert.ok(
-                highlightLine(text).tokens.every(token => !token.type.startsWith("invalid")),
+                highlightLine(text, ModelBDialect).tokens.every(
+                    token => !token.type.startsWith("invalid"),
+                ),
                 text,
             );
         }
@@ -346,16 +360,18 @@ describe("A statement BASIC stops at", () => {
         ["IF A THEN [LDA CLEAR 1 ELSE PRINT 2", ["CLEAR 1"]],
     ])("%s should be red on %j", (text, expected) => {
         assert.deepStrictEqual(redRuns(text), expected);
-        const {tokens} = highlightLine(text);
+        const {tokens} = highlightLine(text, ModelBDialect);
         assert.ok(tokens.every(token => !token.type.startsWith("invalid") || !token.bracket));
-        const marked = programProblems(text).filter(problem => !problem.unfinished);
+        const marked = programProblems(readLines(text, ModelBDialect)).filter(
+            problem => !problem.unfinished,
+        );
         assert.deepStrictEqual(
             marked.map(({start, end}) => text.slice(start, end)),
             expected,
         );
     });
     it("should leave the marker at the single [ of a block that is never closed", () => {
-        const problems = programProblems("[NOP\nLDA CLEAR 1 2");
+        const problems = programProblems(readLines("[NOP\nLDA CLEAR 1 2", ModelBDialect));
         assert.deepStrictEqual(
             problems.map(({line, start, end, unclosed}) => [line, start, end, unclosed]),
             [[1, 0, 1, true]],
@@ -414,7 +430,7 @@ describe("A line typed in an editor that closes brackets", () => {
         );
     });
     it("should be unfinished at the ) with the last argument missing, and red with one too many", () => {
-        const [problem] = programProblems("A$=LEFT$(B$)");
+        const [problem] = programProblems(readLines("A$=LEFT$(B$)", ModelBDialect));
         assert.deepStrictEqual(invalid("A$=LEFT$(B$)"), []);
         assert.strictEqual(problem.unfinished, true);
         assert.strictEqual("A$=LEFT$(B$)".slice(problem.start, problem.end), ")");
@@ -426,7 +442,7 @@ describe("A line typed in an editor that closes brackets", () => {
 // expression and then the end of the statement, and could not be a variable; BASIC II's ROM says Mistake to it.
 describe("COLOR on the editor's Model B", () => {
     const redB = text => invalidSpans(text, ModelBDialect).map(([a, b]) => text.slice(a, b));
-    const kinds = (text, dialect = ModelBDialect) =>
+    const kinds = (text, dialect) =>
         readLines(text, dialect)[0]
             .tokens.filter(t => t.kind !== "white")
             .map(t => `${t.kind} ${t.text}`);
@@ -462,9 +478,11 @@ describe("COLOR on the editor's Model B", () => {
         "10 COLOR 1",
     ])("%s should be COLOUR where it starts a statement, and not red", text => {
         assert.deepStrictEqual(redB(text), []);
-        assert.ok(readLines(text)[0].colors.length > 0, text);
+        assert.ok(readLines(text, ModelBDialect)[0].colors.length > 0, text);
         assert.ok(
-            readLines(text)[0].tokens.some(t => t.kind === "keyword" && t.text === "COLOR"),
+            readLines(text, ModelBDialect)[0].tokens.some(
+                t => t.kind === "keyword" && t.text === "COLOR",
+            ),
             text,
         );
     });
@@ -496,7 +514,7 @@ describe("COLOR on the editor's Model B", () => {
         ["COLOR 7 7", ["name COLOR", "number 7", "number 7"]],
         ["EDITED=FALSE", ["name EDITED", "punct =", "keyword FALSE"]],
     ])("%s should keep COLOR as characters", (text, expected) => {
-        assert.deepStrictEqual(kinds(text), expected);
+        assert.deepStrictEqual(kinds(text, ModelBDialect), expected);
     });
     it("should be red where BASIC II is, when COLOR is not COLOUR", () => {
         assert.deepStrictEqual(redB("COLOR 1,2"), ["1,2"]);
@@ -505,10 +523,10 @@ describe("COLOR on the editor's Model B", () => {
         assert.deepStrictEqual(redB("X=COLOR 1"), ["1"]);
     });
     it("should stay a variable, not red, while it is typed", () => {
-        const [problem] = programProblems("COLOR", readLines("COLOR", ModelBDialect));
+        const [problem] = programProblems(readLines("COLOR", ModelBDialect));
         assert.deepStrictEqual(redB("COLOR"), []);
         assert.strictEqual(problem.unfinished, true);
-        assert.deepStrictEqual(kinds("COLOR"), ["name COLOR"]);
+        assert.deepStrictEqual(kinds("COLOR", ModelBDialect), ["name COLOR"]);
     });
     it.each([
         "COLOR 7",
@@ -529,7 +547,7 @@ describe("COLOR on the editor's Model B", () => {
     it.each(["COL.7", "COLO.7", "COLOUR 7", "GCOL 0,1", "COLOURS=7"])(
         "should read %s as BASIC II does",
         text => {
-            assert.deepStrictEqual(kinds(text), kinds(text, BasicIIDialect));
+            assert.deepStrictEqual(kinds(text, ModelBDialect), kinds(text, BasicIIDialect));
         },
     );
 });
@@ -638,7 +656,7 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
         (text, prefix, message) => {
             assert.deepStrictEqual(red(text), [prefix]);
             assert.deepStrictEqual(
-                programProblems(text)
+                programProblems(readLines(text, ModelBDialect))
                     .filter(problem => problem.stricter)
                     .map(({start, end, message}) => [text.slice(start, end), message]),
                 [[prefix, message]],
@@ -656,7 +674,7 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
         ["[OPT0:B2K:]", [[7, 8, "2", "R"]]],
     ])("%s should be red on the character, with what BASIC reads it as", (text, expected) => {
         assert.deepStrictEqual(
-            programProblems(text)
+            programProblems(readLines(text, ModelBDialect))
                 .filter(problem => problem.stricter)
                 .map(({start, end, message}) => [start, end, message]),
             expected.map(([start, end, char, letter]) => [start, end, AliasMessage(char, letter)]),
@@ -675,7 +693,8 @@ describe("A character in a mnemonic that BASIC reads as a letter", () => {
     ])("%s should be red on what BASIC drops before the token", (text, dropped) => {
         assert.deepStrictEqual(red(text), [dropped]);
         assert.match(
-            programProblems(text).find(problem => problem.stricter).message,
+            programProblems(readLines(text, ModelBDialect)).find(problem => problem.stricter)
+                .message,
             /^BASIC drops the \w+ before the token/,
         );
     });
@@ -709,7 +728,9 @@ describe("An instruction typed one key at a time", () => {
             for (let n = 1; n <= text.length; ++n) {
                 const typed = text.slice(0, n);
                 assert.deepStrictEqual(
-                    programProblems(typed).filter(problem => problem.stricter),
+                    programProblems(readLines(typed, ModelBDialect)).filter(
+                        problem => problem.stricter,
+                    ),
                     [],
                     typed,
                 );
@@ -723,7 +744,10 @@ describe("An instruction typed one key at a time", () => {
             for (const text of texts) {
                 assert.deepStrictEqual(red(text), [], text);
                 assert.deepStrictEqual(
-                    programProblems(text).map(problem => [problem.unfinished, problem.stricter]),
+                    programProblems(readLines(text, ModelBDialect)).map(problem => [
+                        problem.unfinished,
+                        problem.stricter,
+                    ]),
                     [[true, false]],
                     text,
                 );
@@ -738,7 +762,8 @@ describe("An instruction typed one key at a time", () => {
 // BASIC ignores what follows a complete instruction up to the next colon, so the first thing there that is not a
 // comment is red, and only that: the rest of the statement is ignored with it.
 describe("Junk after a complete instruction", () => {
-    const stricter = text => programProblems(text).filter(problem => problem.stricter);
+    const stricter = text =>
+        programProblems(readLines(text, ModelBDialect)).filter(problem => problem.stricter);
     it.each([
         ["[OPT0:LDA #1 hello:]", "hello"],
         ["[OPT0:NOP 5 6:]", "5"],
@@ -805,7 +830,9 @@ describe("Junk after a complete instruction", () => {
         },
     );
     it("should leave the block open after a ] that is ignored, so the next line is assembled", () => {
-        const [first, second] = programProblems("[LDA #1]\ntax=1\n]").filter(p => p.stricter);
+        const [first, second] = programProblems(
+            readLines("[LDA #1]\ntax=1\n]", ModelBDialect),
+        ).filter(p => p.stricter);
         assert.deepStrictEqual([first.line, first.start], [1, 7]);
         assert.deepStrictEqual([second.line, second.start], [2, 3]);
     });

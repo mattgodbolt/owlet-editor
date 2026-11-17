@@ -2,7 +2,6 @@ import {editor, KeyCode, KeyMod, languages} from "monaco-editor/editor/editor.ap
 import "monaco-editor/editor/contrib/rename/browser/rename";
 import "monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter";
 import {LanguageId} from "./bbcbasic";
-import {ModelBDialect} from "./parser/dialect";
 import {readLines} from "./parser/highlight";
 
 const MessageControllerId = "editor.contrib.messageController";
@@ -16,7 +15,7 @@ function symbol(kind, name, lineNumber, offset) {
 
 // Every name in the program that BASIC looks up as a variable, array, FN or PROC. A variable, an array, a FN and a
 // PROC with the same name are different things, as are A, A% and A$; an assembler label is a variable.
-export function programSymbols(text, dialect = ModelBDialect) {
+export function programSymbols(text, dialect) {
     return readLines(text, dialect).flatMap((recogniser, lineIndex) => {
         const lineNumber = lineIndex + 1;
         const {text: line} = recogniser.lexer;
@@ -76,7 +75,7 @@ function range(s) {
 
 // The occurrences of the variable, array, FN or PROC at the position, the one at the position first; null if there
 // is none there.
-export function occurrencesAt(model, position, dialect = ModelBDialect) {
+export function occurrencesAt(model, position, dialect) {
     const symbols = modelSymbols(model, dialect);
     const target = symbolAt(symbols, position);
     if (!target) return null;
@@ -160,7 +159,6 @@ export const renameProviderFor = dialect => ({
         };
     },
 });
-export const renameProvider = renameProviderFor(ModelBDialect);
 
 const selectOccurrences = dialect => codeEditor => {
     const ranges = occurrencesAt(codeEditor.getModel(), codeEditor.getPosition(), dialect);
@@ -178,7 +176,7 @@ const selectOccurrences = dialect => codeEditor => {
 let registrations = [];
 
 /** Has the editor find a name's occurrences by the dialect, in place of the one it was finding them by. */
-export function registerOccurrences(dialect = ModelBDialect) {
+export function registerOccurrences(dialect) {
     for (const registration of registrations) registration.dispose();
     registrations = [
         languages.registerDocumentHighlightProvider(LanguageId, highlightProviderFor(dialect)),

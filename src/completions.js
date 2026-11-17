@@ -1,7 +1,6 @@
 import {languages} from "monaco-editor/editor/editor.api";
 import "monaco-editor/editor/contrib/suggest/browser/suggestController";
 import {FirstStatementToken, Flags} from "./tokens";
-import {ModelBDialect} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
 import {Kind, programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
@@ -123,7 +122,7 @@ function splitBareExponent(tokens, length) {
 
 // What can be typed at the end of the text: {startColumn, labels} for keywords, {startColumn, nameKind} after FN or
 // PROC, or null for nothing (in a string, REM, DATA, * command or number, or after DEF PROC or DEF FN).
-export function completionContext(text, dialect = ModelBDialect) {
+export function completionContext(text, dialect) {
     const recogniser = readLines(text, dialect).at(-1);
     const line = recogniser.lexer.text;
     const tokens = splitBareExponent(
@@ -166,7 +165,7 @@ function programNames(model, kind, position, startColumn, dialect) {
     return [...new Set(names)];
 }
 
-export function completionItems(model, position, dialect = ModelBDialect) {
+export function completionItems(model, position, dialect) {
     const context = completionContext(
         model.getValueInRange({
             startLineNumber: 1,
@@ -195,7 +194,7 @@ export function completionItems(model, position, dialect = ModelBDialect) {
 let registration = null;
 
 /** Has the editor complete by the dialect, in place of the one it was completing by. */
-export function registerCompletions(dialect = ModelBDialect) {
+export function registerCompletions(dialect) {
     registration?.dispose();
     registration = languages.registerCompletionItemProvider(LanguageId, {
         // Incomplete, so that Monaco asks again when a word ends and another starts without a space, as in PROCd.

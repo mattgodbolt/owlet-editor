@@ -7,7 +7,6 @@ import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
 import {ForeignOperators} from "./parser/recogniser";
-import {ModelBDialect} from "./parser/dialect";
 import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
@@ -47,7 +46,7 @@ const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
 let registrations = [];
 
 /** Has the editor read its BBC BASIC by the dialect, in place of the one it was reading by. */
-export function registerBbcBasicLanguage(dialect = ModelBDialect) {
+export function registerBbcBasicLanguage(dialect) {
     if (registrations.length === 0) languages.register({id: LanguageId});
     for (const registration of registrations) registration.dispose();
 
@@ -97,7 +96,7 @@ export const codeActionProviderFor = dialect => ({
         const codeOf = marker => {
             if (marker.code) return marker.code;
             const text = model.getValue();
-            known = known || [...getWarnings(text, dialect), ...getSyntaxMarkers(text, 0, dialect)];
+            known = known || [...getWarnings(text, dialect), ...getSyntaxMarkers(text, dialect)];
             return known.find(
                 found =>
                     found.message === marker.message &&
@@ -149,7 +148,6 @@ export const codeActionProviderFor = dialect => ({
         return {actions, dispose: () => {}};
     },
 });
-export const codeActionProvider = codeActionProviderFor(ModelBDialect);
 
 function quickFix(model, marker, title, range, text) {
     return {
@@ -185,7 +183,7 @@ const marker = (severity, line, start, end, details) => ({
 });
 
 // The warnings for each line of the program.
-export function getWarnings(text, dialect = ModelBDialect) {
+export function getWarnings(text, dialect) {
     return readLines(text, dialect).flatMap(({lexer, tokens}, i) =>
         lineWarnings(lexer.text, tokens, dialect).map(({start, end, ...details}) =>
             marker(MarkerSeverity.Warning, i + 1, start, end, details),
@@ -195,12 +193,12 @@ export function getWarnings(text, dialect = ModelBDialect) {
 
 // The markers for the lines BASIC would stop at, and for those that end too soon or have something missing. A line is unfinished while the cursor is on it (`cursorLine`) and so is not marked then,
 // and a warning that covers the same text says enough.
-export function getSyntaxMarkers(text, cursorLine = 0, dialect = ModelBDialect) {
+export function getSyntaxMarkers(text, dialect, cursorLine = 0) {
     const recognisers = readLines(text, dialect);
     const warnings = recognisers.map(({lexer, tokens}) =>
         lineWarnings(lexer.text, tokens, dialect),
     );
-    return programProblems(text, recognisers).flatMap(problem => {
+    return programProblems(recognisers).flatMap(problem => {
         const {line, start, end, unfinished, code} = problem;
         const covered = warnings[line - 1].some(
             warning => warning.start < end && start < warning.end,

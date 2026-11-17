@@ -1,5 +1,4 @@
 import {Selection} from "monaco-editor/editor/editor.api";
-import {ModelBDialect} from "./parser/dialect";
 import {readLines} from "./parser/highlight";
 
 export const ImplicitLineNumberStep = 10;
@@ -9,7 +8,7 @@ const ExplicitLineNumberRegex = /^\s*\d/;
 // startColumn, endColumn, target, own, keyword}, where lineNumber is the editor's line, target is the number, own says
 // it starts its line and so is that line's own number, and keyword is the BASIC keyword a reference follows (GOTO,
 // THEN...), undefined for an own number.
-export function lineNumberTokens(text, dialect = ModelBDialect) {
+export function lineNumberTokens(text, dialect) {
     return readLines(text, dialect).flatMap(({tokens, problems}, index) => {
         const stoppedAt = problems.filter(problem => !problem.unfinished).map(({token}) => token);
         return tokens.flatMap((token, tokenIndex) => {
@@ -33,7 +32,7 @@ export function lineNumberTokens(text, dialect = ModelBDialect) {
 
 // The line numbers the program refers to, as the tokeniser reads them: {lineNumber, startColumn, endColumn, target,
 // keyword}, where lineNumber is the editor's line and target is the BASIC line number referred to.
-export function lineNumberReferences(text, dialect = ModelBDialect) {
+export function lineNumberReferences(text, dialect) {
     return lineNumberTokens(text, dialect)
         .filter(token => !token.own)
         .map(({lineNumber, startColumn, endColumn, target, keyword}) => ({
@@ -74,7 +73,7 @@ function renumberEdits(references, oldToNew, movesTraceLimits = false) {
 }
 
 // The program with each line number it refers to that is in the oldToNew map replaced by the new number.
-export function renumberReferences(text, oldToNew, dialect = ModelBDialect) {
+export function renumberReferences(text, oldToNew, dialect) {
     const lines = text.split("\n");
     const edits = renumberEdits(lineNumberReferences(text, dialect), oldToNew);
     for (const {range, text: newNumber} of edits.reverse()) {
@@ -124,7 +123,7 @@ const isImplicit = lines => !lines.some(line => ExplicitLineNumberRegex.test(lin
 // lines and the program has no line numbers, so that its lines are numbered 10, 20, 30... by position. A line is the
 // same line while what starts it does, and a reference to a line that no longer is one is left as it is (except for
 // TRACE, see traceLimit). References in the text the changes insert are left as they are.
-export function implicitRenumberEdits(oldText, newText, changes, dialect = ModelBDialect) {
+export function implicitRenumberEdits(oldText, newText, changes, dialect) {
     if (!changes.some(changesLines)) return [];
     const oldLines = oldText.split("\n");
     const newLines = newText.split("\n");
@@ -170,7 +169,7 @@ export function implicitRenumberEdits(oldText, newText, changes, dialect = Model
 
 // Rewrites the references as lines are added and removed in the editor's program (see implicitRenumberEdits). The
 // rewrite joins the edit's own undo step, so undo and redo need nothing from here.
-export function followImplicitLineNumbers(codeEditor, dialect = ModelBDialect) {
+export function followImplicitLineNumbers(codeEditor, dialect) {
     const model = codeEditor.getModel();
     let previous = model.getValue();
     return model.onDidChangeContent(event => {

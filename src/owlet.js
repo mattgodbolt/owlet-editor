@@ -25,7 +25,8 @@ import {
 } from "./bbcbasic";
 import {registerCompletions} from "./completions";
 import {registerOccurrences} from "./occurrences";
-import {dialectFor, ModelBDialect} from "./parser/dialect";
+import * as models from "jsbeeb/src/models";
+import {dialectFor} from "./parser/dialect";
 import {problemCount} from "./problem-count";
 import {getLineNumberMarkers} from "./line-numbers";
 import {DefaultMachine, Machines, machineOf, modelQuery, withMachine} from "./machines";
@@ -63,8 +64,8 @@ export class OwletEditor {
         this.onChangeHandler = onChangeHandler;
         this.onMachineChangeHandler = onMachineChangeHandler;
 
-        // The emulator starts on the default machine, a Model B; setMachine changes the dialect if it is not.
-        this.dialect = ModelBDialect;
+        // The emulator starts on the default machine; setMachine changes the dialect when another is chosen.
+        this.dialect = dialectFor(models.findModel(DefaultMachine));
         this.registerLanguage();
 
         monacoEditor.defineTheme("bbcbasicTheme", {
@@ -209,8 +210,8 @@ export class OwletEditor {
         const model = this.editor.getModel();
         this.syntaxCursorLine = this.editor.getPosition().lineNumber;
         const text = model.getValue();
-        const syntax = getSyntaxMarkers(text, this.syntaxCursorLine, this.dialect);
-        const lineNumbers = getLineNumberMarkers(text, this.syntaxCursorLine, this.dialect);
+        const syntax = getSyntaxMarkers(text, this.dialect, this.syntaxCursorLine);
+        const lineNumbers = getLineNumberMarkers(text, this.dialect, this.syntaxCursorLine);
         monacoEditor.setModelMarkers(model, "syntax", withoutCodes(syntax));
         monacoEditor.setModelMarkers(model, "lineNumbers", lineNumbers);
         const warnings = getWarnings(text, this.dialect);
@@ -480,7 +481,7 @@ export class OwletEditor {
                 return false;
             }
         };
-        this.updateEditorText(expandCode(this.getBasicText(), fits, this.dialect), "expand code");
+        this.updateEditorText(expandCode(this.getBasicText(), this.dialect, fits), "expand code");
     }
 
     tokenise() {

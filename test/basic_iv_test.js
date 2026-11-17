@@ -18,7 +18,7 @@ import {
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 // Whether the recogniser says BASIC stops at the line, or would if the line ended there.
 const stops = (text, dialect) =>
-    programProblems(text, readLines(text, dialect)).some(problem => !problem.stricter);
+    programProblems(readLines(text, dialect)).some(problem => !problem.stricter);
 
 // Lines BASIC IV runs that are marked on purpose (see the README): what follows a complete instruction is ignored.
 const StricterThanRom = [
@@ -175,20 +175,20 @@ describe("BASIC IV", () => {
     it.each([["EDITED=FALSE"], ["EDIT 10"], ["A=1:ED."], ["IF A THEN EDIT"]])(
         "should say Syntax error at %j, where a program starts a statement with EDIT",
         text => {
-            expect(getSyntaxMarkers(text, 0, BasicIVDialect).map(m => m.message)).toEqual([
+            expect(getSyntaxMarkers(text, BasicIVDialect).map(m => m.message)).toEqual([
                 expect.stringContaining("(BASIC: Syntax error)"),
             ]);
         },
     );
     it("should not mark EDIT where BASIC IV does not stop at it", () => {
-        expect(getSyntaxMarkers("edited=FALSE", 0, BasicIVDialect)).toEqual([]);
-        expect(getSyntaxMarkers("REM EDIT 10", 0, BasicIVDialect)).toEqual([]);
-        expect(getSyntaxMarkers("EDITED=FALSE", 0, ModelBDialect)).toEqual([]);
+        expect(getSyntaxMarkers("edited=FALSE", BasicIVDialect)).toEqual([]);
+        expect(getSyntaxMarkers("REM EDIT 10", BasicIVDialect)).toEqual([]);
+        expect(getSyntaxMarkers("EDITED=FALSE", ModelBDialect)).toEqual([]);
     });
     it("should word a bad hexadecimal number as BASIC IV does", () => {
-        const [{message}] = getSyntaxMarkers("X=&G", 0, BasicIVDialect);
+        const [{message}] = getSyntaxMarkers("X=&G", BasicIVDialect);
         expect(message).toMatch(/^Expected a hex digit .*\(BASIC: Bad Hex\)$/);
-        expect(getSyntaxMarkers("X=&G", 0, ModelBDialect)[0].message).toContain("Bad HEX");
+        expect(getSyntaxMarkers("X=&G", ModelBDialect)[0].message).toContain("Bad HEX");
     });
     it.each([
         ["ON 1 PRINT", false, "Expected GOTO or GOSUB after PRINT (BASIC: ON syntax)"],
@@ -197,7 +197,7 @@ describe("BASIC IV", () => {
         ["ON 1 PROCp", true, null],
     ])("should name only what ON accepts: %j on BASIC IV %j", (text, basicIV, expected) => {
         const dialect = basicIV ? BasicIVDialect : ModelBDialect;
-        expect(getSyntaxMarkers(text, 0, dialect)[0]?.message ?? null).toBe(expected);
+        expect(getSyntaxMarkers(text, dialect)[0]?.message ?? null).toBe(expected);
     });
 });
 
@@ -213,7 +213,7 @@ describe("Each BASIC's own recorded rows", () => {
         text => {
             expect(verdicts.get(text)).toBe("Index");
             expect(masterVerdicts.get(text)).toBe("ok");
-            expect(stops(text)).toBe(true);
+            expect(stops(text, ModelBDialect)).toBe(true);
             expect(stops(text, BasicIVDialect)).toBe(false);
         },
     );
@@ -231,31 +231,30 @@ describe("Each BASIC's own recorded rows", () => {
         expect(verdicts.get(text)).toBe(basicII);
         expect(masterVerdicts.get(text)).toBe(basicIV);
         const message = dialect =>
-            programProblems(text, readLines(text, dialect)).find(problem => !problem.stricter)
-                ?.message;
-        expect(stops(text)).toBe(basicII !== "ok");
-        if (basicII !== "ok") expect(message()).toBe(basicII);
+            programProblems(readLines(text, dialect)).find(problem => !problem.stricter)?.message;
+        expect(stops(text, ModelBDialect)).toBe(basicII !== "ok");
+        if (basicII !== "ok") expect(message(ModelBDialect)).toBe(basicII);
         expect(stops(text, BasicIVDialect)).toBe(basicIV !== "ok");
         if (basicIV !== "ok") expect(message(BasicIVDialect)).toBe(basicIV);
     });
     it.each(OnBothBasics)("%j runs on both", text => {
         expect(masterVerdicts.get(text)).toBe("ok");
-        expect(stops(text)).toBe(false);
+        expect(stops(text, ModelBDialect)).toBe(false);
         expect(stops(text, BasicIVDialect)).toBe(false);
     });
     it.each(OnNeitherBasic)("%j stops both", text => {
         expect(verdicts.get(text) ?? masterVerdicts.get(text)).not.toBe("ok");
         expect(masterVerdicts.get(text)).not.toBe("ok");
         const marked = (text, dialect) =>
-            stops(text, dialect) || getSyntaxMarkers(text, 0, dialect).length > 0;
-        expect(marked(text)).toBe(true);
+            stops(text, dialect) || getSyntaxMarkers(text, dialect).length > 0;
+        expect(marked(text, ModelBDialect)).toBe(true);
         expect(marked(text, BasicIVDialect)).toBe(true);
     });
 });
 
 describe("The editor on the Master", () => {
-    beforeEach(() => registerBbcBasicLanguage());
-    afterEach(() => registerBbcBasicLanguage());
+    beforeEach(() => registerBbcBasicLanguage(ModelBDialect));
+    afterEach(() => registerBbcBasicLanguage(ModelBDialect));
 
     // The colour of the character at the offset in the editor's own reading of the line.
     const colourAt = (text, offset) => {
@@ -276,7 +275,7 @@ describe("The editor on the Master", () => {
         registerBbcBasicLanguage(BasicIVDialect);
         expect(redAt("V.23,255,255|", 12)).toBe(false);
         expect(redAt("[BRA P%", 1)).toBe(false);
-        registerBbcBasicLanguage();
+        registerBbcBasicLanguage(ModelBDialect);
         expect(redAt("V.23,255,255|", 12)).toBe(true);
     });
     it("should read COLOR as the keyword on the Master wherever it is, and on a Model B only where it is COLOUR", () => {
@@ -290,7 +289,7 @@ describe("The editor on the Master", () => {
     it("should mark the lines BASIC IV stops at, not those BASIC II does", () => {
         const text = "V.7|\nVDU|";
         const lines = dialect =>
-            getSyntaxMarkers(text, 0, dialect).map(marker => marker.startLineNumber);
+            getSyntaxMarkers(text, dialect).map(marker => marker.startLineNumber);
         expect(lines(ModelBDialect)).toEqual([1, 2]);
         expect(lines(BasicIVDialect)).toEqual([2]);
     });

@@ -1,6 +1,6 @@
 import {debbreviate, expandCode} from "../src/expand-code";
 import {Flags, detokenise, forEachBasicLine, keywords, partialDetokenise} from "../src/tokens";
-import {BasicIVDialect} from "../src/parser/dialect";
+import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {RomTokens} from "./rom-tables";
 import {describe, expect, it} from "vitest";
 import assert from "assert";
@@ -201,36 +201,43 @@ describe("Expanding a token byte straight after DATA or REM", () => {
             ["\xf4", "REM"],
         ];
         for (const [keyword, expanded = keyword] of cases)
-            assert.strictEqual(expandCode(`${keyword}\xf1A`), `${expanded}\xf1A`, keyword);
+            assert.strictEqual(
+                expandCode(`${keyword}\xf1A`, ModelBDialect),
+                `${expanded}\xf1A`,
+                keyword,
+            );
     });
 });
 
 describe("Debbreviation", () => {
     it("should work with the empty string", () => {
-        assert.strictEqual(debbreviate(""), "");
+        assert.strictEqual(debbreviate("", ModelBDialect), "");
     });
     it("should leave non-token things alone", () => {
-        assert.strictEqual(debbreviate("I am a mongoose."), "I am a mongoose.");
+        assert.strictEqual(debbreviate("I am a mongoose.", ModelBDialect), "I am a mongoose.");
     });
     it("should handle simple cases", () => {
-        assert.strictEqual(debbreviate("P."), "PRINT");
+        assert.strictEqual(debbreviate("P.", ModelBDialect), "PRINT");
     });
     it("should expand abbreviation after full token", () => {
-        assert.strictEqual(debbreviate("IFCOU."), "IFCOUNT");
+        assert.strictEqual(debbreviate("IFCOU.", ModelBDialect), "IFCOUNT");
     });
     it("should not expand abbreviation after conditional token", () => {
-        assert.strictEqual(debbreviate("PIP=1:P.PIP."), "PIP=1:PRINTPIP.");
+        assert.strictEqual(debbreviate("PIP=1:P.PIP.", ModelBDialect), "PIP=1:PRINTPIP.");
     });
     it("should not expand abbreviation in *-command", () => {
-        assert.strictEqual(debbreviate("*H."), "*H.");
-        assert.strictEqual(debbreviate("10*H."), "10*H.");
-        assert.strictEqual(debbreviate("IF1*H.:*H."), "IF1*HIMEM:*H.");
+        assert.strictEqual(debbreviate("*H.", ModelBDialect), "*H.");
+        assert.strictEqual(debbreviate("10*H.", ModelBDialect), "10*H.");
+        assert.strictEqual(debbreviate("IF1*H.:*H.", ModelBDialect), "IF1*HIMEM:*H.");
         assert.strictEqual(
-            debbreviate("ONERR.*K.0PA.=4608|MO.|MRU.|M"),
+            debbreviate("ONERR.*K.0PA.=4608|MO.|MRU.|M", ModelBDialect),
             "ONERROR*K.0PA.=4608|MO.|MRU.|M",
         );
-        assert.strictEqual(debbreviate("IFCOU.TH.*LO. P.DATA"), "IFCOU.THEN*LO. P.DATA");
-        assert.strictEqual(debbreviate("P.\n*H.\nP."), "PRINT\n*H.\nPRINT");
+        assert.strictEqual(
+            debbreviate("IFCOU.TH.*LO. P.DATA", ModelBDialect),
+            "IFCOU.THEN*LO. P.DATA",
+        );
+        assert.strictEqual(debbreviate("P.\n*H.\nP.", ModelBDialect), "PRINT\n*H.\nPRINT");
     });
 });
 
@@ -250,7 +257,7 @@ describe("Debbreviation and the ROM", () => {
             ["A=MID$.A$,1)", "A=MID$(A$,1)"],
         ];
         for (const [text, expanded] of cases) {
-            assert.strictEqual(debbreviate(text), expanded, text);
+            assert.strictEqual(debbreviate(text, ModelBDialect), expanded, text);
             for (const row of [text, expanded])
                 assert.ok(romTokens.has(row), `${row} is not a row`);
             assert.strictEqual(romTokens.get(expanded), romTokens.get(text), text);
@@ -319,34 +326,37 @@ describe("Expanding code", () => {
     // PRINT and TIME as token characters, then A%: expanding gives "PRINTTIME A%", with the space that TIME needs.
     const tokens = "\xf1\u0191A%";
     it("expands every line when it all fits", () => {
-        assert.strictEqual(expandCode(`${tokens}\n\xf1A`), "PRINTTIME A%\nPRINTA");
+        assert.strictEqual(expandCode(`${tokens}\n\xf1A`, ModelBDialect), "PRINTTIME A%\nPRINTA");
     });
     it("leaves a line as it was when its expansion would not tokenise", () => {
         const fits = line => line.length <= 8;
-        assert.strictEqual(expandCode(`${tokens}\n\xf1A`, fits), `${tokens}\nPRINTA`);
+        assert.strictEqual(
+            expandCode(`${tokens}\n\xf1A`, ModelBDialect, fits),
+            `${tokens}\nPRINTA`,
+        );
     });
     it("leaves lines that are not tokens alone", () => {
         assert.strictEqual(
-            expandCode("P.A", () => false),
+            expandCode("P.A", ModelBDialect, () => false),
             "P.A",
         );
     });
     it("does not mistake a short ASCII program for base2048", () => {
         for (const program of ["END", "RUN", "GOTO10"])
-            assert.strictEqual(expandCode(program), program);
+            assert.strictEqual(expandCode(program, ModelBDialect), program);
     });
     it("still decodes base2048, with or without the clamp emoji", () => {
-        assert.strictEqual(expandCode("🗜༤ı3"), "\xf1A\r");
-        assert.strictEqual(expandCode("༤ı3"), "\xf1A\r");
+        assert.strictEqual(expandCode("🗜༤ı3", ModelBDialect), "\xf1A\r");
+        assert.strictEqual(expandCode("༤ı3", ModelBDialect), "\xf1A\r");
     });
     it("keeps the stand-in for a newline byte inside a REM or string as data", () => {
         // U+010A stands for the byte &0A; only a real newline ends a line.
-        assert.strictEqual(expandCode("\xf4A\u010aB\xf1"), "REMA\u010aB\xf1");
-        assert.strictEqual(expandCode('\xf1"A\u010aB"\xf1'), 'PRINT"A\u010aB"PRINT');
-        assert.strictEqual(expandCode("\xf4A\u020aB"), "REMA\u020aB");
-        assert.strictEqual(expandCode("*FX\u010aP."), "*FX\u010aP.");
+        assert.strictEqual(expandCode("\xf4A\u010aB\xf1", ModelBDialect), "REMA\u010aB\xf1");
+        assert.strictEqual(expandCode('\xf1"A\u010aB"\xf1', ModelBDialect), 'PRINT"A\u010aB"PRINT');
+        assert.strictEqual(expandCode("\xf4A\u020aB", ModelBDialect), "REMA\u020aB");
+        assert.strictEqual(expandCode("*FX\u010aP.", ModelBDialect), "*FX\u010aP.");
     });
     it("still reads a newline byte inside an encoded line number", () => {
-        assert.strictEqual(expandCode("\xe5\x8dT\u010a@"), "GOTO74");
+        assert.strictEqual(expandCode("\xe5\x8dT\u010a@", ModelBDialect), "GOTO74");
     });
 });

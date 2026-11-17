@@ -1,6 +1,5 @@
 // The recogniser's tokens as Monaco token types, the names the editor's theme colours.
 import {BracketCollisions, byteView, lexLine} from "./lexer.js";
-import {ModelBDialect} from "./dialect.js";
 import {ColorSpelling, Recogniser} from "./recogniser.js";
 
 const Operators = new Set("+ - * / ^ = <> < > <= >= $ ? ; , ! '".split(" "));
@@ -95,8 +94,8 @@ function parts(token) {
 // The line's tokens as {offset, type, bracket}, and whether an assembler block is open at its end. `bracket` is set on
 // a "(" and the ")" that closes it on the same line, where neither is invalid, and on a valid "[" or "]": those are
 // the only text Monaco is to match brackets in. Neighbours of the same type and `bracket` are joined.
-export function highlightLine(text, inAssembler = false, dialect = ModelBDialect) {
-    const recogniser = new Recogniser(text, inAssembler, false, dialect);
+export function highlightLine(text, dialect, inAssembler = false) {
+    const recogniser = new Recogniser(text, inAssembler, dialect);
     const open = recogniser.line();
     const tokens = [];
     const unclosed = [];
@@ -120,16 +119,16 @@ export function highlightLine(text, inAssembler = false, dialect = ModelBDialect
 }
 
 // The recogniser's reading of each line of a program, an assembler block open at the end of one carrying into the next.
-export function readEach(lines, dialect = ModelBDialect) {
+export function readEach(lines, dialect) {
     let inAssembler = false;
     return lines.map(lineText => {
-        const recogniser = new Recogniser(lineText, inAssembler, false, dialect);
+        const recogniser = new Recogniser(lineText, inAssembler, dialect);
         inAssembler = recogniser.line();
         return recogniser;
     });
 }
 
-export const readLines = (text, dialect = ModelBDialect) => readEach(text.split(/\r?\n/), dialect);
+export const readLines = (text, dialect) => readEach(text.split(/\r?\n/), dialect);
 
 // Each line's tokens as the dialect's tokeniser makes them: the lexer's, with each COLOR that is COLOUR as such, which
 // is decided as the highlighter does, with the assembler block a line may be in.
@@ -143,7 +142,7 @@ export function tokeniseLines(lines, dialect) {
 // shown at its last token and on to the end of the line, and one that something is missing from (a `hole`) at the token
 // where it stops; `message` is the error BASIC would give, or null where the recogniser does not know it. A block
 // that is never closed is one problem at its "[" ({unclosed: true}) in place of those of the lines after it, if it has any.
-export function programProblems(text, recognisers = readLines(text)) {
+export function programProblems(recognisers) {
     let block = null;
     const problems = recognisers.flatMap((recogniser, i) => {
         const lineText = recogniser.lexer.text;
@@ -199,11 +198,11 @@ const States = [new State(false), new State(true)];
 
 // `metadata(scopes, bracket)` is Monaco's encoding of a token: the theme's colours for the scopes, and whether Monaco
 // looks for brackets in its text.
-export function tokensProvider(languageId, metadata, dialect = ModelBDialect) {
+export function tokensProvider(languageId, metadata, dialect) {
     return {
         getInitialState: () => States[0],
         tokenizeEncoded(line, state) {
-            const {tokens, inAssembler} = highlightLine(line, state.inAssembler, dialect);
+            const {tokens, inAssembler} = highlightLine(line, dialect, state.inAssembler);
             return {
                 tokens: Uint32Array.from(
                     tokens.flatMap(({offset, type, bracket}) => [

@@ -1,11 +1,10 @@
 import {decode} from "base2048";
-import {ModelBDialect} from "./parser/dialect.js";
 import {lexLine} from "./parser/lexer.js";
 import {detokenise} from "./tokens.js";
 
 // The text with each abbreviation written out, as BASIC's tokeniser reads it: not in a string, REM, DATA or * command,
 // and not where a name or a conditional keyword's spelling continues.
-export function debbreviate(text, dialect = ModelBDialect) {
+export function debbreviate(text, dialect) {
     return text
         .split("\n")
         .map(line =>
@@ -35,7 +34,7 @@ function decode2048(input) {
 
 // fits says whether a line, as expanded, can still be tokenised: expanding can add a space (TIME before a name, say),
 // which can push a full line over the limit, and then the line is left as it was.
-export function expandCode(text, fits = () => true, dialect = ModelBDialect) {
+export function expandCode(text, dialect, fits = () => true) {
     if (text !== decode2048(text)) {
         return decode2048(text);
     }

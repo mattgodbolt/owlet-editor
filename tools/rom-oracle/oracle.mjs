@@ -82,7 +82,7 @@ async function romVerdicts(texts) {
 // purpose, which is where it read a COLOR as COLOUR, which BASIC II does not.
 function highlighterVerdicts(texts) {
     return texts.map(text => {
-        const tokens = highlightLine(text, false, dialect).tokens.filter(
+        const tokens = highlightLine(text, dialect).tokens.filter(
             (token, i, all) => i === 0 || token.type !== all[i - 1].type,
         );
         const invalid = tokens.flatMap((token, i) =>
@@ -90,7 +90,7 @@ function highlighterVerdicts(texts) {
                 ? [[token.offset, i + 1 < tokens.length ? tokens[i + 1].offset : text.length]]
                 : [],
         );
-        const problems = programProblems(text, readLines(text, dialect));
+        const problems = programProblems(readLines(text, dialect));
         const spans = field => problems.flatMap(p => (p[field] ? [[p.start, p.end]] : []));
         const [reading] = readLines(text, dialect);
         return {

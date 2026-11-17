@@ -1,5 +1,4 @@
 import {keywords} from "./tokens";
-import {ModelBDialect} from "./parser/dialect.js";
 
 // What the ROM's error says is missing, in plain words.
 const Needed = {
@@ -33,7 +32,7 @@ function keywordStartingWith(name) {
 export function problemMessage(
     {message, unfinished, hole, unclosed, stricter},
     {at, previous, atEnd, statementName},
-    dialect = ModelBDialect,
+    dialect,
 ) {
     if (unclosed) return UnclosedBlock;
     if (stricter) return message;
