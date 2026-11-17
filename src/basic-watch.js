@@ -1,37 +1,26 @@
 // What BBC BASIC is doing, read from the emulated machine's memory with jsbeeb's reading of BASIC's workspace.
 import {
     basicRom,
+    ErrorBlockPointer,
     findLine,
     holds,
     LanguageRomNumber,
     lineHolding,
     readPointers,
+    readReportedError,
     readResidentIntegers,
     readVariables,
     romTitle,
+    TextPointerBase,
+    TextPointerOffset,
 } from "jsbeeb/src/basic-state";
 
 const LineHeaderBytes = 4;
-const TextPointerOffset = 0x0a;
-const TextPointerHigh = 0x0c;
+const TextPointerHigh = TextPointerBase + 1;
 const InputBufferPage = 0x07;
-// BASIC starts each statement with LDY &0A: INC &0A, then reads its first character with the LDA (&0B),Y that is this
-// many bytes before jsbeeb's statementStart, so a write to &0A that leaves the CPU there is a statement starting.
-const StatementReadBeforeStart = 6;
-// BASIC's workspace beyond what jsbeeb reads: https://8bs.com/basic/memory.htm
-const ErrorLine = 0x08;
-const ExpressionPointerBase = 0x19;
-const ExpressionPointerOffset = 0x1b;
-// The OS's BRK handler leaves the address of the error block (its number, then its message up to a zero) here, writing
-// the low byte first.
-const ErrorBlock = 0xfd;
-const ErrorBlockHigh = 0xfe;
+// The OS's BRK handler writes the error block's address low byte first, so a write to its high byte is an error raised.
+const ErrorBlockHigh = ErrorBlockPointer + 1;
 const RomStart = 0x8000;
-const RomEnd = 0xc000;
-const MostMessageBytes = 255;
-const FirstToken = 0x80;
-// BASIC IV keeps "Missing " in its messages as a token of its own, which is not a keyword.
-const MissingToken = 0x8d;
 const Colon = 0x3a;
 const Space = 0x20;
 const DefaultPrintFormat = "&0000090A";
@@ -51,49 +40,11 @@ const residentBit = address => 1 << (((address - ResidentFirstByte) / ResidentBy
 export const writtenResidentIntegers = (residents, written) =>
     residents.filter((_, index) => written & (1 << index));
 
-const word = (peek, address) => peek(address) | (peek(address + 1) << 8);
-const reading = (peek, base, offset) => (word(peek, base) + peek(offset) - 1) & 0xffff;
-
-/** The message of the error block at `block`, with its tokens spelt out as REPORT prints them. */
-function errorMessage(peek, block, keywords) {
-    let message = "";
-    for (let at = block + 1; at <= block + MostMessageBytes; ++at) {
-        const code = peek(at & 0xffff);
-        if (code === 0) break;
-        if (code >= FirstToken)
-            message += code === MissingToken ? "Missing " : (keywords.get(code) ?? ".");
-        else message += code >= Space ? String.fromCharCode(code) : ".";
-    }
-    return message;
-}
-
-/**
- * The error BASIC has come back to its prompt from: its own error handler, which reports an error that no ON ERROR
- * has taken (or any error numbered 0, such as STOP), is BASIC text in its ROM, and the last text BASIC read until the
- * next command is typed. Its line is 0 for an error in a command typed at the prompt.
- */
-function reportedError(peek, keywords) {
-    const expression = word(peek, ExpressionPointerBase);
-    if (expression < RomStart || expression >= RomEnd) return null;
-    const block = word(peek, ErrorBlock);
-    return {
-        number: peek(block),
-        message: errorMessage(peek, block, keywords),
-        lineNumber: word(peek, ErrorLine),
-    };
-}
-
 /**
  * Whether BASIC's text pointer, in page `high`, is in the program, rather than in a command typed at the prompt or in
  * BASIC's own error handler.
  */
 const inProgram = high => high !== InputBufferPage && high < RomStart >> 8;
-
-/** Where BASIC's two text pointers are reading: the statement's, and the expression's within it. */
-const textPointers = peek => ({
-    statement: readPointers(peek).reading,
-    expression: reading(peek, ExpressionPointerBase, ExpressionPointerOffset),
-});
 
 /**
  * The offset into `line`'s text of the statement BASIC raised an error in, from its text pointers as they were then,
@@ -149,9 +100,10 @@ export class BasicWatch {
         this.hook = cpu.debugWrite.add((address, value) => {
             if (address >= ResidentFirstByte && address <= ResidentLastByte)
                 this.written |= residentBit(address);
-            else if (address === ErrorBlockHigh)
-                this.raised = {...textPointers(peek), inProgram: this.programLast};
-            else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
+            else if (address === ErrorBlockHigh) {
+                const {reading: statement, expression} = readPointers(peek);
+                this.raised = {statement, expression, inProgram: this.programLast};
+            } else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
                 this.noteStatement(peek(TextPointerHigh));
             else if (address === TextPointerHigh && value === InputBufferPage)
                 this.programLast = false;
@@ -206,7 +158,7 @@ export class BasicWatch {
                 title,
                 basic: basic !== null,
                 keywords: basic?.keywords,
-                statementRead: basic && basic.statementStart - StatementReadBeforeStart,
+                statementRead: basic?.statementRead,
             };
         }
         return this.language;
@@ -245,7 +197,7 @@ export class BasicWatch {
      * being as the running one is, with a null offset where the statement is not known, or null at the prompt.
      */
     errorAtPrompt(peek, page, keywords) {
-        const error = reportedError(peek, keywords);
+        const error = readReportedError(peek, keywords);
         if (!error) return this.stopped;
         const {lineNumber, ...shown} = error;
         const inProgram = this.raised ? this.raised.inProgram : lineNumber !== 0;
