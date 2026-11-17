@@ -1,8 +1,123 @@
 import {debbreviate, expandCode} from "../src/expand-code";
-import {detokenise, forEachBasicLine, partialDetokenise} from "../src/tokens";
+import {Flags, detokenise, forEachBasicLine, keywords, partialDetokenise} from "../src/tokens";
+import {BasicIVDialect} from "../src/parser/dialect";
 import {RomTokens} from "./rom-tables";
-import {describe, it} from "vitest";
+import {describe, expect, it} from "vitest";
 import assert from "assert";
+import {Buffer} from "buffer";
+import {existsSync, readFileSync} from "fs";
+
+// The ROM images jsbeeb ships: BASIC II's on its own, and BASIC IV's inside the Master's 128K MOS image.
+const RomDirectory = "node_modules/jsbeeb/public/roms";
+const BasicIIRom = `${RomDirectory}/BASIC.ROM`;
+const MasterRom = `${RomDirectory}/master/mos3.20`;
+// The table starts with "AND", &80 and no flags, and ends with the statement form of HIMEM, &D3.
+const TableStart = Buffer.from([0x41, 0x4e, 0x44, 0x80, 0x00]);
+const LastTableToken = 0xd3;
+const FirstKeywordCharacter = 0x20;
+const FirstTokenByte = 0x80;
+const RomFlagsMask = 0xff;
+
+const romKeywords = path => {
+    if (!existsSync(path))
+        throw new Error(`jsbeeb no longer ships ${path}; point this test at the ROM it ships now`);
+    const rom = readFileSync(path);
+    const start = rom.indexOf(TableStart);
+    if (start < 0 || rom.indexOf(TableStart, start + 1) >= 0) {
+        throw new Error(`${path} should hold exactly one keyword table, starting AND &80 &00`);
+    }
+    const entries = [];
+    for (let i = start; ;) {
+        let keyword = "";
+        while (rom[i] >= FirstKeywordCharacter && rom[i] < FirstTokenByte)
+            keyword += String.fromCharCode(rom[i++]);
+        const entry = {keyword, token: rom[i++], flags: rom[i++]};
+        entries.push(entry);
+        if (entry.token === LastTableToken) return entries;
+        if (i >= rom.length)
+            throw new Error(`${path}: the keyword table does not end with token &D3`);
+    }
+};
+const ownRows = list =>
+    list.map(kw => ({keyword: kw.keyword, token: kw.token, flags: kw.flags & RomFlagsMask}));
+
+describe("The keyword table", () => {
+    it("should be BASIC II's keyword table, row for row", () => {
+        const rom = romKeywords(BasicIIRom);
+        expect(rom).toHaveLength(126);
+        expect(ownRows(keywords)).toEqual(rom);
+    });
+    it("should give BASIC IV's keyword table, row for row", () => {
+        const rom = romKeywords(MasterRom);
+        expect(rom).toHaveLength(128);
+        expect(ownRows(BasicIVDialect.keywords)).toEqual(rom);
+    });
+    it("should mark as values the operators and the functions, but not TO", () => {
+        const values = keywords.filter(kw => kw.flags & Flags.Expr).map(kw => kw.keyword);
+        expect(values).toEqual([
+            "AND",
+            "ABS",
+            "ACS",
+            "ADVAL",
+            "ASC",
+            "ASN",
+            "ATN",
+            "BGET",
+            "CHR$",
+            "COS",
+            "COUNT",
+            "DEG",
+            "DIV",
+            "EVAL",
+            "ERL",
+            "EOF",
+            "EOR",
+            "ERR",
+            "EXP",
+            "EXT",
+            "FALSE",
+            "FN",
+            "GET$",
+            "GET",
+            "HIMEM",
+            "INKEY$",
+            "INKEY",
+            "INT",
+            "INSTR(",
+            "LOMEM",
+            "LEFT$(",
+            "LEN",
+            "LOG",
+            "LN",
+            "MID$(",
+            "MOD",
+            "NOT",
+            "OR",
+            "OPENIN",
+            "OPENOUT",
+            "OPENUP",
+            "PAGE",
+            "PTR",
+            "PI",
+            "POINT(",
+            "POS",
+            "RAD",
+            "RIGHT$(",
+            "RND",
+            "SGN",
+            "SIN",
+            "SQR",
+            "STR$",
+            "STRING$(",
+            "TAN",
+            "TIME",
+            "TRUE",
+            "USR",
+            "VAL",
+            "VPOS",
+        ]);
+    });
+});
 
 describe("Detokenisation", () => {
     it("should detokenise the empty string", () => {
