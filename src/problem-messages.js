@@ -13,7 +13,8 @@ const Needed = {
     Index: "an array index",
 };
 
-const neededAfterOn = dialect => (dialect.basicIV ? "GOTO, GOSUB or PROC" : "GOTO or GOSUB");
+const neededAfterOn = ({onBranches}) =>
+    `${onBranches.slice(0, -1).join(", ")} or ${onBranches.at(-1)}`;
 
 const UnclosedBlock = "Assembler block not closed: there is no ] after this [";
 

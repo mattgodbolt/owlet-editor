@@ -2,8 +2,8 @@
 // token at which BASIC would stop with an error: one per statement, then on to the next colon, as BASIC reports only
 // the first. Where there is no rule for a statement, anything is accepted.
 import {Assembler, mnemonicsFor} from "./assembler.js";
-import {FirstStatementToken} from "../tokens.js";
-import {BasicIIDialect} from "./dialect.js";
+import {isFnProc, isStatementKeyword, pseudoVariables} from "../tokens.js";
+import {BasicIIDialect, canStartStatement} from "./dialect.js";
 import {Lexer} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -16,7 +16,6 @@ const OneArgument = names(
         "OPENIN OPENOUT OPENUP",
 );
 const ChannelFunction = names("BGET EOF EXT PTR");
-const PseudoVariables = names("PTR PAGE TIME LOMEM HIMEM");
 // The fewest and most arguments of the functions whose keyword ends in "(".
 const BracketFunction = {
     "INSTR(": [2, 3],
@@ -362,15 +361,13 @@ export class Recogniser {
         if (token.kind === "name" && this.readsAsColor(token)) return this.statement();
         if (token.kind !== "keyword") return this.assignment();
         const {keyword} = token.kw;
-        // BASIC IV also starts a statement with EXT#, which sets the length of a file.
-        const extStatement = this.basicIV && keyword === "EXT";
         // EDIT is a command only to the prompt, so a program that reaches it stops there on BASIC IV, as on a line that
         // starts with any other command.
-        if ((token.kw.token < FirstStatementToken && !extStatement) || keyword === "EDIT")
+        if (!canStartStatement(this.dialect, token.kw) || keyword === "EDIT")
             this.fail("Syntax error");
         this.next();
-        // The lexer has made these the statement forms of the pseudo-variables.
-        if (PseudoVariables.has(keyword) || extStatement) return this.pseudoVariable(keyword);
+        // The lexer has made these the statement forms of the pseudo-variables; EXT can only be BASIC IV's EXT#.
+        if (pseudoVariables.has(keyword) || keyword === "EXT") return this.pseudoVariable(keyword);
         if (keyword in ExpressionCount) return this.expressions(ExpressionCount[keyword]);
         if (this[keyword]) return this[keyword]();
         while (!this.atEnd()) this.next();
@@ -524,7 +521,7 @@ export class Recogniser {
             return void this.next();
         if (token.kind === "hex" && token.text.length > 1) return void this.next();
         if (token.kind === "name") return (this.name(), true);
-        if (token.kind !== "keyword" || token.kw.token >= FirstStatementToken)
+        if (token.kind !== "keyword" || isStatementKeyword(token.kw))
             this.fail(this.operandError(token), token, this.unfinishedOperand(token), true);
         this.next();
         const {keyword} = token.kw;
@@ -659,9 +656,7 @@ export class Recogniser {
             return this.statement();
         }
         this.expression();
-        // BASIC IV can also call a procedure from the list.
-        const branch = this.basicIV ? ["GOTO", "GOSUB", "PROC"] : ["GOTO", "GOSUB"];
-        if (!this.isKeyword(...branch)) this.fail("ON syntax");
+        if (!this.isKeyword(...this.dialect.onBranches)) this.fail("ON syntax");
         if (this.next().kw.keyword === "PROC") this.call();
         else this.GOTO();
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
@@ -712,7 +707,8 @@ export class Recogniser {
 
     // BASIC only reads a DEF when it looks for the FN or PROC it defines.
     DEF() {
-        if (!this.isKeyword("FN", "PROC")) return void this.skipLine();
+        const token = this.peek();
+        if (token.kind !== "keyword" || !isFnProc(token.kw)) return void this.skipLine();
         this.next();
         if (this.is("fnname")) this.next();
         if (this.isPunct("(")) {

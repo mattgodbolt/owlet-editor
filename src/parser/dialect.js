@@ -1,7 +1,7 @@
 // Which BASIC the parser follows: BASIC II (the Model B's) or BASIC IV (the Master's). Each of the lexer, recogniser and
 // assembler takes the dialect to read a line by, and the editor passes that of the machine it is on; the default where
 // one is optional is the Model B's, and nothing here changes with the editor's machine.
-import {Flags, immediateCommands, keywords} from "../tokens.js";
+import {Flags, isStatementKeyword, keywords, LastCommandToken} from "../tokens.js";
 
 // BASIC IV's keyword table is BASIC II's with COLOR (the same token as COLOUR, which BASIC reads first) and EDIT
 // added, each straight after the entry it follows in the ROM's table, since the first entry that matches is the one used.
@@ -13,11 +13,35 @@ const basicIVKeywords = keywords.flatMap(kw => [
     ...(kw.keyword === "EXT" ? [{keyword: "EDIT", token: EditToken, flags: Flags.LineNumber}] : []),
 ]);
 
+// The keywords BASIC takes as commands at its prompt, which are the tokens from AUTO up to the last command.
+const commandsIn = (table, lastToken) =>
+    table.filter(kw => isStatementKeyword(kw) && kw.token <= lastToken).map(kw => kw.keyword);
+// The number after TRACE is a limit, not a line.
+export const LimitKeyword = "TRACE";
+// The keywords whose line number BASIC looks up when it runs them: those the ROM flags as taking one, but for the
+// commands (the numbers they take need not be lines) and TRACE.
+const lookedUpIn = (table, commands) =>
+    new Set(
+        table
+            .filter(
+                kw =>
+                    kw.flags & Flags.LineNumber &&
+                    kw.keyword !== LimitKeyword &&
+                    !commands.includes(kw.keyword),
+            )
+            .map(kw => kw.keyword),
+    );
+
+const basicIICommands = commandsIn(keywords, LastCommandToken);
+const basicIVCommands = commandsIn(basicIVKeywords, EditToken);
+
 // What BASIC II's ROM does, which the recorded ROM rows and the oracle are checked against.
 export const BasicIIDialect = Object.freeze({
     basicIV: false,
     keywords,
-    immediateCommands,
+    immediateCommands: basicIICommands,
+    lineNumberLookups: lookedUpIn(keywords, basicIICommands),
+    onBranches: ["GOTO", "GOSUB"],
     usColor: false,
 });
 // The editor's Model B: BASIC II, and a COLOR that starts a statement and can only be COLOUR is COLOUR (the recogniser
@@ -26,9 +50,16 @@ export const ModelBDialect = Object.freeze({...BasicIIDialect, usColor: true});
 export const BasicIVDialect = Object.freeze({
     basicIV: true,
     keywords: basicIVKeywords,
-    immediateCommands: [...immediateCommands, "EDIT"],
+    immediateCommands: basicIVCommands,
+    lineNumberLookups: lookedUpIn(basicIVKeywords, basicIVCommands),
+    onBranches: ["GOTO", "GOSUB", "PROC"],
     usColor: false,
 });
+
+// Whether a statement can start with the keyword: a token from &C6 up, ELSE (which skips the rest of the line), or on
+// BASIC IV EXT#, which sets the length of a file.
+export const canStartStatement = (dialect, kw) =>
+    isStatementKeyword(kw) || kw.keyword === "ELSE" || (dialect.basicIV && kw.keyword === "EXT");
 
 /** The dialect of the BASIC that the model runs. */
 export const dialectFor = model => (model.isMaster ? BasicIVDialect : ModelBDialect);

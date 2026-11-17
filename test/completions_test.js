@@ -5,7 +5,7 @@ import {readLines} from "../src/parser/highlight";
 import {expandCode} from "../src/expand-code";
 import Examples from "../src/examples.yaml";
 import {generate} from "../tools/rom-oracle/generate.mjs";
-import {immediateCommands, keywords} from "../src/tokens";
+import {keywords} from "../src/tokens";
 import {describe, expect, it} from "vitest";
 import assert from "assert";
 import {readFileSync} from "fs";
@@ -272,7 +272,7 @@ describe("Completions", () => {
         }
         const programKeywords = keywords
             .map(kw => kw.keyword)
-            .filter(kw => !immediateCommands.includes(kw));
+            .filter(kw => !ModelBDialect.immediateCommands.includes(kw));
         assert.deepStrictEqual(
             programKeywords.filter(kw => !used.has(kw)),
             [],

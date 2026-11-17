@@ -155,9 +155,9 @@ export const keywords = [
 
 export const keywordByToken = new Map(keywords.map(kw => [kw.token, kw]));
 
-// BASIC II starts a statement only with a token from here up (they include the statement forms of PTR, PAGE, TIME,
-// LOMEM and HIMEM) or ELSE, which skips the rest of the line. BASIC IV also starts one with EXT#.
+// The tokens from here up are the statements, including the statement forms of PTR, PAGE, TIME, LOMEM and HIMEM.
 export const FirstStatementToken = 0xc6;
+export const isStatementKeyword = kw => kw.token >= FirstStatementToken;
 export const LineNumberToken = 0x8d;
 // A keyword can appear in a value if it is an operator (&80-&84) or a function or pseudo-variable (&8E up to the
 // statements), except TO.
@@ -187,10 +187,13 @@ export const byteChar = byte => String.fromCodePoint(needsOffset(byte) ? byte + 
 export const tokenChar = kw => byteChar(kw.token);
 
 // The last of AUTO DELETE LIST LOAD NEW OLD RENUMBER SAVE; BASIC IV's EDIT follows it.
-const LastCommandToken = 0xcd;
-export const immediateCommands = keywords
-    .filter(kw => kw.token >= FirstStatementToken && kw.token <= LastCommandToken)
-    .map(kw => kw.keyword);
+export const LastCommandToken = 0xcd;
+
+// By spelling, since the lexer reads the statement form of one of these as the row at the end of the table.
+export const pseudoVariables = new Set(
+    keywords.filter(kw => kw.flags & Flags.PseudoVariable).map(kw => kw.keyword),
+);
+export const isFnProc = kw => Boolean(kw.flags & Flags.FnProc);
 
 const Chars = {
     FirstToken: 0x80,
