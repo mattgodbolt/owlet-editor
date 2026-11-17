@@ -422,5 +422,25 @@ for (const {name, state} of Machines) {
             expect(await markedLines(page, "error")).toBe(0);
             expect(problems).toEqual([]);
         });
+
+        test("STOP in a line numbered 0 is an error at line 0, kept through a command typed at the prompt", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, "0 X=1:STOP", state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            const stopped = "STOP at line 0. The variables are as the program left them.";
+            await expect(status(page)).toHaveText(stopped);
+            await expect(status(page)).toHaveAttribute("data-mark", "error");
+            await expect.poll(() => markedText(page, "error")).toBe("STOP");
+            await page.locator("#screen").click();
+            for (const key of ["KeyC", "KeyL", "KeyS", "Enter"])
+                await page.keyboard.press(key, {delay: 100});
+            await settle(page);
+            await expect(status(page)).toHaveText(stopped);
+            expect(await markedText(page, "error")).toBe("STOP");
+            expect(problems).toEqual([]);
+        });
     });
 }

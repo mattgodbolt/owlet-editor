@@ -60,13 +60,16 @@ An abbreviation such as `P.` is marked as it is written. The panel says:
 - **No such variable (ERR 26) at line N**: the program stopped with that error in line N, which is marked in red:
   the statement the error was in, or the whole line where that is not known (see below). The variables are as the
   program left them, as they are on a real BBC Micro. This stays, through anything typed at the prompt, until the
-  program runs again (from the run button, or a `RUN`, `GOTO` or `PROC` typed at the prompt; not a `LIST`), which is the point: the message is often not on the emulated screen, after `VDU 5` with the
-  graphics cursor off the screen, or a `CLS`, or once a mistyped `REPORT` has replaced it.
+  program runs again (from the run button, or a `RUN`, `GOTO` or `PROC` typed at the prompt; not a `LIST`), which is
+  the point: the message is often not on the emulated screen, after `VDU 5` with the graphics cursor off the screen
+  or in the background colour, or a `CLS`, or once a mistyped `REPORT` has replaced it.
+- **STOP at line N** is shown the same way: the program stopped where it should not have gone on.
+- **Escape (ERR 17) at line N** is shown the same way but in amber, as people press Escape on purpose.
 - **..., which has changed since the error**: the editor's line N is not what BASIC ran, so nothing is marked.
-- **STOP at line N** and **Escape (ERR 17) at line N** are shown the same way, in amber, as people stop a program
-  with them on purpose.
-- **Mistake (ERR 4) in a command typed at the prompt**: an error in a command typed at BASIC's prompt (BASIC gives
-  it line 0), shown only until the next command, and never in place of the error the program stopped with.
+- **Mistake (ERR 4) in a command typed at the prompt**: an error in a command typed at BASIC's prompt, shown only
+  until the next command, and never in place of the error the program stopped with. BASIC gives such an error line
+  0, as it does an error in a line numbered 0, so Debug tells them apart by whether a statement of the program had
+  started since the last command was typed; switched on after the error, it takes line 0 to be the prompt.
 - **At BASIC's prompt**: the program has ended, without an error, or not started; its variables stay as it left them.
 - **Not BASIC**: another language ROM has taken over.
 

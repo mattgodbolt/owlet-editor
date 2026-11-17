@@ -83,6 +83,12 @@ function reportedError(peek, keywords) {
     };
 }
 
+/**
+ * Whether BASIC's text pointer, in page `high`, is in the program, rather than in a command typed at the prompt or in
+ * BASIC's own error handler.
+ */
+const inProgram = high => high !== InputBufferPage && high < RomStart >> 8;
+
 /** Where BASIC's two text pointers are reading: the statement's, and the expression's within it. */
 const textPointers = peek => ({
     statement: readPointers(peek).reading,
@@ -121,6 +127,7 @@ export class BasicWatch {
         this.cpu = null;
         this.hook = null;
         this.written = 0;
+        this.programLast = false;
         this.raised = null;
         this.stopped = null;
     }
@@ -130,19 +137,24 @@ export class BasicWatch {
      * the machine makes through a slower path while it is attached). A write to a resident integer is the program's:
      * the OS or BASIC set them all before the program starts, and RUN, CLEAR, NEW and CHAIN leave them be. Those
      * written before this call are unknown, so those not at their start value stand in for them (see restart). It also
-     * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text.
+     * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text,
+     * and whether a statement of the program had started since BASIC last pointed it at its input buffer, which tells an
+     * error in a line numbered 0 from one typed at the prompt.
      */
     track(cpu) {
         if (this.cpu === cpu) return;
         this.untrack();
         this.cpu = cpu;
         const peek = address => cpu.peekmemAsLanguage(address);
-        this.hook = cpu.debugWrite.add(address => {
+        this.hook = cpu.debugWrite.add((address, value) => {
             if (address >= ResidentFirstByte && address <= ResidentLastByte)
                 this.written |= residentBit(address);
-            else if (address === ErrorBlockHigh) this.raised = textPointers(peek);
+            else if (address === ErrorBlockHigh)
+                this.raised = {...textPointers(peek), inProgram: this.programLast};
             else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
                 this.noteStatement(peek(TextPointerHigh));
+            else if (address === TextPointerHigh && value === InputBufferPage)
+                this.programLast = false;
         });
         this.restart();
     }
@@ -156,12 +168,14 @@ export class BasicWatch {
         this.forgetErrors();
     }
 
-    /** A statement is starting in the page `high`: one of the program's, unlike one typed at the prompt or in ROM. */
+    /** A statement is starting in the page `high`. */
     noteStatement(high) {
-        if (high !== InputBufferPage && high < RomStart >> 8) this.stopped = null;
+        this.programLast = inProgram(high);
+        if (this.programLast) this.stopped = null;
     }
 
     forgetErrors() {
+        this.programLast = false;
         this.raised = null;
         this.stopped = null;
     }
@@ -234,7 +248,8 @@ export class BasicWatch {
         const error = reportedError(peek, keywords);
         if (!error) return this.stopped;
         const {lineNumber, ...shown} = error;
-        if (!lineNumber) return this.stopped ?? {...shown, line: null};
+        const inProgram = this.raised ? this.raised.inProgram : lineNumber !== 0;
+        if (!inProgram) return this.stopped ?? {...shown, line: null};
         const found = findLine(peek, page, lineNumber);
         const offset = found && this.raised ? errorOffset(peek, found, this.raised) : null;
         this.stopped = {

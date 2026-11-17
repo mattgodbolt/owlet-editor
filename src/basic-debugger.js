@@ -4,7 +4,7 @@ import {BasicWatch} from "./basic-watch";
 import {programStatements, statementAt} from "./statement-map";
 
 // The classes and scroll bar colour of each kind of mark: the statement running, the one an error stopped the program
-// in, and the one it stopped in by Escape or STOP, which people do on purpose.
+// in, and the one Escape stopped it in, which people press on purpose.
 const Marks = {
     running: {line: "debug-running-line", statement: "debug-running-statement", colour: "#5e8040"},
     error: {line: "debug-error-line", statement: "debug-error-statement", colour: "#b03a3a"},
@@ -28,7 +28,7 @@ function variable({name, value}) {
 
 const isStop = ({number, message}) => number === 0 && message === "STOP";
 
-const markFor = error => (error.number === EscapeError || isStop(error) ? "quiet" : "error");
+const markFor = error => (error.number === EscapeError ? "quiet" : "error");
 
 function describeError(error, range) {
     const what = isStop(error) ? "STOP" : `${error.message} (ERR ${error.number})`;

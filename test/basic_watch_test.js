@@ -331,6 +331,15 @@ describe("BasicWatch errors", () => {
                     },
                 },
                 {
+                    // BASIC gives this line 0, as it does a command typed at the prompt.
+                    lines: ["0 PRINT 1/0"],
+                    error: {number: 18, message: "Division by zero", line: 0, marked: "PRINT 1/0"},
+                },
+                {
+                    lines: ["0 X=1:STOP"],
+                    error: {number: 0, message: "STOP", line: 0, marked: "STOP"},
+                },
+                {
                     lines: ["A=1", "X=1:STOP:Y=2"],
                     error: {number: 0, message: "STOP", line: 20, marked: "STOP"},
                 },
@@ -438,6 +447,53 @@ describe("BasicWatch errors", () => {
                 expect(watch.read(booted.cpu)).toMatchObject({line: {number: 20}, error: null});
                 await booted.testMachine.runFor(CyclesPerRun * 20);
                 expect(watch.read(booted.cpu)).toMatchObject({line: null, error: null});
+            });
+
+            it("keeps an error in a line 0 through commands typed at the prompt", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                const lines = ["0 X=1:PRINT 1/0"];
+                await run(booted, lines);
+                const stopped = {
+                    number: 18,
+                    message: "Division by zero",
+                    line: 0,
+                    marked: "PRINT 1/0",
+                };
+                expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual(stopped);
+                for (const command of ["MODE 7", "PRINT 1/0"]) {
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun);
+                    expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual(
+                        stopped,
+                    );
+                }
+            });
+
+            it.each([
+                {name: "after a program that ended", lines: ["0 X=1", "END"]},
+                // BASIC gives this the line LIST had got to.
+                {name: "while it lists the program", lines: Array(300).fill("REM"), list: true},
+            ])("shows Escape pressed at the prompt $name as typed there", async ({lines, list}) => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, lines);
+                if (list) {
+                    await booted.testMachine.type("LIST");
+                    await booted.testMachine.runFor(CyclesPerRun * 3);
+                    expect(watch.read(booted.cpu).error).toBeNull();
+                }
+                booted.testMachine.keyDown("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                booted.testMachine.keyUp("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                expect(watch.read(booted.cpu).error).toEqual({
+                    number: 17,
+                    message: "Escape",
+                    line: null,
+                });
             });
 
             it("marks the line of an error raised before it started watching", async () => {
