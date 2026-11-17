@@ -41,6 +41,8 @@ class ScreenResizer {
         this.desiredAspectRatio = origWidth / origHeight;
         this.minHeight = origHeight / 4;
         this.minWidth = origWidth / 4;
+        // The height at the bottom of the parent that a panel under the screen takes.
+        this.reserved = 0;
         this.observer = new ResizeObserver(() => this.resizeScreen());
         this.observer.observe(this.screen.parent()[0]);
         this.resizeScreen();
@@ -49,7 +51,10 @@ class ScreenResizer {
     resizeScreen() {
         const InnerBorder = 0;
         let width = Math.max(this.minWidth, this.screen.parent().innerWidth() - InnerBorder);
-        let height = Math.max(this.minHeight, this.screen.parent().innerHeight() - InnerBorder);
+        let height = Math.max(
+            this.minHeight,
+            this.screen.parent().innerHeight() - InnerBorder - this.reserved,
+        );
         if (width / height <= this.desiredAspectRatio) {
             height = width / this.desiredAspectRatio;
         } else {
@@ -106,6 +111,8 @@ export class Emulator {
         screen.blur(() => this.clearKeys());
         setInterval(this.timer.bind(this), 1000);
         this.lastFrameTime = 0;
+        // Called after each animation frame's run, while something watches the machine.
+        this.onFrame = null;
         this.onAnimFrame = _.bind(this.frameFunc, this);
         this.ready = false;
         this.rebuilding = false;
@@ -337,6 +344,16 @@ export class Emulator {
             }
         }
         this.lastFrameTime = now;
+        if (this.onFrame) this.onFrame();
+    }
+
+    /** Shrinks the screen to leave `height` pixels under it, for a panel there. */
+    reserveBelowScreen(height) {
+        if (height === this.resizer.reserved) return;
+        this.resizer.reserved = height;
+        // The screen is centred in what is left.
+        this.root.css("padding-bottom", height ? `${height}px` : "");
+        this.resizer.resizeScreen();
     }
 
     paint(video, minx, miny, maxx, maxy) {

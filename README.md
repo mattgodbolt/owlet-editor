@@ -39,6 +39,30 @@ field and runs the Model B with the GXR. The GXR is a fitting, not a different B
 same either way. `?experimental` only shows the send to beebjit button, as it always has, and that button works on
 either Model B.
 
+### Debug: watching BASIC run
+
+The Debug button under the emulator opens a panel under the screen with BASIC's variables (the resident integers
+`@%` and `A%` to `Z%` that are not as BASIC starts them, then every other variable, then the names of the procedures
+and functions it has found), and marks the statement BASIC is running in the editor: its line faintly, the
+statement itself more strongly, and the line in the scroll bar. Both follow the program as it runs, many times a
+second, and stay where they were while the emulator is paused, so pausing shows where the program had got to.
+
+What is shown is read from the emulated machine's memory, with jsbeeb's reading of BASIC's workspace, and works the
+same on the Model B (BASIC II) and the Master 128 (BASIC IV). The statement is the one BASIC's text pointer is in: a
+line `IF A=1 THEN B=2:C=3 ELSE D=4` has the statements `IF A=1 THEN`, `B=2`, `C=3`, `ELSE` and `D=4`, a `REPEAT`,
+`DEF PROC` or `ON ERROR` is a statement apart from the one after it, and `REM` and `DATA` run to the end of the line.
+An abbreviation such as `P.` is marked as it is written. The panel says:
+
+- **Running line N**: the program is running (or paused in) line N, which is marked in the editor.
+- **Running line N, which is not as in the editor**: the editor's line N is not what BASIC has, as after an edit
+  since the program ran. Nothing is marked until the program runs again; the variables still update. Lines that were
+  not edited are still marked, so an edit to one line does not lose the others.
+- **At BASIC's prompt**: the program has ended, stopped with an error or not started; its variables stay as it left
+  them, as they do on a real BBC Micro.
+- **Not BASIC**: another language ROM has taken over.
+
+While Debug is off nothing is read from the machine, so it costs nothing. Debug is not remembered between visits.
+
 ## Share your creations with the BBC Micro Bot Mastodon community
 
 * One button tweet to share code (not yet updated for Mastodon)
