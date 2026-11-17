@@ -33,6 +33,10 @@ const HiddenErrorStatus =
 const OnceErrorProgram = ["IF A%=0 THEN A%=1:PRINT 1/0", "END"].join("\n");
 // Waits a second before it stops with an error, so that a run can be seen before it.
 const SlowErrorProgram = ["10 T%=TIME:REPEAT UNTIL TIME>T%+100", "20 X=1:PRINT 1/0:Y=2"].join("\n");
+const KeyProgram = ["10 G=GET", "20 INPUT X", "30 END"].join("\n");
+// Reads the keyboard many times a frame without waiting for it.
+const PollingProgram = "10 REPEAT:K=INKEY(0):UNTIL FALSE";
+const VsyncProgram = ["10 REPEAT", "20 *FX19", "30 UNTIL FALSE"].join("\n");
 
 const Machines = [
     {name: "Model B", state: {}},
@@ -140,6 +144,12 @@ const runningLine = async page => {
     const match = /^Running line (\d+)$/.exec(await status(page).textContent());
     return match ? Number(match[1]) : null;
 };
+
+/** Presses each of `keys` at the emulator, holding it down long enough for the OS to see it. */
+async function typeAtEmulator(page, keys) {
+    await page.locator("#screen").click();
+    for (const key of keys) await page.keyboard.press(key, {delay: 100});
+}
 
 /** Lets the emulator get through a good number of animation frames, to show that something has not changed. */
 const settle = page =>
@@ -440,6 +450,53 @@ for (const {name, state} of Machines) {
             await settle(page);
             await expect(status(page)).toHaveText(stopped);
             expect(await markedText(page, "error")).toBe("STOP");
+            expect(problems).toEqual([]);
+        });
+
+        test("a program waiting for a key says so, with the keyword and line, and moves on when one is pressed", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, KeyProgram, state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText("Waiting for keyboard input (GET) at line 10");
+            await expect.poll(() => markedText(page)).toBe("G=GET");
+            await typeAtEmulator(page, ["KeyA"]);
+            await expect(status(page)).toHaveText("Waiting for keyboard input (INPUT) at line 20");
+            await expect.poll(() => markedText(page)).toBe("INPUT X");
+            await typeAtEmulator(page, ["Digit5", "Enter"]);
+            await expect(status(page)).toHaveText("At BASIC's prompt");
+            await expect.poll(() => variables(page)).toEqual({G: "65", X: "5"});
+            expect(problems).toEqual([]);
+        });
+
+        test("a program that reads the keyboard without waiting for it says it is running", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, PollingProgram, state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText("Running line 10");
+            await recordEveryFrame(page);
+            await settle(page);
+            await settle(page);
+            expect((await recorded(page)).statuses).toEqual(["Running line 10"]);
+            expect(problems).toEqual([]);
+        });
+
+        test("a program that waits for vsync says so in the frames that end in the wait", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, VsyncProgram, state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText(/line (20|30)$/);
+            await recordEveryFrame(page);
+            await settle(page);
+            expect((await recorded(page)).statuses).toContain("Waiting for vsync at line 20");
             expect(problems).toEqual([]);
         });
     });

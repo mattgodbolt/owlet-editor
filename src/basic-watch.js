@@ -10,10 +10,12 @@ import {
     readReportedError,
     readResidentIntegers,
     readVariables,
+    readWait,
     romTitle,
     TextPointerBase,
     TextPointerOffset,
 } from "jsbeeb/src/basic-state";
+import {totalCycles} from "./cycles";
 
 const LineHeaderBytes = 4;
 const TextPointerHigh = TextPointerBase + 1;
@@ -66,6 +68,13 @@ function errorOffset(peek, line, {statement, expression}) {
     return next - text;
 }
 
+/**
+ * What a program is waiting for, {kind, keyword} from jsbeeb's readWait, or null while it is running: in the vsync
+ * loop it is waiting, and elsewhere only while BASIC has `stalled`, as a program that reads the keyboard with INKEY(0)
+ * passes through the OS's keyboard read without waiting.
+ */
+const waitingFor = (wait, stalled) => (wait && (wait.kind === "vsync" || stalled) ? wait : null);
+
 function lineBytes(peek, line) {
     const bytes = [];
     for (let at = line.start + LineHeaderBytes; at < line.end; ++at) bytes.push(peek(at));
@@ -81,6 +90,7 @@ export class BasicWatch {
         this.programLast = false;
         this.raised = null;
         this.stopped = null;
+        this.forgetMoving();
     }
 
     /**
@@ -90,7 +100,8 @@ export class BasicWatch {
      * written before this call are unknown, so those not at their start value stand in for them (see restart). It also
      * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text,
      * and whether a statement of the program had started since BASIC last pointed it at its input buffer, which tells an
-     * error in a line numbered 0 from one typed at the prompt.
+     * error in a line numbered 0 from one typed at the prompt, and whether BASIC has moved on through the program,
+     * which it does by writing its text pointer at each statement.
      */
     track(cpu) {
         if (this.cpu === cpu) return;
@@ -103,9 +114,11 @@ export class BasicWatch {
             else if (address === ErrorBlockHigh) {
                 const {reading: statement, expression} = readPointers(peek);
                 this.raised = {statement, expression, inProgram: this.programLast};
-            } else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
-                this.noteStatement(peek(TextPointerHigh));
-            else if (address === TextPointerHigh && value === InputBufferPage)
+            } else if (address === TextPointerOffset) {
+                this.movedOn = true;
+                if (cpu.pc === this.language?.statementRead)
+                    this.noteStatement(peek(TextPointerHigh));
+            } else if (address === TextPointerHigh && value === InputBufferPage)
                 this.programLast = false;
         });
         this.restart();
@@ -118,6 +131,7 @@ export class BasicWatch {
         this.hook = null;
         this.written = 0;
         this.forgetErrors();
+        this.forgetMoving();
     }
 
     /** A statement is starting in the page `high`. */
@@ -130,6 +144,12 @@ export class BasicWatch {
         this.programLast = false;
         this.raised = null;
         this.stopped = null;
+    }
+
+    forgetMoving() {
+        this.movedOn = true;
+        this.stalled = false;
+        this.readAt = null;
     }
 
     /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
@@ -167,7 +187,8 @@ export class BasicWatch {
     /**
      * What BASIC is doing: {basic: false, title} when the language is not a BASIC; otherwise the line it is reading
      * ({number, bytes, offset}, the offset being into the line's bytes after its header) or null when it is not in the
-     * program (at the prompt), the error it is at the prompt after (see errorAtPrompt) or null, and its variables.
+     * program (at the prompt), what the program in that line is waiting for (see waitingFor) or null, the error it is
+     * at the prompt after (see errorAtPrompt) or null, and its variables.
      */
     read(cpu) {
         this.track(cpu);
@@ -176,6 +197,7 @@ export class BasicWatch {
         const peek = address => cpu.peekmemAsLanguage(address);
         const {page, reading} = readPointers(peek);
         const line = lineHolding(peek, page, reading);
+        const stalled = this.stalledSinceLastRead(cpu);
         return {
             basic,
             title,
@@ -184,10 +206,25 @@ export class BasicWatch {
                 bytes: lineBytes(peek, line),
                 offset: reading - line.start - LineHeaderBytes,
             },
+            wait: line && waitingFor(readWait(cpu, line, keywords), stalled),
             error: line ? null : this.errorAtPrompt(peek, page, keywords),
             residents: writtenResidentIntegers(readResidentIntegers(peek), this.written),
             ...readVariables(peek),
         };
+    }
+
+    /**
+     * Whether BASIC has not moved on since the last read that came after the machine had run, as it does not while it
+     * waits; as it was then while the machine has not run since, as while it is paused.
+     */
+    stalledSinceLastRead(cpu) {
+        const cycles = totalCycles(cpu);
+        if (cycles !== this.readAt) {
+            this.stalled = !this.movedOn;
+            this.movedOn = false;
+            this.readAt = cycles;
+        }
+        return this.stalled;
     }
 
     /**

@@ -54,6 +54,19 @@ line `IF A=1 THEN B=2:C=3 ELSE D=4` has the statements `IF A=1 THEN`, `B=2`, `C=
 An abbreviation such as `P.` is marked as it is written. The panel says:
 
 - **Running line N**: the program is running (or paused in) line N, which is marked in the editor.
+- **Waiting for keyboard input (GET) at line N**: the program is waiting in line N for a key, for `GET`, `GET$`, or
+  `INKEY` or `INKEY$` with a time limit, or for a line to be typed for `INPUT` or `INPUT LINE`; the brackets say which
+  (for `PRINT GET;GET$`, which of the two), and are left out where it is not one of those, as for machine code that
+  calls OSRDCH. A key pressed (and Return, for `INPUT`) takes it back to running. A program that reads the keyboard
+  without waiting, as `INKEY(0)` and `INKEY(-n)` do, is running.
+- **Waiting for vsync at line N**: the program is in `*FX19`, which waits for the next vertical sync, at most a
+  fiftieth of a second. This is shown whenever the emulator's frame ends in the wait, so a program that waits for vsync
+  shows it in turn with running, about as often as it waits.
+- **Waiting for room in the sound queue at line N**: a `SOUND` whose channel already has its queue of notes waits for
+  one to finish.
+- **Waiting for the filing system at line N**: a `CHAIN`, `OPENIN`, `*CAT` or the like is waiting for the disc
+  filing system. Owlet has no disc in the drive, so these wait for ever: Escape stops them on the Master 128,
+  BREAK on either.
 - **Running line N, which is not as in the editor**: the editor's line N is not what BASIC has, as after an edit
   since the program ran. Nothing is marked until the program runs again; the variables still update. Lines that were
   not edited are still marked, so an edit to one line does not lose the others.
@@ -73,6 +86,13 @@ An abbreviation such as `P.` is marked as it is written. The panel says:
 - **At BASIC's prompt**: the program has ended, without an error, or not started; its variables stay as it left them.
 - **Not BASIC**: another language ROM has taken over.
 
+A program is waiting when BASIC has not moved on to another statement for a whole frame of the emulator (a sixtieth of
+a second or so) and the machine is in the OS's routine that reads the keyboard, in the filing system's ROM, or in a
+`SOUND` statement; and in any frame that ends in `*FX19`'s wait, which is never longer than a frame. jsbeeb works out
+which of these the machine is in. Anything else that holds a program up, such as a long `PRINT`, or machine code that
+waits in a loop of its own, is shown as running. The waiting line and statement are marked as the running ones are, and
+`..., which is not as in the editor` is added in the same way.
+
 An error that an `ON ERROR` handler took is not shown (the program goes on, or its handler ends it). A program has
 stopped with an error when BASIC's own error handler, which is BASIC text in its ROM, is the last text it read; the
 number and message are those `ERR` and `REPORT` give, and the line is `ERL`. BASIC keeps no note of where in the line
@@ -90,9 +110,11 @@ Switch Debug on before running the program (the run button runs it again) to see
 
 ![A program stopped with an error that BASIC printed in black, after VDU 5: the panel shows it, and the statement is marked in red](docs/images/debugger-hidden-error.png)
 
+![A guessing game waiting at GET: the panel says which keyword and line, and the statement is marked](docs/images/debugger-waiting.png)
+
 While Debug is off nothing is read from the machine and nothing is hooked, so it costs nothing. While it is on, the
 emulator notes writes to the resident integers, where BASIC was when the OS takes an error, and when a statement of
-the program starts, through jsbeeb's write hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
+the program starts or BASIC moves on, through jsbeeb's write hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 

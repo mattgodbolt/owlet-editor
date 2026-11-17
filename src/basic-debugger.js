@@ -11,6 +11,12 @@ const Marks = {
     quiet: {line: "debug-quiet-line", statement: "debug-quiet-statement", colour: "#a08440"},
 };
 const EscapeError = 17;
+const WaitedFor = {
+    keyboard: "keyboard input",
+    vsync: "vsync",
+    "filing system": "the filing system",
+    sound: "room in the sound queue",
+};
 
 function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -37,12 +43,17 @@ function describeError(error, range) {
     return `${what} ${where}. The variables are as the program left them.`;
 }
 
+function describeWait({kind, keyword}, number) {
+    return `Waiting for ${WaitedFor[kind]}${keyword ? ` (${keyword})` : ""} at line ${number}`;
+}
+
 function describe(state, range) {
     if (!state.basic) return `Not BASIC: the language is ${state.title || "an unnamed ROM"}`;
     if (state.error) return describeError(state.error, range);
     if (!state.line) return "At BASIC's prompt";
-    if (!range) return `Running line ${state.line.number}, which is not as in the editor`;
-    return `Running line ${state.line.number}`;
+    const {number} = state.line;
+    const doing = state.wait ? describeWait(state.wait, number) : `Running line ${number}`;
+    return range ? doing : `${doing}, which is not as in the editor`;
 }
 
 /**
