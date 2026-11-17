@@ -1,6 +1,22 @@
-import {BasicIIDialect, ModelBDialect} from "../src/parser/dialect";
+import {
+    BasicIIDialect,
+    BasicIVDialect,
+    ModelBDialect,
+    canStartStatement,
+} from "../src/parser/dialect";
 import {highlightLine, programProblems, readLines} from "../src/parser/highlight";
 import {lexLine, romBytes} from "../src/parser/lexer";
+import {
+    BracketFunction,
+    ChannelFunction,
+    ExpectingRecogniser,
+    ExpressionCount,
+    NoArgument,
+    OneArgument,
+    Recogniser,
+    TextKeyword,
+} from "../src/parser/recogniser";
+import {Flags} from "../src/tokens";
 import {
     invalidSpans,
     LenientThanRom,
@@ -835,5 +851,122 @@ describe("Junk after a complete instruction", () => {
         ).filter(p => p.stricter);
         assert.deepStrictEqual([first.line, first.start], [1, 7]);
         assert.deepStrictEqual([second.line, second.start], [2, 3]);
+    });
+});
+
+// What the grammar has for each keyword in the table: a statement rule, a value rule, or a place it is read inside
+// another statement. A keyword added to a table without one of these fails here, instead of being read as anything.
+describe.each([
+    ["BASIC II", BasicIIDialect],
+    ["BASIC IV", BasicIVDialect],
+])("The grammar's rules for the keywords of %s", (_, dialect) => {
+    const statements = dialect.keywords.filter(kw => canStartStatement(dialect, kw));
+    const values = dialect.keywords.filter(kw => kw.flags & Flags.Expr);
+    const problemCount = text => readLines(text, dialect)[0].problems.length;
+    const spellings = rows => [...new Set(rows.map(kw => kw.keyword))].sort();
+
+    // The statements read as far as their end of line with no rule: AUTO to SAVE are commands for the prompt, which
+    // a program that runs into one stops at, DATA and REM are text, and ELSE ends the statement before it.
+    const WithoutRule = [
+        "AUTO",
+        "DATA",
+        "DELETE",
+        "ELSE",
+        "LIST",
+        "LOAD",
+        "REM",
+        "RENUMBER",
+        "SAVE",
+    ];
+    // The words that are neither a value nor a statement, each with text that BASIC reads it after.
+    const ReadInsideStatement = {
+        ERROR: "ON ",
+        LINE: "INPUT ",
+        OFF: "ON ERROR ",
+        STEP: "FOR I=1 TO 2 ",
+        SPC: "PRINT ",
+        "TAB(": "PRINT ",
+        THEN: "IF 1 ",
+        TO: "FOR I=1 ",
+    };
+    // The operators between two values, which are read where one value follows another.
+    const Infix = ["AND", "DIV", "EOR", "MOD", "OR"];
+
+    it("should have a rule for every statement, bar those it deliberately skips", () => {
+        // Any text after a statement with a rule is an error; one without a rule skips the rest of the line.
+        const probe = kw => (kw === "DEF" ? "DEF FN )" : `${kw} )`);
+        const skipped = statements.filter(kw => problemCount(probe(kw.keyword)) === 0);
+        assert.deepStrictEqual(spellings(skipped), WithoutRule);
+    });
+
+    it("should read each statement, bare or with an operand, without an exception", () => {
+        for (const {keyword} of statements)
+            for (const operand of ["", " 1", " A$", " 1,2", ' "x"', " #1"])
+                assert.doesNotThrow(() => readLines(keyword + operand, dialect), keyword + operand);
+    });
+
+    it("should read each value with a rule, bare or with its operand", () => {
+        const operands = ["", " 1", "#1", "(1)", "(1,2)", "1,2)", "1,2,3)", " A$"];
+        const unread = values.filter(
+            kw =>
+                !Infix.includes(kw.keyword) &&
+                operands.every(operand => problemCount(`A=${kw.keyword}${operand}`) > 0),
+        );
+        assert.deepStrictEqual(spellings(unread), []);
+        for (const keyword of Infix)
+            assert.strictEqual(problemCount(`A=1 ${keyword} 2`), 0, keyword);
+    });
+
+    it("should make each keyword a value, a statement or a word read inside a statement", () => {
+        const other = dialect.keywords.filter(
+            kw => !(kw.flags & Flags.Expr) && !canStartStatement(dialect, kw),
+        );
+        assert.deepStrictEqual(spellings(other), Object.keys(ReadInsideStatement).sort());
+        const both = values.filter(kw => canStartStatement(dialect, kw));
+        assert.deepStrictEqual(spellings(both), dialect.basicIV ? ["EXT"] : []);
+    });
+
+    it("should look for each word read inside a statement where it is read", () => {
+        for (const [keyword, before] of Object.entries(ReadInsideStatement)) {
+            const reading = new ExpectingRecogniser(before, false, dialect);
+            reading.line();
+            assert(reading.words.has(keyword), `${keyword} after ${before}`);
+        }
+    });
+});
+
+describe("The spellings the grammar names", () => {
+    const table = new Set(BasicIVDialect.keywords.map(kw => kw.keyword));
+    const spellingsIn = {
+        NoArgument: [...NoArgument],
+        OneArgument: [...OneArgument],
+        ChannelFunction: [...ChannelFunction],
+        BracketFunction: Object.keys(BracketFunction),
+        ExpressionCount: Object.keys(ExpressionCount),
+        TextKeyword: [...TextKeyword],
+    };
+
+    it("should all be keywords of BASIC IV's table, which has BASIC II's", () => {
+        for (const [name, spellings] of Object.entries(spellingsIn))
+            assert.deepStrictEqual(
+                spellings.filter(spelling => !table.has(spelling)),
+                [],
+                name,
+            );
+    });
+
+    it("should have a statement rule only for a statement keyword", () => {
+        const statements = new Set(
+            BasicIVDialect.keywords
+                .filter(kw => canStartStatement(BasicIVDialect, kw))
+                .map(kw => kw.keyword),
+        );
+        const rules = Object.getOwnPropertyNames(Recogniser.prototype).filter(name =>
+            /^[A-Z][A-Z$]*$/.test(name),
+        );
+        assert.deepStrictEqual(
+            [...rules, ...spellingsIn.ExpressionCount].filter(name => !statements.has(name)),
+            [],
+        );
     });
 });

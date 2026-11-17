@@ -1,16 +1,9 @@
 import {debbreviate, expandCode} from "../src/expand-code";
-import {
-    Flags,
-    detokenise,
-    forEachBasicLine,
-    isFnProc,
-    keywords,
-    partialDetokenise,
-    pseudoVariables,
-} from "../src/tokens";
+import {Flags, isFnProc, keywords, pseudoVariables} from "../src/tokens";
 import {
     BasicIIDialect,
     BasicIVDialect,
+    LimitKeyword,
     ModelBDialect,
     canStartStatement,
 } from "../src/parser/dialect";
@@ -18,7 +11,7 @@ import {RomTokens} from "./rom-tables";
 import {describe, expect, it} from "vitest";
 import assert from "assert";
 import {Buffer} from "buffer";
-import {existsSync, readFileSync} from "fs";
+import {existsSync, readdirSync, readFileSync} from "fs";
 
 // The ROM images jsbeeb ships: BASIC II's on its own, and BASIC IV's inside the Master's 128K MOS image.
 const RomDirectory = "node_modules/jsbeeb/public/roms";
@@ -186,6 +179,31 @@ describe.each([
             "THEN",
         ]);
     });
+    it("should put each keyword that takes a line number in exactly one of the commands, the lookups and the limit", () => {
+        const expected = {
+            AUTO: ["command"],
+            DELETE: ["command"],
+            ELSE: ["lookup"],
+            GOSUB: ["lookup"],
+            GOTO: ["lookup"],
+            LIST: ["command"],
+            RENUMBER: ["command"],
+            RESTORE: ["lookup"],
+            THEN: ["lookup"],
+            TRACE: ["limit"],
+            ...(dialect.basicIV ? {EDIT: ["command"]} : {}),
+        };
+        const classesOf = word =>
+            [
+                dialect.immediateCommands.includes(word) && "command",
+                dialect.lineNumberLookups.has(word) && "lookup",
+                word === LimitKeyword && "limit",
+            ].filter(Boolean);
+        const flagged = spellings(dialect.keywords, kw => kw.flags & Flags.LineNumber).sort();
+        expect(flagged).toEqual(Object.keys(expected).sort());
+        expect(Object.fromEntries(flagged.map(word => [word, classesOf(word)]))).toEqual(expected);
+        expect([...dialect.lineNumberLookups].every(word => flagged.includes(word))).toBe(true);
+    });
     it("should branch an ON to GOTO and GOSUB, and on BASIC IV PROC", () => {
         expect(dialect.onBranches).toEqual(
             dialect.basicIV ? ["GOTO", "GOSUB", "PROC"] : ["GOTO", "GOSUB"],
@@ -193,74 +211,31 @@ describe.each([
     });
 });
 
-describe("Detokenisation", () => {
-    it("should detokenise the empty string", () => {
-        assert.strictEqual(detokenise(""), "");
-    });
-    it("should leave untokenised things alone", () => {
-        assert.strictEqual(detokenise("I am a mongoose."), "I am a mongoose.");
-    });
-    it("should detokenise simple tokens", () => {
-        assert.strictEqual(detokenise("\x80"), "AND");
-        assert.strictEqual(detokenise("\xf1"), "PRINT");
-        assert.strictEqual(detokenise("\xff"), "OSCLI");
-    });
-    it("should leave a byte that is not a token as it is", () => {
-        assert.strictEqual(detokenise("\xf1\xce1"), "PRINT\xce1");
-    });
-    it("should detokenise a simple example", () => {
-        assert.strictEqual(detokenise('\xf1 "HELLO"'), 'PRINT "HELLO"');
-    });
-    it("should not detokenise within quotes", () => {
-        assert.strictEqual(detokenise('\xf1 "\xf1"'), 'PRINT "\xf1"');
-    });
-    it("should handle GOTOs", () => {
-        assert.strictEqual(detokenise("\xe5\x8dTT@"), "GOTO20");
-        assert.strictEqual(detokenise("\xe5\x8d\x54\x79\x70"), "GOTO12345");
-        assert.strictEqual(detokenise("\xe5\x8d\x60\x7f\x7f"), "GOTO32767");
-    });
-    it("should handle nested quotes", () => {
-        assert.strictEqual(detokenise('\xf1 "HI""MUM"'), 'PRINT "HI""MUM"');
-    });
-    it("should not detokenise in quotes even with nested quotes", () => {
-        assert.strictEqual(detokenise('\xf1 "HI""\xf1"'), 'PRINT "HI""\xf1"');
-    });
-    it("should not detokenise in quotes even with colons", () => {
-        assert.strictEqual(detokenise('\xf1 "HI:\xf1"'), 'PRINT "HI:\xf1"');
-    });
-    it("should detokenise a complete program", () => {
-        const original = `0ô1i0123456789!oÿ1234567890=^\\<>$o QWERTYUIOP@[_^v oÿÿASDFGHJKL:;]ÿ )kÿZXCVBNM,./ÿ6g        q\`ÿ!\`ÿ!\`ÿ~\`ÿ aÿÿ8f       q\`ÿ!\`ÿ!\`ÿ~\`ÿsbÿÿÿ
-1ë1:Y=6:P=4420:!3320=³:æ64,0:ð97,P,P:ï535;P;P;P;P;5:æ16,0:ì80,50:ð97,1120,386:æ0,0:ð&65,80,500
-Q=+5:ãJ=0¸16:X=?Q-19:L=Q?1-96:Q=Q+2:ãI=0¸L:æ0,P:ì10*X+64*I,60*Y:ð97,48,48:ð0,-40,0:æ0,3:çPð0,-8,0:ï102:ð0,-12,-16
-ïQ?I:í:Y=Y+(5Y>1):Q=Q+L+1:P=0:í:ï1
-`;
-        assert.strictEqual(
-            detokenise(original),
-            `0REM1i0123456789!oÿ1234567890=^\\<>$o QWERTYUIOP@[_^v oÿÿASDFGHJKL:;]ÿ )kÿZXCVBNM,./ÿ6g        q\`ÿ!\`ÿ!\`ÿ~\`ÿ aÿÿ8f       q\`ÿ!\`ÿ!\`ÿ~\`ÿsbÿÿÿ
-1MODE1:Y=6:P=4420:!3320=RND:GCOL64,0:PLOT97,P,P:VDU535;P;P;P;P;5:GCOL16,0:MOVE80,50:PLOT97,1120,386:GCOL0,0:PLOT&65,80,500
-Q=PAGE+5:FORJ=0TO16:X=?Q-19:L=Q?1-96:Q=Q+2:FORI=0TOL:GCOL0,ATNP:MOVE10*X+64*I,60*Y:PLOT97,48,48:PLOT0,-40,0:GCOL0,3:IFP PLOT0,-8,0:VDU102:PLOT0,-12,-16
-VDUQ?I:NEXT:Y=Y+(5ORY>1):Q=Q+L+1:P=0:NEXT:VDU1
-`,
+describe("The spellings the code compares keywords by", () => {
+    const SourceDirectory = "src";
+    const sourceFiles = directory =>
+        readdirSync(directory, {withFileTypes: true}).flatMap(entry =>
+            entry.isDirectory()
+                ? sourceFiles(`${directory}/${entry.name}`)
+                : entry.name.endsWith(".js")
+                  ? [`${directory}/${entry.name}`]
+                  : [],
         );
-    });
-    it("should add spaces after tokens with the Conditional flag", () => {
-        assert.strictEqual(detokenise("\xf1\x9f\x841"), "PRINTERR OR1");
-    });
-    it("should add spaces before tokens which follow an identifier", () => {
-        assert.strictEqual(detokenise("\xf1X\x84Y"), "PRINTX ORY");
-    });
-    it("shouldn't expand tokens after DATA or REM, tokenised, typed or abbreviated", () => {
-        const cases = [
-            ["\xdc", "DATA"],
-            ["DATA"],
-            ["DAT."],
-            ["DA."],
-            ["D."],
-            ["\xf4", "REM"],
-            ["REM"],
-        ];
-        for (const [keyword, expanded = keyword] of cases)
-            assert.strictEqual(detokenise(`${keyword}X\x84Y`), `${expanded}X\u0184Y`, keyword);
+    // keyword === "X" and isKeyword("X", "Y"): the code that names a keyword by its spelling.
+    const named = text => [
+        ...[...text.matchAll(/keyword\s*[!=]==\s*"([^"]+)"/g)].map(match => match[1]),
+        ...[...text.matchAll(/isKeyword\(((?:\s*"[^"]+",?)+)\)/g)].flatMap(match =>
+            [...match[1].matchAll(/"([^"]+)"/g)].map(word => word[1]),
+        ),
+    ];
+    it("should all be in a keyword table", () => {
+        const table = new Set(BasicIVDialect.keywords.map(kw => kw.keyword));
+        const spelled = sourceFiles(SourceDirectory).flatMap(file =>
+            named(readFileSync(file, "utf8")).map(word => ({file, word})),
+        );
+        // Enough to show the patterns still find the code that does it.
+        expect(spelled.length).toBeGreaterThan(30);
+        expect(spelled.filter(({word}) => !table.has(word))).toEqual([]);
     });
 });
 
@@ -337,62 +312,6 @@ describe("Debbreviation and the ROM", () => {
             assert.strictEqual(romTokens.get(expanded), romTokens.get(text), text);
         }
         assert.notStrictEqual(romTokens.get("IFCOUNTTHEN*LO. P.DATA"), romTokens.get(cases[0][0]));
-    });
-});
-
-describe("For each basic line", () => {
-    it("should handle an empty program", () => {
-        forEachBasicLine("\x0d\xff", () => assert.fail("Shouldn't call me"));
-    });
-    it("should handle a single line program", () => {
-        const result = [];
-        forEachBasicLine('\x0d\x00\x0a\x0d\xf1 "Hello"\x0d\xff', (lineNum, line) =>
-            result.push({num: lineNum, line}),
-        );
-        assert.deepStrictEqual(result, [{num: 10, line: '\xf1 "Hello"'}]);
-    });
-    it("should handle a two line program", () => {
-        const result = [];
-        forEachBasicLine(
-            '\x0d\x00\x0a\x0d\xf1 "Hello"\x0d\x00\x14\x05\xf9\x0d\xff',
-            (lineNum, line) => result.push({num: lineNum, line}),
-        );
-        assert.deepStrictEqual(result, [
-            {num: 10, line: '\xf1 "Hello"'},
-            {num: 20, line: "\xf9"},
-        ]);
-    });
-});
-
-describe("Partial detokenisation", () => {
-    it("should drop sequential 10, 20 etc", () => {
-        const rawProgram =
-            '\x0d\x00\x0a\x14 \xf1 "Hello world"\x0d\x00\x14\x0b \xe5 \x8d\x54\x4a\x40\x0d\xff';
-        assert.strictEqual(partialDetokenise(rawProgram), '\xf1 "Hello world"\n\xe5 10');
-    });
-    it("should leave non-tens line numbers", () => {
-        const rawProgram =
-            '\x0d\x00\x0a\x14 \xf1 "Hello world"\x0d\x00\x0b\x0b \xe5 \x8d\x54\x4a\x40\x0d\xff';
-        assert.strictEqual(partialDetokenise(rawProgram), '\xf1 "Hello world"\n11 \xe5 10');
-    });
-    it("should not result in invisible Unicode characters", () => {
-        const rawProgram = "\x0d\x00\x0a\x08\xf1\x9f\x841\x0d\xff";
-        assert.strictEqual(partialDetokenise(rawProgram), "\xf1\u019f\u01841");
-    });
-    it("should write the bytes that would be invisible as visible characters", () => {
-        const rawProgram = "\x0d\x00\x0a\x06\xa0\xad\x0d\xff";
-        const shrunk = partialDetokenise(rawProgram);
-        assert.strictEqual(shrunk, "\u01a0\u01ad");
-        assert.strictEqual(shrunk.trim(), shrunk);
-    });
-    it("should reset state after a line number token", () => {
-        const rawProgram =
-            "\x0d\x00\x0a\x13\xe4\x8d\x54\x4a\x40:\xe5\x8d\x54\x54\x40:\xf4OK\x0d\xff";
-        assert.strictEqual(partialDetokenise(rawProgram), "\xe410:\xe520:\xf4OK");
-    });
-    it("should not expand line number token in literal string", () => {
-        const rawProgram = '\x0d\x00\x0a\x13\xf1"\x8dHello":\xe5\x8d\x54\x4a\x40\x0d\xff';
-        assert.strictEqual(partialDetokenise(rawProgram), '\xf1"\u018dHello":\xe510');
     });
 });
 

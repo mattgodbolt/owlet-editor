@@ -1,6 +1,6 @@
 import {decode} from "base2048";
 import {lexLine} from "./parser/lexer.js";
-import {detokenise} from "./tokens.js";
+import {detokenise} from "./detokenise.js";
 
 // The text with each abbreviation written out, as BASIC's tokeniser reads it: not in a string, REM, DATA or * command,
 // and not where a name or a conditional keyword's spelling continues.
@@ -39,7 +39,7 @@ export function expandCode(text, dialect, fits = () => true) {
         return decode2048(text);
     }
     const original = text.split("\n");
-    const expanded = detokenise(debbreviate(text, dialect)).split("\n");
+    const expanded = detokenise(debbreviate(text, dialect), dialect).split("\n");
     if (original.length !== expanded.length) return expanded.join("\n");
     return expanded.map((line, i) => (fits(line) ? line : original[i])).join("\n");
 }

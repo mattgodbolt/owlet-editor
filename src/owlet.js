@@ -12,7 +12,7 @@ import {Emulator} from "./emulator";
 import {BasicDebugger} from "./basic-debugger";
 import Examples from "./examples.yaml";
 import {expandCode} from "./expand-code";
-import {partialDetokenise} from "./tokens";
+import {partialDetokenise} from "./detokenise";
 import {createTokenisers, tokeniserFor} from "./tokeniser";
 import {encode} from "base2048";
 import "./owlet-editor.less";
@@ -507,7 +507,7 @@ export class OwletEditor {
             // TODO, something went wrong.
             return;
         }
-        this.updateEditorText(partialDetokenise(rawTokenised), "tokenise");
+        this.updateEditorText(partialDetokenise(rawTokenised, this.dialect), "tokenise");
     }
 
     copy() {
