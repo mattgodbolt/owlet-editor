@@ -73,8 +73,24 @@ An abbreviation such as `P.` is marked as it is written. The panel says:
 - **At BASIC's prompt**: the program has ended, without an error, or not started; its variables stay as it left them.
 - **Not BASIC**: another language ROM has taken over.
 
-An error that an `ON ERROR` handler took is not shown (the program goes on, or its handler ends it). A program has
-stopped with an error when BASIC's own error handler, which is BASIC text in its ROM, is the last text it read; the
+Under the status, the panel lists the errors that `ON ERROR` handlers took in this run, which are otherwise easy to
+miss: once a handler runs, BASIC's own state no longer shows the error, and the handler may print nothing, or clear
+the screen. The latest is first, each as `No such variable (ERR 26) at line 140, 3 times, taken by the ON ERROR at
+line 20`, under the number taken in all. The last eight different errors are kept (an error is the same if it has the
+same number, message, line, part of the line between colons, and handler); a handler that loops on its own error,
+thousands of times a second, is one row with a growing count. The latest one's statement is marked in the editor with
+a dashed box, which fades after about a second of the program running on without another; the error the program
+stopped with, if it did, keeps its solid red mark and the status line, and is not counted among the handled ones.
+Escape taken by a handler is listed in amber. The list starts afresh when the program runs again, as the error the
+program stopped with does. The line is the one `ERL` gives, but found from BASIC's text pointer as the error is raised,
+so an error in a line numbered 0 is at line 0, and one in a command typed at the prompt has no line.
+
+An error numbered 0 (`STOP`) never goes to an `ON ERROR` handler, so it is never listed: BASIC's own handler takes it.
+Only plain `ON ERROR` exists in BASIC II and BASIC IV; `ON ERROR LOCAL` is BASIC V's, and on these machines sets a
+handler that runs `LOCAL`, which fails with `Not LOCAL` and so loops forever, as the list then shows. Handled errors
+are caught as they are raised, so only those raised while Debug is on are listed.
+
+A program has stopped with an error when BASIC's own error handler, which is BASIC text in its ROM, is the last text it read; the
 number and message are those `ERR` and `REPORT` give, and the line is `ERL`. BASIC keeps no note of where in the line
 the error was: its error handler moves its text pointer to the `ON ERROR` text. So the statement is known only when
 Debug was on as the error was raised, and caught the pointer then; switched on later, Debug marks the whole line. An
@@ -90,9 +106,11 @@ Switch Debug on before running the program (the run button runs it again) to see
 
 ![A program stopped with an error that BASIC printed in black, after VDU 5: the panel shows it, and the statement is marked in red](docs/images/debugger-hidden-error.png)
 
+![A program whose ON ERROR handler silently skips a division by zero: the panel lists it, three times, and the statement is marked with a dashed box](docs/images/debugger-handled-error.png)
+
 While Debug is off nothing is read from the machine and nothing is hooked, so it costs nothing. While it is on, the
-emulator notes writes to the resident integers, where BASIC was when the OS takes an error, and when a statement of
-the program starts, through jsbeeb's write hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
+emulator notes writes to the resident integers, where BASIC was and which handler was set when the OS takes an error,
+and when a statement of the program starts, through jsbeeb's write hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 

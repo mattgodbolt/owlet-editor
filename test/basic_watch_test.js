@@ -511,3 +511,303 @@ describe("BasicWatch errors", () => {
         });
     }
 });
+
+// An empty, formatted DFS disc, so that a * command DFS does not know is looked for on it and is not found.
+function blankDisc() {
+    const SingleSidedBytes = 200 * 1024;
+    const SectorCount = 800;
+    const disc = new Uint8Array(SingleSidedBytes);
+    disc[0x106] = SectorCount >> 8;
+    disc[0x107] = SectorCount & 0xff;
+    return disc;
+}
+
+// What the watch shows of the errors ON ERROR handlers took, with the error the program stopped with, and ERL as a
+// handler noted it in L%.
+function handledShown(state, lines, machine) {
+    return {
+        total: state.handled.total,
+        errors: state.handled.errors.map(({number, message, line, handler, count}) => ({
+            number,
+            message,
+            line: line?.number ?? null,
+            marked: line && markedText(lines, machine, line),
+            handler,
+            count,
+        })),
+        stopped: describeError(state.error, lines, machine),
+        erl: state.residents.find(({name}) => name === "L%")?.value,
+    };
+}
+
+async function runWatched(machine, lines, {disc} = {}) {
+    const booted = await bootedMachine(machine);
+    if (disc) booted.testMachine.loadDiscData(blankDisc());
+    const watch = new BasicWatch();
+    watch.read(booted.cpu);
+    await run(booted, lines);
+    // DFS reads the disc before it finds nothing there.
+    if (disc) await booted.testMachine.runFor(CyclesPerRun * 40);
+    return {booted, watch};
+}
+
+const taken = (number, message, line, marked, handler, count = 1) => ({
+    number,
+    message,
+    line,
+    marked,
+    handler,
+    count,
+});
+
+describe("BasicWatch handled errors", () => {
+    for (const machine of ["B", "Master"]) {
+        describe(`on the ${machine}`, () => {
+            it.each([
+                {
+                    name: "a handler that prints nothing and carries on",
+                    lines: ["ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END", "X=1:Y=Q:Z=1"],
+                    errors: [taken(26, "No such variable", 20, "Y=Q", 10, 3)],
+                    erl: "20",
+                },
+                {
+                    // The text pointer is a byte further into the line after the GOTO than after the line before.
+                    name: "an error at the start of a line, however it was reached",
+                    lines: ["ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END", "X=Q"],
+                    errors: [taken(26, "No such variable", 20, "X=Q", 10, 3)],
+                    erl: "20",
+                },
+                {
+                    name: "an error in a PROC",
+                    lines: [
+                        "ON ERROR L%=ERL:END",
+                        "PROCx",
+                        "END",
+                        "DEF PROCx",
+                        "A=1:B=1/0",
+                        "ENDPROC",
+                    ],
+                    errors: [taken(18, "Division by zero", 50, "B=1/0", 10)],
+                    erl: "50",
+                },
+                {
+                    name: "an error in a FN",
+                    lines: ["ON ERROR L%=ERL:END", "X=FNf", "DEF FNf=1/0"],
+                    errors: [taken(18, "Division by zero", 30, "=1/0", 10)],
+                    erl: "30",
+                },
+                {
+                    name: "errors in the handler itself",
+                    lines: ["ON ERROR IF N%<3 THEN N%=N%+1:PRINT 1/0 ELSE END", "X=Q"],
+                    errors: [
+                        taken(18, "Division by zero", 10, "PRINT 1/0", 10, 3),
+                        taken(26, "No such variable", 20, "X=Q", 10),
+                    ],
+                },
+                {
+                    name: "a BRK in assembled code",
+                    lines: [
+                        "ON ERROR L%=ERL:END",
+                        "DIM C% 20",
+                        "P%=C%",
+                        "[OPT 0",
+                        'BRK:EQUB 100:EQUS "Mine":EQUB 0',
+                        "]",
+                        "X=1:CALL C%",
+                    ],
+                    errors: [taken(100, "Mine", 70, "CALL C%", 10)],
+                    erl: "70",
+                },
+                {
+                    name: "an error from DFS",
+                    lines: ["ON ERROR L%=ERL:END", "X=1:*DRIVE 9"],
+                    errors: [taken(205, "Bad drive", 20, "*DRIVE 9", 10)],
+                    erl: "20",
+                },
+                {
+                    name: "an error from the MOS",
+                    lines: ["ON ERROR L%=ERL:END", 'X=1:OSCLI "FX 999"'],
+                    errors: [taken(254, "Bad command", 20, 'OSCLI "FX 999"', 10)],
+                    erl: "20",
+                },
+                {
+                    name: "a * command DFS does not find on the disc",
+                    lines: ["ON ERROR L%=ERL:END", "*FOO"],
+                    disc: true,
+                    errors: [taken(254, "Bad command", 20, "*FOO", 10)],
+                    erl: "20",
+                },
+                {
+                    name: "an error in a line numbered 0",
+                    lines: ["0 GOSUB 2:X=Q", "1 END", "2 ON ERROR L%=ERL:END", "3 RETURN"],
+                    errors: [taken(26, "No such variable", 0, "X=Q", 2)],
+                    erl: "0",
+                },
+                {
+                    name: "an ON ERROR that a later one replaced",
+                    lines: ["ON ERROR END", "ON ERROR L%=ERL:END", "X=Q"],
+                    errors: [taken(26, "No such variable", 30, "X=Q", 20)],
+                    erl: "30",
+                },
+            ])("keeps $name", async ({lines, disc, errors, erl}) => {
+                const {booted, watch} = await runWatched(machine, lines, {disc});
+                expect(handledShown(watch.read(booted.cpu), lines, booted)).toEqual({
+                    total: errors.reduce((total, {count}) => total + count, 0),
+                    errors,
+                    stopped: null,
+                    erl,
+                });
+            });
+
+            it.each([
+                {
+                    name: "an error the handler then stops with",
+                    lines: ["ON ERROR ON ERROR OFF:PRINT 1/0", "X=Q"],
+                    stopped: {
+                        number: 18,
+                        message: "Division by zero",
+                        line: 10,
+                        marked: "PRINT 1/0",
+                    },
+                },
+                {
+                    name: "a STOP in the handler",
+                    lines: ["ON ERROR STOP", "X=Q"],
+                    stopped: {number: 0, message: "STOP", line: 10, marked: "STOP"},
+                },
+            ])(
+                "keeps a handled error apart from $name, which it does not count",
+                async ({lines, stopped}) => {
+                    const {booted, watch} = await runWatched(machine, lines);
+                    expect(handledShown(watch.read(booted.cpu), lines, booted)).toEqual({
+                        total: 1,
+                        errors: [taken(26, "No such variable", 20, "X=Q", 10)],
+                        stopped,
+                        erl: undefined,
+                    });
+                },
+            );
+
+            it.each([
+                {
+                    name: "STOP, which BASIC's own handler takes",
+                    lines: ['ON ERROR PRINT "h":END', "STOP"],
+                },
+                {
+                    name: "an error after ON ERROR OFF",
+                    lines: ["ON ERROR END", "ON ERROR OFF", "X=Q"],
+                },
+                {name: "no error", lines: ["ON ERROR END", "X=1"]},
+                {
+                    // Only the OS's own write of the error block's address is an error being raised.
+                    name: "a program writing where the OS keeps the error block's address",
+                    lines: [
+                        "ON ERROR END",
+                        'DIM B% 8:?B%=99:$(B%+1)="Fake"',
+                        "!&FD=B%:?&FE=B% DIV 256",
+                        "X=1",
+                    ],
+                },
+            ])("keeps nothing for $name", async ({lines}) => {
+                const {booted, watch} = await runWatched(machine, lines);
+                expect(watch.read(booted.cpu).handled).toEqual({total: 0, errors: []});
+            });
+
+            it("keeps Escape pressed while a handler is set", async () => {
+                const lines = ["ON ERROR L%=ERL:END", "REPEAT:A=A+1:UNTIL FALSE"];
+                const {booted, watch} = await runWatched(machine, lines);
+                booted.testMachine.keyDown("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                booted.testMachine.keyUp("Escape");
+                await booted.testMachine.runFor(CyclesPerRun);
+                const shown = handledShown(watch.read(booted.cpu), lines, booted);
+                expect(shown).toMatchObject({total: 1, stopped: null, erl: "20"});
+                expect(shown.errors).toEqual([
+                    {
+                        number: 17,
+                        message: "Escape",
+                        line: 20,
+                        marked: expect.any(String),
+                        handler: 10,
+                        count: 1,
+                    },
+                ]);
+            });
+
+            it("keeps nothing for an error typed at the prompt, as BASIC's own handler is set again there", async () => {
+                const {booted, watch} = await runWatched(machine, ["ON ERROR END", "X=1"]);
+                for (const command of ['ON ERROR PRINT "h"', "PRINT 1/0"]) {
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun);
+                }
+                expect(watch.read(booted.cpu)).toMatchObject({
+                    handled: {total: 0, errors: []},
+                    error: {number: 18, line: null},
+                });
+            });
+
+            it("keeps only the last few different errors, the latest first, and counts them all", async () => {
+                const lines = [
+                    "ON ERROR N%=N%+1:IF N%<12 GOTO (110+10*N%) ELSE END",
+                    "GOTO 110",
+                    ...Array.from({length: 12}, (_, i) => `${110 + 10 * i} X=Q${i}`),
+                ];
+                const {booted, watch} = await runWatched(machine, lines);
+                const {handled} = watch.read(booted.cpu);
+                expect(handled.total).toBe(12);
+                expect(handled.errors.map(({line}) => line.number)).toEqual([
+                    220, 210, 200, 190, 180, 170, 160, 150,
+                ]);
+            });
+
+            it("keeps up with a handler that loops on its own error", async () => {
+                // BASIC II and IV take ON ERROR LOCAL as a handler that runs LOCAL, which is an error outside a PROC.
+                const {booted, watch} = await runWatched(machine, ["ON ERROR LOCAL", "X=Q"]);
+                await booted.testMachine.runFor(Machines[machine].startCycles);
+                const {handled} = watch.read(booted.cpu);
+                expect(handled.total).toBeGreaterThan(500);
+                expect(handled.errors).toHaveLength(2);
+                expect(handled.errors[0]).toMatchObject({
+                    message: "Not LOCAL",
+                    count: handled.total - 1,
+                });
+            });
+
+            it("keeps them through what is typed at the prompt, and forgets them when the program runs again", async () => {
+                const lines = [
+                    "ON ERROR END",
+                    "IF A%=0 THEN A%=1:X=Q",
+                    "INPUT V",
+                    'Y=EVAL("V+1")',
+                    "END",
+                ];
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, lines.slice(0, 2));
+                expect(watch.read(booted.cpu).handled.total).toBe(1);
+                for (const command of ["MODE 7", "PRINT X", "LIST", "MDOE"]) {
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun);
+                    expect(watch.read(booted.cpu).handled.total).toBe(1);
+                }
+                await booted.testMachine.type("RUN");
+                await booted.testMachine.runFor(CyclesPerRun * 5);
+                expect(watch.read(booted.cpu).handled).toEqual({total: 0, errors: []});
+
+                // Nor does an INPUT or EVAL in the program lose them.
+                await run(booted, ["ON ERROR GOTO 30", "X=Q", "INPUT V", 'Y=EVAL("V+1")', "END"]);
+                await booted.testMachine.type("5");
+                await booted.testMachine.runFor(CyclesPerRun * 5);
+                expect(watch.read(booted.cpu)).toMatchObject({
+                    line: null,
+                    variables: expect.arrayContaining([{name: "Y", value: "6"}]),
+                    handled: {total: 1},
+                });
+
+                watch.restart();
+                expect(watch.read(booted.cpu).handled).toEqual({total: 0, errors: []});
+            });
+        });
+    }
+});

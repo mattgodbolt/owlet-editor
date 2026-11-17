@@ -220,6 +220,28 @@ canvas.screen {
     }
   }
 
+  .debug-handled {
+    margin-bottom: 4px;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .debug-handled-title {
+    color: #999;
+  }
+
+  .debug-handled-error {
+    padding-left: 2ch;
+    text-indent: -1ch;
+    color: #e06060;
+
+    &[data-mark="quiet"] {
+      color: #c0a060;
+    }
+  }
+
   .debug-variables {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(16ch, 1fr));
@@ -274,6 +296,20 @@ canvas.screen {
 .monaco-editor .debug-quiet-statement {
   background-color: rgba(160, 132, 64, 0.4);
   outline: 1px solid #a08440;
+}
+
+.monaco-editor .debug-handled-statement {
+  background-color: rgba(176, 58, 58, 0.35);
+  outline: 1px dashed #e06060;
+
+  &.debug-handled-quiet {
+    background-color: rgba(160, 132, 64, 0.3);
+    outline-color: #c0a060;
+  }
+
+  &.debug-handled-faded {
+    background-color: transparent;
+  }
 }
 
 @keyframes soundPrompt {
