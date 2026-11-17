@@ -1,4 +1,4 @@
-import {languages, MarkerSeverity} from "monaco-editor/editor/editor.api";
+import {editor, languages, MarkerSeverity} from "monaco-editor/editor/editor.api";
 import {Flags, keywords, tokenChar} from "./tokens";
 import {StandaloneServices} from "monaco-editor/editor/standalone/browser/standaloneServices";
 import {IStandaloneThemeService} from "monaco-editor/editor/standalone/common/standaloneTheme";
@@ -29,6 +29,18 @@ function tokenMetadata(scopes, bracket) {
     const language =
         StandaloneServices.get(ILanguageService).languageIdCodec.encodeLanguageId(LanguageId);
     return (theme.match(language, scopes) | (bracket ? BalancedBrackets : 0)) >>> 0;
+}
+
+/**
+ * Has Monaco pair the brackets of a model again, from our tokens. A tree built while the model has no tokens (as after
+ * setValue, or the tokens provider being replaced) counts every "." as an opener, and Monaco does not rebuild it once
+ * tokens arrive if it has already seen tokenizing complete; changing a model option does rebuild it.
+ */
+export function rebuildBracketPairs(model) {
+    model.tokenization.forceTokenization(model.getLineCount());
+    const {bracketPairColorizationOptions: options} = model.getOptions();
+    model.updateOptions({bracketColorizationOptions: {...options, enabled: !options.enabled}});
+    model.updateOptions({bracketColorizationOptions: options});
 }
 
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
@@ -78,6 +90,8 @@ export function registerBbcBasicLanguage() {
         configuration,
         languages.registerCodeActionProvider(LanguageId, codeActionProvider),
     ];
+    for (const model of editor.getModels())
+        if (model.getLanguageId() === LanguageId) rebuildBracketPairs(model);
 }
 
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
