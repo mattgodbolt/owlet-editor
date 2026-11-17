@@ -60,7 +60,7 @@ An abbreviation such as `P.` is marked as it is written. The panel says:
 - **No such variable (ERR 26) at line N**: the program stopped with that error in line N, which is marked in red:
   the statement the error was in, or the whole line where that is not known (see below). The variables are as the
   program left them, as they are on a real BBC Micro. This stays, through anything typed at the prompt, until the
-  program runs again, which is the point: the message is often not on the emulated screen, after `VDU 5` with the
+  program runs again (from the run button, or a `RUN`, `GOTO` or `PROC` typed at the prompt; not a `LIST`), which is the point: the message is often not on the emulated screen, after `VDU 5` with the
   graphics cursor off the screen, or a `CLS`, or once a mistyped `REPORT` has replaced it.
 - **..., which has changed since the error**: the editor's line N is not what BASIC ran, so nothing is marked.
 - **STOP at line N** and **Escape (ERR 17) at line N** are shown the same way, in amber, as people stop a program
@@ -88,8 +88,8 @@ Switch Debug on before running the program (the run button runs it again) to see
 ![A program stopped with an error that BASIC printed in black, after VDU 5: the panel shows it, and the statement is marked in red](docs/images/debugger-hidden-error.png)
 
 While Debug is off nothing is read from the machine and nothing is hooked, so it costs nothing. While it is on, the
-emulator notes writes to the resident integers, and where BASIC was when the OS takes an error, through jsbeeb's write
-hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
+emulator notes writes to the resident integers, where BASIC was when the OS takes an error, and when a statement of
+the program starts, through jsbeeb's write hook, which makes it do a little more work on each write the program makes. Debug is not remembered between visits.
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 

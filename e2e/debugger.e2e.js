@@ -29,6 +29,8 @@ const HiddenErrorProgram = [
 ].join("\n");
 const HiddenErrorStatus =
     "Division by zero (ERR 18) at line 100. The variables are as the program left them.";
+// Stops with an error the first time it runs, and ends at once the next.
+const OnceErrorProgram = ["IF A%=0 THEN A%=1:PRINT 1/0", "END"].join("\n");
 // Waits a second before it stops with an error, so that a run can be seen before it.
 const SlowErrorProgram = ["10 T%=TIME:REPEAT UNTIL TIME>T%+100", "20 X=1:PRINT 1/0:Y=2"].join("\n");
 
@@ -401,6 +403,22 @@ for (const {name, state} of Machines) {
             expect(await markedLines(page, "error")).toBe(0);
             await expect(status(page)).toHaveText("At BASIC's prompt");
             await expect(status(page)).toHaveAttribute("data-mark", "");
+            expect(await markedLines(page, "error")).toBe(0);
+            expect(problems).toEqual([]);
+        });
+
+        test("the error goes when RUN typed at the prompt runs the program, even one that ends at once", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, OnceErrorProgram, state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText(/^Division by zero \(ERR 18\) at line 10\./);
+            await page.locator("#screen").click();
+            for (const key of ["KeyR", "KeyU", "KeyN", "Enter"])
+                await page.keyboard.press(key, {delay: 100});
+            await expect(status(page)).toHaveText("At BASIC's prompt");
             expect(await markedLines(page, "error")).toBe(0);
             expect(problems).toEqual([]);
         });

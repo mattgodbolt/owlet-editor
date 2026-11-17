@@ -381,7 +381,14 @@ describe("BasicWatch errors", () => {
                     line: 20,
                     marked: "PRINT 1/0",
                 });
-                for (const command of ["MODE 7", "MDOE 7", "PRINT X"]) {
+                for (const command of [
+                    "MODE 7",
+                    "MDOE 7",
+                    "PRINT X",
+                    "Q=5",
+                    "LIST",
+                    "PRINT FNnone",
+                ]) {
                     await booted.testMachine.type(command);
                     await booted.testMachine.runFor(CyclesPerRun);
                     expect(describeError(watch.read(booted.cpu).error, lines, booted)).toEqual(
@@ -401,6 +408,24 @@ describe("BasicWatch errors", () => {
                 await booted.testMachine.runFor(CyclesPerRun);
                 expect(watch.read(booted.cpu).error).toBeNull();
             });
+
+            it.each(["RUN", "GOTO 20", "PROCp"])(
+                "forgets the error once %s typed at the prompt runs the program, however soon it ends",
+                async command => {
+                    const booted = await bootedMachine(machine);
+                    const watch = new BasicWatch();
+                    watch.read(booted.cpu);
+                    await run(booted, [
+                        "IF A%=0 THEN A%=1:PRINT 1/0",
+                        "PROCp:END",
+                        "DEF PROCp:ENDPROC",
+                    ]);
+                    expect(watch.read(booted.cpu).error).toMatchObject({number: 18});
+                    await booted.testMachine.type(command);
+                    await booted.testMachine.runFor(CyclesPerRun * 5);
+                    expect(watch.read(booted.cpu)).toMatchObject({line: null, error: null});
+                },
+            );
 
             it("forgets the error once the program runs again", async () => {
                 const booted = await bootedMachine(machine);

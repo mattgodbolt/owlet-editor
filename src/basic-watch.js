@@ -12,6 +12,12 @@ import {
 } from "jsbeeb/src/basic-state";
 
 const LineHeaderBytes = 4;
+const TextPointerOffset = 0x0a;
+const TextPointerHigh = 0x0c;
+const InputBufferPage = 0x07;
+// BASIC starts each statement with LDY &0A: INC &0A, then reads its first character with the LDA (&0B),Y that is this
+// many bytes before jsbeeb's statementStart, so a write to &0A that leaves the CPU there is a statement starting.
+const StatementReadBeforeStart = 6;
 // BASIC's workspace beyond what jsbeeb reads: https://8bs.com/basic/memory.htm
 const ErrorLine = 0x08;
 const ExpressionPointerBase = 0x19;
@@ -135,6 +141,8 @@ export class BasicWatch {
             if (address >= ResidentFirstByte && address <= ResidentLastByte)
                 this.written |= residentBit(address);
             else if (address === ErrorBlockHigh) this.raised = textPointers(peek);
+            else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
+                this.noteStatement(peek(TextPointerHigh));
         });
         this.restart();
     }
@@ -146,6 +154,11 @@ export class BasicWatch {
         this.hook = null;
         this.written = 0;
         this.forgetErrors();
+    }
+
+    /** A statement is starting in the page `high`: one of the program's, unlike one typed at the prompt or in ROM. */
+    noteStatement(high) {
+        if (high !== InputBufferPage && high < RomStart >> 8) this.stopped = null;
     }
 
     forgetErrors() {
@@ -173,7 +186,14 @@ export class BasicWatch {
         const known = this.language;
         if (known?.cpu !== cpu || known.bank !== bank || known.title !== title) {
             const basic = basicRom(rom);
-            this.language = {cpu, bank, title, basic: basic !== null, keywords: basic?.keywords};
+            this.language = {
+                cpu,
+                bank,
+                title,
+                basic: basic !== null,
+                keywords: basic?.keywords,
+                statementRead: basic && basic.statementStart - StatementReadBeforeStart,
+            };
         }
         return this.language;
     }
@@ -190,7 +210,6 @@ export class BasicWatch {
         const peek = address => cpu.peekmemAsLanguage(address);
         const {page, reading} = readPointers(peek);
         const line = lineHolding(peek, page, reading);
-        if (line) this.stopped = null;
         return {
             basic,
             title,
@@ -206,7 +225,8 @@ export class BasicWatch {
     }
 
     /**
-     * At the prompt, the error the program last stopped with, which is kept until the program runs again, or else an
+     * At the prompt, the error the program last stopped with, which is kept until a statement of the program runs
+     * again (as RUN, GOTO or a PROC typed at the prompt make one, and LIST does not), or else an
      * error in a command typed at the prompt while it is the last thing BASIC did: {number, message, line}, the line
      * being as the running one is, with a null offset where the statement is not known, or null at the prompt.
      */
