@@ -1435,14 +1435,14 @@ describe("Problem count", () => {
 });
 
 describe("Bracket pairs", () => {
-    // The line's pairs as "opener~closer", in the model Monaco keeps, where "." opens only for an abbreviated opener.
+    // The line's pairs as "opener~closer" ("-" for none), in the model Monaco keeps, where "." opens only for an abbreviated opener.
     const pairsOfLine = (model, line) =>
         model.bracketPairs
             .getBracketPairsInRange(new Range(line, 1, line, model.getLineMaxColumn(line)))
             .toArray()
             .map(
                 pair =>
-                    `${model.getValueInRange(pair.openingBracketRange)}~${model.getValueInRange(pair.closingBracketRange)}`,
+                    `${model.getValueInRange(pair.openingBracketRange)}~${pair.closingBracketRange ? model.getValueInRange(pair.closingBracketRange) : "-"}`,
             );
     const program = "A=1\nREP.IFb?-1<>90N.EL.?(PA.+3)=b\nQ$=MID.Q$,2)+STR.(Q%)";
 
@@ -1466,7 +1466,7 @@ describe("Bracket pairs", () => {
     });
     it("should pair a parenthesis after the language is registered again", () => {
         const model = loadedModel();
-        rebuildBracketPairs(model);
+        assert.notDeepStrictEqual(pairsOfLine(model, 2), ["(~)"]);
         registerBbcBasicLanguage();
         assert.deepStrictEqual(pairsOfLine(model, 2), ["(~)"]);
         model.dispose();
