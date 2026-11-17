@@ -599,8 +599,10 @@ export class Recogniser {
             return;
         }
         // An item is a value, and can directly follow another (PRINT X"a"); ~ (hex) can start any item.
-        while (!this.atEnd()) {
-            if (!this.separator("'", ",", ";", "~") && !this.printItem()) this.expression();
+        for (;;) {
+            if (this.separator("'", ",", ";", "~") || this.printItem()) continue;
+            if (this.atEnd()) return;
+            this.expression();
         }
     }
 
@@ -615,8 +617,9 @@ export class Recogniser {
             return;
         }
         if (this.isKeyword("LINE")) this.next();
-        while (!this.atEnd()) {
+        for (;;) {
             if (this.separator("'", ",", ";") || this.printItem()) continue;
+            if (this.atEnd()) return;
             const prompt = this.peek();
             if (prompt.kind !== "string") this.variable();
             else if (prompt.closed) this.next();
@@ -769,3 +772,23 @@ export class Recogniser {
 }
 
 Recogniser.prototype.GOSUB = Recogniser.prototype.GOTO;
+
+// Reads a line that stops where the text does, and notes the keywords BASIC looks for there and whether a statement
+// can start there, for completions.
+export class ExpectingRecogniser extends Recogniser {
+    constructor(text, inAssembler, dialect) {
+        super(text, inAssembler, dialect);
+        this.words = new Set();
+        this.statementNext = false;
+    }
+
+    isKeyword(...keywords) {
+        if (this.peek().kind === "end") for (const keyword of keywords) this.words.add(keyword);
+        return super.isKeyword(...keywords);
+    }
+
+    statement() {
+        if (this.peek().kind === "end") this.statementNext = true;
+        super.statement();
+    }
+}

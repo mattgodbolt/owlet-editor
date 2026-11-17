@@ -1,0 +1,11 @@
+[
+  ["FOR I=1 STEP 2", "No TO", "#238"],
+  ["FOR I=1 TO 2 TO 3", "Syntax error", "#238"],
+  ["ON 1 ERROR", "ON syntax", "#238"],
+  ["IF THEN PRINT", "No such variable", "#238"],
+  ["PRINT (1 TAB(1))", "Missing )", "#238"],
+  ["INPUT LINE LINE A$", "Syntax error", "#238"],
+  ["FOR I= TO 2", "No such variable", "#238"],
+  ["PRINT 1 TAB(1)", "ok", "#238"],
+  ["FOR I=1 TO 2 STEP 1", "ok", "#238"]
+]

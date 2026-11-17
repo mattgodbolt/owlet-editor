@@ -1,15 +1,15 @@
 import {languages} from "monaco-editor/editor/editor.api";
 import "monaco-editor/editor/contrib/suggest/browser/suggestController";
-import {Flags, isFnProc, isStatementKeyword} from "./tokens";
+import {Flags, isFnProc} from "./tokens";
 import {canStartStatement} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
 import {programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
+import {ExpectingRecogniser} from "./parser/recogniser";
 
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
-const SpcAndTab = ["SPC", "TAB("];
 // The ROM has no token for TOP: it reads TO, then a P where a value is expected, so the table cannot offer it.
 const Top = "TOP";
 // The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
@@ -31,27 +31,10 @@ function labelSetsFor(dialect) {
                 Top,
             ],
             assembler: [...labels(table.filter(kw => kw.flags & Flags.Expr)), Top],
-            // The words besides values that BBC BASIC reads in each statement (tools/rom-oracle), by the statement's
-            // first keyword; "ON ERROR" is what follows ON ERROR, which is read as a statement.
-            inStatement: new Map([
-                ["PRINT", SpcAndTab],
-                ["INPUT", [...SpcAndTab, "LINE"]],
-                ["FOR", ["TO", "STEP"]],
-                ["IF", ["THEN", ...statement]],
-                ["ON", ["ERROR", ...dialect.onBranches]],
-                ["ON ERROR", ["OFF"]],
-                ["TRACE", ["ON", "OFF"]],
-                ["DEF", statement],
-            ]),
         });
     }
     return labelSets.get(dialect);
 }
-// Statements that a statement can follow without a colon: IF X FOR, DEF PROCa FOR. The PROC after DEF is its name.
-const HoldsStatement = new Set(["IF", "DEF"]);
-const startsNestedStatement = token =>
-    token.kind === "keyword" && isStatementKeyword(token.kw) && token.kw.keyword !== "PROC";
-
 // The kind of name the keyword takes after it, which is its spelling.
 const nameKind = token =>
     token && token.kind === "keyword" && isFnProc(token.kw) && token.kw.keyword;
@@ -65,23 +48,13 @@ const startsStatement = token =>
     (token.kind === "keyword" && (token.kw.flags & Flags.Start || token.kw.keyword === "REPEAT"));
 
 function statementState(tokens, inAssembler) {
-    const state = {inAssembler, atStart: true, statement: null};
+    const state = {inAssembler, atStart: true};
     for (const token of tokens) {
         if (token.kind === "punct" && (token.text === "[" || token.text === "]")) {
             state.inAssembler = token.text === "[";
             state.atStart = true;
-        } else if (startsStatement(token)) {
-            state.atStart = true;
-            const onError =
-                token.kind === "keyword" &&
-                token.kw.keyword === "ERROR" &&
-                state.statement === "ON";
-            state.statement = onError ? "ON ERROR" : null;
         } else {
-            if (state.atStart) state.statement = token.kind === "keyword" ? token.kw.keyword : "";
-            else if (HoldsStatement.has(state.statement) && startsNestedStatement(token))
-                state.statement = token.kw.keyword;
-            state.atStart = false;
+            state.atStart = startsStatement(token);
         }
     }
     return state;
@@ -138,9 +111,18 @@ export function completionContext(text, dialect) {
     const sets = labelSetsFor(dialect);
     if (state.inAssembler) return state.atStart ? null : {startColumn, labels: sets.assembler};
     const base = state.atStart ? sets.statement : sets.expression;
+    const typed = line.slice(0, startColumn - 1);
+    const reading = new ExpectingRecogniser(typed, recogniser.startsInAssembler, dialect);
+    reading.line();
     return {
         startColumn,
-        labels: [...new Set([...base, ...(sets.inStatement.get(state.statement) ?? [])])],
+        labels: [
+            ...new Set([
+                ...base,
+                ...reading.words,
+                ...(reading.statementNext || last?.kw?.keyword === "DEF" ? sets.statement : []),
+            ]),
+        ],
     };
 }
 
