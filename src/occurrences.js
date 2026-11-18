@@ -101,6 +101,23 @@ const RegisterSetFrom = new Map([
     ["Y%", "the Y register"],
 ]);
 
+// What the assembler does with P% and O%, after the adverb given.
+const AssemblerUse = new Map([
+    ["P%", adverb => `the assembler ${adverb}assembles code for the address in it and moves it on`],
+    [
+        "O%",
+        adverb =>
+            `the assembler ${adverb}puts code at the address in it with OPT 4 to 7, and moves it on`,
+    ],
+]);
+
+// What BASIC itself does with the variable, after the adverb given, or null if nothing.
+function residentUse(name, adverb) {
+    const register = RegisterSetFrom.get(name);
+    if (register) return `CALL and USR ${adverb}set ${register} from it`;
+    return AssemblerUse.get(name)?.(adverb) ?? null;
+}
+
 const isNumeric = name => [RealSuffix, IntegerSuffix].includes(typeSuffix(name));
 
 function typeChange(target, newName) {
@@ -117,27 +134,32 @@ function residencyChange(target, newName) {
     const [wasResident, isResident] = [target.name, newName].map(name =>
         ResidentInteger.test(name),
     );
-    const [oldRegister, newRegister] = [target.name, newName].map(name =>
-        RegisterSetFrom.get(name),
-    );
+    const [oldUse, newUse] = [target.name, newName].map(name => residentUse(name, ""));
     if (!wasResident && isResident)
         return (
             `${newName} is a resident integer, so RUN, CLEAR, etc leave it alone` +
-            (newRegister ? `, and CALL and USR set ${newRegister} from it.` : ".")
+            (newUse ? `, and ${newUse}.` : ".")
         );
     if (wasResident && !isResident)
         return (
             `${target.name} was a resident integer, and ${newName} is not: RUN, CLEAR, etc forget it` +
-            (oldRegister ? `, and CALL and USR no longer set ${oldRegister} from it.` : ".")
+            (oldUse ? `, and ${residentUse(target.name, "no longer ")}.` : ".")
         );
-    if (oldRegister === newRegister) return null;
-    if (!newRegister) return `CALL and USR no longer set ${oldRegister} from it.`;
-    if (!oldRegister) return `CALL and USR now set ${newRegister} from it.`;
-    return `CALL and USR now set ${newRegister} from it, not ${oldRegister}.`;
+    if (oldUse === newUse) return null;
+    const [oldRegister, newRegister] = [target.name, newName].map(name =>
+        RegisterSetFrom.get(name),
+    );
+    if (oldRegister && newRegister)
+        return `CALL and USR now set ${newRegister} from it, not ${oldRegister}.`;
+    const changes = [
+        oldUse && residentUse(target.name, "no longer "),
+        newUse && residentUse(newName, "now "),
+    ];
+    return `${changes.filter(Boolean).join(", and ")}.`;
 }
 
 // What the user is told after a rename that changes what BASIC does with a variable or array, or null if it does not:
-// between real and integer, onto or off a resident integer, or between what CALL and USR set from it.
+// between real and integer, onto or off a resident integer, or between what CALL, USR and the assembler do with it.
 function renameNotice(target, newName) {
     const sentences = [typeChange(target, newName), residencyChange(target, newName)].filter(
         Boolean,

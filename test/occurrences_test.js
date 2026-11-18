@@ -221,6 +221,7 @@ describe("Rename notice", () => {
         "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
     const Real = "it is now a real variable (slower, and not limited to whole numbers).";
     const Resident = name => `${name} is a resident integer, so RUN, CLEAR, etc leave it alone`;
+    const AssemblesFor = "the assembler assembles code for the address in it and moves it on";
     const NotResident = (name, newName) =>
         `${name} was a resident integer, and ${newName} is not: RUN, CLEAR, etc forget it`;
 
@@ -325,6 +326,33 @@ describe("Rename notice", () => {
                 "Renamed A% to I%: CALL and USR no longer set the accumulator from it.",
             ],
             ["‸I%=1", "C%", "Renamed I% to C%: CALL and USR now set the carry flag from it."],
+            // P% and O%, which the assembler reads and moves on, from Olly's comment on #303.
+            ["‸p%=1", "P%", `Renamed p% to P%: ${Resident("P%")}, and ${AssemblesFor}.`],
+            [
+                "‸O%=1",
+                "o",
+                `Renamed O% to o: ${Real} ${NotResident("O%", "o")}, and the assembler no longer puts code at the address in it with OPT 4 to 7, and moves it on.`,
+            ],
+            [
+                "‸I%=1",
+                "P%",
+                "Renamed I% to P%: the assembler now assembles code for the address in it and moves it on.",
+            ],
+            [
+                "‸P%=1",
+                "I%",
+                "Renamed P% to I%: the assembler no longer assembles code for the address in it and moves it on.",
+            ],
+            [
+                "‸A%=1",
+                "P%",
+                "Renamed A% to P%: CALL and USR no longer set the accumulator from it, and the assembler now assembles code for the address in it and moves it on.",
+            ],
+            [
+                "‸P%=1",
+                "O%",
+                "Renamed P% to O%: the assembler no longer assembles code for the address in it and moves it on, and the assembler now puts code at the address in it with OPT 4 to 7, and moves it on.",
+            ],
             ["‸a%=1", "aa%", null],
             ["‸B%=1", "D%", null],
             ["DIM ‸a%(3)", "A%", null],

@@ -145,6 +145,35 @@ describe.each(["B", "Master"])("On the %s", machine => {
         expect(await program(booted, lines("CALL l%"))).toBe("         12305");
     });
 
+    it("should assemble for P%, and put the code at O% only with OPT 4 to 7, moving both on", async () => {
+        const booted = await bootedMachine(machine);
+        for (let opt = 0; opt < 8; ++opt) {
+            const shown = await program(booted, [
+                "10 DIM c% 20:O%=c%:P%=&5000:?&5000=0:?c%=0",
+                `20 [OPT ${opt}:.l LDA #1:RTS:]`,
+                '30 P.~P%;" ";O%-c%;" ";~l;" ";~?&5000;" ";~?c%',
+            ]);
+            // The listing that odd values of OPT ask for comes first.
+            expect(shown.split("\n").at(-1), `OPT ${opt}`).toBe(
+                opt < 4 ? "      5003 0 5000 A9 0" : "      5003 3 5000 0 A9",
+            );
+        }
+    });
+
+    it("should change no resident integer but by assigning it or assembling", async () => {
+        const booted = await bootedMachine(machine);
+        const others = Residents.slice(1);
+        const values = others.map((name, i) => `${name}=${i + 1}`).join(":");
+        expect(
+            await program(booted, [
+                `10 ${values}:ON ERROR GOTO 40`,
+                "20 X=INKEY(1):*FX 15,0",
+                '30 OSCLI "FX 15,0":X=RND(1):X=ADVAL(0):VDU 7:SOUND 1,0,0,1:X=TIME:X$=STR$(1.5):X=POINT(0,0):X=USR(&FFF4):CALL &FFF4:X=1/0',
+                `40 ON ERROR OFF:P.ERR;" ";${others.join(';" ";')};" ";~@%`,
+            ]),
+        ).toBe(`        18 ${others.map((_, i) => i + 1).join(" ")} 90A`);
+    });
+
     it("should have only @% and A% to Z% resident, which RUN, CLEAR, NEW, LOAD and CHAIN leave alone", async () => {
         const booted = await bootedMachine(machine);
         const printAll = `P.${Residents.join(';" ";')}`;
