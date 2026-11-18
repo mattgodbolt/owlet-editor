@@ -596,10 +596,7 @@ for (const {name, state} of Machines) {
             await recordEveryFrame(page);
             await settle(page);
             await settle(page);
-            // A frame can still catch BASIC between the writes that move its text pointer, and read the prompt.
-            const {statuses} = await recorded(page);
-            expect(statuses).toContain("Running line 10");
-            expect(statuses.filter(shown => shown.startsWith("Waiting"))).toEqual([]);
+            expect((await recorded(page)).statuses).toEqual(["Running line 10"]);
             expect(problems).toEqual([]);
         });
 

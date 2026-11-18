@@ -2,7 +2,7 @@
 import {describe, expect, it} from "vitest";
 import {TestMachine} from "jsbeeb/src/test-machine";
 import {installBasic} from "jsbeeb/src/basic-loader";
-import {basicRom, LanguageRomNumber} from "jsbeeb/src/basic-state";
+import {basicRom, LanguageRomNumber, lineHolding, readPointers} from "jsbeeb/src/basic-state";
 import {BasicWatch} from "../src/basic-watch";
 import {programStatements, statementAt} from "../src/statement-map";
 import {createTokenisers, tokeniserFor} from "../src/tokeniser";
@@ -203,6 +203,152 @@ describe("BasicWatch", () => {
                     value("n", "0"),
                 ],
                 routines: ["PROCp", "FNf"],
+            });
+        });
+    }
+});
+
+const CyclesPerFrame = 40000;
+const FramesWatched = 1000;
+
+// The line numbers the watch shows as running in `frames` frames of a program, null being the prompt.
+async function linesShown(machine, lines, frames = FramesWatched) {
+    const booted = await bootedMachine(machine);
+    const watch = new BasicWatch();
+    watch.read(booted.cpu);
+    await run(booted, lines);
+    const shown = new Set();
+    for (let frame = 0; frame < frames; ++frame) {
+        await booted.testMachine.runFor(CyclesPerFrame);
+        shown.add(watch.read(booted.cpu).line?.number ?? null);
+    }
+    return [...shown].sort((a, b) => a - b);
+}
+
+// The end of a statement in BASIC II and IV, which moves the text pointer's base to the colon or return after it
+// (STA &0B: BCC: INC &0C) before setting its offset to 1 (LDY #1: STY &0A).
+const EndOfStatementBaseStore = [0x85, 0x0b];
+const EndOfStatement = [...EndOfStatementBaseStore, 0x90, 0x02, 0xe6, 0x0c, 0xa0, 0x01, 0x84, 0x0a];
+const OffsetStoreDistance = 6;
+const OffsetStoreBytes = 2;
+// The end of a call to a PROC or FN, which pulls the caller's text pointer off the stack.
+const CallReturn = [0x68, 0x85, 0x0c, 0x68, 0x85, 0x0b, 0x68, 0x85, 0x0a];
+
+/** The address in a language ROM after the first `length` bytes of the only place `bytes` are. */
+function romAddressAfter(rom, bytes, length = bytes.length) {
+    const at = rom.findIndex((_, i) => bytes.every((byte, j) => rom[i + j] === byte));
+    return 0x8000 + at + length;
+}
+
+describe("BasicWatch running line", () => {
+    for (const machine of ["B", "Master"]) {
+        describe(`on the ${machine}`, () => {
+            it.each([
+                {lines: ["REPEAT:X=X+1:UNTIL FALSE"], shown: [10]},
+                {lines: ["REPEAT:X=X+1:UNTIL FALSE", "END"], shown: [10]},
+                {lines: ["REPEAT UNTIL FALSE", "END"], shown: [10]},
+                {lines: ["0GOTO0", '22222P."NO"'], shown: [0]},
+                {lines: ["GOTO 10", "END"], shown: [10]},
+                {lines: ["IF FALSE THEN X=1 ELSE GOTO 10", "END"], shown: [10]},
+                {lines: ["GOSUB 30", "GOTO 10", "RETURN", "END"], shown: [10, 20, 30]},
+            ])(
+                "shows only the lines of $lines that it runs, frame after frame",
+                {timeout: 60000},
+                async ({lines, shown}) => {
+                    expect(await linesShown(machine, lines)).toEqual(shown);
+                },
+            );
+
+            it(
+                "shows each line of an assembler block as it assembles it",
+                {timeout: 60000},
+                async () => {
+                    const booted = await bootedMachine(machine);
+                    const watch = new BasicWatch();
+                    watch.read(booted.cpu);
+                    await run(booted, [
+                        "DIM C% 100",
+                        "FOR I%=0 TO 1E9 STEP 2:P%=C%",
+                        "[OPT 0",
+                        "LDA #1",
+                        "STA &70",
+                        "RTS",
+                        "]",
+                        "NEXT",
+                    ]);
+                    const peek = address => booted.cpu.peekmemAsLanguage(address);
+                    let elsewhere = 0;
+                    for (let frame = 0; frame < FramesWatched; ++frame) {
+                        await booted.testMachine.runFor(CyclesPerFrame);
+                        const {page, reading} = readPointers(peek);
+                        if (
+                            watch.read(booted.cpu).line?.number !==
+                            lineHolding(peek, page, reading)?.number
+                        )
+                            ++elsewhere;
+                    }
+                    // A frame that ends as BASIC moves on to the next line shows the line before.
+                    expect(elsewhere).toBeLessThan(FramesWatched / 10);
+                },
+            );
+
+            it("shows the line it is in when an interrupt comes between BASIC's writes to its text pointer", async () => {
+                const booted = await bootedMachine(machine);
+                const {cpu, testMachine} = booted;
+                const watch = new BasicWatch();
+                watch.read(cpu);
+                await run(booted, ["0GOTO0", '22222P."NO"']);
+                const bank = cpu.bankPagedBy(cpu.peekmemAsLanguage(LanguageRomNumber));
+                const after = romAddressAfter(
+                    cpu.romBank(bank),
+                    EndOfStatement,
+                    EndOfStatementBaseStore.length,
+                );
+                // Stopped after the base is written and before the offset is, an interrupt is taken there.
+                await testMachine.runUntilAddress(after, 1, {bank});
+                cpu.sysvia.setca1(true);
+                cpu.sysvia.setca1(false);
+                await testMachine.runUntilAddress(after + OffsetStoreDistance, 1, {bank});
+                expect(watch.read(cpu).line?.number).toBe(0);
+                await testMachine.runUntilAddress(
+                    after + OffsetStoreDistance + OffsetStoreBytes,
+                    1,
+                    {bank},
+                );
+                expect(watch.read(cpu).line?.number).toBe(0);
+            });
+
+            it("shows the line a FN returned into while it waits there", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, ["X=FNa+GET", "END", "DEF FNa=1"]);
+                expect(watch.read(booted.cpu).line?.number).toBe(10);
+            });
+
+            it("shows the line a FN returned into while it waits there, after an interrupt as it returned", async () => {
+                const booted = await bootedMachine(machine);
+                const {cpu, testMachine} = booted;
+                const watch = new BasicWatch();
+                watch.read(cpu);
+                const bank = cpu.bankPagedBy(cpu.peekmemAsLanguage(LanguageRomNumber));
+                const returned = romAddressAfter(cpu.romBank(bank), CallReturn);
+                installBasic(
+                    tokeniserFor(booted.tokenisers, cpu.model).tokenise(
+                        // Long enough for the typing of RUN to be over before the FN returns.
+                        "FOR I%=1 TO 2000:NEXT:X=FNa+GET\nEND\nDEF FNa=1",
+                    ),
+                    {
+                        readByte: address => testMachine.readbyte(address),
+                        writeByte: (address, value) => testMachine.writebyte(address, value),
+                    },
+                );
+                await testMachine.type("RUN");
+                await testMachine.runUntilAddress(returned, 1, {bank});
+                cpu.sysvia.setca1(true);
+                cpu.sysvia.setca1(false);
+                await testMachine.runFor(CyclesPerRun);
+                expect(watch.read(cpu).line?.number).toBe(10);
             });
         });
     }
@@ -860,6 +1006,120 @@ describe("BasicWatch handled errors", () => {
                     lines: ["0 GOSUB 2:X=Q", "1 END", "2 ON ERROR L%=ERL:END", "3 RETURN"],
                     errors: [taken(26, "No such variable", 0, "X=Q", 2)],
                     erl: "0",
+                },
+                {
+                    name: "the same error in an IF's condition, after its THEN and after its ELSE apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "IF 1/N%>0.6 THEN X=1/(N%-1) ELSE PRINT 1/(N%-2)",
+                    ],
+                    errors: [
+                        taken(18, "Division by zero", 20, "PRINT 1/(N%-2)", 10),
+                        taken(18, "Division by zero", 20, "X=1/(N%-1)", 10),
+                        taken(18, "Division by zero", 20, "IF 1/N%>0.6 THEN", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with a space before its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX (A,B)X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with spaces around its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX   (A,B)   X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX   (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with spaces inside its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX ( A , B ) X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX ( A , B )", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, of a FN with a space before its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN Y=FNX(1,Q) ELSE Y=FNX(1,1)",
+                        "END",
+                        "DEFFNX (A,B)=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "=Q", 10),
+                        taken(26, "No such variable", 40, "DEFFNX (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX(A,B)X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX(A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in two REPEATs with nothing between them apart",
+                    lines: [
+                        "N%=19:ONERRORC%=C%+1:IFC%>3END ELSE N%=39-N%",
+                        "F.X=1TON%:REPEATN.",
+                        "REPEAT REPEAT",
+                    ],
+                    errors: [
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                    ],
+                },
+                {
+                    name: "the same error in two REPEATs with an IF between them apart",
+                    lines: [
+                        "N%=19:ONERRORC%=C%+1:IFC%>3END ELSE N%=39-N%",
+                        "F.X=1TON%:REPEATN.",
+                        "REPEAT IF 1 REPEAT",
+                    ],
+                    errors: [
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                    ],
+                },
+                {
+                    name: "the same error in the conditions of an IF straight after an IF apart",
+                    lines: ["ONERRORX%=X%+1", 'IF 1/X% IF 1/(X%-1) PRINT "Y"'],
+                    errors: [
+                        taken(18, "Division by zero", 20, "IF 1/(X%-1)", 10),
+                        taken(18, "Division by zero", 20, "IF 1/X%", 10),
+                    ],
+                },
+                {
+                    name: "the same error either side of a colon in a string as one",
+                    lines: ["ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END", 'PRINT 1/N%;":";1/(N%-1)'],
+                    errors: [taken(18, "Division by zero", 20, 'PRINT 1/N%;":";1/(N%-1)', 10, 2)],
                 },
                 {
                     name: "an ON ERROR that a later one replaced",
