@@ -305,8 +305,8 @@ export class Recogniser {
     }
 
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
-    // up to the next colon or ELSE after `from`, or that is not itself unfinished.
-    valid(candidate, statementStart, from) {
+    // up to the next colon or ELSE after `from`, other than one where the line ends too soon unless `complete` is set.
+    valid(candidate, statementStart, from, complete = false) {
         const probe = new Recogniser(candidate, this.startsInAssembler, this.dialect, true);
         probe.line();
         const stop =
@@ -317,7 +317,7 @@ export class Recogniser {
             )?.start ?? candidate.length;
         const inRange = start => start >= statementStart.start && start < stop;
         return (
-            probe.problems.every(p => p.unfinished || !inRange(p.token.start)) &&
+            probe.problems.every(p => (p.unfinished && !complete) || !inRange(p.token.start)) &&
             !probe.tokens.some(token => token.invalid && inRange(token.start))
         );
     }

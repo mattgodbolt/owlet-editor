@@ -404,7 +404,7 @@ export class Assembler {
         r.next().type = "keyword";
     }
 
-    // Whether the register in capitals leaves the statement with no error.
+    // Whether the register in capitals leaves the statement with no error, not even one where the line ends too soon.
     capitalisable(token) {
         const r = this.recogniser;
         if (r.probing || !r.is("name")) return false;
@@ -414,6 +414,7 @@ export class Assembler {
             text.slice(0, token.start) + capital + text.slice(token.start + 1),
             token,
             token.start,
+            true,
         );
     }
 

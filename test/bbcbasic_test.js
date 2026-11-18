@@ -1348,6 +1348,8 @@ describe("Quick fix for a lower case index register", () => {
         ["[OPT0:LDA (42),y:]", "Replace y with Y", "[OPT0:LDA (42),Y:]"],
         ["[OPT0:ASL 42,x:]", "Replace x with X", "[OPT0:ASL 42,X:]"],
         ["[OPT0:LDA 42,x", "Replace x with X", "[OPT0:LDA 42,X"],
+        ["[OPT0:LDA (42),y", "Replace y with Y", "[OPT0:LDA (42),Y"],
+        ["[OPT0:STA (42),y", "Replace y with Y", "[OPT0:STA (42),Y"],
     ])("BASIC II: %s should offer %s, leaving %s", (text, title, result) => {
         assert.deepStrictEqual([verdicts.get(text), verdicts.get(result)], ["Index", "ok"]);
         assert.deepStrictEqual(fixes(text, BasicIIDialect), [[title, result]]);
@@ -1358,6 +1360,7 @@ describe("Quick fix for a lower case index register", () => {
         ["[OPT0:ASL 42,y:]", "[OPT0:ASL 42,Y:]"],
         ["[OPT0:LDX 42,x:]", "[OPT0:LDX 42,X:]"],
         ["[OPT0:LDA (42,x:]", "[OPT0:LDA (42,X:]"],
+        ["[OPT0:LDA (42,x", "[OPT0:LDA (42,X"],
         ["[OPT0:JMP (42,x):]", "[OPT0:JMP (42,X):]"],
     ])("BASIC II: %s should offer no fix, as %s is still wrong", (text, capitalised) => {
         assert.deepStrictEqual([verdicts.get(text), verdicts.get(capitalised)], ["Index", "Index"]);
@@ -1372,10 +1375,14 @@ describe("Quick fix for a lower case index register", () => {
             assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect), []);
         },
     );
-    it("BASIC IV: a register the mnemonic does not take should offer no fix", () => {
-        assert.strictEqual(masterVerdicts.get("[OPT0:ASL 42,y:]"), "Index");
-        assert.deepStrictEqual(fixes("[OPT0:ASL 42,y:]", BasicIVDialect), []);
-    });
+    it.each(["[OPT0:ASL 42,y:]", "[OPT0:LDA (42,x"])(
+        "BASIC IV: %s, wrong in either case, should offer no fix",
+        text => {
+            assert.strictEqual(masterVerdicts.get(text), "Index");
+            assert.strictEqual(getSyntaxMarkers(text, BasicIVDialect).length, 1);
+            assert.deepStrictEqual(fixes(text, BasicIVDialect), []);
+        },
+    );
     it("should mend the register on a later line of an assembler block", () => {
         assert.deepStrictEqual(fixes("[\nLDA 42,x\n]", BasicIIDialect), [
             ["Replace x with X", "[\nLDA 42,X\n]"],

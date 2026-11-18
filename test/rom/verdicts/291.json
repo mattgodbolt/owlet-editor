@@ -68,5 +68,10 @@
   ["[OPT0:LDA (42,x:]", "Index", "#291"],
   ["[OPT0:LDA 42,x", "Index", "#291"],
   ["[OPT0:LDA 42,X", "ok", "b5 2a", "#291"],
-  ["[OPT0:ASL 42,Y:]", "Index", "#291"]
+  ["[OPT0:ASL 42,Y:]", "Index", "#291"],
+  ["[OPT0:LDA (42,x", "Index", "#291"],
+  ["[OPT0:LDA (42),y", "Index", "#291"],
+  ["[OPT0:LDA (42),Y", "ok", "b1 2a", "#291"],
+  ["[OPT0:STA (42),y", "Index", "#291"],
+  ["[OPT0:STA (42),Y", "ok", "91 2a", "#291"]
 ]
