@@ -33,6 +33,20 @@ const HiddenErrorStatus =
 const OnceErrorProgram = ["IF A%=0 THEN A%=1:PRINT 1/0", "END"].join("\n");
 // Waits a second before it stops with an error, so that a run can be seen before it.
 const SlowErrorProgram = ["10 T%=TIME:REPEAT UNTIL TIME>T%+100", "20 X=1:PRINT 1/0:Y=2"].join("\n");
+// Its handler prints nothing and carries on, taking each of two errors in turn every half a second.
+const HandledProgram = [
+    "10 MODE 7",
+    "20 ON ERROR GOTO 60",
+    "30 IF C% MOD 2 GOTO 50",
+    "40 X=Q",
+    "50 Y=1/0",
+    '60 C%=C%+1:PRINT TAB(0,0);"Still running ";C%',
+    "70 T%=TIME:REPEAT UNTIL TIME>T%+50",
+    "80 GOTO 30",
+].join("\n");
+const NoSuchVariableHandled = "No such variable (ERR 26) at line 40";
+const DivisionHandled = "Division by zero (ERR 18) at line 50";
+const ByHandler = "taken by the ON ERROR at line 20";
 const KeyProgram = ["10 G=GET", "20 INPUT X", "30 END"].join("\n");
 // Reads the keyboard many times a frame without waiting for it.
 const PollingProgram = "10 REPEAT:K=INKEY(0):UNTIL FALSE";
@@ -117,6 +131,32 @@ const readMarkedText = (mark = "running") => {
 };
 
 const markedText = (page, mark) => page.evaluate(readMarkedText, mark);
+
+const handledList = page => panel(page).locator(".debug-handled");
+const handledRows = page =>
+    handledList(page)
+        .locator(".debug-handled-error")
+        .evaluateAll(rows => rows.map(row => row.textContent));
+const escaped = text => text.replace(/[()]/g, "\\$&");
+
+/** The handled errors listed, whether the total given is what their counts add up to, and the statement marked. */
+const handledShown = page =>
+    page.evaluate(source => {
+        const readMarkedText = new Function(`return (${source})`)();
+        const title = document.querySelector("#debugger .debug-handled-title")?.textContent ?? "";
+        const rows = [...document.querySelectorAll("#debugger .debug-handled-error")].map(
+            row => row.textContent,
+        );
+        const counted = rows.reduce(
+            (sum, row) => sum + Number(/, (\d+) times,/.exec(row)?.[1] ?? 1),
+            0,
+        );
+        return {
+            rows,
+            totalCounted: title.startsWith(`${counted} error`),
+            marked: readMarkedText("handled"),
+        };
+    }, readMarkedText.toString());
 
 /** Starts noting, on every animation frame, each status and marked text the page shows. */
 const recordEveryFrame = page =>
@@ -453,6 +493,80 @@ for (const {name, state} of Machines) {
             expect(problems).toEqual([]);
         });
 
+        test("errors a handler hides are listed with their counts, the latest marked, until a new run", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, HandledProgram, state);
+            await debugButton(page).click();
+            await page.locator('[data-action="run"]').click();
+            // Each error is the latest for half a second in turn, and its statement is marked.
+            const latest = {[NoSuchVariableHandled]: "X=Q", [DivisionHandled]: "Y=1/0"};
+            const repeated = error =>
+                expect.stringMatching(new RegExp(`^${escaped(error)}, \\d+ times, ${ByHandler}$`));
+            for (const [newest, older] of [
+                [NoSuchVariableHandled, DivisionHandled],
+                [DivisionHandled, NoSuchVariableHandled],
+            ]) {
+                await expect
+                    .poll(() => handledShown(page), {intervals: [50]})
+                    .toEqual({
+                        rows: [repeated(newest), repeated(older)],
+                        totalCounted: true,
+                        marked: latest[newest],
+                    });
+            }
+            // The program is still running, and has not stopped with an error.
+            await expect(status(page)).toHaveText(/^Running line \d+$/);
+            expect(await markedLines(page, "error")).toBe(0);
+
+            await page.locator(".monaco-editor").click();
+            await page.keyboard.press("ControlOrMeta+a");
+            await page.keyboard.type("ON ERROR END\nX=1\nEND");
+            await page.locator('[data-action="run"]').click();
+            await expect(status(page)).toHaveText("At BASIC's prompt");
+            await expect(handledList(page)).toBeHidden();
+            expect(await markedText(page, "handled")).toBe("");
+            expect(problems).toEqual([]);
+        });
+
+        for (const {name: ending, program, shown, mark, marked} of [
+            {
+                name: "ends",
+                program: "ON ERROR END\nX=1:X=Q",
+                shown: "At BASIC's prompt",
+                mark: "",
+            },
+            {
+                name: "stops with an error",
+                program: "ON ERROR ON ERROR OFF:PRINT 1/0\nX=1:X=Q",
+                shown: "Division by zero (ERR 18) at line 10. The variables are as the program left them.",
+                mark: "error",
+                marked: "PRINT 1/0",
+            },
+        ])
+            test(`a handled error stays listed and marked, apart from the status, once its handler ${ending}`, async ({
+                page,
+                baseURL,
+            }) => {
+                const problems = await open(page, baseURL, program, state);
+                await debugButton(page).click();
+                await page.locator('[data-action="run"]').click();
+                await expect(status(page)).toHaveText(shown);
+                await expect(status(page)).toHaveAttribute("data-mark", mark);
+                await expect(handledList(page).locator(".debug-handled-title")).toHaveText(
+                    "1 error taken by ON ERROR, the latest first:",
+                );
+                expect(await handledRows(page)).toEqual([
+                    "No such variable (ERR 26) at line 20, taken by the ON ERROR at line 10",
+                ]);
+                await expect.poll(() => markedText(page, "handled")).toBe("X=Q");
+                if (marked) expect(await markedText(page, "error")).toBe(marked);
+                // The mark fades as the machine runs on without another.
+                await expect(page.locator(".debug-handled-faded")).toHaveCount(1);
+                expect(await markedText(page, "handled")).toBe("X=Q");
+                expect(problems).toEqual([]);
+            });
         test("a program waiting for a key says so, with the keyword and line, and moves on when one is pressed", async ({
             page,
             baseURL,

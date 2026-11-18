@@ -11,6 +11,9 @@ const Marks = {
     quiet: {line: "debug-quiet-line", statement: "debug-quiet-statement", colour: "#a08440"},
 };
 const EscapeError = 17;
+// The latest error an ON ERROR handler took is marked strongly for about a second of the program running on.
+const FreshFrames = 50;
+const HandledColour = "#e06060";
 const WaitedFor = {
     keyboard: "keyboard input",
     vsync: "vsync",
@@ -43,6 +46,18 @@ function describeError(error, range) {
     return `${what} ${where}. The variables are as the program left them.`;
 }
 
+function describeHandled(error, range) {
+    const where = error.line
+        ? ` at line ${error.line.number}${range ? "" : " (since changed)"}`
+        : "";
+    const times = error.count > 1 ? `, ${error.count} times` : "";
+    const handler = error.handler === null ? "" : ` at line ${error.handler}`;
+    return `${error.message} (ERR ${error.number})${where}${times}, taken by the ON ERROR${handler}`;
+}
+
+const handledTitle = total =>
+    `${total} ${total === 1 ? "error" : "errors"} taken by ON ERROR, the latest first:`;
+
 function describeWait({kind, keyword}, number) {
     return `Waiting for ${WaitedFor[kind]}${keyword ? ` (${keyword})` : ""} at line ${number}`;
 }
@@ -70,13 +85,17 @@ export class BasicDebugger {
         this.decorations = editor.createDecorationsCollection();
         this.panel = document.getElementById("debugger");
         this.status = this.panel.querySelector(".debug-status");
+        this.handled = this.panel.querySelector(".debug-handled");
+        this.handledMark = editor.createDecorationsCollection();
         this.variables = this.panel.querySelector(".debug-variables");
         this.routines = this.panel.querySelector(".debug-routines");
         this.button = document.getElementById("debug");
         this.on = false;
         this.screenShown = true;
         this.program = null;
-        this.shown = {status: null, mark: null, variables: null, range: null};
+        this.frame = 0;
+        this.latestHandled = {total: 0, frame: 0};
+        this.forgetShown();
         emulator.onProgramStart = () => this.watch.restart();
         new ResizeObserver(() => this.reserveScreen()).observe(this.panel);
     }
@@ -86,10 +105,24 @@ export class BasicDebugger {
         this.button.setAttribute("aria-pressed", String(this.on));
         this.emulator.onFrame = this.on ? () => this.update() : null;
         if (!this.on) this.watch.untrack();
-        this.shown = {status: null, mark: null, variables: null, range: null};
+        this.forgetShown();
         if (this.on) this.update();
-        else this.decorations.clear();
+        else {
+            this.decorations.clear();
+            this.handledMark.clear();
+        }
         this.showPanel();
+    }
+
+    forgetShown() {
+        this.shown = {
+            status: null,
+            mark: null,
+            variables: null,
+            range: null,
+            handled: null,
+            handledRange: null,
+        };
     }
 
     /** Whether the emulator's screen is the view shown, which the panel goes under. */
@@ -125,7 +158,70 @@ export class BasicDebugger {
         const mark = state.error ? markFor(state.error) : "running";
         this.showRange(range, mark);
         this.showStatus(describe(state, range), state.error ? mark : null);
+        this.showHandled(state.basic ? state.handled : {total: 0, errors: []});
         this.showVariables(state.basic ? state : {residents: [], variables: [], routines: []});
+    }
+
+    /**
+     * Lists the errors ON ERROR handlers took, and marks the latest one's statement: dashed, so as not to be taken for
+     * the error the program stopped with, and fainter once the program has run on for a while without another.
+     */
+    showHandled({total, errors}) {
+        ++this.frame;
+        if (total !== this.latestHandled.total) this.latestHandled = {total, frame: this.frame};
+        const ranges = errors.map(
+            error => error.line && statementAt(this.statements(), error.line),
+        );
+        const rows = errors.map((error, i) => ({
+            text: describeHandled(error, ranges[i]),
+            mark: markFor(error),
+        }));
+        const shown = JSON.stringify([total, rows]);
+        if (shown !== this.shown.handled) {
+            this.shown.handled = shown;
+            this.listHandled(total, rows);
+        }
+        const fresh = this.frame - this.latestHandled.frame < FreshFrames;
+        this.markHandled(ranges[0] ?? null, errors[0] && markFor(errors[0]), fresh);
+    }
+
+    /** Shows the list, changing only the text of rows already there, as it can change every frame. */
+    listHandled(total, rows) {
+        this.handled.hidden = total === 0;
+        if (this.handled.children.length !== rows.length + 1)
+            this.handled.replaceChildren(
+                element("div", "debug-handled-title", ""),
+                ...rows.map(() => element("div", "debug-handled-error", "")),
+            );
+        const [title, ...items] = this.handled.children;
+        title.textContent = handledTitle(total);
+        rows.forEach(({text, mark}, i) => {
+            items[i].textContent = text;
+            items[i].dataset.mark = mark;
+        });
+    }
+
+    markHandled(range, mark, fresh) {
+        const shown = range && JSON.stringify([range, mark, fresh]);
+        if (shown === this.shown.handledRange) return;
+        this.shown.handledRange = shown;
+        if (!range) return void this.handledMark.clear();
+        const {lineNumber, startColumn, endColumn} = range;
+        const classes = ["debug-handled-statement"];
+        if (mark === "quiet") classes.push("debug-handled-quiet");
+        if (!fresh) classes.push("debug-handled-faded");
+        this.handledMark.set([
+            {
+                range: new Range(lineNumber, startColumn, lineNumber, endColumn),
+                options: {
+                    className: classes.join(" "),
+                    overviewRuler: {
+                        color: mark === "quiet" ? Marks.quiet.colour : HandledColour,
+                        position: monacoEditor.OverviewRulerLane.Left,
+                    },
+                },
+            },
+        ]);
     }
 
     showRange(range, mark) {
