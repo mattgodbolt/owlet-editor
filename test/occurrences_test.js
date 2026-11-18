@@ -331,6 +331,21 @@ describe("Rename notice", () => {
             ["‸I%=1", "J%", null],
             ["‸I=1", "J", null],
             ["PROC‸a", "b", null],
+            // Real names that are also properties of every JavaScript object are names like any other.
+            ["‸toString=1", "ts", null],
+            ["‸ts=1", "toString", null],
+            ["‸constructor=1", "valueOf", null],
+            ["‸__proto__=1", "hasOwnProperty", null],
+            [
+                "‸toString=1",
+                "A%",
+                `Renamed toString to A%: ${WholeNumbers} ${Resident("A%")}, and CALL and USR set the accumulator from it.`,
+            ],
+            [
+                "‸C%=1",
+                "constructor",
+                `Renamed C% to constructor: ${Real} ${NotResident("C%", "constructor")}, and CALL and USR no longer set the carry flag from it.`,
+            ],
             // A refused rename says why, as it did.
             ["‸I=1", "I$", "Renaming I to I$ would change its type"],
             ["‸I=1:I%=2", "I%", "I% is already used in this program"],

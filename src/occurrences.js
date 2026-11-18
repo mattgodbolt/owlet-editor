@@ -94,12 +94,12 @@ const RealSuffix = "";
 const IntegerSuffix = "%";
 const ResidentInteger = /^[A-Z]%$/;
 // What CALL and USR set from the resident integers they read: the low byte of A%, X% and Y%, and bit 0 of C%.
-const RegisterSetFrom = {
-    "A%": "the accumulator",
-    "C%": "the carry flag",
-    "X%": "the X register",
-    "Y%": "the Y register",
-};
+const RegisterSetFrom = new Map([
+    ["A%", "the accumulator"],
+    ["C%", "the carry flag"],
+    ["X%", "the X register"],
+    ["Y%", "the Y register"],
+]);
 
 const isNumeric = name => [RealSuffix, IntegerSuffix].includes(typeSuffix(name));
 
@@ -117,7 +117,9 @@ function residencyChange(target, newName) {
     const [wasResident, isResident] = [target.name, newName].map(name =>
         ResidentInteger.test(name),
     );
-    const [oldRegister, newRegister] = [target.name, newName].map(name => RegisterSetFrom[name]);
+    const [oldRegister, newRegister] = [target.name, newName].map(name =>
+        RegisterSetFrom.get(name),
+    );
     if (!wasResident && isResident)
         return (
             `${newName} is a resident integer, so RUN and CLEAR leave it alone` +
