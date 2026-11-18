@@ -38,7 +38,9 @@ const ElseToken = 0x8b;
 const ThenToken = 0x8c;
 const FnToken = 0xa4;
 const DefToken = 0xdd;
+const IfToken = 0xe7;
 const ProcToken = 0xf2;
+const RepeatToken = 0xf5;
 const OpenBracket = 0x28;
 const CloseBracket = 0x29;
 const DefaultPrintFormat = "&0000090A";
@@ -134,10 +136,11 @@ function definedNameEnd(peek, at, end) {
 }
 
 /**
- * The address of the last byte of each statement of `line` that its bytes alone show: up to a colon, THEN or a DEF's
- * name and parameters, or the byte before an ELSE, and the last up to the return that ends the line. A statement
- * after an implicit THEN is not told from the IF before it, as that needs its condition parsed. A colon in a REM, DATA
- * or star command ends a statement here though not for BASIC, which is no matter, as no error is raised past its start.
+ * The address of the last byte of each statement of `line` that its bytes alone show: up to a colon, THEN, REPEAT or
+ * a DEF's name and parameters, or the byte before an ELSE or IF, and the last up to the return that ends the line. A
+ * statement after an implicit THEN is not told from the IF before it unless it is another IF, as that needs the
+ * condition parsed. A colon in a REM, DATA or star command ends a statement here though not for BASIC, which is no
+ * matter, as no error is raised past its start.
  */
 function statementEnds(peek, line) {
     const found = [];
@@ -148,8 +151,9 @@ function statementEnds(peek, line) {
         if (quoted) continue;
         const named = code === DefToken ? definedNameEnd(peek, at, line.end) : null;
         if (named !== null) at = named;
-        if (named !== null || code === Colon || code === ThenToken) found.push(at);
-        else if (code === ElseToken) found.push(at - 1);
+        if (named !== null || code === Colon || code === ThenToken || code === RepeatToken)
+            found.push(at);
+        else if (code === ElseToken || code === IfToken) found.push(at - 1);
     }
     found.push(line.end);
     return found;

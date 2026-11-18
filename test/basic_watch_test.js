@@ -887,6 +887,38 @@ describe("BasicWatch handled errors", () => {
                     ],
                 },
                 {
+                    name: "the same error in two REPEATs with nothing between them apart",
+                    lines: [
+                        "N%=19:ONERRORC%=C%+1:IFC%>3END ELSE N%=39-N%",
+                        "F.X=1TON%:REPEATN.",
+                        "REPEAT REPEAT",
+                    ],
+                    errors: [
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                    ],
+                },
+                {
+                    name: "the same error in two REPEATs with an IF between them apart",
+                    lines: [
+                        "N%=19:ONERRORC%=C%+1:IFC%>3END ELSE N%=39-N%",
+                        "F.X=1TON%:REPEATN.",
+                        "REPEAT IF 1 REPEAT",
+                    ],
+                    errors: [
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                    ],
+                },
+                {
+                    name: "the same error in the conditions of an IF straight after an IF apart",
+                    lines: ["ONERRORX%=X%+1", 'IF 1/X% IF 1/(X%-1) PRINT "Y"'],
+                    errors: [
+                        taken(18, "Division by zero", 20, "IF 1/(X%-1)", 10),
+                        taken(18, "Division by zero", 20, "IF 1/X%", 10),
+                    ],
+                },
+                {
                     name: "the same error either side of a colon in a string as one",
                     lines: ["ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END", 'PRINT 1/N%;":";1/(N%-1)'],
                     errors: [taken(18, "Division by zero", 20, 'PRINT 1/N%;":";1/(N%-1)', 10, 2)],
