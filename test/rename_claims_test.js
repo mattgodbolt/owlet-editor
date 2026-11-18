@@ -71,6 +71,11 @@ describe.each(["B", "Master"])("On the %s", machine => {
             "DIM S%(1):S%(1)=1E10",
         ])
             expect(await program(booted, [`10 ${assignment}`])).toBe("Too big at line 10");
+        // Both ends of the range are values an integer holds, though a typed -2147483648 is read as a minus and a number.
+        expect(await program(booted, ['10 I%=2147483647:J%=-2147483647-1:P.~I%;" ";~J%'])).toBe(
+            "  7FFFFFFF 80000000",
+        );
+        expect(await program(booted, ["10 I%=-2147483648"])).toBe("Too big at line 10");
         expect(await program(booted, ["10 I=1E10:P.I"])).toBe("      1E10");
     });
 

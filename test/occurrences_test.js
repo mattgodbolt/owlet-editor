@@ -218,7 +218,7 @@ describe("Rename notice", () => {
     });
 
     const WholeNumbers =
-        "it now holds whole numbers only (0.5 is stored as 0, and a value beyond \u00b12147483647 is a Too big error).";
+        "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
     const Real = "it is now a real variable (slower, and not limited to whole numbers).";
     const Resident =
         "is a resident integer: CALL and USR pass it to machine code, and RUN and CLEAR leave it alone.";

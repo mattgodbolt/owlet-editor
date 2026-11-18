@@ -106,7 +106,7 @@ function typeChangeNotice(target, newName) {
     const sentences = [
         `Renamed ${displayName(target)} to ${displayName(renamed)}: ` +
             (toInteger
-                ? "it now holds whole numbers only (0.5 is stored as 0, and a value beyond \u00b12147483647 is a Too big error)."
+                ? "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error)."
                 : `it is now a real ${noun} (slower, and not limited to whole numbers).`),
     ];
     // Arrays are never resident.
