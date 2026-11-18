@@ -85,6 +85,8 @@ const MnemonicLists = new Map([
 ]);
 export const mnemonicsFor = dialect => MnemonicLists.get(dialect.basicIV ? BasicIV : BasicII);
 const ThirdCharacter = 2;
+const InsideBrackets = " inside the brackets";
+const AfterBrackets = " after the brackets";
 const LogicalTokenChars = new Set(
     keywords.filter(kw => ["AND", "EOR", "OR"].includes(kw.keyword)).map(tokenChar),
 );
@@ -339,15 +341,21 @@ export class Assembler {
             const opener = r.next();
             r.expression();
             if (r.isPunct(",")) return this.indexedIndirect(mnemonic);
-            r.close(opener, "Index");
+            this.closeIndirect(opener);
             // BASIC IV takes (&70) as an address in the zero page, and ignores what follows it.
             if (rules.basicIV && !r.isPunct(",")) return;
-            if (!r.isPunct(",")) r.fail("Index", r.last, r.is("end"));
-            return this.index(mnemonic, "Y");
+            if (!r.isPunct(","))
+                r.fail(
+                    "Index",
+                    r.last,
+                    r.is("end"),
+                    `Expected ,Y after ): BASIC II has ${mnemonic} (address),Y but not ${mnemonic} (address)`,
+                );
+            return this.index(mnemonic, AfterBrackets, "Y");
         }
         r.expression();
         const registers = rules.indexRegisters[mnemonic] || ["X", "Y"];
-        if (registers.length && r.isPunct(",")) this.index(mnemonic, ...registers);
+        if (registers.length && r.isPunct(",")) this.index(mnemonic, "", ...registers);
     }
 
     // A ( after JMP is indirect addressing on both BASICs: after the ) the rest is ignored, as it is for any address.
@@ -356,27 +364,55 @@ export class Assembler {
         const r = this.recogniser;
         const opener = r.next();
         r.expression();
-        if (this.rules.basicIV && r.isPunct(",")) return this.indexedIndirect("JMP");
-        r.close(opener, "Index");
+        if (r.isPunct(",")) {
+            if (this.rules.basicIV) return this.indexedIndirect("JMP");
+            r.fail("Index", r.peek(), false, "BASIC II has JMP (address) but not JMP (address,X)");
+        }
+        this.closeIndirect(opener);
     }
 
     // After the comma in (address,X).
     indexedIndirect(mnemonic) {
         const r = this.recogniser;
-        this.index(mnemonic, "X");
-        if (!r.isPunct(")")) r.fail("Index");
-        r.next();
+        this.index(mnemonic, InsideBrackets, "X");
+        this.closeIndirect(r.peek());
     }
 
-    // A comma and an index register.
-    index(mnemonic, ...registers) {
+    // The ) of an indirect operand; where the statement ends without one, the error is at `unclosed`.
+    closeIndirect(unclosed) {
+        const r = this.recogniser;
+        if (r.isPunct(")")) return void r.next();
+        const ended = r.atEnd();
+        const explanation = ended
+            ? `Expected a closing ) after ${r.last.text}`
+            : `Expected a closing ) here, not ${r.peek().text}`;
+        r.fail("Index", ended ? unclosed : r.peek(), r.is("end"), explanation);
+    }
+
+    // A comma and an index register; `where` is where it goes in the operand, for the message.
+    index(mnemonic, where, ...registers) {
         const r = this.recogniser;
         r.next().type = "symbol";
         const token = r.peek();
         const register = token.text?.[0];
         if (!r.is("name") || !this.rules.indexRegister(mnemonic, registers, register))
-            r.fail("Index");
+            r.fail("Index", token, r.is("end"), this.wrongIndex(mnemonic, where, registers));
         r.lexer.split(token, 1);
         r.next().type = "keyword";
+    }
+
+    wrongIndex(mnemonic, where, registers) {
+        const r = this.recogniser;
+        const typed = r.is("name") ? r.peek().text[0] : "";
+        const register = typed.toUpperCase();
+        const allowed = registers.join(" or ");
+        const takes = `${mnemonic} takes ${allowed}${where}`;
+        if (registers.includes(register))
+            return `BASIC II reads the index register after ${mnemonic} only in capitals: ${register}, not ${typed}`;
+        if (register === "X" || register === "Y")
+            return `${mnemonic} cannot be indexed by ${register}${where}, only by ${allowed}`;
+        if (r.atEnd() || r.isPunct("]"))
+            return `Expected an index register after the comma: ${takes}`;
+        return `${r.peek().text} is not an index register: ${takes}`;
     }
 }
