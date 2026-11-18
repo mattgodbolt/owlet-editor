@@ -66,6 +66,7 @@ const ExpectedPunct = {",": "Missing ,", "=": "Mistake", "#": "Missing #"};
 const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 // BASIC IV words one of its errors differently.
 const BadHexIV = "Bad Hex";
+const MissingAfterOperand = new Set([...Object.values(OperandErrors), BadHexIV]);
 
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
@@ -81,6 +82,8 @@ function completions(assembling, dialect) {
     }
     return CompletionWords.get(key);
 }
+
+const AnotherArgument = "a comma or a closing )";
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
@@ -226,7 +229,11 @@ export class Recogniser {
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
         const atEnd = token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE";
-        if (atEnd && this.last && this.last.start >= statementStart.start) token = this.last;
+        const movedBack = atEnd && this.last !== null && this.last.start >= statementStart.start;
+        // What is missing goes after the marked token, rather than in its place, where the mark moved back from the end
+        // of the statement, and always for a string's closing quote and the digits after a &.
+        const missingAfter = movedBack || MissingAfterOperand.has(message);
+        if (movedBack) token = this.last;
         const tokens = this.lexer.tokens;
         const before = tokens[tokens.lastIndexOf(token) - 1];
         const after = token === this.peek() ? this.peek(1) : null;
@@ -238,6 +245,7 @@ export class Recogniser {
             end: marked.end,
             unfinished,
             hole,
+            missingAfter,
             ...(explanation && {explanation}),
         };
         this.problems.push(problem);
@@ -440,14 +448,18 @@ export class Recogniser {
         }
         if (count < fewest) this.fail("Missing ,");
         if (count > most) this.fail("Missing )", this.peek(), false);
-        this.close(opener, count === most || most === Infinity ? "Missing )" : null);
+        this.close(
+            opener,
+            count === most || most === Infinity ? "Missing )" : null,
+            count < most ? AnotherArgument : "a closing )",
+        );
     }
 
-    // The ")" of a bracket; an unclosed one is shown at its "(".
-    close(opener, message = "Missing )") {
-        if (!this.isPunct(")"))
-            this.fail(message, this.atEnd() ? opener : this.peek(), this.is("end"));
-        this.next();
+    // The ")" of a bracket; an unclosed one is shown at its "(", and `needed` is what may follow the last argument.
+    close(opener, message = "Missing )", needed = AnotherArgument) {
+        if (this.isPunct(")")) return void this.next();
+        if (!this.atEnd()) this.fail(message);
+        this.fail(message, opener, this.is("end"), `Expected ${needed} after ${this.last.text}`);
     }
 
     name(message = "Syntax error") {

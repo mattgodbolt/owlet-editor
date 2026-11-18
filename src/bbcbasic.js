@@ -225,17 +225,12 @@ export function getSyntaxMarkers(text, dialect, cursorLine = 0) {
         const stopped = tokens.find(token => token.start === start);
         const before = tokens.filter(token => token.kind !== "white" && token.end <= start);
         const previous = before.at(-1);
-        const next = tokens.find(
-            token => token.kind !== "white" && token.start >= (stopped?.end ?? end),
-        );
-        const atEnd = !next || next.text === ":" || next.kw?.keyword === "ELSE";
         const statementStart = before.slice(0, -1).every(token => token.kind === "linenum");
         const message = problemMessage(
             problem,
             {
                 at: stopped?.text ?? lexer.text.slice(start, end).trim(),
                 previous: previous?.text,
-                atEnd,
                 statementName: previous?.kind === "name" && statementStart,
             },
             dialect,

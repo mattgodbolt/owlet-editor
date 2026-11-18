@@ -30,10 +30,10 @@ function keywordStartingWith(name) {
 
 // The text of a marker for a problem of the recogniser, plain words first and the ROM's own in brackets. `at` is the
 // text the marker covers, `previous` the text of the token before it (null if none) and `statementName` true if that
-// token is a name that begins the statement; `atEnd` is true if the statement ends straight after it.
+// token is a name that begins the statement.
 export function problemMessage(
-    {message, explanation, unfinished, hole, unclosed, stricter},
-    {at, previous, atEnd, statementName},
+    {message, explanation, unfinished, hole, missingAfter, unclosed, stricter},
+    {at, previous, statementName},
     dialect,
 ) {
     if (unclosed) return UnclosedBlock;
@@ -42,12 +42,12 @@ export function problemMessage(
     if (explanation) return explanation + rom;
     const needed = message === "ON syntax" ? neededAfterOn(dialect) : Needed[message];
     let plain;
-    if (unfinished && !hole) {
-        plain = needed ? `Expected ${needed} after ${at}` : `Unfinished after ${at}`;
-    } else if (hole) {
+    if (hole) {
         plain = needed ? `Expected ${needed} before ${at}` : `Unfinished before ${at}`;
-    } else if (needed && atEnd && at !== ")") {
+    } else if (needed && missingAfter) {
         plain = `Expected ${needed} after ${at}`;
+    } else if (unfinished && !needed) {
+        plain = `Unfinished after ${at}`;
     } else if (message === "Missing )" && at === ")") {
         plain = "Too many arguments before )";
     } else if (statementName) {

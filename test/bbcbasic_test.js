@@ -1417,7 +1417,7 @@ describe("Syntax markers", () => {
     it.each([
         ["GOTO 20 30", "30 is not expected here (BASIC: Syntax error)", 9, 11],
         ["PRINT )", "Expected a value here, not ) (BASIC: No such variable)", 7, 8],
-        ["X=1+*", "Expected a value after * (BASIC: No such variable)", 5, 6],
+        ["X=1+*", "Expected a value here, not * (BASIC: No such variable)", 5, 6],
         ["X=(1+:Y=2", "Expected a value after + (BASIC: No such variable)", 5, 6],
         ["FOR I=1:NEXT", "Expected TO after 1 (BASIC: No TO)", 7, 8],
         ["A$=LEFT$(X$,1,2)", "Too many arguments before ) (BASIC: Missing ))", 16, 17],
@@ -1438,6 +1438,41 @@ describe("Syntax markers", () => {
             );
         },
     );
+    // "here, not" where BASIC stops at the marked token, and "after" where it stops after it; the error in brackets is
+    // the recorded one.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("on %s", (_, dialect, table) => {
+        it.each([
+            ["PRINT (1 2:PRINT", "Expected a closing ) here, not 2"],
+            ["PRINT (1 2", "Expected a closing ) here, not 2"],
+            ["FOR I=1 2:NEXT", "Expected TO here, not 2"],
+            ['X$=LEFT$("A" 2:P.', "Expected a comma here, not 2"],
+            ['X=INSTR("A" "B"', 'Expected a comma here, not "B"'],
+            ["MOVE 1 2:P.", "Expected a comma here, not 2"],
+            ["BPUT 1", "Expected a # here, not 1"],
+            ["X=1+*", "Expected a value here, not *"],
+            ["PRINT GOTO", "Expected a value here, not GOTO"],
+            ["X=RND(1,", "Expected a closing ) here, not ,"],
+            ["FOR I=1 T", "Expected TO here, not T"],
+            ["[OPT0:LDA #]", "Expected a value here, not ]"],
+            ["PRINT (1:PRINT", "Expected a closing ) after 1"],
+            ['X$=LEFT$("A",1:P.', "Expected a closing ) after 1"],
+            ["PRINT TAB(1:P.", "Expected a comma or a closing ) after 1", false],
+            ["FOR I=1:NEXT", "Expected TO after 1"],
+            ["FOR I=(1):NEXT", "Expected TO after )"],
+            ["X=(1+:Y=2", "Expected a value after +"],
+            ["X=&G", "Expected a hex digit after &"],
+            ["X=&:P.", "Expected a hex digit after &"],
+            ['X$="A', 'Expected a closing quote after "A'],
+        ])("%s should say %j", (text, plain, worded = true) => {
+            const rom = table.get(text);
+            assert.ok(rom, `${text} is not a recorded row`);
+            const [marker] = getSyntaxMarkers(text, dialect);
+            assert.strictEqual(marker.message, worded ? `${plain} (BASIC: ${rom})` : plain);
+        });
+    });
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
         ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],
