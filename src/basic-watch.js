@@ -132,7 +132,9 @@ function definedNameEnd(peek, at, end) {
     if (peek(next) !== ProcToken && peek(next) !== FnToken) return null;
     do ++next;
     while (next < end && isNameCharacter(peek(next)));
-    if (peek(next) !== OpenBracket) return next - 1;
+    const nameEnd = next - 1;
+    while (peek(next) === Space) ++next;
+    if (peek(next) !== OpenBracket) return nameEnd;
     while (next < end && peek(next) !== CloseBracket) ++next;
     return next;
 }

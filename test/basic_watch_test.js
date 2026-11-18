@@ -874,6 +874,58 @@ describe("BasicWatch handled errors", () => {
                     ],
                 },
                 {
+                    name: "the same error in a DEF's arguments and after its name apart, with a space before its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX (A,B)X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with spaces around its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX   (A,B)   X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX   (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with spaces inside its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX ( A , B ) X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX ( A , B )", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, of a FN with a space before its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN Y=FNX(1,Q) ELSE Y=FNX(1,1)",
+                        "END",
+                        "DEFFNX (A,B)=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "=Q", 10),
+                        taken(26, "No such variable", 40, "DEFFNX (A,B)", 10),
+                    ],
+                },
+                {
                     name: "the same error in a DEF's arguments and after its name apart",
                     lines: [
                         "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
