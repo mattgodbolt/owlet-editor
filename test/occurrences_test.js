@@ -142,6 +142,57 @@ describe("Rename", () => {
         }
     });
 
+    it("should allow a rename between real and integer, and no other change of type", () => {
+        const cases = [
+            // Olly's example from #294.
+            [
+                "DIMS(360):F.‸I=0TO360:S(I)=SINRADI:N.",
+                "I%",
+                "DIMS(360):F.I%=0TO360:S(I%)=SINRADI%:N.",
+            ],
+            ["‸I%=1:P.I%", "I", "I=1:P.I"],
+            ["DIM ‸S(3):S(1)=S(2)", "S%", "DIM S%(3):S%(1)=S%(2)"],
+            ["DIM ‸S%(3):S%(1)=S%(2)", "S", "DIM S(3):S(1)=S(2)"],
+            ['‸A=1:A%=2:A$=""', "B%", 'B%=1:A%=2:A$=""'],
+            ["‸I=1", "A%", "A%=1"],
+            ["‸A%=1", "i", "i=1"],
+            ["DIM ‸A(1):A=1", "A%", "DIM A%(1):A=1"],
+            ["‸I%=1:J%=2", "J", "J=1:J%=2"],
+        ];
+        for (const [text, newName, expected] of cases)
+            assert.strictEqual(rename(text, newName), expected, `${text} to ${newName}`);
+        const refused = [
+            ["‸F=1", "F$", "Renaming F to F$ would change its type"],
+            ["‸F%=1", "F$", "Renaming F% to F$ would change its type"],
+            ['‸F$=""', "F", "Renaming F$ to F would change its type"],
+            ['‸F$=""', "F%", "Renaming F$ to F% would change its type"],
+            ["DIM ‸A(1)", "A$", "Renaming A to A$ would change its type"],
+            ["DIM ‸A$(1)", "A%", "Renaming A$ to A% would change its type"],
+            ["‸F=1", "@%", "Renaming F to @% would change how numbers are printed"],
+            ["‸@%=1", "F", "Renaming @% to F would change how numbers are printed"],
+            ["‸I=1:I%=2", "I%", "I% is already used in this program"],
+            ["‸I%=1:I=2", "I", "I is already used in this program"],
+            ["DIM ‸S(1):DIM S%(1)", "S%", "S%( is already used in this program"],
+            ["‸I=1", "2%", "2% is not a valid name for I"],
+            ["‸I=1", "I%%", "I%% is not a valid name for I"],
+            ["‸I=1", "PRINT%", "PRINT% is not a valid name for I"],
+            ["DIM ‸S(1)", "TIME%", "TIME% is not a valid name for S("],
+        ];
+        for (const [text, newName, rejectReason] of refused)
+            assert.deepStrictEqual(rename(text, newName), {rejectReason}, `${text} to ${newName}`);
+        // FN and PROC names have no suffix, so a name with one is not a name.
+        for (const [text, kind] of [
+            ["PROC‸a:b=FNa", "PROCa"],
+            ["b=FN‸a:PROCa", "FNa"],
+        ])
+            for (const suffix of ["%", "$"])
+                assert.deepStrictEqual(
+                    rename(text, `a${suffix}`),
+                    {rejectReason: `a${suffix} is not a valid name for ${kind}`},
+                    `${text} to a${suffix}`,
+                );
+    });
+
     it("should only offer to rename names", () => {
         assert.deepStrictEqual(
             at("P‸RINT F", renameProviderFor(ModelBDialect).resolveRenameLocation),
@@ -158,6 +209,136 @@ describe("Rename", () => {
                 text: "F",
             },
         );
+    });
+});
+
+describe("Rename notice", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    const WholeNumbers =
+        "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
+    const Real = "it is now a real variable (slower, and not limited to whole numbers).";
+    const Resident =
+        "is a resident integer: CALL and USR pass it to machine code, and RUN and CLEAR leave it alone.";
+
+    // Runs fn with an editor on the text and a spy on what it is asked to show in a message. The editor draws on
+    // animation frames while fn waits, and jsdom's canvas does nothing at all.
+    async function withEditor(text, fn) {
+        const context = new Proxy(
+            {measureText: () => ({width: 8})},
+            {get: (target, name) => target[name] ?? (() => {})},
+        );
+        vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
+        const element = document.body.appendChild(document.createElement("div"));
+        const codeEditor = editor.create(element, {
+            value: text,
+            language: "BBCBASIC",
+            occurrencesHighlight: "off",
+        });
+        try {
+            const shown = vi.spyOn(
+                codeEditor.getContribution("editor.contrib.messageController"),
+                "showMessage",
+            );
+            await fn(codeEditor);
+            await new Promise(resolve => setTimeout(resolve, 0));
+            return shown.mock.calls.map(([message]) => message);
+        } finally {
+            codeEditor.dispose();
+            element.remove();
+        }
+    }
+
+    // Does what Monaco's rename does with the provider's answer, unless apply is false.
+    function messagesAfterRename(textWithCursor, newName, {apply = true} = {}) {
+        const {text, position} = withCursor(textWithCursor);
+        return withEditor(text, codeEditor => {
+            codeEditor.setPosition(position);
+            const {edits} = renameProviderFor(ModelBDialect).provideRenameEdits(
+                codeEditor.getModel(),
+                position,
+                newName,
+            );
+            if (apply)
+                codeEditor.executeEdits(
+                    "rename",
+                    edits.map(edit => edit.textEdit),
+                );
+        });
+    }
+
+    it("should say what a change between real and integer does, once it is applied", async () => {
+        const cases = [
+            // Olly's example from #294, in which I% is itself a resident integer.
+            [
+                "F.‸I=0TO360:S(I)=SINRADI:N.",
+                "I%",
+                [`Renamed I to I%: ${WholeNumbers} I% ${Resident}`],
+            ],
+            ["F.‸IX=0TO360:S(IX)=SINRADIX:N.", "IX%", [`Renamed IX to IX%: ${WholeNumbers}`]],
+            ["‸IX%=1", "IX", [`Renamed IX% to IX: ${Real}`]],
+            [
+                "‸I%=1",
+                "I",
+                [
+                    `Renamed I% to I: ${Real} I% was a resident integer, which CALL and USR pass to machine code.`,
+                ],
+            ],
+            ["DIM ‸S(3)", "S%", [`Renamed S( to S%(: ${WholeNumbers}`]],
+            [
+                "DIM ‸S%(3)",
+                "S",
+                [
+                    "Renamed S%( to S(: it is now a real array (slower, and not limited to whole numbers).",
+                ],
+            ],
+            ["‸I=1", "A%", [`Renamed I to A%: ${WholeNumbers} A% ${Resident}`]],
+            [
+                "‸Z%=1",
+                "Z",
+                [
+                    `Renamed Z% to Z: ${Real} Z% was a resident integer, which CALL and USR pass to machine code.`,
+                ],
+            ],
+            // Only A% to Z% are resident, and not their arrays.
+            ["DIM ‸A(3)", "A%", [`Renamed A( to A%(: ${WholeNumbers}`]],
+            ["‸I=1", "a%", [`Renamed I to a%: ${WholeNumbers}`]],
+            // Where the type is the same, or the name has none, there is nothing to say; a refused rename says why, as it did.
+            ["‸I%=1", "J%", []],
+            ["‸I=1", "J", []],
+            ["‸I=1", "I$", ["Renaming I to I$ would change its type"]],
+            ["‸I=1:I%=2", "I%", ["I% is already used in this program"]],
+            ["‸I=1", "@%", ["Renaming I to @% would change how numbers are printed"]],
+            ["PROC‸a", "b", []],
+        ];
+        for (const [text, newName, expected] of cases)
+            expect(await messagesAfterRename(text, newName), `${text} to ${newName}`).toEqual(
+                expected,
+            );
+    });
+
+    it("should say nothing if the edits are not applied", async () => {
+        expect(await messagesAfterRename("‸I=1", "I%", {apply: false})).toEqual([]);
+    });
+
+    it("should say nothing if the next change is not the rename", async () => {
+        const messages = await withEditor("I=1:PRINT I", codeEditor => {
+            const model = codeEditor.getModel();
+            renameProviderFor(ModelBDialect).provideRenameEdits(
+                model,
+                {lineNumber: 1, column: 1},
+                "I%",
+            );
+            codeEditor.executeEdits("typing", [
+                {
+                    range: {startLineNumber: 1, startColumn: 12, endLineNumber: 1, endColumn: 12},
+                    text: "1",
+                },
+            ]);
+        });
+        expect(messages).toEqual([]);
     });
 });
 
