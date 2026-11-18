@@ -7,11 +7,11 @@ import {
     rebuildBracketPairs,
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
-import {BasicIIDialect, ModelBDialect} from "../src/parser/dialect";
+import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {problemCount} from "../src/problem-count";
 import {highlightLine, readLines} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
-import {falseInvalid, RomTokens, verdicts} from "./rom-tables";
+import {falseInvalid, masterVerdicts, RomTokens, verdicts} from "./rom-tables";
 import {describe, it} from "vitest";
 import assert from "assert";
 import {editor, MarkerSeverity, Range} from "monaco-editor/editor/editor.api";
@@ -1434,6 +1434,61 @@ describe("Syntax markers", () => {
             assert.deepStrictEqual(
                 markers(text),
                 [[MarkerSeverity.Error, message, 1, start, end]],
+                text,
+            );
+        },
+    );
+    it.each([
+        ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
+        ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],
+        ["[OPT0:LDX 42,X:]", BasicIIDialect, "LDX cannot be indexed by X, only by Y"],
+        ["[OPT0:STZ 42,Y:]", BasicIVDialect, "STZ cannot be indexed by Y, only by X"],
+        ["[OPT0:LDA Z,Z:]", BasicIIDialect, "Z is not an index register: LDA takes X or Y"],
+        [
+            "[OPT0:LDA 42,:]",
+            BasicIIDialect,
+            "Expected an index register after the comma: LDA takes X or Y",
+        ],
+        [
+            "[OPT0:LDA 42,x:]",
+            BasicIIDialect,
+            "BASIC II reads the index register after LDA only in capitals: X, not x",
+        ],
+        [
+            "[OPT0:LDA (42,Y):]",
+            BasicIIDialect,
+            "LDA cannot be indexed by Y inside the brackets, only by X",
+        ],
+        [
+            "[OPT0:JMP (42,Y):]",
+            BasicIVDialect,
+            "JMP cannot be indexed by Y inside the brackets, only by X",
+        ],
+        [
+            "[OPT0:LDA (42),X:]",
+            BasicIVDialect,
+            "LDA cannot be indexed by X after the brackets, only by Y",
+        ],
+        [
+            "[OPT0:LDA (42):]",
+            BasicIIDialect,
+            "Expected ,Y after ): BASIC II has LDA (address),Y but not LDA (address)",
+        ],
+        [
+            "[OPT0:JMP (42,X):]",
+            BasicIIDialect,
+            "BASIC II has JMP (address) but not JMP (address,X)",
+        ],
+        ["[OPT0:LDA (42,X Z:]", BasicIIDialect, "Expected a closing ) here, not Z"],
+        ["[OPT0:JMP (42:]", BasicIVDialect, "Expected a closing ) after 42"],
+    ])(
+        "should say what is wrong with an operand where BASIC says Index: %s",
+        (text, dialect, message) => {
+            const table = dialect === BasicIVDialect ? masterVerdicts : verdicts;
+            assert.strictEqual(table.get(text), "Index", text);
+            assert.deepStrictEqual(
+                getSyntaxMarkers(text, dialect).map(marker => marker.message),
+                [`${message} (BASIC: Index)`],
                 text,
             );
         },

@@ -489,6 +489,167 @@ describe("BasicWatch errors", () => {
                     lines: ["A=1", "X=1:STOP:Y=2"],
                     error: {number: 0, message: "STOP", line: 20, marked: "STOP"},
                 },
+                {
+                    // An assignment leaves the statement pointer on the byte before it, here THEN.
+                    lines: ["IF 1 THEN X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["IF 1 THENX=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["IF1X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["IF 0 THEN A=1 ELSE X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["IF 0 THEN A=1 ELSEX=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["IF 1 THEN X=1:Y=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "Y=Q"},
+                },
+                {
+                    lines: ["IF 1 THEN X=1: Y=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "Y=Q"},
+                },
+                {
+                    lines: ["IF 0 THEN X=1 ELSE Y=1:Z=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "Z=Q"},
+                },
+                {
+                    lines: ["IF 1 THEN IF 1 THEN X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["IF 1 THEN PRINT 1/0"],
+                    error: {number: 18, message: "Division by zero", line: 10, marked: "PRINT 1/0"},
+                },
+                {
+                    lines: ["IF Q THEN X=1"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "IF Q THEN"},
+                },
+                {
+                    lines: ["REP. X=Y"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Y"},
+                },
+                {
+                    lines: ["REPEATX=Y"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Y"},
+                },
+                {
+                    lines: ["IF 1 THEN REPEAT X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["REPEAT X=X+1:UNTIL X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "UNTIL X=Q"},
+                },
+                {
+                    lines: ["PROCX", "DEFPROCX X=Y"],
+                    error: {number: 26, message: "No such variable", line: 20, marked: "X=Y"},
+                },
+                {
+                    lines: ["PROCX(1)", "END", "DEFPROCX(A) X=Q"],
+                    error: {number: 26, message: "No such variable", line: 30, marked: "X=Q"},
+                },
+                {
+                    // BASIC reads a PROC's arguments at its DEF, and ERL is the DEF's line.
+                    lines: ["PROCX(1,Q)", "END", "DEFPROCX(A,B)X=1"],
+                    error: {
+                        number: 26,
+                        message: "No such variable",
+                        line: 30,
+                        marked: "DEFPROCX(A,B)",
+                    },
+                },
+                {
+                    lines: ["IFFNX", "DEFFNX X=Y"],
+                    error: {number: 26, message: "No such variable", line: 20, marked: "X=Y"},
+                },
+                {
+                    lines: ["X=FNX(2)", "END", "DEFFNX(A) X=Q"],
+                    error: {number: 26, message: "No such variable", line: 30, marked: "X=Q"},
+                },
+                {
+                    lines: ["P.FNX", "DEFFNX:IF1=1=Q"],
+                    error: {number: 26, message: "No such variable", line: 20, marked: "=Q"},
+                },
+                {
+                    lines: ["ON 5 GOTO 20 ELSE X=Q", "X=1"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["ON 3 GOTO 20,30 ELSE X=Q", "X=1"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["X=1:ON 5 GOTO 20", "X=1"],
+                    error: {number: 40, message: "ON range", line: 10, marked: "ON 5 GOTO 20"},
+                },
+                {
+                    lines: ["FOR I=1 TO Q:NEXT"],
+                    error: {
+                        number: 26,
+                        message: "No such variable",
+                        line: 10,
+                        marked: "FOR I=1 TO Q",
+                    },
+                },
+                {
+                    lines: ["FOR I=1 TO 2:X=Q:NEXT"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["FORI=1TO2:NEXTI:X=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "X=Q"},
+                },
+                {
+                    lines: ["X=1:Y=Q:REM a:b"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "Y=Q"},
+                },
+                {
+                    lines: ["X=1: :Y=Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "Y=Q"},
+                },
+                {
+                    lines: ["X=1: PRINT 1/0 :Y=2"],
+                    error: {number: 18, message: "Division by zero", line: 10, marked: "PRINT 1/0"},
+                },
+                {
+                    lines: ["X=1:PRINT Q"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "PRINT Q"},
+                },
+                {
+                    lines: ["GOTO 20", "X=Q:Y=1"],
+                    error: {number: 26, message: "No such variable", line: 20, marked: "X=Q"},
+                },
+                {
+                    // A statement BASIC has finished leaves the statement pointer on what ends it.
+                    lines: ["X$=1:Y=2"],
+                    error: {number: 6, message: "Type mismatch", line: 10, marked: "X$=1"},
+                },
+                {
+                    lines: ["IF 1 THEN X$=1 ELSE Y=2"],
+                    error: {number: 6, message: "Type mismatch", line: 10, marked: "X$=1"},
+                },
+                {
+                    lines: ["IF 1 THEN STOP ELSE Y=2"],
+                    error: {number: 0, message: "STOP", line: 10, marked: "STOP"},
+                },
+                {
+                    lines: ["X=1:RETURN"],
+                    error: {number: 38, message: "No GOSUB", line: 10, marked: "RETURN"},
+                },
+                {
+                    lines: ["IF 1 THEN RETURN ELSE X=1"],
+                    error: {number: 38, message: "No GOSUB", line: 10, marked: "RETURN"},
+                },
             ])("shows the error, line and statement of $lines", async ({lines, error}) => {
                 expect(await errorShown(machine, lines)).toEqual(error);
             });
@@ -724,6 +885,63 @@ describe("BasicWatch handled errors", () => {
                     erl: "20",
                 },
                 {
+                    name: "an assignment straight after THEN, however it was reached",
+                    lines: ["ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END", "IF 1 THEN X=Q"],
+                    errors: [taken(26, "No such variable", 20, "X=Q", 10, 3)],
+                    erl: "20",
+                },
+                {
+                    name: "an assignment straight after an IF's condition, however it was reached",
+                    lines: ["ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END", "IF1X=Q"],
+                    errors: [taken(26, "No such variable", 20, "X=Q", 10, 3)],
+                    erl: "20",
+                },
+                {
+                    name: "an assignment straight after ELSE, however it was reached",
+                    lines: [
+                        "ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "IF 0 THEN A=1 ELSE X=Q",
+                    ],
+                    errors: [taken(26, "No such variable", 20, "X=Q", 10, 3)],
+                    erl: "20",
+                },
+                {
+                    name: "an assignment straight after REPEAT, however it was reached",
+                    lines: ["ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END", "REP. X=Q"],
+                    errors: [taken(26, "No such variable", 20, "X=Q", 10, 3)],
+                    erl: "20",
+                },
+                {
+                    name: "an assignment straight after a DEF PROC",
+                    lines: [
+                        "ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "PROCX",
+                        "DEFPROCX X=Q",
+                    ],
+                    errors: [taken(26, "No such variable", 30, "X=Q", 10, 3)],
+                    erl: "30",
+                },
+                {
+                    name: "an assignment straight after a DEF FN",
+                    lines: [
+                        "ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "IFFNX",
+                        "DEFFNX X=Q",
+                    ],
+                    errors: [taken(26, "No such variable", 30, "X=Q", 10, 3)],
+                    erl: "30",
+                },
+                {
+                    name: "a FN's result after an IF's condition",
+                    lines: [
+                        "ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "P.FNX",
+                        "DEFFNX:IF1=1=Q",
+                    ],
+                    errors: [taken(26, "No such variable", 30, "=Q", 10, 3)],
+                    erl: "30",
+                },
+                {
                     name: "an error in a PROC",
                     lines: [
                         "ON ERROR L%=ERL:END",
@@ -903,6 +1121,16 @@ describe("BasicWatch handled errors", () => {
                 expect(handled.total).toBe(12);
                 expect(handled.errors.map(({line}) => line.number)).toEqual([
                     220, 210, 200, 190, 180, 170, 160, 150,
+                ]);
+            });
+
+            it("marks the assignment an ON ERROR runs, in a handler that loops on its own error", async () => {
+                const lines = ["ONERROR X=Y", "Z"];
+                const {booted, watch} = await runWatched(machine, lines);
+                const {errors} = handledShown(watch.read(booted.cpu), lines, booted);
+                expect(errors).toEqual([
+                    taken(26, "No such variable", 10, "X=Y", 10, expect.any(Number)),
+                    taken(4, "Mistake", 20, "Z", 10),
                 ]);
             });
 

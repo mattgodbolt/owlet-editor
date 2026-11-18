@@ -138,9 +138,10 @@ export function tokeniseLines(lines, dialect) {
     return readEach(lines, dialect).map(({colors}, i) => lexLine(lines[i], dialect, colors));
 }
 
-// What each line's errors are, for editor markers: {line, start, end, message, unfinished, hole, stricter, code}. An unfinished line is
-// shown at its last token and on to the end of the line, and one that something is missing from (a `hole`) at the token
-// where it stops; `message` is the error BASIC would give, or null where the recogniser does not know it. A block
+// What each line's errors are, for editor markers: {line, start, end, message, explanation, unfinished, hole, stricter,
+// code}. An unfinished line is shown at its last token and on to the end of the line, and one that something is missing
+// from (a `hole`) at the token where it stops; `message` is the error BASIC would give, or null where the recogniser
+// does not know it, and `explanation`, where there is one, says in plain words what is wrong. A block
 // that is never closed is one problem at its "[" ({unclosed: true}) in place of those of the lines after it, if it has any.
 export function programProblems(recognisers) {
     let block = null;
@@ -149,11 +150,12 @@ export function programProblems(recognisers) {
         if (recogniser.opener) block = {line: i + 1, token: recogniser.opener};
         const last = recogniser.tokens.findLast(token => token.kind !== "white");
         return recogniser.problems.map(
-            ({message, token, end, unfinished, hole, stricter, code}) => ({
+            ({message, explanation, token, end, unfinished, hole, stricter, code}) => ({
                 line: i + 1,
                 start: unfinished && !hole ? last.start : token.start,
                 end: unfinished && !hole ? lineText.length : end,
                 message,
+                ...(explanation && {explanation}),
                 unfinished,
                 hole,
                 stricter: Boolean(stricter),

@@ -90,11 +90,12 @@ const ColourSpelling = "COLOUR";
 
 // `at` is the token that was next when BASIC stopped.
 class Failure {
-    constructor(message, token, unfinished, at) {
+    constructor(message, token, unfinished, at, explanation) {
         this.message = message;
         this.token = token;
         this.unfinished = unfinished;
         this.at = at;
+        this.explanation = explanation;
     }
 }
 
@@ -162,9 +163,10 @@ export class Recogniser {
         return !this.peek().spaced;
     }
 
-    // `message` is the ROM's error. The error is unfinished if the line ends where the text is wrong.
-    fail(message, token = this.peek(), unfinished = token.kind === "end") {
-        throw new Failure(message, token, unfinished, this.peek());
+    // `message` is the ROM's error, and `explanation` says what is wrong where the ROM's error alone would not. The
+    // error is unfinished if the line ends where the text is wrong.
+    fail(message, token = this.peek(), unfinished = token.kind === "end", explanation = undefined) {
+        throw new Failure(message, token, unfinished, this.peek(), explanation);
     }
 
     expectPunct(text, message = ExpectedPunct[text]) {
@@ -219,7 +221,7 @@ export class Recogniser {
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
     mark(failure, statementStart, assembling) {
         let {token} = failure;
-        const {message} = failure;
+        const {message, explanation} = failure;
         const ended = failure.unfinished || this.completable(token, statementStart, assembling);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
@@ -230,7 +232,14 @@ export class Recogniser {
         const after = token === this.peek() ? this.peek(1) : null;
         const adjacent = (first, second) => first && second && first.end === second.start;
         const marked = before && before.abbreviation && adjacent(before, token) ? before : token;
-        const problem = {message, token: marked, end: marked.end, unfinished, hole};
+        const problem = {
+            message,
+            token: marked,
+            end: marked.end,
+            unfinished,
+            hole,
+            ...(explanation && {explanation}),
+        };
         this.problems.push(problem);
         if (unfinished) return problem;
         marked.invalid = true;
@@ -524,7 +533,7 @@ export class Recogniser {
         if (token.kind === "hex" && token.text.length > 1) return void this.next();
         if (token.kind === "name") return (this.name(), true);
         if (token.kind !== "keyword" || isStatementKeyword(token.kw))
-            this.fail(this.operandError(token), token, this.unfinishedOperand(token), true);
+            this.fail(this.operandError(token), token, this.unfinishedOperand(token));
         this.next();
         const {keyword} = token.kw;
         this.timeString(keyword);
