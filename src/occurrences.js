@@ -122,12 +122,12 @@ function residencyChange(target, newName) {
     );
     if (!wasResident && isResident)
         return (
-            `${newName} is a resident integer, so RUN and CLEAR leave it alone` +
+            `${newName} is a resident integer, so RUN, CLEAR, etc leave it alone` +
             (newRegister ? `, and CALL and USR set ${newRegister} from it.` : ".")
         );
     if (wasResident && !isResident)
         return (
-            `${target.name} was a resident integer, and ${newName} is not: RUN and CLEAR forget it` +
+            `${target.name} was a resident integer, and ${newName} is not: RUN, CLEAR, etc forget it` +
             (oldRegister ? `, and CALL and USR no longer set ${oldRegister} from it.` : ".")
         );
     if (oldRegister === newRegister) return null;

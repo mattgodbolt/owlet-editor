@@ -220,9 +220,9 @@ describe("Rename notice", () => {
     const WholeNumbers =
         "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
     const Real = "it is now a real variable (slower, and not limited to whole numbers).";
-    const Resident = name => `${name} is a resident integer, so RUN and CLEAR leave it alone`;
+    const Resident = name => `${name} is a resident integer, so RUN, CLEAR, etc leave it alone`;
     const NotResident = (name, newName) =>
-        `${name} was a resident integer, and ${newName} is not: RUN and CLEAR forget it`;
+        `${name} was a resident integer, and ${newName} is not: RUN, CLEAR, etc forget it`;
 
     // Runs fn with an editor on the text and a spy on what it is asked to show in a message. The editor draws on
     // animation frames while fn waits, and jsdom's canvas does nothing at all.

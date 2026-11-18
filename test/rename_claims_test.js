@@ -4,6 +4,7 @@ import {TestMachine} from "jsbeeb/src/test-machine";
 import {installBasic} from "jsbeeb/src/basic-loader";
 import {createTokenisers, tokeniserFor} from "../src/tokeniser";
 import {Machines} from "../src/machines";
+import {blankDisc} from "./blank_disc";
 
 // What the notices after a rename say about BASIC, run on the machines as Owlet does.
 
@@ -144,7 +145,7 @@ describe.each(["B", "Master"])("On the %s", machine => {
         expect(await program(booted, lines("CALL l%"))).toBe("         12305");
     });
 
-    it("should have only @% and A% to Z% resident, which RUN, CLEAR and NEW leave alone", async () => {
+    it("should have only @% and A% to Z% resident, which RUN, CLEAR, NEW, LOAD and CHAIN leave alone", async () => {
         const booted = await bootedMachine(machine);
         const printAll = `P.${Residents.join(';" ";')}`;
         expect(await program(booted, [`10 ${printAll}`])).toBe(`      2314${" 0".repeat(26)}`);
@@ -163,7 +164,7 @@ describe.each(["B", "Master"])("On the %s", machine => {
             expect(await program(booted, [`10 P.${name}`]), name).toBe(
                 "No such variable at line 10",
             );
-        // A program's integer that is not resident is gone after RUN or CLEAR.
+        // A program's integer that is not resident is gone after RUN, CLEAR, LOAD or CHAIN.
         await program(booted, ["10 P.I%;i%"]);
         for (const forget of ["RUN", "CLEAR"]) {
             await command(booted, "I%=5:i%=6");
@@ -172,5 +173,17 @@ describe.each(["B", "Master"])("On the %s", machine => {
                 forget,
             ).toMatch(/^\s*5\nNo such variable( at line 10)?$/);
         }
+        booted.testMachine.loadDiscData(blankDisc());
+        await program(booted, ['10 P.I%;" ";~@%;" ";Z%:P.i%']);
+        await command(booted, 'SAVE "T"');
+        await command(booted, "@%=&20A:Z%=9:i%=6");
+        await command(booted, 'LOAD "T"');
+        expect(await command(booted, 'P.I%;" ";~@%;" ";Z%:P.i%'), "LOAD").toBe(
+            "         5 20A 9\nNo such variable",
+        );
+        await command(booted, "i%=6");
+        expect(await command(booted, 'CHAIN "T"'), "CHAIN").toBe(
+            "         5 20A 9\nNo such variable at line 10",
+        );
     });
 });
