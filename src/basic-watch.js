@@ -14,6 +14,7 @@ import {
     TextPointerBase,
     TextPointerOffset,
 } from "jsbeeb/src/basic-state";
+import {totalCycles} from "./cycles";
 import {keywords} from "./tokens";
 
 const LineHeaderBytes = 4;
@@ -46,6 +47,10 @@ const RepeatToken = tokenOf("REPEAT");
 const OpenBracket = 0x28;
 const CloseBracket = 0x29;
 const DefaultPrintFormat = "&0000090A";
+// Longer than BASIC takes between the writes that move its text pointer, which it makes one byte at a time, and longer
+// than the OS takes over an interrupt, which can come between them.
+const PointerWritingCycles = 32;
+const InterruptCycles = 4000;
 const ResidentFirstByte = 0x400;
 const ResidentLastByte = 0x46b;
 const ResidentBytes = 4;
@@ -63,6 +68,9 @@ export const writtenResidentIntegers = (residents, written) =>
     residents.filter((_, index) => written & (1 << index));
 
 const word = (peek, address) => peek(address) | (peek(address + 1) << 8);
+
+/** Where BASIC's text pointer reads, as readPointers has it, with its offset `offset`. */
+const textReading = (peek, offset) => (word(peek, TextPointerBase) + offset - 1) & 0xffff;
 
 const inRom = address => address >= RomStart && address < MosStart;
 
@@ -236,11 +244,13 @@ export class BasicWatch {
         this.language = null;
         this.cpu = null;
         this.hook = null;
+        this.interruptHook = null;
         this.written = 0;
         this.programLast = false;
         this.raised = null;
         this.stopped = null;
         this.handled = new HandledErrors();
+        this.forgetPointer();
     }
 
     /**
@@ -250,8 +260,8 @@ export class BasicWatch {
      * written before this call are unknown, so those not at their start value stand in for them (see restart). It also
      * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text,
      * and whether a statement of the program had started since BASIC last pointed it at its input buffer, which tells an
-     * error in a line numbered 0 from one typed at the prompt; and keeps each error an ON ERROR handler takes, which is
-     * gone from BASIC's workspace once the handler runs.
+     * error in a line numbered 0 from one typed at the prompt; keeps each error an ON ERROR handler takes, which is
+     * gone from BASIC's workspace once the handler runs; and notes where its text pointer was last whole (see settled).
      */
     track(cpu) {
         if (this.cpu === cpu) return;
@@ -263,21 +273,36 @@ export class BasicWatch {
                 this.written |= residentBit(address);
             else if (address === ErrorBlockHigh && cpu.pc >= MosStart)
                 this.noteError(peek, peek(ErrorBlockPointer) | (value << 8));
-            else if (address === TextPointerOffset && cpu.pc === this.language?.statementRead)
-                this.noteStatement(peek(TextPointerHigh));
-            else if (address === TextPointerHigh && value === InputBufferPage)
-                this.programLast = false;
+            else if (address >= TextPointerOffset && address <= TextPointerHigh)
+                this.notePointer(cpu, peek, address, value);
         });
+        this.interruptHook = cpu.debugInterrupt.add(() => this.noteInterrupt(cpu));
         this.restart();
     }
 
     /** Stops noting writes, which takes the machine back to its fast path. */
     untrack() {
         this.hook?.remove();
+        this.interruptHook?.remove();
         this.cpu = null;
         this.hook = null;
+        this.interruptHook = null;
         this.written = 0;
         this.forgetErrors();
+        this.forgetPointer();
+    }
+
+    notePointer(cpu, peek, address, value) {
+        const cycles = totalCycles(cpu);
+        if (cycles - this.pointerWritten > PointerWritingCycles && !this.mayBeTorn(cycles))
+            this.lastWhole = textReading(peek, peek(TextPointerOffset));
+        this.pointerWritten = cycles;
+        this.interruptedAt = null;
+        if (address === TextPointerOffset && cpu.pc === this.language?.statementRead) {
+            this.lastWhole = textReading(peek, value);
+            this.noteStatement(peek(TextPointerHigh));
+        } else if (address === TextPointerHigh && value === InputBufferPage)
+            this.programLast = false;
     }
 
     /**
@@ -317,10 +342,29 @@ export class BasicWatch {
         this.handled.clear();
     }
 
+    /** An interrupt is starting, which may have come between BASIC's writes to its text pointer. */
+    noteInterrupt(cpu) {
+        const cycles = totalCycles(cpu);
+        if (this.mayBeTorn(cycles) || cycles - this.pointerWritten <= PointerWritingCycles)
+            this.interruptedAt = cycles;
+    }
+
+    /** Whether an interrupt came so soon after BASIC wrote its text pointer that the write may be half done. */
+    mayBeTorn(cycles) {
+        return this.interruptedAt !== null && cycles - this.interruptedAt <= InterruptCycles;
+    }
+
+    forgetPointer() {
+        this.lastWhole = null;
+        this.pointerWritten = null;
+        this.interruptedAt = null;
+    }
+
     /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
     restart() {
         this.written = 0;
         this.forgetErrors();
+        this.forgetPointer();
         if (!this.cpu) return;
         const residents = readResidentIntegers(address => this.cpu.peekmemAsLanguage(address));
         residents.forEach((resident, index) => {
@@ -360,7 +404,8 @@ export class BasicWatch {
         const {basic, title, keywords} = this.currentLanguage(cpu);
         if (!basic) return {basic, title};
         const peek = address => cpu.peekmemAsLanguage(address);
-        const {page, reading} = readPointers(peek);
+        const {page, reading: sampled} = readPointers(peek);
+        const reading = this.settled(cpu, sampled);
         const line = lineHolding(peek, page, reading);
         return {
             basic,
@@ -375,6 +420,22 @@ export class BasicWatch {
             residents: writtenResidentIntegers(readResidentIntegers(peek), this.written),
             ...readVariables(peek),
         };
+    }
+
+    /**
+     * Where BASIC is reading the program: where its text pointer is (`sampled`), or, where that may be torn, where it
+     * last was whole. BASIC moves the pointer with separate writes to its base and its offset (at the end of a
+     * statement, and in BASIC IV's GOTO), and a frame that ends between them leaves it past the statement, often in
+     * another line or past the end of the program. So it is taken as whole once BASIC has gone on for a while without
+     * writing it, unless an interrupt came soon after it last did, which can be between two of the writes, until BASIC
+     * writes it again or the interrupt is surely over; and, as the hooks note, just before BASIC starts writing it
+     * again after a while with no such interrupt, and as a statement starts.
+     */
+    settled(cpu, sampled) {
+        const cycles = totalCycles(cpu);
+        const whole =
+            cycles - this.pointerWritten > PointerWritingCycles && !this.mayBeTorn(cycles);
+        return whole ? sampled : (this.lastWhole ?? sampled);
     }
 
     /**
