@@ -450,7 +450,7 @@ describe("A line typed in an editor that closes brackets", () => {
         assert.deepStrictEqual(invalid("A$=LEFT$(B$)"), []);
         assert.strictEqual(problem.unfinished, true);
         assert.strictEqual("A$=LEFT$(B$)".slice(problem.start, problem.end), ")");
-        assert.deepStrictEqual(red("A$=LEFT$(B$,1,2)"), [")"]);
+        assert.deepStrictEqual(red("A$=LEFT$(B$,1,2)"), [",2)"]);
     });
 });
 

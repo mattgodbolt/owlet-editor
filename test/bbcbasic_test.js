@@ -1356,22 +1356,47 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Warning, "Expected a comma before ) (BASIC: Missing ,)", 1, 12, 13],
         ]);
     });
-    it("should say too many arguments where a call has more than it takes, not that a ) is expected at a )", () => {
-        for (const [text, column] of [
-            ["A$=LEFT$(X$,1,2)", 16],
-            ["PRINT TAB(1,2,3)", 16],
-            ["A$=MID$(X$,1,2,3)", 17],
-        ]) {
-            assert.deepStrictEqual(markers(text), [
-                [
-                    MarkerSeverity.Error,
-                    "Too many arguments before ) (BASIC: Missing ))",
-                    1,
-                    column,
-                    column + 1,
-                ],
+    // The red starts at the comma before the first argument too many, where BASIC stops, and runs to the end of the
+    // statement.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("an argument too many on %s", (name, dialect, table) => {
+        const TooMany = "Too many arguments before )";
+        const NoClose = "Expected a closing ) here, not ,";
+        it.each([
+            ["A$=LEFT$(X$,1,2)", ",2)", TooMany],
+            ["X=RND(1,2)", ",2)", TooMany],
+            ["A$=LEFT$(X$,1,2,3,4)", ",2,3,4)", TooMany],
+            ["A$=MID$(X$,1,2,3,4)", ",3,4)", TooMany],
+            ["A$=STRING$(2,X$,3)", ",3)", TooMany],
+            ["X=INSTR(X$,X$,1,2)", ",2)", TooMany],
+            ["X=POINT(1,2,3)", ",3)", TooMany],
+            ["PRINT TAB(1,2,3)", ",3)", TooMany],
+            ["PRINT SPC(1,2)", ",2)", TooMany],
+            ["X=(1,2,3)", ",2,3)", TooMany],
+            ["X=RND(1 , 2 )", ", 2 )", TooMany],
+            ["X=RND(1,)", ",)", TooMany],
+            ["X=RND(1,FNa(2,3))", ",FNa(2,3))", TooMany],
+            ["X=RND(1,(2,3))", ",(2,3))", TooMany],
+            ['X=RND(1,"a)b")', ',"a)b")', TooMany],
+            ['X=RND(1,"a(")', ',"a(")', TooMany],
+            ["X=SQR(RND(1,2))", ",2))", TooMany],
+            ["X=RND(1,2)+1", ",2)+1", TooMany],
+            ["IF 1 THEN X=RND(1,2) ELSE PRINT", ",2)", TooMany],
+            ["X=RND(1,2", ",2", NoClose],
+            ["X=RND(1,2:PRINT", ",2", NoClose],
+            ["X=RND(1,2 ELSE )", ",2", NoClose],
+            ["X=RND(1,FNa(2)", ",FNa(2)", NoClose],
+            ["X=RND(1,LEFT$(X$,1)", ",LEFT$(X$,1)", NoClose],
+            ["X=RND(1,LE.X$,1)", ",LE.X$,1)", NoClose],
+        ])("%s", (text, marked, message) => {
+            const found = getSyntaxMarkers(text, dialect).map(m => [
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
             ]);
-        }
+            assert.deepStrictEqual(found, [[marked, `${message} (BASIC: ${table.get(text)})`]]);
+        });
     });
     it("should not mark the line the cursor is on as unfinished, only the others", () => {
         const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";
@@ -1420,7 +1445,7 @@ describe("Syntax markers", () => {
         ["X=1+*", "Expected a value after * (BASIC: No such variable)", 5, 6],
         ["X=(1+:Y=2", "Expected a value after + (BASIC: No such variable)", 5, 6],
         ["FOR I=1:NEXT", "Expected TO after 1 (BASIC: No TO)", 7, 8],
-        ["A$=LEFT$(X$,1,2)", "Too many arguments before ) (BASIC: Missing ))", 16, 17],
+        ["A$=LEFT$(X$,1,2)", "Too many arguments before ) (BASIC: Missing ))", 14, 17],
         ["A=1'", "' is not expected here (BASIC: Syntax error)", 4, 5],
         [
             "10 FO I%=1 TO 10",

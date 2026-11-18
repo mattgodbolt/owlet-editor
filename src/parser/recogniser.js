@@ -66,6 +66,7 @@ const ExpectedPunct = {",": "Missing ,", "=": "Mistake", "#": "Missing #"};
 const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 // BASIC IV words one of its errors differently.
 const BadHexIV = "Bad Hex";
+const TooMany = "Too many arguments before )";
 
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
@@ -432,15 +433,32 @@ export class Recogniser {
         let count = 1;
         this.expression();
         while (this.isPunct(",")) {
-            const comma = this.next();
-            // RND(1, is wrong however it goes on.
-            if (count >= most && this.is("end")) this.fail("Missing )", comma, false);
+            // BASIC stops at the comma before an argument too many, whatever follows it.
+            if (count === most)
+                this.fail(
+                    "Missing )",
+                    this.peek(),
+                    false,
+                    this.closedLater() ? TooMany : undefined,
+                );
+            this.next();
             this.expression();
             count++;
         }
         if (count < fewest) this.fail("Missing ,");
-        if (count > most) this.fail("Missing )", this.peek(), false);
         this.close(opener, count === most || most === Infinity ? "Missing )" : null);
+    }
+
+    // Whether a ")" in the statement closes the bracket the next token is in.
+    closedLater() {
+        let depth = 0;
+        for (let n = 0; ; n++) {
+            const token = this.peek(n);
+            if (token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE")
+                return false;
+            if (token.text === "(" || token.kw?.keyword.endsWith("(")) depth++;
+            else if (token.text === ")" && depth-- === 0) return true;
+        }
     }
 
     // The ")" of a bracket; an unclosed one is shown at its "(".
