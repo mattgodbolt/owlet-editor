@@ -15,6 +15,7 @@ import {
     TextPointerBase,
     TextPointerOffset,
 } from "jsbeeb/src/basic-state";
+import {keywords} from "./tokens";
 
 const LineHeaderBytes = 4;
 const TextPointerHigh = TextPointerBase + 1;
@@ -35,6 +36,8 @@ const NoKeywords = new Map();
 const RomStart = 0x8000;
 const Colon = 0x3a;
 const Space = 0x20;
+const Return = 0x0d;
+const ElseToken = keywords.find(({keyword}) => keyword === "ELSE").token;
 const DefaultPrintFormat = "&0000090A";
 const ResidentFirstByte = 0x400;
 const ResidentLastByte = 0x46b;
@@ -84,20 +87,25 @@ const inProgram = high => high !== InputBufferPage && high < RomStart >> 8;
 
 /**
  * The offset into `line`'s text of the statement BASIC raised an error in, from its text pointers as they were then,
- * or null where they do not show it. The statement pointer can be on the colon between two statements: BASIC reads it
- * before a statement that does not start with a keyword, as an assignment does not, and then reads that through the
- * expression pointer; and after one it has finished, with the expression pointer left behind it. After an EVAL, the
+ * or null where they do not show it. A keyword statement leaves the statement pointer on its token or further into it.
+ * An assignment leaves it on the byte before the assignment (a colon or space, THEN, ELSE, REPEAT, or the end of an
+ * IF's condition or a DEF's name), or on its first byte when reached by GOTO or ON ERROR, and reads on through the
+ * expression pointer, which is then not behind it. A statement BASIC has finished leaves it on the colon, ELSE or return
+ * after it. Between two statements, the expression pointer says which: not behind, the one after. After an EVAL, the
  * expression pointer is not in the program at all.
  */
 function errorOffset(peek, line, {statement, expression}) {
     if (!holds(line, statement)) return null;
     const text = line.start + LineHeaderBytes;
-    let colon = statement;
-    while (peek(colon) === Space && colon > text) --colon;
-    if (peek(colon) !== Colon) return statement - text;
+    const ahead = holds(line, expression) && expression >= statement;
+    let end = statement;
+    while (peek(end) === Space && end > text) --end;
+    const code = end < text ? null : peek(end);
+    if (code === Return) return end - text - 1;
+    if (code !== Colon && code !== ElseToken) return statement - text + (ahead ? 1 : 0);
     if (!holds(line, expression)) return null;
-    if (expression < colon) return colon - text;
-    let next = colon + 1;
+    if (!ahead) return end - text - 1;
+    let next = end + 1;
     while (peek(next) === Space) ++next;
     return next - text;
 }
