@@ -10,7 +10,6 @@ const Needed = {
     "No TO": "TO",
     "Bad HEX": "a hex digit",
     "Bad Hex": "a hex digit",
-    Index: "an array index",
 };
 
 const neededAfterOn = ({onBranches}) =>
@@ -33,13 +32,14 @@ function keywordStartingWith(name) {
 // text the marker covers, `previous` the text of the token before it (null if none) and `statementName` true if that
 // token is a name that begins the statement; `atEnd` is true if the statement ends straight after it.
 export function problemMessage(
-    {message, unfinished, hole, unclosed, stricter},
+    {message, explanation, unfinished, hole, unclosed, stricter},
     {at, previous, atEnd, statementName},
     dialect,
 ) {
     if (unclosed) return UnclosedBlock;
     if (stricter) return message;
     const rom = message ? ` (BASIC: ${message})` : "";
+    if (explanation) return explanation + rom;
     const needed = message === "ON syntax" ? neededAfterOn(dialect) : Needed[message];
     let plain;
     if (unfinished && !hole) {
