@@ -1299,3 +1299,163 @@ describe("BasicWatch handled errors", () => {
         });
     }
 });
+
+// About as many cycles as the emulator runs between two of the browser's frames, when the watch is read.
+const FrameCycles = 40000;
+const KeyHeldCycles = 200000;
+
+// What the watch reads at the end of each of `frames` frames, as the Debug panel reads it.
+async function framesRead({testMachine, cpu}, watch, frames) {
+    const reads = [];
+    for (let frame = 0; frame < frames; ++frame) {
+        await testMachine.runFor(FrameCycles);
+        reads.push(watch.read(cpu));
+    }
+    return reads;
+}
+
+// Owlet's machine started on `lines`, with the watch reading it from before the program runs.
+async function watching(machine, lines) {
+    const booted = await bootedMachine(machine);
+    const watch = new BasicWatch();
+    watch.read(booted.cpu);
+    installBasic(tokeniserFor(booted.tokenisers, booted.cpu.model).tokenise(lines.join("\n")), {
+        readByte: address => booted.testMachine.readbyte(address),
+        writeByte: (address, value) => booted.testMachine.writebyte(address, value),
+    });
+    await booted.testMachine.type("RUN");
+    return {booted, watch};
+}
+
+async function press(testMachine, key) {
+    testMachine.keyDown(key);
+    await testMachine.runFor(KeyHeldCycles);
+    testMachine.keyUp(key);
+}
+
+const waitShown = ({line, wait}) => line && {line: line.number, ...wait};
+
+describe("BasicWatch waits", () => {
+    for (const machine of ["B", "Master"]) {
+        describe(`on the ${machine}`, () => {
+            it("says the program waits for a key at GET, then for INPUT once a key is pressed", async () => {
+                const {booted, watch} = await watching(machine, ["G=GET", "INPUT X", "END"]);
+                const keyboard = {kind: "keyboard"};
+                expect(waitShown((await framesRead(booted, watch, 10)).at(-1))).toEqual({
+                    line: 10,
+                    ...keyboard,
+                    keyword: "GET",
+                });
+                await press(booted.testMachine, "KeyA");
+                expect(waitShown((await framesRead(booted, watch, 10)).at(-1))).toEqual({
+                    line: 20,
+                    ...keyboard,
+                    keyword: "INPUT",
+                });
+            });
+
+            it.each([
+                {lines: ["A=INKEY(500)"], wait: {kind: "keyboard", keyword: "INKEY"}},
+                {lines: ["INPUT LINE A$"], wait: {kind: "keyboard", keyword: "INPUT LINE"}},
+                ...['CHAIN "X"', 'A=OPENIN "X"', "*CAT"].map(line => ({
+                    lines: [line],
+                    wait: {kind: "filing system", keyword: null},
+                })),
+                {
+                    lines: ["REPEAT:SOUND 1,-15,100,200:UNTIL FALSE"],
+                    wait: {kind: "sound", keyword: null},
+                },
+            ])("says $lines waits for $wait.kind", async ({lines, wait}) => {
+                const {booted, watch} = await watching(machine, lines);
+                // Long enough for some frames to end in an interrupt, which jsbeeb cannot place.
+                const reads = (await framesRead(booted, watch, 60)).slice(10);
+                expect(new Set(reads.map(read => JSON.stringify(waitShown(read))))).toEqual(
+                    new Set([JSON.stringify({line: 10, ...wait})]),
+                );
+            });
+
+            it.each([
+                ["REPEAT:X=X+1:UNTIL FALSE"],
+                ["REPEAT:A=INKEY(0):UNTIL FALSE"],
+                ["REPEAT:A$=INKEY$(0):B$=INKEY$(0):UNTIL FALSE"],
+                ["REPEAT:A=INKEY(-99):UNTIL FALSE"],
+                ["REPEAT:SOUND 1,0,0,1:T%=TIME:REPEAT UNTIL TIME>T%+10:UNTIL FALSE"],
+                ["REPEAT:*FX143,96", "UNTIL FALSE"],
+                // Machine code, which never moves BASIC on, left running with the filing system's ROM paged in.
+                ["DIM C% 20:P%=C%", "[OPT 0:LDA &DBC:STA &F4:STA &FE30:.l JMP l:]", "CALL C%"],
+            ])(
+                "says %s, which only passes through a place a program can wait, is running",
+                async (...lines) => {
+                    const {booted, watch} = await watching(machine, lines);
+                    const reads = (await framesRead(booted, watch, 50)).slice(5);
+                    expect(reads.filter(({wait, error}) => wait || error)).toEqual([]);
+                },
+            );
+
+            it("says the program waits for vsync in the frames that end in *FX19's wait", async () => {
+                const {booted, watch} = await watching(machine, ["REPEAT", "*FX19", "UNTIL FALSE"]);
+                const reads = (await framesRead(booted, watch, 30)).slice(5);
+                const waiting = reads.filter(({wait}) => wait);
+                expect(waiting.length).toBeGreaterThan(reads.length / 2);
+                expect(new Set(waiting.map(waitShown).map(read => JSON.stringify(read)))).toEqual(
+                    new Set([JSON.stringify({line: 20, kind: "vsync", keyword: null})]),
+                );
+            });
+
+            it("says the program runs until a frame has passed without BASIC moving on, and keeps that while paused or until Debug is on again", async () => {
+                const booted = await bootedMachine(machine);
+                await run(booted, ["G=GET"]);
+                const watch = new BasicWatch();
+                expect(watch.read(booted.cpu).wait).toBeNull();
+                expect(watch.read(booted.cpu).wait).toBeNull();
+                await booted.testMachine.runFor(FrameCycles);
+                expect(watch.read(booted.cpu).wait).toMatchObject({kind: "keyboard"});
+                // Switched off and on again, it knows nothing of what BASIC did in between.
+                watch.untrack();
+                expect(watch.read(booted.cpu).wait).toBeNull();
+                await booted.testMachine.runFor(FrameCycles);
+                expect(watch.read(booted.cpu).wait).toMatchObject({kind: "keyboard"});
+            });
+
+            it("says nothing of the last program's wait once a saved state of another is loaded", async () => {
+                const busy = await watching(machine, ["REPEAT:X=X+1:UNTIL FALSE"]);
+                await framesRead(busy.booted, busy.watch, 5);
+                const saved = busy.booted.testMachine.snapshot();
+                const {booted, watch} = await watching(machine, ["G=GET"]);
+                expect((await framesRead(booted, watch, 10)).at(-1).wait).toMatchObject({
+                    kind: "keyboard",
+                });
+                // As Owlet loads a saved state: the machine's state replaced, then onProgramStart.
+                booted.testMachine.restore(saved);
+                watch.restart();
+                expect(watch.read(booted.cpu)).toMatchObject({line: {number: 10}, wait: null});
+            });
+
+            it.each([
+                {
+                    name: "Escape",
+                    stop: async testMachine => press(testMachine, "Escape"),
+                    error: {number: 17, message: "Escape"},
+                },
+                {
+                    name: "BREAK",
+                    stop: async ({processor}) => {
+                        processor.setReset(true);
+                        await processor.execute(KeyHeldCycles);
+                        processor.setReset(false);
+                    },
+                    error: null,
+                },
+            ])("stops saying the program waits once $name stops it", async ({stop, error}) => {
+                const {booted, watch} = await watching(machine, ["A$=GET$"]);
+                expect((await framesRead(booted, watch, 10)).at(-1).wait).toMatchObject({
+                    keyword: "GET$",
+                });
+                await stop(booted.testMachine);
+                const after = (await framesRead(booted, watch, 50)).at(-1);
+                expect(after).toMatchObject({line: null, wait: null});
+                if (error) expect(after.error).toMatchObject(error);
+            });
+        });
+    }
+});

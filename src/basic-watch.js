@@ -10,6 +10,7 @@ import {
     readReportedError,
     readResidentIntegers,
     readVariables,
+    readWait,
     romTitle,
     TextPointerBase,
     TextPointerOffset,
@@ -250,6 +251,7 @@ export class BasicWatch {
         this.raised = null;
         this.stopped = null;
         this.handled = new HandledErrors();
+        this.forgetMoving();
         this.forgetPointer();
     }
 
@@ -261,7 +263,8 @@ export class BasicWatch {
      * notes BASIC's text pointers as each error is raised, before BASIC's error handler moves them to its ON ERROR text,
      * and whether a statement of the program had started since BASIC last pointed it at its input buffer, which tells an
      * error in a line numbered 0 from one typed at the prompt; keeps each error an ON ERROR handler takes, which is
-     * gone from BASIC's workspace once the handler runs; and notes where its text pointer was last whole (see settled).
+     * gone from BASIC's workspace once the handler runs; notes where its text pointer was last whole (see settled); and
+     * notes whether BASIC has moved on through the program, which it does by writing its text pointer at each statement.
      */
     track(cpu) {
         if (this.cpu === cpu) return;
@@ -298,6 +301,7 @@ export class BasicWatch {
             this.lastWhole = textReading(peek, peek(TextPointerOffset));
         this.pointerWritten = cycles;
         this.interruptedAt = null;
+        if (address === TextPointerOffset) this.movedOn = true;
         if (address === TextPointerOffset && cpu.pc === this.language?.statementRead) {
             this.lastWhole = textReading(peek, value);
             this.noteStatement(peek(TextPointerHigh));
@@ -342,6 +346,13 @@ export class BasicWatch {
         this.handled.clear();
     }
 
+    forgetMoving() {
+        this.movedOn = true;
+        this.stalled = false;
+        this.readAt = null;
+        this.waiting = null;
+    }
+
     /** An interrupt is starting, which may have come between BASIC's writes to its text pointer. */
     noteInterrupt(cpu) {
         const cycles = totalCycles(cpu);
@@ -360,11 +371,15 @@ export class BasicWatch {
         this.interruptedAt = null;
     }
 
-    /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
+    /**
+     * The machine has started again, so what was written, and what BASIC was waiting for, are forgotten, and those not
+     * at their start value stand in.
+     */
     restart() {
         this.written = 0;
         this.forgetErrors();
         this.forgetPointer();
+        this.forgetMoving();
         if (!this.cpu) return;
         const residents = readResidentIntegers(address => this.cpu.peekmemAsLanguage(address));
         residents.forEach((resident, index) => {
@@ -396,8 +411,9 @@ export class BasicWatch {
     /**
      * What BASIC is doing: {basic: false, title} when the language is not a BASIC; otherwise the line it is reading
      * ({number, bytes, offset}, the offset being into the line's bytes after its header) or null when it is not in the
-     * program (at the prompt), the error it is at the prompt after (see errorAtPrompt) or null, the errors ON ERROR
-     * handlers have taken in this run (see handledErrors), and its variables.
+     * program (at the prompt), what the program in that line is waiting for (see waitFor) or null, the error it is
+     * at the prompt after (see errorAtPrompt) or null, the errors ON ERROR handlers have taken in this run (see
+     * handledErrors), and its variables.
      */
     read(cpu) {
         this.track(cpu);
@@ -407,6 +423,7 @@ export class BasicWatch {
         const {page, reading: sampled} = readPointers(peek);
         const reading = this.settled(cpu, sampled);
         const line = lineHolding(peek, page, reading);
+        const stalled = this.stalledSinceLastRead(cpu);
         return {
             basic,
             title,
@@ -415,11 +432,38 @@ export class BasicWatch {
                 bytes: lineBytes(peek, line),
                 offset: reading - line.start - LineHeaderBytes,
             },
+            wait: line && this.waitFor(readWait(cpu, line, keywords), stalled),
             error: line ? null : this.errorAtPrompt(peek, page, keywords),
             handled: this.handledErrors(keywords),
             residents: writtenResidentIntegers(readResidentIntegers(peek), this.written),
             ...readVariables(peek),
         };
+    }
+
+    /**
+     * What the program is waiting for, {kind, keyword} from jsbeeb's readWait (`wait`), or null while it is running:
+     * in the vsync loop it is waiting, and elsewhere only while BASIC has `stalled`, as a program that reads the
+     * keyboard with INKEY(0) passes through the OS's keyboard read without waiting. A wait lasts while BASIC stays
+     * stalled, through a frame that ends in an interrupt, which readWait cannot place.
+     */
+    waitFor(wait, stalled) {
+        if (wait && (wait.kind === "vsync" || stalled)) this.waiting = wait;
+        else if (!stalled || this.waiting?.kind === "vsync") this.waiting = null;
+        return this.waiting;
+    }
+
+    /**
+     * Whether BASIC has not moved on since the last read that came after the machine had run, as it does not while it
+     * waits; as it was then while the machine has not run since, as while it is paused.
+     */
+    stalledSinceLastRead(cpu) {
+        const cycles = totalCycles(cpu);
+        if (cycles !== this.readAt) {
+            this.stalled = !this.movedOn;
+            this.movedOn = false;
+            this.readAt = cycles;
+        }
+        return this.stalled;
     }
 
     /**

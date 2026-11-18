@@ -14,6 +14,12 @@ const EscapeError = 17;
 // The latest error an ON ERROR handler took is marked strongly for about a second of the program running on.
 const FreshFrames = 50;
 const HandledColour = "#e06060";
+const WaitedFor = {
+    keyboard: "keyboard input",
+    vsync: "vsync",
+    "filing system": "the filing system",
+    sound: "room in the sound queue",
+};
 
 function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -52,12 +58,17 @@ function describeHandled(error, range) {
 const handledTitle = total =>
     `${total} ${total === 1 ? "error" : "errors"} taken by ON ERROR, the latest first:`;
 
+function describeWait({kind, keyword}, number) {
+    return `Waiting for ${WaitedFor[kind]}${keyword ? ` (${keyword})` : ""} at line ${number}`;
+}
+
 function describe(state, range) {
     if (!state.basic) return `Not BASIC: the language is ${state.title || "an unnamed ROM"}`;
     if (state.error) return describeError(state.error, range);
     if (!state.line) return "At BASIC's prompt";
-    if (!range) return `Running line ${state.line.number}, which is not as in the editor`;
-    return `Running line ${state.line.number}`;
+    const {number} = state.line;
+    const doing = state.wait ? describeWait(state.wait, number) : `Running line ${number}`;
+    return range ? doing : `${doing}, which is not as in the editor`;
 }
 
 /**

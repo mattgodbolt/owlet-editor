@@ -29,7 +29,7 @@
   "dependencies": {
     "base2048": "^3.0.0",
     "jquery": "^4.0.0",
-    "jsbeeb": "2.23.0",
+    "jsbeeb": "2.24.0",
     "monaco-editor": "^0.57.0",
     "promise": "^8.3.0",
     "resize-observer-polyfill": "^1.5.1",
