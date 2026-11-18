@@ -225,6 +225,21 @@ async function linesShown(machine, lines, frames = FramesWatched) {
     return [...shown].sort((a, b) => a - b);
 }
 
+// The end of a statement in BASIC II and IV, which moves the text pointer's base to the colon or return after it
+// (STA &0B: BCC: INC &0C) before setting its offset to 1 (LDY #1: STY &0A).
+const EndOfStatementBaseStore = [0x85, 0x0b];
+const EndOfStatement = [...EndOfStatementBaseStore, 0x90, 0x02, 0xe6, 0x0c, 0xa0, 0x01, 0x84, 0x0a];
+const OffsetStoreDistance = 6;
+const OffsetStoreBytes = 2;
+// The end of a call to a PROC or FN, which pulls the caller's text pointer off the stack.
+const CallReturn = [0x68, 0x85, 0x0c, 0x68, 0x85, 0x0b, 0x68, 0x85, 0x0a];
+
+/** The address in a language ROM after the first `length` bytes of the only place `bytes` are. */
+function romAddressAfter(rom, bytes, length = bytes.length) {
+    const at = rom.findIndex((_, i) => bytes.every((byte, j) => rom[i + j] === byte));
+    return 0x8000 + at + length;
+}
+
 describe("BasicWatch running line", () => {
     for (const machine of ["B", "Master"]) {
         describe(`on the ${machine}`, () => {
@@ -277,12 +292,63 @@ describe("BasicWatch running line", () => {
                 },
             );
 
+            it("shows the line it is in when an interrupt comes between BASIC's writes to its text pointer", async () => {
+                const booted = await bootedMachine(machine);
+                const {cpu, testMachine} = booted;
+                const watch = new BasicWatch();
+                watch.read(cpu);
+                await run(booted, ["0GOTO0", '22222P."NO"']);
+                const bank = cpu.bankPagedBy(cpu.peekmemAsLanguage(LanguageRomNumber));
+                const after = romAddressAfter(
+                    cpu.romBank(bank),
+                    EndOfStatement,
+                    EndOfStatementBaseStore.length,
+                );
+                // Stopped after the base is written and before the offset is, an interrupt is taken there.
+                await testMachine.runUntilAddress(after, 1, {bank});
+                cpu.sysvia.setca1(true);
+                cpu.sysvia.setca1(false);
+                await testMachine.runUntilAddress(after + OffsetStoreDistance, 1, {bank});
+                expect(watch.read(cpu).line?.number).toBe(0);
+                await testMachine.runUntilAddress(
+                    after + OffsetStoreDistance + OffsetStoreBytes,
+                    1,
+                    {bank},
+                );
+                expect(watch.read(cpu).line?.number).toBe(0);
+            });
+
             it("shows the line a FN returned into while it waits there", async () => {
                 const booted = await bootedMachine(machine);
                 const watch = new BasicWatch();
                 watch.read(booted.cpu);
                 await run(booted, ["X=FNa+GET", "END", "DEF FNa=1"]);
                 expect(watch.read(booted.cpu).line?.number).toBe(10);
+            });
+
+            it("shows the line a FN returned into while it waits there, after an interrupt as it returned", async () => {
+                const booted = await bootedMachine(machine);
+                const {cpu, testMachine} = booted;
+                const watch = new BasicWatch();
+                watch.read(cpu);
+                const bank = cpu.bankPagedBy(cpu.peekmemAsLanguage(LanguageRomNumber));
+                const returned = romAddressAfter(cpu.romBank(bank), CallReturn);
+                installBasic(
+                    tokeniserFor(booted.tokenisers, cpu.model).tokenise(
+                        // Long enough for the typing of RUN to be over before the FN returns.
+                        "FOR I%=1 TO 2000:NEXT:X=FNa+GET\nEND\nDEF FNa=1",
+                    ),
+                    {
+                        readByte: address => testMachine.readbyte(address),
+                        writeByte: (address, value) => testMachine.writebyte(address, value),
+                    },
+                );
+                await testMachine.type("RUN");
+                await testMachine.runUntilAddress(returned, 1, {bank});
+                cpu.sysvia.setca1(true);
+                cpu.sysvia.setca1(false);
+                await testMachine.runFor(CyclesPerRun);
+                expect(watch.read(cpu).line?.number).toBe(10);
             });
         });
     }

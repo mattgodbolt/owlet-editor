@@ -189,6 +189,7 @@ export class BasicWatch {
         this.language = null;
         this.cpu = null;
         this.hook = null;
+        this.interruptHook = null;
         this.written = 0;
         this.programLast = false;
         this.raised = null;
@@ -220,14 +221,17 @@ export class BasicWatch {
             else if (address >= TextPointerOffset && address <= TextPointerHigh)
                 this.notePointer(cpu, peek, address, value);
         });
+        this.interruptHook = cpu.debugInterrupt.add(() => this.noteInterrupt(cpu));
         this.restart();
     }
 
     /** Stops noting writes, which takes the machine back to its fast path. */
     untrack() {
         this.hook?.remove();
+        this.interruptHook?.remove();
         this.cpu = null;
         this.hook = null;
+        this.interruptHook = null;
         this.written = 0;
         this.forgetErrors();
         this.forgetPointer();
@@ -235,9 +239,10 @@ export class BasicWatch {
 
     notePointer(cpu, peek, address, value) {
         const cycles = totalCycles(cpu);
-        if (cycles - this.pointerWritten > PointerWritingCycles)
+        if (cycles - this.pointerWritten > PointerWritingCycles && !this.mayBeTorn(cycles))
             this.lastWhole = textReading(peek, peek(TextPointerOffset));
         this.pointerWritten = cycles;
+        this.interruptedAt = null;
         if (address === TextPointerOffset && cpu.pc === this.language?.statementRead) {
             this.lastWhole = textReading(peek, value);
             this.noteStatement(peek(TextPointerHigh));
@@ -282,9 +287,22 @@ export class BasicWatch {
         this.handled.clear();
     }
 
+    /** An interrupt is starting, which may have come between BASIC's writes to its text pointer. */
+    noteInterrupt(cpu) {
+        const cycles = totalCycles(cpu);
+        if (this.mayBeTorn(cycles) || cycles - this.pointerWritten <= PointerWritingCycles)
+            this.interruptedAt = cycles;
+    }
+
+    /** Whether an interrupt came so soon after BASIC wrote its text pointer that the write may be half done. */
+    mayBeTorn(cycles) {
+        return this.interruptedAt !== null && cycles - this.interruptedAt <= InterruptCycles;
+    }
+
     forgetPointer() {
         this.lastWhole = null;
         this.pointerWritten = null;
+        this.interruptedAt = null;
     }
 
     /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
@@ -354,12 +372,14 @@ export class BasicWatch {
      * last was whole. BASIC moves the pointer with separate writes to its base and its offset (at the end of a
      * statement, and in BASIC IV's GOTO), and a frame that ends between them leaves it past the statement, often in
      * another line or past the end of the program. So it is taken as whole once BASIC has gone on for a while without
-     * writing it, and for longer in an interrupt, which can come between the writes; and, as the hook notes, just
-     * before BASIC starts writing it again after a while, and as a statement starts.
+     * writing it, unless an interrupt came soon after it last did, which can be between two of the writes, until BASIC
+     * writes it again or the interrupt is surely over; and, as the hooks note, just before BASIC starts writing it
+     * again after a while with no such interrupt, and as a statement starts.
      */
     settled(cpu, sampled) {
-        const unwritten = totalCycles(cpu) - this.pointerWritten;
-        const whole = unwritten > (cpu.p.i ? InterruptCycles : PointerWritingCycles);
+        const cycles = totalCycles(cpu);
+        const whole =
+            cycles - this.pointerWritten > PointerWritingCycles && !this.mayBeTorn(cycles);
         return whole ? sampled : (this.lastWhole ?? sampled);
     }
 
