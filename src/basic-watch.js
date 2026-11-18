@@ -15,6 +15,7 @@ import {
     TextPointerBase,
     TextPointerOffset,
 } from "jsbeeb/src/basic-state";
+import {keywords} from "./tokens";
 
 const LineHeaderBytes = 4;
 const TextPointerHigh = TextPointerBase + 1;
@@ -36,7 +37,7 @@ const RomStart = 0x8000;
 const Colon = 0x3a;
 const Space = 0x20;
 const Return = 0x0d;
-const ElseToken = 0x8b;
+const ElseToken = keywords.find(({keyword}) => keyword === "ELSE").token;
 const DefaultPrintFormat = "&0000090A";
 const ResidentFirstByte = 0x400;
 const ResidentLastByte = 0x46b;
