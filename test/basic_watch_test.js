@@ -879,7 +879,8 @@ describe("BasicWatch waits", () => {
                 },
             ])("says $lines waits for $wait.kind", async ({lines, wait}) => {
                 const {booted, watch} = await watching(machine, lines);
-                const reads = (await framesRead(booted, watch, 20)).slice(10);
+                // Long enough for some frames to end in an interrupt, which jsbeeb cannot place.
+                const reads = (await framesRead(booted, watch, 60)).slice(10);
                 expect(new Set(reads.map(read => JSON.stringify(waitShown(read))))).toEqual(
                     new Set([JSON.stringify({line: 10, ...wait})]),
                 );
@@ -890,11 +891,18 @@ describe("BasicWatch waits", () => {
                 ["REPEAT:A=INKEY(0):UNTIL FALSE"],
                 ["REPEAT:A$=INKEY$(0):B$=INKEY$(0):UNTIL FALSE"],
                 ["REPEAT:A=INKEY(-99):UNTIL FALSE"],
-            ])("says %s, which reads the keyboard without waiting, is running", async line => {
-                const {booted, watch} = await watching(machine, [line]);
-                const reads = (await framesRead(booted, watch, 50)).slice(5);
-                expect(reads.filter(({wait, error}) => wait || error)).toEqual([]);
-            });
+                ["REPEAT:SOUND 1,0,0,1:T%=TIME:REPEAT UNTIL TIME>T%+10:UNTIL FALSE"],
+                ["REPEAT:*FX143,96", "UNTIL FALSE"],
+                // Machine code, which never moves BASIC on, left running with the filing system's ROM paged in.
+                ["DIM C% 20:P%=C%", "[OPT 0:LDA &DBC:STA &F4:STA &FE30:.l JMP l:]", "CALL C%"],
+            ])(
+                "says %s, which only passes through a place a program can wait, is running",
+                async (...lines) => {
+                    const {booted, watch} = await watching(machine, lines);
+                    const reads = (await framesRead(booted, watch, 50)).slice(5);
+                    expect(reads.filter(({wait, error}) => wait || error)).toEqual([]);
+                },
+            );
 
             it("says the program waits for vsync in the frames that end in *FX19's wait", async () => {
                 const {booted, watch} = await watching(machine, ["REPEAT", "*FX19", "UNTIL FALSE"]);

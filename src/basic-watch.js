@@ -104,13 +104,6 @@ function errorOffset(peek, line, {statement, expression}) {
     return next - text;
 }
 
-/**
- * What a program is waiting for, {kind, keyword} from jsbeeb's readWait, or null while it is running: in the vsync
- * loop it is waiting, and elsewhere only while BASIC has `stalled`, as a program that reads the keyboard with INKEY(0)
- * passes through the OS's keyboard read without waiting.
- */
-const waitingFor = (wait, stalled) => (wait && (wait.kind === "vsync" || stalled) ? wait : null);
-
 function lineBytes(peek, line) {
     const bytes = [];
     for (let at = line.start + LineHeaderBytes; at < line.end; ++at) bytes.push(peek(at));
@@ -280,6 +273,7 @@ export class BasicWatch {
         this.movedOn = true;
         this.stalled = false;
         this.readAt = null;
+        this.waiting = null;
     }
 
     /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
@@ -317,7 +311,7 @@ export class BasicWatch {
     /**
      * What BASIC is doing: {basic: false, title} when the language is not a BASIC; otherwise the line it is reading
      * ({number, bytes, offset}, the offset being into the line's bytes after its header) or null when it is not in the
-     * program (at the prompt), what the program in that line is waiting for (see waitingFor) or null, the error it is
+     * program (at the prompt), what the program in that line is waiting for (see waitFor) or null, the error it is
      * at the prompt after (see errorAtPrompt) or null, the errors ON ERROR handlers have taken in this run (see
      * handledErrors), and its variables.
      */
@@ -337,12 +331,24 @@ export class BasicWatch {
                 bytes: lineBytes(peek, line),
                 offset: reading - line.start - LineHeaderBytes,
             },
-            wait: line && waitingFor(readWait(cpu, line, keywords), stalled),
+            wait: line && this.waitFor(readWait(cpu, line, keywords), stalled),
             error: line ? null : this.errorAtPrompt(peek, page, keywords),
             handled: this.handledErrors(keywords),
             residents: writtenResidentIntegers(readResidentIntegers(peek), this.written),
             ...readVariables(peek),
         };
+    }
+
+    /**
+     * What the program is waiting for, {kind, keyword} from jsbeeb's readWait (`wait`), or null while it is running:
+     * in the vsync loop it is waiting, and elsewhere only while BASIC has `stalled`, as a program that reads the
+     * keyboard with INKEY(0) passes through the OS's keyboard read without waiting. A wait lasts while BASIC stays
+     * stalled, through a frame that ends in an interrupt, which readWait cannot place.
+     */
+    waitFor(wait, stalled) {
+        if (wait && (wait.kind === "vsync" || stalled)) this.waiting = wait;
+        else if (!stalled || this.waiting?.kind === "vsync") this.waiting = null;
+        return this.waiting;
     }
 
     /**
