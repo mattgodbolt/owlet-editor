@@ -93,32 +93,55 @@ function typeSuffix(name) {
 const RealSuffix = "";
 const IntegerSuffix = "%";
 const ResidentInteger = /^[A-Z]%$/;
+// What CALL and USR set from the resident integers they read: the low byte of A%, X% and Y%, and bit 0 of C%.
+const RegisterSetFrom = {
+    "A%": "the accumulator",
+    "C%": "the carry flag",
+    "X%": "the X register",
+    "Y%": "the Y register",
+};
 
 const isNumeric = name => [RealSuffix, IntegerSuffix].includes(typeSuffix(name));
 
-// What the user is told after a rename that changes a variable or array between real and integer, or null if it does
-// not. FN and PROC names carry no suffix, so they never change type.
-function typeChangeNotice(target, newName) {
+function typeChange(target, newName) {
     if (typeSuffix(target.name) === typeSuffix(newName)) return null;
-    const renamed = {...target, name: newName};
-    const toInteger = typeSuffix(newName) === IntegerSuffix;
+    if (typeSuffix(newName) === IntegerSuffix)
+        return "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
     const noun = target.kind === Kind.Array ? "array" : "variable";
-    const sentences = [
-        `Renamed ${displayName(target)} to ${displayName(renamed)}: ` +
-            (toInteger
-                ? "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error)."
-                : `it is now a real ${noun} (slower, and not limited to whole numbers).`),
-    ];
-    // Arrays are never resident.
-    if (target.kind === Kind.Variable && ResidentInteger.test(newName))
-        sentences.push(
-            `${newName} is a resident integer: CALL and USR pass it to machine code, and RUN and CLEAR leave it alone.`,
+    return `it is now a real ${noun} (slower, and not limited to whole numbers).`;
+}
+
+// Arrays, FNs and PROCs are never resident.
+function residencyChange(target, newName) {
+    if (target.kind !== Kind.Variable) return null;
+    const [wasResident, isResident] = [target.name, newName].map(name =>
+        ResidentInteger.test(name),
+    );
+    const [oldRegister, newRegister] = [target.name, newName].map(name => RegisterSetFrom[name]);
+    if (!wasResident && isResident)
+        return (
+            `${newName} is a resident integer, so RUN and CLEAR leave it alone` +
+            (newRegister ? `, and CALL and USR set ${newRegister} from it.` : ".")
         );
-    if (target.kind === Kind.Variable && ResidentInteger.test(target.name))
-        sentences.push(
-            `${target.name} was a resident integer, which CALL and USR pass to machine code.`,
+    if (wasResident && !isResident)
+        return (
+            `${target.name} was a resident integer, and ${newName} is not: RUN and CLEAR forget it` +
+            (oldRegister ? `, and CALL and USR no longer set ${oldRegister} from it.` : ".")
         );
-    return sentences.join(" ");
+    if (oldRegister === newRegister) return null;
+    if (!newRegister) return `CALL and USR no longer set ${oldRegister} from it.`;
+    if (!oldRegister) return `CALL and USR now set ${newRegister} from it.`;
+    return `CALL and USR now set ${newRegister} from it, not ${oldRegister}.`;
+}
+
+// What the user is told after a rename that changes what BASIC does with a variable or array, or null if it does not:
+// between real and integer, onto or off a resident integer, or between what CALL and USR set from it.
+function renameNotice(target, newName) {
+    const sentences = [typeChange(target, newName), residencyChange(target, newName)].filter(
+        Boolean,
+    );
+    if (!sentences.length) return null;
+    return `Renamed ${displayName(target)} to ${displayName({...target, name: newName})}: ${sentences.join(" ")}`;
 }
 
 // A line in which BASIC reads the name as the given kind of symbol.
@@ -199,7 +222,7 @@ export const renameProviderFor = dialect => ({
             showMessage(model, position, error);
             return {edits: [], rejectReason: error};
         }
-        const notice = typeChangeNotice(target, newName);
+        const notice = renameNotice(target, newName);
         if (notice)
             showNoticeWhenApplied(model, dialect, target, {...target, name: newName}, notice);
         const versionId = model.getVersionId();
