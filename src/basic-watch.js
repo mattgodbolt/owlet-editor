@@ -14,6 +14,7 @@ import {
     TextPointerBase,
     TextPointerOffset,
 } from "jsbeeb/src/basic-state";
+import {keywords} from "./tokens";
 
 const LineHeaderBytes = 4;
 const TextPointerHigh = TextPointerBase + 1;
@@ -34,13 +35,14 @@ const Colon = 0x3a;
 const Space = 0x20;
 const Return = 0x0d;
 const Quote = 0x22;
-const ElseToken = 0x8b;
-const ThenToken = 0x8c;
-const FnToken = 0xa4;
-const DefToken = 0xdd;
-const IfToken = 0xe7;
-const ProcToken = 0xf2;
-const RepeatToken = 0xf5;
+const tokenOf = word => keywords.find(({keyword}) => keyword === word).token;
+const ElseToken = tokenOf("ELSE");
+const ThenToken = tokenOf("THEN");
+const FnToken = tokenOf("FN");
+const DefToken = tokenOf("DEF");
+const IfToken = tokenOf("IF");
+const ProcToken = tokenOf("PROC");
+const RepeatToken = tokenOf("REPEAT");
 const OpenBracket = 0x28;
 const CloseBracket = 0x29;
 const DefaultPrintFormat = "&0000090A";
