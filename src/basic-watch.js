@@ -284,10 +284,14 @@ export class BasicWatch {
         this.waiting = null;
     }
 
-    /** The machine has started again, so what was written is forgotten, and those not at their start value stand in. */
+    /**
+     * The machine has started again, so what was written, and what BASIC was waiting for, are forgotten, and those not
+     * at their start value stand in.
+     */
     restart() {
         this.written = 0;
         this.forgetErrors();
+        this.forgetMoving();
         if (!this.cpu) return;
         const residents = readResidentIntegers(address => this.cpu.peekmemAsLanguage(address));
         residents.forEach((resident, index) => {

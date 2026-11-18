@@ -1157,6 +1157,20 @@ describe("BasicWatch waits", () => {
                 expect(watch.read(booted.cpu).wait).toMatchObject({kind: "keyboard"});
             });
 
+            it("says nothing of the last program's wait once a saved state of another is loaded", async () => {
+                const busy = await watching(machine, ["REPEAT:X=X+1:UNTIL FALSE"]);
+                await framesRead(busy.booted, busy.watch, 5);
+                const saved = busy.booted.testMachine.snapshot();
+                const {booted, watch} = await watching(machine, ["G=GET"]);
+                expect((await framesRead(booted, watch, 10)).at(-1).wait).toMatchObject({
+                    kind: "keyboard",
+                });
+                // As Owlet loads a saved state: the machine's state replaced, then onProgramStart.
+                booted.testMachine.restore(saved);
+                watch.restart();
+                expect(watch.read(booted.cpu)).toMatchObject({line: {number: 10}, wait: null});
+            });
+
             it.each([
                 {
                     name: "Escape",
