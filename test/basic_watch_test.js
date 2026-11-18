@@ -862,6 +862,36 @@ describe("BasicWatch handled errors", () => {
                     erl: "0",
                 },
                 {
+                    name: "the same error in an IF's condition, after its THEN and after its ELSE apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "IF 1/N%>0.6 THEN X=1/(N%-1) ELSE PRINT 1/(N%-2)",
+                    ],
+                    errors: [
+                        taken(18, "Division by zero", 20, "PRINT 1/(N%-2)", 10),
+                        taken(18, "Division by zero", 20, "X=1/(N%-1)", 10),
+                        taken(18, "Division by zero", 20, "IF 1/N%>0.6 THEN", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX(A,B)X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX(A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error either side of a colon in a string as one",
+                    lines: ["ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END", 'PRINT 1/N%;":";1/(N%-1)'],
+                    errors: [taken(18, "Division by zero", 20, 'PRINT 1/N%;":";1/(N%-1)', 10, 2)],
+                },
+                {
                     name: "an ON ERROR that a later one replaced",
                     lines: ["ON ERROR END", "ON ERROR L%=ERL:END", "X=Q"],
                     errors: [taken(26, "No such variable", 30, "X=Q", 20)],

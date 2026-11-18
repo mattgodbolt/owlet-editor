@@ -77,13 +77,14 @@ Under the status, the panel lists the errors that `ON ERROR` handlers took in th
 miss: once a handler runs, BASIC's own state no longer shows the error, and the handler may print nothing, or clear
 the screen. The latest is first, each as `No such variable (ERR 26) at line 140, 3 times, taken by the ON ERROR at
 line 20`, under the number taken in all. The last eight different errors are kept (an error is the same if it has the
-same number, message, line, part of the line between colons, and handler); a handler that loops on its own error,
-thousands of times a second, is one row with a growing count. The latest one's statement is marked in the editor with
-a dashed box, which fades after about a second of the program running on without another; the error the program
-stopped with, if it did, keeps its solid red mark and the status line, and is not counted among the handled ones.
-Escape taken by a handler is listed in amber. The list starts afresh when the program runs again, as the error the
-program stopped with does. The line is the one `ERL` gives, but found from BASIC's text pointer as the error is raised,
-so an error in a line numbered 0 is at line 0, and one in a command typed at the prompt has no line.
+same number, message, line, statement and handler, statements being told apart at colons, `THEN`, `ELSE` and the end
+of a `DEF`'s name and parameters, though not at an implicit `THEN` as in `IF X Y=1`); a handler that loops on its own
+error, thousands of times a second, is one row with a growing count. The latest one's statement is marked in the
+editor with a dashed box, which fades after about a second of the program running on without another; the error the
+program stopped with, if it did, keeps its solid red mark and the status line, and is not counted among the handled
+ones. Escape taken by a handler is listed in amber. The list starts afresh when the program runs again, as the error
+the program stopped with does. The line is the one `ERL` gives, but found from BASIC's text pointer as the error is
+raised, so an error in a line numbered 0 is at line 0, and one in a command typed at the prompt has no line.
 
 An error numbered 0 (`STOP`) never goes to an `ON ERROR` handler, so it is never listed: BASIC's own handler takes it.
 Only plain `ON ERROR` exists in BASIC II and BASIC IV; `ON ERROR LOCAL` is BASIC V's, and on these machines sets a
