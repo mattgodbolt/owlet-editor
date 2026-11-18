@@ -862,6 +862,120 @@ describe("BasicWatch handled errors", () => {
                     erl: "0",
                 },
                 {
+                    name: "the same error in an IF's condition, after its THEN and after its ELSE apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<3 GOTO 20 ELSE END",
+                        "IF 1/N%>0.6 THEN X=1/(N%-1) ELSE PRINT 1/(N%-2)",
+                    ],
+                    errors: [
+                        taken(18, "Division by zero", 20, "PRINT 1/(N%-2)", 10),
+                        taken(18, "Division by zero", 20, "X=1/(N%-1)", 10),
+                        taken(18, "Division by zero", 20, "IF 1/N%>0.6 THEN", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with a space before its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX (A,B)X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with spaces around its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX   (A,B)   X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX   (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, with spaces inside its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX ( A , B ) X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX ( A , B )", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart, of a FN with a space before its parameters",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN Y=FNX(1,Q) ELSE Y=FNX(1,1)",
+                        "END",
+                        "DEFFNX (A,B)=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "=Q", 10),
+                        taken(26, "No such variable", 40, "DEFFNX (A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in a DEF's arguments and after its name apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                        "IF N%=0 THEN PROCX(1,Q) ELSE PROCX(1,1)",
+                        "END",
+                        "DEFPROCX(A,B)X=Q",
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 40, "X=Q", 10),
+                        taken(26, "No such variable", 40, "DEFPROCX(A,B)", 10),
+                    ],
+                },
+                {
+                    name: "the same error in two REPEATs with nothing between them apart",
+                    lines: [
+                        "N%=19:ONERRORC%=C%+1:IFC%>3END ELSE N%=39-N%",
+                        "F.X=1TON%:REPEATN.",
+                        "REPEAT REPEAT",
+                    ],
+                    errors: [
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                    ],
+                },
+                {
+                    name: "the same error in two REPEATs with an IF between them apart",
+                    lines: [
+                        "N%=19:ONERRORC%=C%+1:IFC%>3END ELSE N%=39-N%",
+                        "F.X=1TON%:REPEATN.",
+                        "REPEAT IF 1 REPEAT",
+                    ],
+                    errors: [
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                        taken(44, "Too many REPEATs", 30, "REPEAT", 10, 2),
+                    ],
+                },
+                {
+                    name: "the same error in the conditions of an IF straight after an IF apart",
+                    lines: ["ONERRORX%=X%+1", 'IF 1/X% IF 1/(X%-1) PRINT "Y"'],
+                    errors: [
+                        taken(18, "Division by zero", 20, "IF 1/(X%-1)", 10),
+                        taken(18, "Division by zero", 20, "IF 1/X%", 10),
+                    ],
+                },
+                {
+                    name: "the same error either side of a colon in a string as one",
+                    lines: ["ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END", 'PRINT 1/N%;":";1/(N%-1)'],
+                    errors: [taken(18, "Division by zero", 20, 'PRINT 1/N%;":";1/(N%-1)', 10, 2)],
+                },
+                {
                     name: "an ON ERROR that a later one replaced",
                     lines: ["ON ERROR END", "ON ERROR L%=ERL:END", "X=Q"],
                     errors: [taken(26, "No such variable", 30, "X=Q", 20)],

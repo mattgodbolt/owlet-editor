@@ -6,7 +6,6 @@ import {
     holds,
     LanguageRomNumber,
     lineHolding,
-    listStatements,
     readPointers,
     readReportedError,
     readResidentIntegers,
@@ -31,13 +30,21 @@ const MissingToken = 0x8d;
 const ErrorHandler = 0x16;
 const HandledErrorsKept = 8;
 const PlacesKept = 64;
-// Only the extent of each statement listStatements finds is wanted, not its text.
-const NoKeywords = new Map();
 const RomStart = 0x8000;
 const Colon = 0x3a;
 const Space = 0x20;
 const Return = 0x0d;
-const ElseToken = keywords.find(({keyword}) => keyword === "ELSE").token;
+const Quote = 0x22;
+const tokenOf = word => keywords.find(({keyword}) => keyword === word).token;
+const ElseToken = tokenOf("ELSE");
+const ThenToken = tokenOf("THEN");
+const FnToken = tokenOf("FN");
+const DefToken = tokenOf("DEF");
+const IfToken = tokenOf("IF");
+const ProcToken = tokenOf("PROC");
+const RepeatToken = tokenOf("REPEAT");
+const OpenBracket = 0x28;
+const CloseBracket = 0x29;
 const DefaultPrintFormat = "&0000090A";
 const ResidentFirstByte = 0x400;
 const ResidentLastByte = 0x46b;
@@ -116,11 +123,51 @@ function lineBytes(peek, line) {
     return bytes;
 }
 
-/** Which of the parts of `line` between colons holds the byte at `offset` into its text, or null for a null offset. */
+const isNameCharacter = code => /[\w`]/.test(String.fromCharCode(code));
+
+/** The address of the last byte of the name, and any parameters, of a DEF PROC or FN at `at`, or null. */
+function definedNameEnd(peek, at, end) {
+    let next = at + 1;
+    while (peek(next) === Space) ++next;
+    if (peek(next) !== ProcToken && peek(next) !== FnToken) return null;
+    do ++next;
+    while (next < end && isNameCharacter(peek(next)));
+    const nameEnd = next - 1;
+    while (peek(next) === Space) ++next;
+    if (peek(next) !== OpenBracket) return nameEnd;
+    while (next < end && peek(next) !== CloseBracket) ++next;
+    return next;
+}
+
+/**
+ * The address of the last byte of each statement of `line` that its bytes alone show: up to a colon, THEN, REPEAT or
+ * a DEF's name and parameters, or the byte before an ELSE or IF, and the last up to the return that ends the line. A
+ * statement after an implicit THEN is not told from the IF before it unless it is another IF, as that needs the
+ * condition parsed. A colon in a REM, DATA or star command ends a statement here though not for BASIC, which is no
+ * matter, as no error is raised past its start.
+ */
+function statementEnds(peek, line) {
+    const found = [];
+    let quoted = false;
+    for (let at = line.start + LineHeaderBytes; at < line.end; ++at) {
+        const code = peek(at);
+        if (code === Quote) quoted = !quoted;
+        if (quoted) continue;
+        const named = code === DefToken ? definedNameEnd(peek, at, line.end) : null;
+        if (named !== null) at = named;
+        if (named !== null || code === Colon || code === ThenToken || code === RepeatToken)
+            found.push(at);
+        else if (code === ElseToken || code === IfToken) found.push(at - 1);
+    }
+    found.push(line.end);
+    return found;
+}
+
+/** Which statement of `line`, as statementEnds tells them, holds the byte `offset` into its text, or null for null. */
 function part(peek, line, offset) {
     if (offset === null) return null;
     const at = line.start + LineHeaderBytes + offset;
-    return listStatements(peek, line, NoKeywords).findIndex(({to}) => at <= to);
+    return statementEnds(peek, line).findIndex(end => at <= end);
 }
 
 /**
@@ -155,7 +202,7 @@ class HandledErrors {
      * line numbered 0 is not taken for the prompt, where BASIC's own handler is always set); the line number of the ON
      * ERROR that took it; each null where it is not in the program; and a key, the same for the same statement. The
      * text pointer can be a byte further into a line reached by GOTO than one reached from the line before, so the
-     * key has the part of the line between colons rather than the offset.
+     * key has the statement of the line (see statementEnds) rather than the offset.
      */
     place(peek, raised, handler) {
         const at = `${raised.statement} ${raised.expression} ${handler}`;
