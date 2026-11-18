@@ -204,7 +204,10 @@ rest of this section holds for either. The colours are a function of the text al
   cursor is on is not marked as unfinished (it would blink with every key), and is marked as soon as the cursor
   leaves it. An assembler block that is never closed is one error on its `[` in place of one per later line (the
   later lines are coloured as before). A syntax marker is left out where a warning already covers the same text
-  (`x == 3` has the warning about `==`), and quick fixes are offered only for the warnings, never for a syntax marker.
+  (`x == 3` has the warning about `==`), and quick fixes are offered only for the warnings, never for a syntax marker,
+  apart from an index register that BASIC II reads only in capitals (`LDA 42,x`, `STA (42),y`): its fix, "Replace x
+  with X", is offered only where the statement in capitals has no error (not for `ASL 42,y`, as `ASL` takes only
+  `X`, nor where a `)` is missing). Suggested by Olly Betts on #291.
 - **Line number markers**: after the same delay, an error squiggle on a `GOTO`, `GOSUB`, `THEN`,
   `ELSE` (and so `ON ... GOTO` lists) or `RESTORE` that names a line the program does not have (BASIC's `No such line`),
   and on any line number above 32767, which BASIC cannot have: the program ends at the first such line, so BASIC never

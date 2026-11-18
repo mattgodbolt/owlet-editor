@@ -90,12 +90,13 @@ const ColourSpelling = "COLOUR";
 
 // `at` is the token that was next when BASIC stopped.
 class Failure {
-    constructor(message, token, unfinished, at, explanation) {
+    constructor(message, token, unfinished, at, explanation, code) {
         this.message = message;
         this.token = token;
         this.unfinished = unfinished;
         this.at = at;
         this.explanation = explanation;
+        this.code = code;
     }
 }
 
@@ -164,9 +165,15 @@ export class Recogniser {
     }
 
     // `message` is the ROM's error, and `explanation` says what is wrong where the ROM's error alone would not. The
-    // error is unfinished if the line ends where the text is wrong.
-    fail(message, token = this.peek(), unfinished = token.kind === "end", explanation = undefined) {
-        throw new Failure(message, token, unfinished, this.peek(), explanation);
+    // error is unfinished if the line ends where the text is wrong. `code` names the quick fix that mends it.
+    fail(
+        message,
+        token = this.peek(),
+        unfinished = token.kind === "end",
+        explanation = undefined,
+        code = undefined,
+    ) {
+        throw new Failure(message, token, unfinished, this.peek(), explanation, code);
     }
 
     expectPunct(text, message = ExpectedPunct[text]) {
@@ -221,7 +228,7 @@ export class Recogniser {
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
     mark(failure, statementStart, assembling) {
         let {token} = failure;
-        const {message, explanation} = failure;
+        const {message, explanation, code} = failure;
         const ended = failure.unfinished || this.completable(token, statementStart, assembling);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
@@ -239,6 +246,7 @@ export class Recogniser {
             unfinished,
             hole,
             ...(explanation && {explanation}),
+            ...(code && {code}),
         };
         this.problems.push(problem);
         if (unfinished) return problem;
