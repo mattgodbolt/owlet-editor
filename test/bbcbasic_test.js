@@ -1397,6 +1397,23 @@ describe("Syntax markers", () => {
             ]);
             assert.deepStrictEqual(found, [[marked, `${message} (BASIC: ${table.get(text)})`]]);
         });
+        // In an assembler block the statement also ends at the "]"; the statement after it has its own marker.
+        it.each([
+            ["[OPT0:LDA RND(1,2):]", ",2)", TooMany],
+            ['[OPT0:LDA RND(1,"]",2)]', ',"]",2)', TooMany],
+            ['[OPT0:EQUS LEFT$("])",1,2)]', ",2)", TooMany],
+            ["[OPT0:LDA RND(1,2]", ",2", NoClose],
+            ["[OPT0:LDA RND(1,2] PRINT RND(1,3))", ",2", NoClose],
+            ["[OPT0:LDA RND(1,2]:X=RND(1,3))", ",2", NoClose],
+            ["[OPT0:LDA RND(1,2:LDA RND(1,3)):]", ",2", NoClose],
+            ["IF X THEN [OPT0:LDA RND(1,2 ELSE PRINT RND(1,3))", ",2", NoClose],
+        ])("%s", (text, marked, message) => {
+            const [first] = getSyntaxMarkers(text, dialect);
+            assert.deepStrictEqual(
+                [text.slice(first.startColumn - 1, first.endColumn - 1), first.message],
+                [marked, `${message} (BASIC: ${table.get(text)})`],
+            );
+        });
     });
     it("should not mark the line the cursor is on as unfinished, only the others", () => {
         const text = "FOR I=1 TO\nGOTO 20 30\nPRINT (";

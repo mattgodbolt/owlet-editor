@@ -119,6 +119,8 @@ export class Recogniser {
         this.basicIV = dialect.basicIV;
         this.assembler = new Assembler(this);
         this.inAssembler = inAssembler;
+        // Whether the assembler is reading the statements of a block.
+        this.assembling = false;
         this.startsInAssembler = inAssembler;
         this.probing = probing;
         this.depth = 0;
@@ -177,7 +179,13 @@ export class Recogniser {
 
     // The end of a statement: the end of the line, a colon or ELSE.
     atEnd() {
-        return this.is("end") || this.isPunct(":") || this.isKeyword("ELSE");
+        return this.endsStatement(this.peek());
+    }
+
+    endsStatement(token) {
+        if (token.kind === "punct") return token.text === ":";
+        if (token.kind === "keyword") return token.kw.keyword === "ELSE";
+        return token.kind === "end";
     }
 
     // Reads the whole line and marks its errors; returns whether an assembler block is open at its end.
@@ -454,7 +462,7 @@ export class Recogniser {
         let depth = 0;
         for (let n = 0; ; n++) {
             const token = this.peek(n);
-            if (token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE")
+            if (this.assembling ? this.assembler.endsStatement(token) : this.endsStatement(token))
                 return false;
             if (token.text === "(" || token.kw?.keyword.endsWith("(")) depth++;
             else if (token.text === ")" && depth-- === 0) return true;
