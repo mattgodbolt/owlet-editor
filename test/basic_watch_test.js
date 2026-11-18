@@ -2,7 +2,7 @@
 import {describe, expect, it} from "vitest";
 import {TestMachine} from "jsbeeb/src/test-machine";
 import {installBasic} from "jsbeeb/src/basic-loader";
-import {basicRom, LanguageRomNumber} from "jsbeeb/src/basic-state";
+import {basicRom, LanguageRomNumber, lineHolding, readPointers} from "jsbeeb/src/basic-state";
 import {BasicWatch} from "../src/basic-watch";
 import {programStatements, statementAt} from "../src/statement-map";
 import {createTokenisers, tokeniserFor} from "../src/tokeniser";
@@ -203,6 +203,86 @@ describe("BasicWatch", () => {
                     value("n", "0"),
                 ],
                 routines: ["PROCp", "FNf"],
+            });
+        });
+    }
+});
+
+const CyclesPerFrame = 40000;
+const FramesWatched = 1000;
+
+// The line numbers the watch shows as running in `frames` frames of a program, null being the prompt.
+async function linesShown(machine, lines, frames = FramesWatched) {
+    const booted = await bootedMachine(machine);
+    const watch = new BasicWatch();
+    watch.read(booted.cpu);
+    await run(booted, lines);
+    const shown = new Set();
+    for (let frame = 0; frame < frames; ++frame) {
+        await booted.testMachine.runFor(CyclesPerFrame);
+        shown.add(watch.read(booted.cpu).line?.number ?? null);
+    }
+    return [...shown].sort((a, b) => a - b);
+}
+
+describe("BasicWatch running line", () => {
+    for (const machine of ["B", "Master"]) {
+        describe(`on the ${machine}`, () => {
+            it.each([
+                {lines: ["REPEAT:X=X+1:UNTIL FALSE"], shown: [10]},
+                {lines: ["REPEAT:X=X+1:UNTIL FALSE", "END"], shown: [10]},
+                {lines: ["REPEAT UNTIL FALSE", "END"], shown: [10]},
+                {lines: ["0GOTO0", '22222P."NO"'], shown: [0]},
+                {lines: ["GOTO 10", "END"], shown: [10]},
+                {lines: ["IF FALSE THEN X=1 ELSE GOTO 10", "END"], shown: [10]},
+                {lines: ["GOSUB 30", "GOTO 10", "RETURN", "END"], shown: [10, 20, 30]},
+            ])(
+                "shows only the lines of $lines that it runs, frame after frame",
+                {timeout: 60000},
+                async ({lines, shown}) => {
+                    expect(await linesShown(machine, lines)).toEqual(shown);
+                },
+            );
+
+            it(
+                "shows each line of an assembler block as it assembles it",
+                {timeout: 60000},
+                async () => {
+                    const booted = await bootedMachine(machine);
+                    const watch = new BasicWatch();
+                    watch.read(booted.cpu);
+                    await run(booted, [
+                        "DIM C% 100",
+                        "FOR I%=0 TO 1E9 STEP 2:P%=C%",
+                        "[OPT 0",
+                        "LDA #1",
+                        "STA &70",
+                        "RTS",
+                        "]",
+                        "NEXT",
+                    ]);
+                    const peek = address => booted.cpu.peekmemAsLanguage(address);
+                    let elsewhere = 0;
+                    for (let frame = 0; frame < FramesWatched; ++frame) {
+                        await booted.testMachine.runFor(CyclesPerFrame);
+                        const {page, reading} = readPointers(peek);
+                        if (
+                            watch.read(booted.cpu).line?.number !==
+                            lineHolding(peek, page, reading)?.number
+                        )
+                            ++elsewhere;
+                    }
+                    // A frame that ends as BASIC moves on to the next line shows the line before.
+                    expect(elsewhere).toBeLessThan(FramesWatched / 10);
+                },
+            );
+
+            it("shows the line a FN returned into while it waits there", async () => {
+                const booted = await bootedMachine(machine);
+                const watch = new BasicWatch();
+                watch.read(booted.cpu);
+                await run(booted, ["X=FNa+GET", "END", "DEF FNa=1"]);
+                expect(watch.read(booted.cpu).line?.number).toBe(10);
             });
         });
     }
