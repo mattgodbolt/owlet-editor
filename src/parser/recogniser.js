@@ -67,6 +67,7 @@ const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 // BASIC IV words one of its errors differently.
 const BadHexIV = "Bad Hex";
 const TooMany = "Too many arguments before )";
+const MissingAfterOperand = new Set([...Object.values(OperandErrors), BadHexIV]);
 
 // The words a name at the end of a line might be the start of.
 // TOP is not in the table: BASIC reads it as TO and a P.
@@ -83,6 +84,8 @@ function completions(assembling, dialect) {
     return CompletionWords.get(key);
 }
 
+const AnotherArgument = "a comma or a closing )";
+
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
 
@@ -91,12 +94,13 @@ const ColourSpelling = "COLOUR";
 
 // `at` is the token that was next when BASIC stopped.
 class Failure {
-    constructor(message, token, unfinished, at, explanation) {
+    constructor(message, token, unfinished, at, explanation, code) {
         this.message = message;
         this.token = token;
         this.unfinished = unfinished;
         this.at = at;
         this.explanation = explanation;
+        this.code = code;
     }
 }
 
@@ -167,9 +171,15 @@ export class Recogniser {
     }
 
     // `message` is the ROM's error, and `explanation` says what is wrong where the ROM's error alone would not. The
-    // error is unfinished if the line ends where the text is wrong.
-    fail(message, token = this.peek(), unfinished = token.kind === "end", explanation = undefined) {
-        throw new Failure(message, token, unfinished, this.peek(), explanation);
+    // error is unfinished if the line ends where the text is wrong. `code` names the quick fix that mends it.
+    fail(
+        message,
+        token = this.peek(),
+        unfinished = token.kind === "end",
+        explanation = undefined,
+        code = undefined,
+    ) {
+        throw new Failure(message, token, unfinished, this.peek(), explanation, code);
     }
 
     expectPunct(text, message = ExpectedPunct[text]) {
@@ -230,12 +240,16 @@ export class Recogniser {
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
     mark(failure, statementStart, assembling) {
         let {token} = failure;
-        const {message, explanation} = failure;
+        const {message, explanation, code} = failure;
         const ended = failure.unfinished || this.completable(token, statementStart, assembling);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
         const atEnd = token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE";
-        if (atEnd && this.last && this.last.start >= statementStart.start) token = this.last;
+        const movedBack = atEnd && this.last !== null && this.last.start >= statementStart.start;
+        // What is missing goes after the marked token, rather than in its place, where the mark moved back from the end
+        // of the statement, and always for a string's closing quote and the digits after a &.
+        const missingAfter = movedBack || MissingAfterOperand.has(message);
+        if (movedBack) token = this.last;
         const tokens = this.lexer.tokens;
         const before = tokens[tokens.lastIndexOf(token) - 1];
         const after = token === this.peek() ? this.peek(1) : null;
@@ -247,7 +261,9 @@ export class Recogniser {
             end: marked.end,
             unfinished,
             hole,
+            missingAfter,
             ...(explanation && {explanation}),
+            ...(code && {code}),
         };
         this.problems.push(problem);
         if (unfinished) return problem;
@@ -306,8 +322,8 @@ export class Recogniser {
     }
 
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
-    // up to the next colon or ELSE after `from`, or that is not itself unfinished.
-    valid(candidate, statementStart, from) {
+    // up to the next colon or ELSE after `from`, other than one where the line ends too soon unless `complete` is set.
+    valid(candidate, statementStart, from, complete = false) {
         const probe = new Recogniser(candidate, this.startsInAssembler, this.dialect, true);
         probe.line();
         const stop =
@@ -318,7 +334,7 @@ export class Recogniser {
             )?.start ?? candidate.length;
         const inRange = start => start >= statementStart.start && start < stop;
         return (
-            probe.problems.every(p => p.unfinished || !inRange(p.token.start)) &&
+            probe.problems.every(p => (p.unfinished && !complete) || !inRange(p.token.start)) &&
             !probe.tokens.some(token => token.invalid && inRange(token.start))
         );
     }
@@ -454,7 +470,11 @@ export class Recogniser {
             count++;
         }
         if (count < fewest) this.fail("Missing ,");
-        this.close(opener, count === most || most === Infinity ? "Missing )" : null);
+        this.close(
+            opener,
+            count === most || most === Infinity ? "Missing )" : null,
+            count < most ? AnotherArgument : "a closing )",
+        );
     }
 
     // Whether a ")" in the statement closes the bracket the next token is in.
@@ -469,11 +489,11 @@ export class Recogniser {
         }
     }
 
-    // The ")" of a bracket; an unclosed one is shown at its "(".
-    close(opener, message = "Missing )") {
-        if (!this.isPunct(")"))
-            this.fail(message, this.atEnd() ? opener : this.peek(), this.is("end"));
-        this.next();
+    // The ")" of a bracket; an unclosed one is shown at its "(", and `needed` is what may follow the last argument.
+    close(opener, message = "Missing )", needed = AnotherArgument) {
+        if (this.isPunct(")")) return void this.next();
+        if (!this.atEnd()) this.fail(message);
+        this.fail(message, opener, this.is("end"), `Expected ${needed} after ${this.last.text}`);
     }
 
     name(message = "Syntax error") {

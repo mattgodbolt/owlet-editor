@@ -1,0 +1,23 @@
+[
+  ["PRINT (1 2:PRINT", "Missing )", "#293"],
+  ["PRINT (1 2", "Missing )", "#293"],
+  ["FOR I=1 2:NEXT", "No TO", "#293"],
+  ["X$=LEFT$(\"A\" 2:P.", "Missing ,", "#293"],
+  ["X=INSTR(\"A\" \"B\"", "Missing ,", "#293"],
+  ["PRINT (1:PRINT", "Missing )", "#293"],
+  ["X$=LEFT$(\"A\",1:P.", "Missing )", "#293"],
+  ["FOR I=1:NEXT", "No TO", "#293"],
+  ["FOR I=(1):NEXT", "No TO", "#293"],
+  ["X=(1+:Y=2", "No such variable", "#293"],
+  ["X=1+*", "No such variable", "#293"],
+  ["PRINT GOTO", "No such variable", "#293"],
+  ["BPUT 1", "Missing #", "#293"],
+  ["MOVE 1 2:P.", "Missing ,", "#293"],
+  ["X=RND(1,", "Missing )", "#293"],
+  ["X=&:P.", "Bad HEX", "#293"],
+  ["X$=\"A", "Missing \"", "#293"],
+  ["FOR I=1 T", "No TO", "#293"],
+  ["ON X Y:P.", "ON syntax", "#293"],
+  ["PRINT TAB(1:P.", "Missing ,", "#293"],
+  ["[OPT0:LDA #]", "No such variable", "#293"]
+]

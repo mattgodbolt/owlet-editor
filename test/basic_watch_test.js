@@ -8,6 +8,7 @@ import {programStatements, statementAt} from "../src/statement-map";
 import {createTokenisers, tokeniserFor} from "../src/tokeniser";
 import {dialectFor} from "../src/parser/dialect";
 import {Machines} from "../src/machines";
+import {blankDisc} from "./blank_disc";
 
 const Program = [
     "A%=1:IF A%=1 THEN B%=2:C%=3 ELSE D%=4",
@@ -466,15 +467,45 @@ describe("BasicWatch errors", () => {
                     lines: ["X=1", "*DRIVE 9"],
                     error: {number: 205, message: "Bad drive", line: 20, marked: "*DRIVE 9"},
                 },
+                ...[
+                    ['X=1:Y=EVAL("ZZZ"):Z=2', 'Y=EVAL("ZZZ")'],
+                    ['Y=EVAL("x"):Z=1', 'Y=EVAL("x")'],
+                    ['IF1TH.X=EVAL("x"):RETURN', 'X=EVAL("x")'],
+                    ['IF1X=EVAL("x"):RETURN', 'X=EVAL("x")'],
+                    ['IF0EL.X=EVAL"x":RETURN', 'X=EVAL"x"'],
+                    ['IF 0 THEN X=1 ELSE Y=1:Z=EVAL"x"', 'Z=EVAL"x"'],
+                    ['IF 1 IF 1 X=EVAL"x"', 'X=EVAL"x"'],
+                    ['REPEAT X=EVAL"x":UNTIL 1', 'X=EVAL"x"'],
+                    ['X=1:  Y=EVAL"x"', 'Y=EVAL"x"'],
+                    ['X=1:PRINT 1;EVAL"x"', 'PRINT 1;EVAL"x"'],
+                    ['X=1:IF EVAL"x" THEN Y=1', 'IF EVAL"x" THEN'],
+                    ['X=1:Y=EVAL("EVAL""x""")', 'Y=EVAL("EVAL""x""")'],
+                    ['X=FNf+EVAL"x":END', 'X=FNf+EVAL"x"', "DEFFNf=1"],
+                    ['X=1:Y=EVAL"FNf+x":END', 'Y=EVAL"FNf+x"', "DEFFNf=1"],
+                ].map(([line, marked, ...after]) => ({
+                    lines: [line, ...after],
+                    error: {number: 26, message: "No such variable", line: 10, marked},
+                })),
                 {
-                    // An EVAL leaves no sign of which statement it was in, so the line is marked.
-                    lines: ['X=1:Y=EVAL("ZZZ"):Z=2'],
+                    lines: ['X=1:Y=EVAL"1/0"'],
                     error: {
-                        number: 26,
-                        message: "No such variable",
+                        number: 18,
+                        message: "Division by zero",
                         line: 10,
-                        marked: 'X=1:Y=EVAL("ZZZ"):Z=2',
+                        marked: 'Y=EVAL"1/0"',
                     },
+                },
+                {
+                    lines: ['IF 1 THEN X=EVAL"(1"'],
+                    error: {number: 27, message: "Missing )", line: 10, marked: 'X=EVAL"(1"'},
+                },
+                {
+                    lines: ["PROCp", "END", 'DEFPROCp X=1:Y=EVAL"x"'],
+                    error: {number: 26, message: "No such variable", line: 30, marked: 'Y=EVAL"x"'},
+                },
+                {
+                    lines: ["X=FNf", "END", 'DEFFNf=EVAL"x"'],
+                    error: {number: 26, message: "No such variable", line: 30, marked: '=EVAL"x"'},
                 },
                 {
                     // BASIC gives this line 0, as it does a command typed at the prompt.
@@ -819,16 +850,6 @@ describe("BasicWatch errors", () => {
     }
 });
 
-// An empty, formatted DFS disc, so that a * command DFS does not know is looked for on it and is not found.
-function blankDisc() {
-    const SingleSidedBytes = 200 * 1024;
-    const SectorCount = 800;
-    const disc = new Uint8Array(SingleSidedBytes);
-    disc[0x106] = SectorCount >> 8;
-    disc[0x107] = SectorCount & 0xff;
-    return disc;
-}
-
 // What the watch shows of the errors ON ERROR handlers took, with the error the program stopped with, and ERL as a
 // handler noted it in L%.
 function handledShown(state, lines, machine) {
@@ -849,6 +870,7 @@ function handledShown(state, lines, machine) {
 
 async function runWatched(machine, lines, {disc} = {}) {
     const booted = await bootedMachine(machine);
+    // An empty disc, so that a * command DFS does not know is looked for on it and is not found.
     if (disc) booted.testMachine.loadDiscData(blankDisc());
     const watch = new BasicWatch();
     watch.read(booted.cpu);
@@ -910,6 +932,18 @@ describe("BasicWatch handled errors", () => {
                     lines: ["ON ERROR L%=ERL:N%=N%+1:IF N%<3 GOTO 20 ELSE END", "REP. X=Q"],
                     errors: [taken(26, "No such variable", 20, "X=Q", 10, 3)],
                     erl: "20",
+                },
+                {
+                    name: "errors inside EVALs straight after THEN, an IF's condition and ELSE apart",
+                    lines: [
+                        "ON ERROR N%=N%+1:IF N%<4 GOTO 20 ELSE END",
+                        'IF N%=0 THEN X=EVAL"x" ELSE IF N%=1 Y=EVAL"y" ELSE Z=EVAL"z"',
+                    ],
+                    errors: [
+                        taken(26, "No such variable", 20, 'Z=EVAL"z"', 10, 2),
+                        taken(26, "No such variable", 20, 'Y=EVAL"y"', 10),
+                        taken(26, "No such variable", 20, 'X=EVAL"x"', 10),
+                    ],
                 },
                 {
                     name: "an assignment straight after a DEF PROC",

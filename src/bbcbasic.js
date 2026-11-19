@@ -7,7 +7,11 @@ import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
 import {ForeignOperators} from "./parser/recogniser";
-import {JunkAfterInstructionCode, SpaceAfterMnemonicCode} from "./parser/assembler";
+import {
+    CapitaliseRegisterCode,
+    JunkAfterInstructionCode,
+    SpaceAfterMnemonicCode,
+} from "./parser/assembler";
 
 export const LanguageId = "BBCBASIC";
 
@@ -107,8 +111,9 @@ export function registerBbcBasicLanguage(dialect) {
 // With thanks to https://stackoverflow.com/questions/57994101/show-quick-fix-for-an-error-in-monaco-editor
 export const codeActionProviderFor = dialect => ({
     provideCodeActions(model, range, context) {
-        // Only the warnings above come with a fix; the text under any other marker is not to be rewritten. The editor's
-        // markers carry no code (Monaco would show it in the hover), so it is found from the text again.
+        // Only the markers with a code in QuickFixCodes come with a fix; the text under any other is not to be
+        // rewritten. The editor's markers carry no code (Monaco would show it in the hover), so it is found from the
+        // text again.
         let known = null;
         const codeOf = marker => {
             if (marker.code) return marker.code;
@@ -159,6 +164,21 @@ export const codeActionProviderFor = dialect => ({
                     ? quickFix(model, marker, "Insert : before ]", at, ":")
                     : quickFix(model, marker, "Insert ; before the junk", at, ";");
             }
+            if (marker.code === CapitaliseRegisterCode) {
+                const register = text[0];
+                const at = {
+                    ...marker,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn + 1,
+                };
+                return quickFix(
+                    model,
+                    marker,
+                    `Replace ${register} with ${register.toUpperCase()}`,
+                    at,
+                    register.toUpperCase(),
+                );
+            }
             const replacement = ForeignOperators.get(text) || text.toUpperCase();
             return quickFix(model, marker, `Replace with ${replacement}`, marker, replacement);
         });
@@ -185,6 +205,7 @@ const QuickFixCodes = new Set([
     ForeignOperatorCode,
     JunkAfterInstructionCode,
     SpaceAfterMnemonicCode,
+    CapitaliseRegisterCode,
 ]);
 
 // Markers as the editor shows them: the code is only for the quick fixes, and Monaco would add it to the hover text.
@@ -225,17 +246,12 @@ export function getSyntaxMarkers(text, dialect, cursorLine = 0) {
         const stopped = tokens.find(token => token.start === start);
         const before = tokens.filter(token => token.kind !== "white" && token.end <= start);
         const previous = before.at(-1);
-        const next = tokens.find(
-            token => token.kind !== "white" && token.start >= (stopped?.end ?? end),
-        );
-        const atEnd = !next || next.text === ":" || next.kw?.keyword === "ELSE";
         const statementStart = before.slice(0, -1).every(token => token.kind === "linenum");
         const message = problemMessage(
             problem,
             {
                 at: stopped?.text ?? lexer.text.slice(start, end).trim(),
                 previous: previous?.text,
-                atEnd,
                 statementName: previous?.kind === "name" && statementStart,
             },
             dialect,
