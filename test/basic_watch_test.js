@@ -8,6 +8,7 @@ import {programStatements, statementAt} from "../src/statement-map";
 import {createTokenisers, tokeniserFor} from "../src/tokeniser";
 import {dialectFor} from "../src/parser/dialect";
 import {Machines} from "../src/machines";
+import {blankDisc} from "./blank_disc";
 
 const Program = [
     "A%=1:IF A%=1 THEN B%=2:C%=3 ELSE D%=4",
@@ -849,16 +850,6 @@ describe("BasicWatch errors", () => {
     }
 });
 
-// An empty, formatted DFS disc, so that a * command DFS does not know is looked for on it and is not found.
-function blankDisc() {
-    const SingleSidedBytes = 200 * 1024;
-    const SectorCount = 800;
-    const disc = new Uint8Array(SingleSidedBytes);
-    disc[0x106] = SectorCount >> 8;
-    disc[0x107] = SectorCount & 0xff;
-    return disc;
-}
-
 // What the watch shows of the errors ON ERROR handlers took, with the error the program stopped with, and ERL as a
 // handler noted it in L%.
 function handledShown(state, lines, machine) {
@@ -879,6 +870,7 @@ function handledShown(state, lines, machine) {
 
 async function runWatched(machine, lines, {disc} = {}) {
     const booted = await bootedMachine(machine);
+    // An empty disc, so that a * command DFS does not know is looked for on it and is not found.
     if (disc) booted.testMachine.loadDiscData(blankDisc());
     const watch = new BasicWatch();
     watch.read(booted.cpu);
