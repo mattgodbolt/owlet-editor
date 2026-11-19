@@ -82,14 +82,27 @@ describe("programStatements", () => {
         });
     });
 
-    it("reads an assembler block a line at a time", () => {
+    it("splits an assembler block at its colons, and each line of it", () => {
         const lines = ["DIM P% 9:[OPT 2", "LDA #1:RTS", "]:PRINT", "CALL P%"];
         expect(statementTexts(lines)).toEqual({
-            10: ["DIM P% 9", "[OPT 2"],
-            20: ["LDA #1:RTS"],
+            10: ["DIM P% 9", "[", "OPT 2"],
+            20: ["LDA #1", "RTS"],
             30: ["]", "PRINT"],
             40: ["CALL P%"],
         });
+        const cases = [
+            ["F.X=0TO1:[OPTx:RTS:]:N.", ["F.X=0TO1", "[", "OPTx", "RTS", "]", "N."]],
+            ["[LDA#1:LDX#N:RTS:]", ["[", "LDA#1", "LDX#N", "RTS", "]"]],
+            ["[ LDA #1 : .l LDX #N : RTS ]", ["[", "LDA #1", ".l LDX #N", "RTS ]"]],
+            ["[LDA#1 \\ c:RTS ; d:]", ["[", "LDA#1 \\ c", "RTS ; d", "]"]],
+            [
+                "IF X THEN [LDA#1:RTS:] ELSE PRINT",
+                ["IF X THEN", "[", "LDA#1", "RTS", "]", "ELSE", "PRINT"],
+            ],
+            ["[:LDA#1::RTS", ["[", "LDA#1", "RTS"]],
+        ];
+        for (const [line, expected] of cases)
+            expect(statementTexts([line])[10], line).toEqual(expected);
     });
 
     it("tokenises each line as each machine's tokeniser does", async () => {

@@ -1,6 +1,7 @@
 // Where each statement of the program is in the editor, by the line number and the offset into the line's tokenised
 // bytes that BASIC reads it at, so that the statement BASIC is running can be found in the text.
 import {Recogniser} from "./parser/recogniser";
+import {Assembler} from "./parser/assembler";
 import {romBytes} from "./parser/lexer";
 import {tokeniseLines} from "./parser/highlight";
 import {ImplicitLineNumberStep} from "./tokeniser";
@@ -9,12 +10,25 @@ import {ImplicitLineNumberStep} from "./tokeniser";
 const OwnNumber = /^([0-9]+)?(.*)/;
 const LineNumberBits = 0xffff;
 
-// Notes where the recogniser starts each statement, nested ones included: after THEN, REPEAT, a DEF's name and an
-// assembler block's "]".
+// An assembler block's statements start after each colon, as BASIC reads them, and its "]" is a statement of its own.
+class AssemblerStatementStarts extends Assembler {
+    statement() {
+        this.recogniser.starts.add(this.recogniser.peek().start);
+        super.statement();
+    }
+
+    closed(closer) {
+        this.recogniser.starts.add(closer.start);
+    }
+}
+
+// Notes where the recogniser starts each statement, nested ones included: after THEN, REPEAT, a DEF's name, the "["
+// of an assembler block and each of its statements.
 class StatementStarts extends Recogniser {
     constructor(text, inAssembler, dialect) {
         super(text, inAssembler, dialect);
         this.starts = new Set();
+        this.assembler = new AssemblerStatementStarts(this);
     }
 
     statement() {
@@ -43,8 +57,8 @@ const isFiller = token => token.kind === "white" || (token.kind === "punct" && t
 /**
  * The statements of one line's text (after its number), each as {offset, start, end}: where BASIC reads it in the
  * tokenised line, and the span of text it covers, without the spaces and colon after it. An ELSE is a statement of its
- * own, as BASIC runs one it comes to (by skipping the rest of the line), and so is the start of a line in an
- * assembler block, up to any statement after its "]".
+ * own, as BASIC runs one it comes to (by skipping the rest of the line), and so are the "[" that opens an assembler
+ * block, each statement in it (the first of which starts after the "[") and the "]" that closes it.
  */
 function lineStatements(recogniser, lexed) {
     const offsets = byteOffsets(lexed);

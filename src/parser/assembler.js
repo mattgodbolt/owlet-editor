@@ -117,7 +117,7 @@ export class Assembler {
                 if (r.is("end")) return true;
                 if (this.isBranchElse()) return false;
                 if (r.isPunct("]")) {
-                    r.next();
+                    this.closed(r.next());
                     return false;
                 }
                 if (r.isPunct(":")) {
@@ -135,6 +135,9 @@ export class Assembler {
             r.assembling = false;
         }
     }
+
+    // Called with the "]" that ends the block.
+    closed() {}
 
     // Whether the token ends an assembler statement: the end of the line, a colon, the "]" or the ELSE of an IF.
     endsStatement(token) {
