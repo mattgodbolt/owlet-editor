@@ -66,6 +66,7 @@ const ExpectedPunct = {",": "Missing ,", "=": "Mistake", "#": "Missing #"};
 const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 // BASIC IV words one of its errors differently.
 const BadHexIV = "Bad Hex";
+const TooMany = "Too many arguments before )";
 const MissingAfterOperand = new Set([...Object.values(OperandErrors), BadHexIV]);
 
 // The words a name at the end of a line might be the start of.
@@ -122,6 +123,8 @@ export class Recogniser {
         this.basicIV = dialect.basicIV;
         this.assembler = new Assembler(this);
         this.inAssembler = inAssembler;
+        // Whether the assembler is reading the statements of a block.
+        this.assembling = false;
         this.startsInAssembler = inAssembler;
         this.probing = probing;
         this.depth = 0;
@@ -186,7 +189,13 @@ export class Recogniser {
 
     // The end of a statement: the end of the line, a colon or ELSE.
     atEnd() {
-        return this.is("end") || this.isPunct(":") || this.isKeyword("ELSE");
+        return this.endsStatement(this.peek());
+    }
+
+    endsStatement(token) {
+        if (token.kind === "punct") return token.text === ":";
+        if (token.kind === "keyword") return token.kw.keyword === "ELSE";
+        return token.kind === "end";
     }
 
     // Reads the whole line and marks its errors; returns whether an assembler block is open at its end.
@@ -448,19 +457,36 @@ export class Recogniser {
         let count = 1;
         this.expression();
         while (this.isPunct(",")) {
-            const comma = this.next();
-            // RND(1, is wrong however it goes on.
-            if (count >= most && this.is("end")) this.fail("Missing )", comma, false);
+            // BASIC stops at the comma before an argument too many, whatever follows it.
+            if (count === most)
+                this.fail(
+                    "Missing )",
+                    this.peek(),
+                    false,
+                    this.closedLater() ? TooMany : undefined,
+                );
+            this.next();
             this.expression();
             count++;
         }
         if (count < fewest) this.fail("Missing ,");
-        if (count > most) this.fail("Missing )", this.peek(), false);
         this.close(
             opener,
             count === most || most === Infinity ? "Missing )" : null,
             count < most ? AnotherArgument : "a closing )",
         );
+    }
+
+    // Whether a ")" in the statement closes the bracket the next token is in.
+    closedLater() {
+        let depth = 0;
+        for (let n = 0; ; n++) {
+            const token = this.peek(n);
+            if (this.assembling ? this.assembler.endsStatement(token) : this.endsStatement(token))
+                return false;
+            if (token.text === "(" || token.kw?.keyword.endsWith("(")) depth++;
+            else if (token.text === ")" && depth-- === 0) return true;
+        }
     }
 
     // The ")" of a bracket; an unclosed one is shown at its "(", and `needed` is what may follow the last argument.

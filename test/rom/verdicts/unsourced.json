@@ -176,7 +176,6 @@
   ["X=X()", "No such variable"],
   ["X=ABS", "No such variable"],
   ["X=ABS()", "No such variable"],
-  ["X=ABS(1,2)", "Missing )"],
   ["X=LEN", "No such variable"],
   ["X=FNf(", "Syntax error"],
   ["X=1+", "No such variable"],

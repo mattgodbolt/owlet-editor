@@ -104,25 +104,37 @@ export class Assembler {
     // is still open.
     block() {
         const r = this.recogniser;
-        for (;;) {
-            if (r.is("end")) return true;
-            if (this.isBranchElse()) return false;
-            if (r.isPunct("]")) {
-                r.next();
-                return false;
+        r.assembling = true;
+        try {
+            for (;;) {
+                if (r.is("end")) return true;
+                if (this.isBranchElse()) return false;
+                if (r.isPunct("]")) {
+                    r.next();
+                    return false;
+                }
+                if (r.isPunct(":")) {
+                    r.next();
+                    continue;
+                }
+                const start = r.peek();
+                try {
+                    this.statement();
+                } catch (e) {
+                    r.recover(e, start, () => this.endsStatement(r.peek()), true);
+                }
             }
-            if (r.isPunct(":")) {
-                r.next();
-                continue;
-            }
-            const start = r.peek();
-            try {
-                this.statement();
-            } catch (e) {
-                const atEnd = () => r.is("end") || r.isPunct(":", "]") || this.isBranchElse();
-                r.recover(e, start, atEnd, true);
-            }
+        } finally {
+            r.assembling = false;
         }
+    }
+
+    // Whether the token ends an assembler statement: the end of the line, a colon, the "]" or the ELSE of an IF.
+    endsStatement(token) {
+        if (token.kind === "punct") return [":", "]"].includes(token.text);
+        if (token.kind === "keyword")
+            return this.recogniser.elseIsBranch && token.kw.keyword === "ELSE";
+        return token.kind === "end";
     }
 
     // The ELSE of an IF, which BASIC takes wherever it is on the line: if the condition is false the block is never read.
