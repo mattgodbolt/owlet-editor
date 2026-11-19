@@ -5,6 +5,7 @@ const Message = ".monaco-editor .monaco-editor-overlaymessage";
 const Loop = "20 FOR I=0 TO 360:S(I)=SIN(RAD(I)):NEXT";
 const OtherLoop = "20 FOR J=0 TO 360:S(J)=SIN(RAD(J)):NEXT";
 const IntegerLoop = "20 FOR I%=0 TO 360:S(I%)=SIN(RAD(I%)):NEXT";
+const CarryLoop = "20 FOR C%=0 TO 360:S(C%)=SIN(RAD(C%)):NEXT";
 
 const link = program => `/#${encodeURIComponent(JSON.stringify({v: 1, program}))}`;
 
@@ -45,6 +46,21 @@ test.describe("Rename", () => {
 
         await page.keyboard.press("Control+Z");
         await expect(loopLine(page)).toHaveText(Loop);
+    });
+
+    test("tells the user what a rename between integers changes for CALL and USR", async ({
+        page,
+    }) => {
+        await renameLoopVariable(page, "I%");
+        await expect(loopLine(page)).toHaveText(IntegerLoop);
+        await expect(page.locator(Message)).toContainText("Renamed I to I%");
+        await page.keyboard.press("Escape");
+        await expect(page.locator(Message)).toHaveCount(0);
+        await renameLoopVariable(page, "C%");
+        await expect(loopLine(page)).toHaveText(CarryLoop);
+        await expect(page.locator(Message)).toHaveText(
+            "Renamed I% to C%: CALL and USR now set the carry flag from it.",
+        );
     });
 
     test("says why it refuses a change to a string, and says nothing about a rename that keeps the type", async ({

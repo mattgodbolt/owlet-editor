@@ -14,6 +14,11 @@ const Statement60 = 'PRINT TAB(0,0);I%;" ";Y$';
 // X% is only ever written to the value BASIC starts it with; Z% is never written.
 const ResidentProgram = ["10 X%=1:X%=0", "20 Y%=5", "30 PRINT Z%", "40 END"].join("\n");
 const ErrorProgram = 'A=1:B$="X"\nPRINT 1/0';
+// Each stops with a variable that does not exist in an assembler block, which marks only the instruction.
+const AssemblerErrorPrograms = [
+    ["F.X=0TO1:[OPTx:RTS:]:N.", "OPTx"],
+    ["[LDA#1:LDX#N:RTS:]", "LDX#N"],
+];
 // Stops with an error while drawing in black, which is the colour BASIC then prints its message in, after VDU 5.
 const HiddenErrorProgram = [
     "MODE 1",
@@ -393,6 +398,23 @@ for (const {name, state} of Machines) {
             expect(await markedLines(page, "running")).toBe(0);
             expect(problems).toEqual([]);
         });
+
+        for (const [program, marked] of AssemblerErrorPrograms) {
+            test(`an error in an assembler block marks just its instruction: ${program}`, async ({
+                page,
+                baseURL,
+            }) => {
+                const problems = await open(page, baseURL, program, state);
+                await debugButton(page).click();
+                await page.locator('[data-action="run"]').click();
+                await expect(status(page)).toHaveText(
+                    "No such variable (ERR 26) at line 10. The variables are as the program left them.",
+                );
+                await expect.poll(() => markedText(page, "error")).toBe(marked);
+                expect(await markedLines(page, "error")).toBe(1);
+                expect(problems).toEqual([]);
+            });
+        }
 
         test("the panel carries an error the screen does not show", async ({page, baseURL}) => {
             const problems = await open(page, baseURL, HiddenErrorProgram, state);

@@ -116,7 +116,9 @@ A program has stopped with an error when BASIC's own error handler, which is BAS
 number and message are those `ERR` and `REPORT` give, and the line is `ERL`. BASIC keeps no note of where in the line
 the error was: its error handler moves its text pointer to the `ON ERROR` text. So the statement is known only when
 Debug was on as the error was raised, and caught the pointer then; switched on later, Debug marks the whole line. An
-error inside an `EVAL` also marks the whole line.
+error inside an `EVAL` marks the statement the `EVAL` is in, as `X=EVAL("x")` in `IF 1 THEN X=EVAL("x")`. BASIC raises
+an error in a `PROC`'s or `FN`'s arguments, inside an `EVAL` or not, at its `DEF`, so that is what is marked: the `DEF`'s
+name and parameters, in the line `ERL` gives.
 
 A resident integer is shown once the program has written to it, even if it wrote the value BASIC starts it with, so
 after `X%=1:X%=0` the panel shows `X%` as `0`. Running the program again starts afresh, with nothing written. Debug
@@ -207,7 +209,11 @@ rest of this section holds for either. The colours are a function of the text al
   (`x == 3` has the warning about `==`), and quick fixes are offered only for the warnings, never for a syntax marker,
   apart from an index register that BASIC II reads only in capitals (`LDA 42,x`, `STA (42),y`): its fix, "Replace x
   with X", is offered only where the statement in capitals has no error and does not end too soon (not for
-  `ASL 42,y`, as `ASL` takes only `X`, nor for `LDA (42,x`, which is still missing its `)`). Suggested by Olly Betts on #291.
+  `ASL 42,y`, as `ASL` takes only `X`, nor for `LDA (42,x`, which is still missing its `)`). The same goes for `ORa` on BASIC II, which reads the `A` of
+  `ORA` only in capitals: "Replace ORa with ORA", offered on the same condition. An instruction that only BASIC IV's
+  assembler has (`BRA`, `CLR`, `DEA`, `INA`, `PHX`, `PHY`, `PLX`, `PLY`, `STZ`, `TRB` and `TSB`, found by trying every
+  three-letter word on both ROMs) is said to be a BASIC IV instruction when BASIC II stops at it, naming just the
+  mnemonic. Suggested by Olly Betts on #291 and #311.
 - **Line number markers**: after the same delay, an error squiggle on a `GOTO`, `GOSUB`, `THEN`,
   `ELSE` (and so `ON ... GOTO` lists) or `RESTORE` that names a line the program does not have (BASIC's `No such line`),
   and on any line number above 32767, which BASIC cannot have: the program ends at the first such line, so BASIC never

@@ -220,8 +220,10 @@ describe("Rename notice", () => {
     const WholeNumbers =
         "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
     const Real = "it is now a real variable (slower, and not limited to whole numbers).";
-    const Resident =
-        "is a resident integer: CALL and USR pass it to machine code, and RUN and CLEAR leave it alone.";
+    const Resident = name => `${name} is a resident integer, so RUN, CLEAR, etc leave it alone`;
+    const AssemblesFor = "the assembler assembles code for the address in it and moves it on";
+    const NotResident = (name, newName) =>
+        `${name} was a resident integer, and ${newName} is not: RUN, CLEAR, etc forget it`;
 
     // Runs fn with an editor on the text and a spy on what it is asked to show in a message. The editor draws on
     // animation frames while fn waits, and jsdom's canvas does nothing at all.
@@ -269,76 +271,148 @@ describe("Rename notice", () => {
         });
     }
 
-    it("should say what a change between real and integer does, once it is applied", async () => {
+    it("should say what a rename changes about the variable, once it is applied", async () => {
         const cases = [
-            // Olly's example from #294, in which I% is itself a resident integer.
+            // Between real and integer. Olly's example from #294, in which I% is itself a resident integer.
             [
                 "F.‸I=0TO360:S(I)=SINRADI:N.",
                 "I%",
-                [`Renamed I to I%: ${WholeNumbers} I% ${Resident}`],
+                `Renamed I to I%: ${WholeNumbers} ${Resident("I%")}.`,
             ],
-            ["F.‸IX=0TO360:S(IX)=SINRADIX:N.", "IX%", [`Renamed IX to IX%: ${WholeNumbers}`]],
-            ["‸IX%=1", "IX", [`Renamed IX% to IX: ${Real}`]],
-            [
-                "‸I%=1",
-                "I",
-                [
-                    `Renamed I% to I: ${Real} I% was a resident integer, which CALL and USR pass to machine code.`,
-                ],
-            ],
-            ["DIM ‸S(3)", "S%", [`Renamed S( to S%(: ${WholeNumbers}`]],
+            ["F.‸IX=0TO360:S(IX)=SINRADIX:N.", "IX%", `Renamed IX to IX%: ${WholeNumbers}`],
+            ["‸IX%=1", "IX", `Renamed IX% to IX: ${Real}`],
+            ["‸I%=1", "I", `Renamed I% to I: ${Real} ${NotResident("I%", "I")}.`],
+            ["‸Z%=1", "Z", `Renamed Z% to Z: ${Real} ${NotResident("Z%", "Z")}.`],
+            ["DIM ‸S(3)", "S%", `Renamed S( to S%(: ${WholeNumbers}`],
             [
                 "DIM ‸S%(3)",
                 "S",
-                [
-                    "Renamed S%( to S(: it is now a real array (slower, and not limited to whole numbers).",
-                ],
+                "Renamed S%( to S(: it is now a real array (slower, and not limited to whole numbers).",
             ],
-            ["‸I=1", "A%", [`Renamed I to A%: ${WholeNumbers} A% ${Resident}`]],
             [
-                "‸Z%=1",
-                "Z",
-                [
-                    `Renamed Z% to Z: ${Real} Z% was a resident integer, which CALL and USR pass to machine code.`,
-                ],
+                "‸I=1",
+                "A%",
+                `Renamed I to A%: ${WholeNumbers} ${Resident("A%")}, and CALL and USR set the accumulator from it.`,
+            ],
+            [
+                "‸C%=1",
+                "c",
+                `Renamed C% to c: ${Real} ${NotResident("C%", "c")}, and CALL and USR no longer set the carry flag from it.`,
             ],
             // Only A% to Z% are resident, and not their arrays.
-            ["DIM ‸A(3)", "A%", [`Renamed A( to A%(: ${WholeNumbers}`]],
-            ["‸I=1", "a%", [`Renamed I to a%: ${WholeNumbers}`]],
-            // Where the type is the same, or the name has none, there is nothing to say; a refused rename says why, as it did.
-            ["‸I%=1", "J%", []],
-            ["‸I=1", "J", []],
-            ["‸I=1", "I$", ["Renaming I to I$ would change its type"]],
-            ["‸I=1:I%=2", "I%", ["I% is already used in this program"]],
-            ["‸I=1", "@%", ["Renaming I to @% would change how numbers are printed"]],
-            ["PROC‸a", "b", []],
+            ["DIM ‸A(3)", "A%", `Renamed A( to A%(: ${WholeNumbers}`],
+            ["‸I=1", "a%", `Renamed I to a%: ${WholeNumbers}`],
+            // Between integers, Olly's examples from #303.
+            [
+                "‸a%=1",
+                "A%",
+                `Renamed a% to A%: ${Resident("A%")}, and CALL and USR set the accumulator from it.`,
+            ],
+            ["‸a%=1", "I%", `Renamed a% to I%: ${Resident("I%")}.`],
+            ["‸I%=1", "i%", `Renamed I% to i%: ${NotResident("I%", "i%")}.`],
+            [
+                "‸C%=1",
+                "colour%",
+                `Renamed C% to colour%: ${NotResident("C%", "colour%")}, and CALL and USR no longer set the carry flag from it.`,
+            ],
+            [
+                "‸X%=1",
+                "Y%",
+                "Renamed X% to Y%: CALL and USR now set the Y register from it, not the X register.",
+            ],
+            [
+                "‸A%=1",
+                "I%",
+                "Renamed A% to I%: CALL and USR no longer set the accumulator from it.",
+            ],
+            ["‸I%=1", "C%", "Renamed I% to C%: CALL and USR now set the carry flag from it."],
+            // P% and O%, which the assembler reads and moves on, from Olly's comment on #303.
+            ["‸p%=1", "P%", `Renamed p% to P%: ${Resident("P%")}, and ${AssemblesFor}.`],
+            [
+                "‸O%=1",
+                "o",
+                `Renamed O% to o: ${Real} ${NotResident("O%", "o")}, and the assembler no longer puts code at the address in it with OPT 4 to 7, and moves it on.`,
+            ],
+            [
+                "‸I%=1",
+                "P%",
+                "Renamed I% to P%: the assembler now assembles code for the address in it and moves it on.",
+            ],
+            [
+                "‸P%=1",
+                "I%",
+                "Renamed P% to I%: the assembler no longer assembles code for the address in it and moves it on.",
+            ],
+            [
+                "‸A%=1",
+                "P%",
+                "Renamed A% to P%: CALL and USR no longer set the accumulator from it, and the assembler now assembles code for the address in it and moves it on.",
+            ],
+            [
+                "‸P%=1",
+                "O%",
+                "Renamed P% to O%: the assembler no longer assembles code for the address in it and moves it on, and the assembler now puts code at the address in it with OPT 4 to 7, and moves it on.",
+            ],
+            ["‸a%=1", "aa%", null],
+            ["‸B%=1", "D%", null],
+            ["DIM ‸a%(3)", "A%", null],
+            ["‸I%=1", "J%", null],
+            ["‸I=1", "J", null],
+            ["PROC‸a", "b", null],
+            // Real names that are also properties of every JavaScript object are names like any other.
+            ["‸toString=1", "ts", null],
+            ["‸ts=1", "toString", null],
+            ["‸constructor=1", "valueOf", null],
+            ["‸__proto__=1", "hasOwnProperty", null],
+            [
+                "‸toString=1",
+                "A%",
+                `Renamed toString to A%: ${WholeNumbers} ${Resident("A%")}, and CALL and USR set the accumulator from it.`,
+            ],
+            [
+                "‸C%=1",
+                "constructor",
+                `Renamed C% to constructor: ${Real} ${NotResident("C%", "constructor")}, and CALL and USR no longer set the carry flag from it.`,
+            ],
+            // A refused rename says why, as it did.
+            ["‸I=1", "I$", "Renaming I to I$ would change its type"],
+            ["‸I=1:I%=2", "I%", "I% is already used in this program"],
+            ["‸a%=1:A%=2", "A%", "A% is already used in this program"],
+            ["‸I=1", "@%", "Renaming I to @% would change how numbers are printed"],
+            ["‸A%=1", "@%", "Renaming A% to @% would change how numbers are printed"],
         ];
         for (const [text, newName, expected] of cases)
             expect(await messagesAfterRename(text, newName), `${text} to ${newName}`).toEqual(
-                expected,
+                expected ? [expected] : [],
             );
     });
 
     it("should say nothing if the edits are not applied", async () => {
         expect(await messagesAfterRename("‸I=1", "I%", {apply: false})).toEqual([]);
+        expect(await messagesAfterRename("‸a%=1", "A%", {apply: false})).toEqual([]);
     });
 
     it("should say nothing if the next change is not the rename", async () => {
-        const messages = await withEditor("I=1:PRINT I", codeEditor => {
-            const model = codeEditor.getModel();
-            renameProviderFor(ModelBDialect).provideRenameEdits(
-                model,
-                {lineNumber: 1, column: 1},
-                "I%",
-            );
-            codeEditor.executeEdits("typing", [
-                {
-                    range: {startLineNumber: 1, startColumn: 12, endLineNumber: 1, endColumn: 12},
-                    text: "1",
-                },
-            ]);
-        });
-        expect(messages).toEqual([]);
+        for (const [text, newName] of [
+            ["I=1:PRINT I", "I%"],
+            ["a%=1:P.a%", "A%"],
+        ]) {
+            const messages = await withEditor(text, codeEditor => {
+                const model = codeEditor.getModel();
+                renameProviderFor(ModelBDialect).provideRenameEdits(
+                    model,
+                    {lineNumber: 1, column: 1},
+                    newName,
+                );
+                codeEditor.executeEdits("typing", [
+                    {
+                        range: {startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1},
+                        text: "1",
+                    },
+                ]);
+            });
+            expect(messages, `${text} to ${newName}`).toEqual([]);
+        }
     });
 });
 
