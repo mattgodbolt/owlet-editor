@@ -93,12 +93,13 @@ const ColourSpelling = "COLOUR";
 
 // `at` is the token that was next when BASIC stopped.
 class Failure {
-    constructor(message, token, unfinished, at, explanation) {
+    constructor(message, token, unfinished, at, explanation, code) {
         this.message = message;
         this.token = token;
         this.unfinished = unfinished;
         this.at = at;
         this.explanation = explanation;
+        this.code = code;
     }
 }
 
@@ -167,9 +168,15 @@ export class Recogniser {
     }
 
     // `message` is the ROM's error, and `explanation` says what is wrong where the ROM's error alone would not. The
-    // error is unfinished if the line ends where the text is wrong.
-    fail(message, token = this.peek(), unfinished = token.kind === "end", explanation = undefined) {
-        throw new Failure(message, token, unfinished, this.peek(), explanation);
+    // error is unfinished if the line ends where the text is wrong. `code` names the quick fix that mends it.
+    fail(
+        message,
+        token = this.peek(),
+        unfinished = token.kind === "end",
+        explanation = undefined,
+        code = undefined,
+    ) {
+        throw new Failure(message, token, unfinished, this.peek(), explanation, code);
     }
 
     expectPunct(text, message = ExpectedPunct[text]) {
@@ -224,7 +231,7 @@ export class Recogniser {
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
     mark(failure, statementStart, assembling) {
         let {token} = failure;
-        const {message, explanation} = failure;
+        const {message, explanation, code} = failure;
         const ended = failure.unfinished || this.completable(token, statementStart, assembling);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
@@ -247,6 +254,7 @@ export class Recogniser {
             hole,
             missingAfter,
             ...(explanation && {explanation}),
+            ...(code && {code}),
         };
         this.problems.push(problem);
         if (unfinished) return problem;
@@ -305,8 +313,8 @@ export class Recogniser {
     }
 
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
-    // up to the next colon or ELSE after `from`, or that is not itself unfinished.
-    valid(candidate, statementStart, from) {
+    // up to the next colon or ELSE after `from`, other than one where the line ends too soon unless `complete` is set.
+    valid(candidate, statementStart, from, complete = false) {
         const probe = new Recogniser(candidate, this.startsInAssembler, this.dialect, true);
         probe.line();
         const stop =
@@ -317,7 +325,7 @@ export class Recogniser {
             )?.start ?? candidate.length;
         const inRange = start => start >= statementStart.start && start < stop;
         return (
-            probe.problems.every(p => p.unfinished || !inRange(p.token.start)) &&
+            probe.problems.every(p => (p.unfinished && !complete) || !inRange(p.token.start)) &&
             !probe.tokens.some(token => token.invalid && inRange(token.start))
         );
     }

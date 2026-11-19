@@ -16,6 +16,7 @@ import {matchKeyword} from "./lexer.js";
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
 export const SpaceAfterMnemonicCode = "space-after-mnemonic";
+export const CapitaliseRegisterCode = "capitalise-register";
 
 const words = text => new Set(text.split(" "));
 const BasicII = {
@@ -395,10 +396,26 @@ export class Assembler {
         r.next().type = "symbol";
         const token = r.peek();
         const register = token.text?.[0];
-        if (!r.is("name") || !this.rules.indexRegister(mnemonic, registers, register))
-            r.fail("Index", token, r.is("end"), this.wrongIndex(mnemonic, where, registers));
+        if (!r.is("name") || !this.rules.indexRegister(mnemonic, registers, register)) {
+            const code = this.capitalisable(token) ? CapitaliseRegisterCode : undefined;
+            r.fail("Index", token, r.is("end"), this.wrongIndex(mnemonic, where, registers), code);
+        }
         r.lexer.split(token, 1);
         r.next().type = "keyword";
+    }
+
+    // Whether the register in capitals leaves the statement with no error, not even one where the line ends too soon.
+    capitalisable(token) {
+        const r = this.recogniser;
+        if (r.probing || !r.is("name")) return false;
+        const {text} = r.lexer;
+        const capital = text[token.start].toUpperCase();
+        return r.valid(
+            text.slice(0, token.start) + capital + text.slice(token.start + 1),
+            token,
+            token.start,
+            true,
+        );
     }
 
     wrongIndex(mnemonic, where, registers) {

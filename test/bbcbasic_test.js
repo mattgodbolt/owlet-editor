@@ -1315,6 +1315,87 @@ describe("Quick fixes and syntax markers", () => {
     });
 });
 
+describe("Quick fix for a lower case index register", () => {
+    // The text each quick fix offered for the line's syntax markers leaves, by title.
+    function fixes(text, dialect) {
+        const model = editor.createModel(text, LanguageId);
+        try {
+            const markers = getSyntaxMarkers(text, dialect);
+            const {actions} = codeActionProviderFor(dialect).provideCodeActions(model, markers[0], {
+                markers,
+            });
+            return actions.map(({title, edit}) => {
+                const {range, text: inserted} = edit.edits[0].textEdit;
+                const lines = text.split("\n");
+                const line = lines[range.startLineNumber - 1];
+                lines[range.startLineNumber - 1] =
+                    line.slice(0, range.startColumn - 1) +
+                    inserted +
+                    line.slice(range.endColumn - 1);
+                return [title, lines.join("\n")];
+            });
+        } finally {
+            model.dispose();
+        }
+    }
+    // Each line is a recorded row: on BASIC II it stops with Index, and the capitalised line assembles.
+    it.each([
+        ["[ASL42,x:]", "Replace x with X", "[ASL42,X:]"],
+        ["[OPT0:LDA 42,x:]", "Replace x with X", "[OPT0:LDA 42,X:]"],
+        ["[OPT0:LDA 42,y:]", "Replace y with Y", "[OPT0:LDA 42,Y:]"],
+        ["[OPT0:STA (42),y:]", "Replace y with Y", "[OPT0:STA (42),Y:]"],
+        ["[OPT0:LDA (42,x):]", "Replace x with X", "[OPT0:LDA (42,X):]"],
+        ["[OPT0:LDA (42),y:]", "Replace y with Y", "[OPT0:LDA (42),Y:]"],
+        ["[OPT0:ASL 42,x:]", "Replace x with X", "[OPT0:ASL 42,X:]"],
+        ["[OPT0:LDA 42,x", "Replace x with X", "[OPT0:LDA 42,X"],
+        ["[OPT0:LDA (42),y", "Replace y with Y", "[OPT0:LDA (42),Y"],
+        ["[OPT0:STA (42),y", "Replace y with Y", "[OPT0:STA (42),Y"],
+    ])("BASIC II: %s should offer %s, leaving %s", (text, title, result) => {
+        assert.deepStrictEqual([verdicts.get(text), verdicts.get(result)], ["Index", "ok"]);
+        assert.deepStrictEqual(fixes(text, BasicIIDialect), [[title, result]]);
+        assert.deepStrictEqual(getSyntaxMarkers(result, BasicIIDialect), []);
+    });
+    // Each is a recorded row that stops with Index on BASIC II, and still does with the register in capitals.
+    it.each([
+        ["[OPT0:ASL 42,y:]", "[OPT0:ASL 42,Y:]"],
+        ["[OPT0:LDX 42,x:]", "[OPT0:LDX 42,X:]"],
+        ["[OPT0:LDA (42,x:]", "[OPT0:LDA (42,X:]"],
+        ["[OPT0:LDA (42,x", "[OPT0:LDA (42,X"],
+        ["[OPT0:JMP (42,x):]", "[OPT0:JMP (42,X):]"],
+    ])("BASIC II: %s should offer no fix, as %s is still wrong", (text, capitalised) => {
+        assert.deepStrictEqual([verdicts.get(text), verdicts.get(capitalised)], ["Index", "Index"]);
+        assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+        assert.strictEqual(getSyntaxMarkers(text, BasicIIDialect).length, 1);
+    });
+    // BASIC IV reads the register in either case, so there is nothing to fix.
+    it.each(["[ASL42,x:]", "[OPT0:STA (42),y:]", "[OPT0:LDA (42,x):]", "[OPT0:LDA 42,x"])(
+        "BASIC IV: %s should have no marker",
+        text => {
+            assert.strictEqual(masterVerdicts.get(text), "ok");
+            assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect), []);
+        },
+    );
+    it.each(["[OPT0:ASL 42,y:]", "[OPT0:LDA (42,x"])(
+        "BASIC IV: %s, wrong in either case, should offer no fix",
+        text => {
+            assert.strictEqual(masterVerdicts.get(text), "Index");
+            assert.strictEqual(getSyntaxMarkers(text, BasicIVDialect).length, 1);
+            assert.deepStrictEqual(fixes(text, BasicIVDialect), []);
+        },
+    );
+    it("should mend the register on a later line of an assembler block", () => {
+        assert.deepStrictEqual(fixes("[\nLDA 42,x\n]", BasicIIDialect), [
+            ["Replace x with X", "[\nLDA 42,X\n]"],
+        ]);
+    });
+    it("should leave the marker an error", () => {
+        assert.deepStrictEqual(
+            getSyntaxMarkers("[ASL42,x:]", BasicIIDialect).map(marker => marker.severity),
+            [MarkerSeverity.Error],
+        );
+    });
+});
+
 describe("Syntax markers", () => {
     const Unfinished = (needed, after, rom) => `Expected ${needed} after ${after} (BASIC: ${rom})`;
     const markers = text =>
