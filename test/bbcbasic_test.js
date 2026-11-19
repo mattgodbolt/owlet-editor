@@ -1649,6 +1649,7 @@ describe("Syntax markers", () => {
         ["X=(1+:Y=2", "Expected a value after + (BASIC: No such variable)", 5, 6],
         ["FOR I=1:NEXT", "Expected TO after 1 (BASIC: No TO)", 7, 8],
         ["A$=LEFT$(X$,1,2)", "Too many arguments before ) (BASIC: Missing ))", 14, 17],
+        ["X=RND(1,:P.", "Expected a closing ) here, not , (BASIC: Missing ))", 8, 9],
         ["A=1'", "' is not expected here (BASIC: Syntax error)", 4, 5],
         [
             "10 FO I%=1 TO 10",

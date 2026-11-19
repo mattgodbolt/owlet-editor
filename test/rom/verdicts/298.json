@@ -1,0 +1,10 @@
+[
+  ["X=RND(1,:P.", "Missing )", "#298"],
+  ["X=RND(1,PRINT", "Missing )", "#298"],
+  ["A$=LEFT$(X$,1,:P.", "Missing )", "#298"],
+  ["X=RND(1,:PRINT", "Missing )", "#298"],
+  ["X=RND(1,ELSE", "Missing )", "#298"],
+  ["X=RND(1, :P.", "Missing )", "#298"],
+  ["A$=MID$(X$,1,2,:P.", "Missing )", "#298"],
+  ["X=RND(1,]", "Missing )", "#298"]
+]
