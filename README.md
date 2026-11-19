@@ -116,7 +116,9 @@ A program has stopped with an error when BASIC's own error handler, which is BAS
 number and message are those `ERR` and `REPORT` give, and the line is `ERL`. BASIC keeps no note of where in the line
 the error was: its error handler moves its text pointer to the `ON ERROR` text. So the statement is known only when
 Debug was on as the error was raised, and caught the pointer then; switched on later, Debug marks the whole line. An
-error inside an `EVAL` also marks the whole line.
+error inside an `EVAL` marks the statement the `EVAL` is in, as `X=EVAL("x")` in `IF 1 THEN X=EVAL("x")`. BASIC raises
+an error in a `PROC`'s or `FN`'s arguments, inside an `EVAL` or not, at its `DEF`, so that is what is marked: the `DEF`'s
+name and parameters, in the line `ERL` gives.
 
 A resident integer is shown once the program has written to it, even if it wrote the value BASIC starts it with, so
 after `X%=1:X%=0` the panel shows `X%` as `0`. Running the program again starts afresh, with nothing written. Debug
