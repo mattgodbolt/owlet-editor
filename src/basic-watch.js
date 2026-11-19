@@ -30,6 +30,7 @@ const FirstToken = 0x80;
 const MissingToken = 0x8d;
 // The text BASIC runs on an error: an ON ERROR's, or after ON ERROR OFF and at the prompt, its own handler in its ROM.
 const ErrorHandler = 0x16;
+const StackPointer = 0x04;
 const HandledErrorsKept = 8;
 const PlacesKept = 64;
 const RomStart = 0x8000;
@@ -107,20 +108,20 @@ const inProgram = high => high !== InputBufferPage && high < RomStart >> 8;
  * An assignment leaves it on the byte before the assignment (a colon or space, THEN, ELSE, REPEAT, or the end of an
  * IF's condition or a DEF's name), or on its first byte when reached by GOTO or ON ERROR, and reads on through the
  * expression pointer, which is then not behind it. A statement BASIC has finished leaves it on the colon, ELSE or return
- * after it. Between two statements, the expression pointer says which: not behind, the one after. After an EVAL, the
- * expression pointer is not in the program at all.
+ * after it. Between two statements, the expression pointer says which: not behind, the one after. In an EVAL, the
+ * expression pointer reads the EVAL's string where EVAL copied it, on BASIC's stack, and the statement pointer is as
+ * the statement left it, so the EVAL is ahead of it.
  */
-function errorOffset(peek, line, {statement, expression}) {
+function errorOffset(peek, line, {statement, expression, inEval}) {
     if (!holds(line, statement)) return null;
     const text = line.start + LineHeaderBytes;
-    const ahead = holds(line, expression) && expression >= statement;
+    const ahead = inEval || (holds(line, expression) && expression >= statement);
     let end = statement;
     while (peek(end) === Space && end > text) --end;
     const code = end < text ? null : peek(end);
     if (code === Return) return end - text - 1;
     if (code !== Colon && code !== ElseToken) return statement - text + (ahead ? 1 : 0);
-    if (!holds(line, expression)) return null;
-    if (!ahead) return end - text - 1;
+    if (!ahead) return holds(line, expression) ? end - text - 1 : null;
     let next = end + 1;
     while (peek(next) === Space) ++next;
     return next - text;
@@ -214,7 +215,7 @@ class HandledErrors {
      * key has the statement of the line (see statementEnds) rather than the offset.
      */
     place(peek, raised, handler) {
-        const at = `${raised.statement} ${raised.expression} ${handler}`;
+        const at = `${raised.statement} ${raised.expression} ${raised.inEval} ${handler}`;
         const known = this.places.get(at);
         if (known) return known;
         const {page} = readPointers(peek);
@@ -326,8 +327,9 @@ export class BasicWatch {
      * set, and takes every error numbered 0 (STOP) whatever is set; an ON ERROR handler takes the rest.
      */
     noteError(peek, block) {
-        const {reading: statement, expression} = readPointers(peek);
-        this.raised = {statement, expression, inProgram: this.programLast};
+        const {reading: statement, expression, himem} = readPointers(peek);
+        const inEval = expression >= word(peek, StackPointer) && expression < himem;
+        this.raised = {statement, expression, inEval, inProgram: this.programLast};
         const number = peek(block);
         const handler = word(peek, ErrorHandler);
         if (number === 0 || inRom(handler)) return;

@@ -8,6 +8,7 @@ import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
 import {ForeignOperators} from "./parser/recogniser";
 import {
+    CapitaliseMnemonicCode,
     CapitaliseRegisterCode,
     JunkAfterInstructionCode,
     SpaceAfterMnemonicCode,
@@ -179,6 +180,23 @@ export const codeActionProviderFor = dialect => ({
                     register.toUpperCase(),
                 );
             }
+            if (marker.code === CapitaliseMnemonicCode) {
+                const written = text.slice(0, MnemonicLength);
+                const at = {
+                    ...marker,
+                    startColumn: marker.startColumn + MnemonicLength - 1,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn + MnemonicLength,
+                };
+                const capitals = written.toUpperCase();
+                return quickFix(
+                    model,
+                    marker,
+                    `Replace ${written} with ${capitals}`,
+                    at,
+                    capitals.at(-1),
+                );
+            }
             const replacement = ForeignOperators.get(text) || text.toUpperCase();
             return quickFix(model, marker, `Replace with ${replacement}`, marker, replacement);
         });
@@ -206,7 +224,9 @@ const QuickFixCodes = new Set([
     JunkAfterInstructionCode,
     SpaceAfterMnemonicCode,
     CapitaliseRegisterCode,
+    CapitaliseMnemonicCode,
 ]);
+const MnemonicLength = 3;
 
 // Markers as the editor shows them: the code is only for the quick fixes, and Monaco would add it to the hover text.
 export const withoutCodes = markers => markers.map(marker => ({...marker, code: undefined}));

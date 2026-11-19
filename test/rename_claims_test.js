@@ -4,8 +4,9 @@ import {TestMachine} from "jsbeeb/src/test-machine";
 import {installBasic} from "jsbeeb/src/basic-loader";
 import {createTokenisers, tokeniserFor} from "../src/tokeniser";
 import {Machines} from "../src/machines";
+import {blankDisc} from "./blank_disc";
 
-// What the notices after a rename between real and integer say about BASIC, run on the machines as Owlet does.
+// What the notices after a rename say about BASIC, run on the machines as Owlet does.
 
 const CyclesPerChunk = 500000;
 const MostChunks = 60;
@@ -39,6 +40,18 @@ async function program(booted, lines) {
     });
     return command(booted, "RUN");
 }
+
+// Puts the machine code in a new byte array called name, from the DATA at the end of the program.
+const assembled = (name, code) => [
+    `1 DIM ${name} ${code.length}:FOR J%=0 TO ${code.length - 1}:READ ${name}?J%:NEXT`,
+    `90 DATA ${code.join(",")}`,
+];
+// Stores the registers it is called with: A, X and Y at &70 to &72, and the flags at &73.
+const StoreRegisters = [0x08, 0x85, 0x70, 0x86, 0x71, 0x84, 0x72, 0x68, 0x85, 0x73, 0x60];
+// LDA #&11:LDX #&22:LDY #&33:SEC:RTS
+const SetRegisters = [0xa9, 0x11, 0xa2, 0x22, 0xa0, 0x33, 0x38, 0x60];
+const StoredRegisters = 'P.~?&70;" ";~?&71;" ";~?&72;" ";?&73 AND 1';
+const Residents = [..."@ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(letter => `${letter}%`);
 
 // Olly's example from #294, with the loop variable's name as given, and then what the loop took in centiseconds.
 const sineTable = name => [
@@ -94,5 +107,112 @@ describe.each(["B", "Master"])("On the %s", machine => {
         // The loop variable is what OSWRCH prints.
         expect(await program(booted, ["10 FOR A%=65 TO 67:CALL &FFEE:NEXT"])).toBe("ABC");
         expect(await program(booted, ["10 A%=65:R%=USR(&FFEE)"])).toBe("A");
+    });
+
+    it("should set the accumulator, X, Y and carry from A%, X%, Y% and bit 0 of C%, and nothing from the others", async () => {
+        const booted = await bootedMachine(machine);
+        const called = async (assignments, call = "CALL s%") =>
+            program(booted, [
+                ...assembled("s%", StoreRegisters),
+                `20 ${assignments}:${call}:${StoredRegisters}`,
+            ]);
+        for (const [carry, set] of [
+            [0, 0],
+            [1, 1],
+            [2, 0],
+            [3, 1],
+            [-1, 1],
+        ])
+            expect(await called(`A%=&41:X%=&58:Y%=&59:C%=${carry}`)).toBe(
+                `        41 58 59 ${set}`,
+            );
+        expect(await called("A%=&1234:X%=-1:Y%=&100:C%=0")).toBe("        34 FF 0 0");
+        const others = Residents.filter(name => !["A%", "C%", "X%", "Y%"].includes(name))
+            .map((name, i) => `${name}=${i === 0 ? 10 : 200 + i}`)
+            .join(":");
+        expect(await called(`A%=1:X%=2:Y%=3:C%=0:${others}`)).toBe("         1 2 3 0");
+        expect(await called("A%=&41:X%=&58:Y%=&59:C%=1", "R%=USR(s%)")).toBe("        41 58 59 1");
+    });
+
+    it("should return the registers from USR, and set no variable from them after CALL or USR", async () => {
+        const booted = await bootedMachine(machine);
+        const lines = call => [
+            ...assembled("l%", SetRegisters),
+            `20 A%=1:X%=2:Y%=3:C%=0:P%=5:${call}:P.A%;X%;Y%;C%;P%`,
+        ];
+        // The flags, Y, X and the accumulator, from the top byte down: &31 is the carry and the bits always set.
+        expect(await program(booted, lines("P.~USR(l%)"))).toBe("  31332211\n         12305");
+        expect(await program(booted, lines("CALL l%"))).toBe("         12305");
+    });
+
+    it("should assemble for P%, and put the code at O% only with OPT 4 to 7, moving both on", async () => {
+        const booted = await bootedMachine(machine);
+        for (let opt = 0; opt < 8; ++opt) {
+            const shown = await program(booted, [
+                "10 DIM c% 20:O%=c%:P%=&5000:?&5000=0:?c%=0",
+                `20 [OPT ${opt}:.l LDA #1:RTS:]`,
+                '30 P.~P%;" ";O%-c%;" ";~l;" ";~?&5000;" ";~?c%',
+            ]);
+            // The listing that odd values of OPT ask for comes first.
+            expect(shown.split("\n").at(-1), `OPT ${opt}`).toBe(
+                opt < 4 ? "      5003 0 5000 A9 0" : "      5003 3 5000 0 A9",
+            );
+        }
+    });
+
+    it("should change no resident integer but by assigning it or assembling", async () => {
+        const booted = await bootedMachine(machine);
+        const others = Residents.slice(1);
+        const values = others.map((name, i) => `${name}=${i + 1}`).join(":");
+        expect(
+            await program(booted, [
+                `10 ${values}:ON ERROR GOTO 40`,
+                "20 X=INKEY(1):*FX 15,0",
+                '30 OSCLI "FX 15,0":X=RND(1):X=ADVAL(0):VDU 7:SOUND 1,0,0,1:X=TIME:X$=STR$(1.5):X=POINT(0,0):X=USR(&FFF4):CALL &FFF4:X=1/0',
+                `40 ON ERROR OFF:P.ERR;" ";${others.join(';" ";')};" ";~@%`,
+            ]),
+        ).toBe(`        18 ${others.map((_, i) => i + 1).join(" ")} 90A`);
+    });
+
+    it("should have only @% and A% to Z% resident, which RUN, CLEAR, NEW, LOAD and CHAIN leave alone", async () => {
+        const booted = await bootedMachine(machine);
+        const printAll = `P.${Residents.join(';" ";')}`;
+        expect(await program(booted, [`10 ${printAll}`])).toBe(`      2314${" 0".repeat(26)}`);
+        await command(
+            booted,
+            Residents.slice(1)
+                .map((name, i) => `${name}=${i + 1}`)
+                .join(":"),
+        );
+        const set = `      2314 ${Array.from({length: 26}, (_, i) => i + 1).join(" ")}`;
+        await command(booted, "CLEAR");
+        await command(booted, "NEW");
+        expect(await command(booted, printAll)).toBe(set);
+        expect(await program(booted, [`10 ${printAll}`])).toBe(set);
+        for (const name of ["a%", "i%", "z%", "AB%", "II%"])
+            expect(await program(booted, [`10 P.${name}`]), name).toBe(
+                "No such variable at line 10",
+            );
+        // A program's integer that is not resident is gone after RUN, CLEAR, LOAD or CHAIN.
+        await program(booted, ["10 P.I%;i%"]);
+        for (const forget of ["RUN", "CLEAR"]) {
+            await command(booted, "I%=5:i%=6");
+            expect(
+                await command(booted, forget === "RUN" ? "RUN" : "CLEAR:P.I%;i%"),
+                forget,
+            ).toMatch(/^\s*5\nNo such variable( at line 10)?$/);
+        }
+        booted.testMachine.loadDiscData(blankDisc());
+        await program(booted, ['10 P.I%;" ";~@%;" ";Z%:P.i%']);
+        await command(booted, 'SAVE "T"');
+        await command(booted, "@%=&20A:Z%=9:i%=6");
+        await command(booted, 'LOAD "T"');
+        expect(await command(booted, 'P.I%;" ";~@%;" ";Z%:P.i%'), "LOAD").toBe(
+            "         5 20A 9\nNo such variable",
+        );
+        await command(booted, "i%=6");
+        expect(await command(booted, 'CHAIN "T"'), "CHAIN").toBe(
+            "         5 20A 9\nNo such variable at line 10",
+        );
     });
 });

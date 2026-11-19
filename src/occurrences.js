@@ -93,32 +93,79 @@ function typeSuffix(name) {
 const RealSuffix = "";
 const IntegerSuffix = "%";
 const ResidentInteger = /^[A-Z]%$/;
+// What CALL and USR set from the resident integers they read: the low byte of A%, X% and Y%, and bit 0 of C%.
+const RegisterSetFrom = new Map([
+    ["A%", "the accumulator"],
+    ["C%", "the carry flag"],
+    ["X%", "the X register"],
+    ["Y%", "the Y register"],
+]);
+
+// What the assembler does with P% and O%, after the adverb given.
+const AssemblerUse = new Map([
+    ["P%", adverb => `the assembler ${adverb}assembles code for the address in it and moves it on`],
+    [
+        "O%",
+        adverb =>
+            `the assembler ${adverb}puts code at the address in it with OPT 4 to 7, and moves it on`,
+    ],
+]);
+
+// What BASIC itself does with the variable, after the adverb given, or null if nothing.
+function residentUse(name, adverb) {
+    const register = RegisterSetFrom.get(name);
+    if (register) return `CALL and USR ${adverb}set ${register} from it`;
+    return AssemblerUse.get(name)?.(adverb) ?? null;
+}
 
 const isNumeric = name => [RealSuffix, IntegerSuffix].includes(typeSuffix(name));
 
-// What the user is told after a rename that changes a variable or array between real and integer, or null if it does
-// not. FN and PROC names carry no suffix, so they never change type.
-function typeChangeNotice(target, newName) {
+function typeChange(target, newName) {
     if (typeSuffix(target.name) === typeSuffix(newName)) return null;
-    const renamed = {...target, name: newName};
-    const toInteger = typeSuffix(newName) === IntegerSuffix;
+    if (typeSuffix(newName) === IntegerSuffix)
+        return "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error).";
     const noun = target.kind === Kind.Array ? "array" : "variable";
-    const sentences = [
-        `Renamed ${displayName(target)} to ${displayName(renamed)}: ` +
-            (toInteger
-                ? "it now holds whole numbers only (0.5 is stored as 0, and a value outside -2147483648 to 2147483647 is a Too big error)."
-                : `it is now a real ${noun} (slower, and not limited to whole numbers).`),
+    return `it is now a real ${noun} (slower, and not limited to whole numbers).`;
+}
+
+// Arrays, FNs and PROCs are never resident.
+function residencyChange(target, newName) {
+    if (target.kind !== Kind.Variable) return null;
+    const [wasResident, isResident] = [target.name, newName].map(name =>
+        ResidentInteger.test(name),
+    );
+    const [oldUse, newUse] = [target.name, newName].map(name => residentUse(name, ""));
+    if (!wasResident && isResident)
+        return (
+            `${newName} is a resident integer, so RUN, CLEAR, etc leave it alone` +
+            (newUse ? `, and ${newUse}.` : ".")
+        );
+    if (wasResident && !isResident)
+        return (
+            `${target.name} was a resident integer, and ${newName} is not: RUN, CLEAR, etc forget it` +
+            (oldUse ? `, and ${residentUse(target.name, "no longer ")}.` : ".")
+        );
+    if (oldUse === newUse) return null;
+    const [oldRegister, newRegister] = [target.name, newName].map(name =>
+        RegisterSetFrom.get(name),
+    );
+    if (oldRegister && newRegister)
+        return `CALL and USR now set ${newRegister} from it, not ${oldRegister}.`;
+    const changes = [
+        oldUse && residentUse(target.name, "no longer "),
+        newUse && residentUse(newName, "now "),
     ];
-    // Arrays are never resident.
-    if (target.kind === Kind.Variable && ResidentInteger.test(newName))
-        sentences.push(
-            `${newName} is a resident integer: CALL and USR pass it to machine code, and RUN and CLEAR leave it alone.`,
-        );
-    if (target.kind === Kind.Variable && ResidentInteger.test(target.name))
-        sentences.push(
-            `${target.name} was a resident integer, which CALL and USR pass to machine code.`,
-        );
-    return sentences.join(" ");
+    return `${changes.filter(Boolean).join(", and ")}.`;
+}
+
+// What the user is told after a rename that changes what BASIC does with a variable or array, or null if it does not:
+// between real and integer, onto or off a resident integer, or between what CALL, USR and the assembler do with it.
+function renameNotice(target, newName) {
+    const sentences = [typeChange(target, newName), residencyChange(target, newName)].filter(
+        Boolean,
+    );
+    if (!sentences.length) return null;
+    return `Renamed ${displayName(target)} to ${displayName({...target, name: newName})}: ${sentences.join(" ")}`;
 }
 
 // A line in which BASIC reads the name as the given kind of symbol.
@@ -199,7 +246,7 @@ export const renameProviderFor = dialect => ({
             showMessage(model, position, error);
             return {edits: [], rejectReason: error};
         }
-        const notice = typeChangeNotice(target, newName);
+        const notice = renameNotice(target, newName);
         if (notice)
             showNoticeWhenApplied(model, dialect, target, {...target, name: newName}, notice);
         const versionId = model.getVersionId();
