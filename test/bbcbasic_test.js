@@ -8,6 +8,7 @@ import {
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
 import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
+import {mnemonicsFor} from "../src/parser/assembler";
 import {problemCount} from "../src/problem-count";
 import {highlightLine, readLines} from "../src/parser/highlight";
 import {keywords, tokenChar} from "../src/tokens";
@@ -1315,29 +1316,28 @@ describe("Quick fixes and syntax markers", () => {
     });
 });
 
-describe("Quick fix for a lower case index register", () => {
-    // The text each quick fix offered for the line's syntax markers leaves, by title.
-    function fixes(text, dialect) {
-        const model = editor.createModel(text, LanguageId);
-        try {
-            const markers = getSyntaxMarkers(text, dialect);
-            const {actions} = codeActionProviderFor(dialect).provideCodeActions(model, markers[0], {
-                markers,
-            });
-            return actions.map(({title, edit}) => {
-                const {range, text: inserted} = edit.edits[0].textEdit;
-                const lines = text.split("\n");
-                const line = lines[range.startLineNumber - 1];
-                lines[range.startLineNumber - 1] =
-                    line.slice(0, range.startColumn - 1) +
-                    inserted +
-                    line.slice(range.endColumn - 1);
-                return [title, lines.join("\n")];
-            });
-        } finally {
-            model.dispose();
-        }
+// The text each quick fix offered for the line's syntax markers leaves, by title.
+function fixes(text, dialect) {
+    const model = editor.createModel(text, LanguageId);
+    try {
+        const markers = getSyntaxMarkers(text, dialect);
+        const {actions} = codeActionProviderFor(dialect).provideCodeActions(model, markers[0], {
+            markers,
+        });
+        return actions.map(({title, edit}) => {
+            const {range, text: inserted} = edit.edits[0].textEdit;
+            const lines = text.split("\n");
+            const line = lines[range.startLineNumber - 1];
+            lines[range.startLineNumber - 1] =
+                line.slice(0, range.startColumn - 1) + inserted + line.slice(range.endColumn - 1);
+            return [title, lines.join("\n")];
+        });
+    } finally {
+        model.dispose();
     }
+}
+
+describe("Quick fix for a lower case index register", () => {
     // Each line is a recorded row: on BASIC II it stops with Index, and the capitalised line assembles.
     it.each([
         ["[ASL42,x:]", "Replace x with X", "[ASL42,X:]"],
@@ -1393,6 +1393,111 @@ describe("Quick fix for a lower case index register", () => {
             getSyntaxMarkers("[ASL42,x:]", BasicIIDialect).map(marker => marker.severity),
             [MarkerSeverity.Error],
         );
+    });
+});
+
+describe("BASIC IV's assembler on BASIC II", () => {
+    const BasicIVOnly = "BRA CLR DEA INA PHX PHY PLX PLY STZ TRB TSB".split(" ");
+    const iv = mnemonic => `${mnemonic} is a BASIC IV instruction, which BASIC II does not have`;
+    // The instructions BASIC IV's assembler has over BASIC II's, from enumerating every three-letter word on both ROMs
+    // (#311); each is a recorded row that BASIC II stops at and BASIC IV assembles.
+    it("should know exactly the instructions the ROMs differ by", () => {
+        const only = mnemonicsFor(BasicIVDialect).filter(
+            mnemonic => !mnemonicsFor(BasicIIDialect).includes(mnemonic),
+        );
+        assert.deepStrictEqual(only.sort(), BasicIVOnly);
+    });
+    it.each([
+        ["[PLX:]", iv("PLX")],
+        ["[PLY:]", iv("PLY")],
+        ["[STZZ%:]", iv("STZ")],
+        ["[BRAP%:]", iv("BRA")],
+        ["[OPT0:DEA:]", iv("DEA")],
+        ["[OPT0:INA:]", iv("INA")],
+        ["[OPT0:PHX:]", iv("PHX")],
+        ["[OPT0:PHY:]", iv("PHY")],
+        ["[OPT0:CLR 1:]", iv("CLR")],
+        ["[OPT0:TRB 1:]", iv("TRB")],
+        ["[OPT0:TSB 1:]", iv("TSB")],
+        ["[OPT0:STZ 1,X:]", iv("STZ")],
+        ["[OPT0:stz 1:]", iv("STZ")],
+        ["[OPT0:Bra 1:]", iv("BRA")],
+        ["[OPT0:plx:]", iv("PLX")],
+        ["[OPT0:LDA #1:PLX:LDA #2:]", iv("PLX")],
+    ])("BASIC II: %s should say %j", (text, explanation) => {
+        assert.strictEqual(verdicts.get(text), "Syntax error");
+        assert.strictEqual(masterVerdicts.get(text)?.startsWith("Syntax"), false);
+        const [marker] = getSyntaxMarkers(text, BasicIIDialect);
+        assert.strictEqual(marker.message, `${explanation} (BASIC: Syntax error)`);
+        assert.strictEqual(marker.severity, MarkerSeverity.Error);
+        assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+        assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect), []);
+    });
+    it("should mark from the mnemonic, as BASIC stops there", () => {
+        const [marker] = getSyntaxMarkers("[OPT0:LDA #1:STZZ%:]", BasicIIDialect);
+        assert.deepStrictEqual(
+            [marker.startColumn, marker.endColumn],
+            ["[OPT0:LDA #1:".length + 1, "[OPT0:LDA #1:STZZ%".length + 1],
+        );
+    });
+    it.each(["[OPT0:XYZ 1:]", "[OPT0:RMB 1:]", "[OPT0:WAI:]"])(
+        "BASIC II: %s, which is not one of them, should say only what BASIC says",
+        text => {
+            assert.strictEqual(verdicts.get(text), "Syntax error");
+            const [marker] = getSyntaxMarkers(text, BasicIIDialect);
+            assert.match(marker.message, /^\S+ is not expected here \(BASIC: Syntax error\)$/);
+        },
+    );
+    // Each is a recorded row that stops with a Syntax error on BASIC II, and assembles with the A in capitals.
+    it.each([
+        ["[ORa#10:]", "[ORA#10:]"],
+        ["[OPT0:ORa 1:]", "[OPT0:ORA 1:]"],
+        ["[OPT0:ORa 1", "[OPT0:ORA 1"],
+        ["[OPT0:ORa (1),Y:]", "[OPT0:ORA (1),Y:]"],
+        ["[OPT0:ORa 1,X:]", "[OPT0:ORA 1,X:]"],
+    ])("BASIC II: %s should offer Replace ORa with ORA, leaving %s", (text, result) => {
+        assert.deepStrictEqual([verdicts.get(text), verdicts.get(result)], ["Syntax error", "ok"]);
+        assert.strictEqual(masterVerdicts.get(text), "ok");
+        const [marker] = getSyntaxMarkers(text, BasicIIDialect);
+        assert.strictEqual(
+            marker.message,
+            "BASIC II reads the A of ORA only in capitals: A, not a (BASIC: Syntax error)",
+        );
+        assert.strictEqual(marker.severity, MarkerSeverity.Error);
+        assert.deepStrictEqual(fixes(text, BasicIIDialect), [["Replace ORa with ORA", result]]);
+        assert.deepStrictEqual(getSyntaxMarkers(result, BasicIIDialect), []);
+    });
+    // The capitalised statement is still wrong, or the A is not what is wrong: there is no fix.
+    it.each([
+        ["[OPT0:ORa 1,x:]", "BASIC II reads the A of ORA only in capitals: A, not a"],
+        ["[OPT0:ORa:]", "BASIC II reads the A of ORA only in capitals: A, not a"],
+    ])("BASIC II: %s should say what is wrong but offer no fix", (text, explanation) => {
+        assert.strictEqual(verdicts.get(text), "Syntax error");
+        const [marker] = getSyntaxMarkers(text, BasicIIDialect);
+        assert.strictEqual(marker.message, `${explanation} (BASIC: Syntax error)`);
+        assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+    });
+    it.each(["[OPT0:OR a 1:]", "[OPT0:ORb 1:]"])(
+        "BASIC II: %s is not an ORa, so should say only what BASIC says",
+        text => {
+            assert.strictEqual(verdicts.get(text), "Syntax error");
+            const [marker] = getSyntaxMarkers(text, BasicIIDialect);
+            assert.match(marker.message, /\(BASIC: Syntax error\)$/);
+            assert.doesNotMatch(marker.message, /capitals/);
+            assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+        },
+    );
+    it.each(["[OPT0:Ora 1:]", "[OPT0:ora 1:]", "[OPT0:orA 1:]", "[OPT0:ORA 1:]"])(
+        "BASIC II: %s is accepted, so should have no marker",
+        text => {
+            assert.strictEqual(verdicts.get(text), "ok");
+            assert.deepStrictEqual(getSyntaxMarkers(text, BasicIIDialect), []);
+        },
+    );
+    it("should mend ORa on a later line of an assembler block", () => {
+        assert.deepStrictEqual(fixes("[\nORa 1\n]", BasicIIDialect), [
+            ["Replace ORa with ORA", "[\nORA 1\n]"],
+        ]);
     });
 });
 
