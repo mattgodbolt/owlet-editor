@@ -408,6 +408,8 @@ describe("Text that is wrong, not unfinished", () => {
         ["PRINT (1+2))", [")"]],
         ["A$=LEFT$(X$,1,", [","]],
         ["X=RND(1,", [","]],
+        ["X=RND(1,:P.", [","]],
+        ["A$=LEFT$(X$,1,:P.", [","]],
         ["GOTO:PRINT", ["GOTO"]],
         ["FOR I=1 TO:NEXT", ["TO"]],
         ["FOR I:PRINT I:NEXT", ["I"]],

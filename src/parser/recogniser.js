@@ -449,9 +449,8 @@ export class Recogniser {
         this.expression();
         while (this.isPunct(",")) {
             const comma = this.next();
-            // RND(1, is wrong however it goes on.
-            if (count >= most && this.is("end")) this.fail("Missing )", comma, false);
-            this.expression();
+            if (count >= most) this.beyondLast(comma);
+            else this.expression();
             count++;
         }
         if (count < fewest) this.fail("Missing ,");
@@ -461,6 +460,17 @@ export class Recogniser {
             count === most || most === Infinity ? "Missing )" : null,
             count < most ? AnotherArgument : "a closing )",
         );
+    }
+
+    // The argument after a bracket's last one is read ahead to tell "too many" at its ")"; where it cannot be read,
+    // BASIC's own stop is the comma, with the ")" it wanted.
+    beyondLast(comma) {
+        try {
+            this.expression();
+        } catch (e) {
+            if (e instanceof Failure) this.fail("Missing )", comma, false);
+            throw e;
+        }
     }
 
     // The ")" of a bracket; an unclosed one is shown at its "(", and `needed` is what may follow the last argument.
