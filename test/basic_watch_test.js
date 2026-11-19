@@ -441,6 +441,31 @@ describe("BasicWatch errors", () => {
                     },
                 },
                 {
+                    lines: ["F.X=0TO1:[OPTx:RTS:]:N."],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "OPTx"},
+                },
+                {
+                    lines: ["[LDA#1:LDX#N:RTS:]"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "LDX#N"},
+                },
+                {
+                    lines: ["[LDA#1:LDA#1+N:RTS:]:PRINT"],
+                    error: {number: 26, message: "No such variable", line: 10, marked: "LDA#1+N"},
+                },
+                {
+                    // BASIC reports this one with its pointer on the colon that ends the instruction.
+                    lines: ["[LDA#1:LDA#256:RTS:]"],
+                    error: {number: 2, message: "Byte", line: 10, marked: "LDA#256"},
+                },
+                {
+                    lines: ["[LDA#1:FOO:RTS:]"],
+                    error: {number: 16, message: "Syntax error", line: 10, marked: "FOO"},
+                },
+                {
+                    lines: ["[LDA#1 \\ one", ".l LDX#N:RTS", "]"],
+                    error: {number: 26, message: "No such variable", line: 20, marked: ".l LDX#N"},
+                },
+                {
                     lines: [
                         "DIM C% 20",
                         "P%=C%",

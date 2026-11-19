@@ -108,7 +108,7 @@ export class Assembler {
             if (r.is("end")) return true;
             if (this.isBranchElse()) return false;
             if (r.isPunct("]")) {
-                r.next();
+                this.closed(r.next());
                 return false;
             }
             if (r.isPunct(":")) {
@@ -124,6 +124,9 @@ export class Assembler {
             }
         }
     }
+
+    // Called with the "]" that ends the block.
+    closed() {}
 
     // The ELSE of an IF, which BASIC takes wherever it is on the line: if the condition is false the block is never read.
     isBranchElse() {
