@@ -17,6 +17,7 @@ import {matchKeyword} from "./lexer.js";
 export const JunkAfterInstructionCode = "junk-after-instruction";
 export const SpaceAfterMnemonicCode = "space-after-mnemonic";
 export const CapitaliseRegisterCode = "capitalise-register";
+export const CapitaliseMnemonicCode = "capitalise-mnemonic";
 
 const words = text => new Set(text.split(" "));
 const BasicII = {
@@ -80,12 +81,18 @@ const mnemonicsOf = rules => [
     ...rules.address,
     ..."OPT EQUB EQUD EQUS EQUW".split(" "),
 ];
+const BasicIVOnly = new Set(
+    mnemonicsOf(BasicIV).filter(mnemonic => !mnemonicsOf(BasicII).includes(mnemonic)),
+);
 const MnemonicLists = new Map([
     [BasicII, [...new Set(mnemonicsOf(BasicII))]],
     [BasicIV, [...new Set(mnemonicsOf(BasicIV))]],
 ]);
 export const mnemonicsFor = dialect => MnemonicLists.get(dialect.basicIV ? BasicIV : BasicII);
 const ThirdCharacter = 2;
+// The positions of the characters of a mnemonic that are not letters, which BASIC reads as the letter with the same low
+// five bits.
+const aliasedCharacters = chars => chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [i]));
 const InsideBrackets = " inside the brackets";
 const AfterBrackets = " after the brackets";
 const LogicalTokenChars = new Set(
@@ -222,7 +229,14 @@ export class Assembler {
             const after = r.peek(1);
             if (after.kind !== "name" || after.spaced || !this.rules.letterA.test(after.text[0])) {
                 if (after.kind === "name" && !after.spaced) after.invalid = true;
-                r.fail("Syntax error", token, after.kind === "end");
+                const lowerA = after.kind === "name" && !after.spaced && after.text[0] === "a";
+                r.fail(
+                    "Syntax error",
+                    token,
+                    after.kind === "end",
+                    lowerA ? "BASIC II reads the A of ORA only in capitals: A, not a" : undefined,
+                    lowerA && this.capitalisable(after) ? CapitaliseMnemonicCode : undefined,
+                );
             }
             r.next();
             r.lexer.split(after, 1);
@@ -238,9 +252,18 @@ export class Assembler {
         if (word === "EQU" && !this.rules.equSize.test(size)) r.fail("Syntax error");
         const directive = word === "OPT" || word === "EQU";
         const {implied, accumulator, addressed, address} = this.rules;
-        if (!directive && ![implied, accumulator, addressed, address].some(set => set.has(word)))
-            r.fail("Syntax error");
-        const aliased = chars.flatMap((c, i) => (/[A-Za-z]/.test(c) ? [] : [i]));
+        if (!directive && ![implied, accumulator, addressed, address].some(set => set.has(word))) {
+            const spelt = aliasedCharacters(chars).length === 0 && BasicIVOnly.has(word);
+            r.fail(
+                "Syntax error",
+                undefined,
+                undefined,
+                spelt
+                    ? `${word} is a BASIC IV instruction, which BASIC II does not have`
+                    : undefined,
+            );
+        }
+        const aliased = aliasedCharacters(chars);
         const marks =
             aliased.length === 1 && aliased[0] === ThirdCharacter
                 ? [this.prefixMark(token.start, word, chars[ThirdCharacter])]
@@ -419,7 +442,7 @@ export class Assembler {
     // Whether the register in capitals leaves the statement with no error, not even one where the line ends too soon.
     capitalisable(token) {
         const r = this.recogniser;
-        if (r.probing || !r.is("name")) return false;
+        if (r.probing || token.kind !== "name") return false;
         const {text} = r.lexer;
         const capital = text[token.start].toUpperCase();
         return r.valid(
