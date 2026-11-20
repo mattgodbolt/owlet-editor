@@ -5,13 +5,15 @@ import {canStartStatement} from "./parser/dialect";
 import {LanguageId} from "./bbcbasic";
 import {programSymbols} from "./occurrences";
 import {readLines} from "./parser/highlight";
-import {ExpectingRecogniser} from "./parser/recogniser";
+import {ExpectingRecogniser, Recogniser} from "./parser/recogniser";
 
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
 // The ROM has no token for TOP: it reads TO, then a P where a value is expected, so the table cannot offer it.
 const Top = "TOP";
+// All that BASIC reads after DEF.
+const DefinitionWords = ["FN", "PROC"];
 // The keywords BASIC II or BASIC IV offers, by the kind of place they can be typed in.
 const labelSets = new Map();
 function labelSetsFor(dialect) {
@@ -109,21 +111,84 @@ export function completionContext(text, dialect) {
         return afterDef ? null : {startColumn, nameKind: nameKind(last)};
     }
     const sets = labelSetsFor(dialect);
-    if (state.inAssembler) return state.atStart ? null : {startColumn, labels: sets.assembler};
-    const base = state.atStart ? sets.statement : sets.expression;
     const typed = line.slice(0, startColumn - 1);
     const reading = new ExpectingRecogniser(typed, recogniser.startsInAssembler, dialect);
     reading.line();
+    let candidates;
+    if (state.inAssembler) {
+        if (state.atStart) return null;
+        candidates = sets.assembler;
+    } else if (tokens.at(-1)?.kw?.keyword === "DEF") {
+        candidates = DefinitionWords;
+    } else {
+        candidates = [
+            ...new Set([
+                ...(state.atStart ? sets.statement : sets.expression),
+                ...reading.words,
+                ...(reading.statementNext ? sets.statement : []),
+            ]),
+        ];
+    }
     return {
         startColumn,
-        labels: [
-            ...new Set([
-                ...base,
-                ...reading.words,
-                ...(reading.statementNext || last?.kw?.keyword === "DEF" ? sets.statement : []),
-            ]),
-        ],
+        labels: keepingLineReadable(candidates, reading, line.slice(startColumn - 1), dialect),
     };
+}
+
+// Where the statement the text ends in starts: after the last colon or ELSE.
+function statementStartIn(tokens) {
+    const split = tokens.findLastIndex(
+        token => (token.kind === "punct" && token.text === ":") || token.kw?.keyword === "ELSE",
+    );
+    return tokens[split + 1]?.start ?? Infinity;
+}
+
+const isSubsequence = (word, candidate) => {
+    let at = 0;
+    for (const letter of word) {
+        at = candidate.indexOf(letter, at) + 1;
+        if (!at) return false;
+    }
+    return true;
+};
+
+// What was read of the statement last typed in: each word tried after it, so that typing the rest of a word reads
+// the statement once, not once per key.
+let tried = {key: null, results: new Map()};
+
+// The candidates that BASIC reads after what was typed before the word, one statement at a time: those that leave
+// the statement with no error other than that it ends too soon. Only words that the one being typed could become
+// are tried, as the editor drops the rest. If the statement is already wrong before the word it tells us nothing, so
+// nothing is dropped.
+function keepingLineReadable(candidates, reading, word, dialect) {
+    const typed = reading.lexer.text;
+    const tokens = reading.tokens.filter(token => token.kind !== "white");
+    const from = Math.min(statementStartIn(tokens), typed.length);
+    const inAssembler = statementState(
+        tokens.filter(token => token.start < from),
+        reading.startsInAssembler,
+    ).inAssembler;
+    const statement = typed.slice(from);
+    const key = `${dialect.basicIV} ${dialect.usColor} ${inAssembler} ${statement}`;
+    if (tried.key !== key) tried = {key, results: new Map()};
+    const readable = candidate => {
+        if (!tried.results.has(candidate)) {
+            const text = statement + candidate;
+            const probe = new Recogniser(text, inAssembler, dialect, true);
+            tried.results.set(candidate, probe.valid(text, {start: 0}, statement.length));
+        }
+        return tried.results.get(candidate);
+    };
+    if (!readable("")) return candidates;
+    const wanted = word.toUpperCase();
+    // ELSE is only a branch after an IF or ON, and a line that has neither skips the rest of it.
+    const branches = tokens.some(token => ["IF", "ON"].includes(token.kw?.keyword));
+    return candidates.filter(
+        candidate =>
+            (!wanted || (candidate[0] === wanted[0] && isSubsequence(wanted, candidate))) &&
+            (candidate !== "ELSE" || branches) &&
+            readable(candidate),
+    );
 }
 
 function programNames(model, kind, position, startColumn, dialect) {
