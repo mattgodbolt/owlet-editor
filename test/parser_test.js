@@ -55,7 +55,6 @@ const KnownGaps = ["X=FNf (1)", "PROCp (1)", 'LIST IF "a"'];
 // instruction, a character in a mnemonic that is not a letter but that BASIC reads as one, and an ELSE that no IF is
 // waiting for.
 const StricterThanRom = [
-    // ELSE with no IF before it, which BASIC accepts and skips the rest of the line at (the README).
     "P.1:ELSE",
     "PRINT X ELSE",
     "ELSE",

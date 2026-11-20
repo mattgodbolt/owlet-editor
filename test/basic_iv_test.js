@@ -23,7 +23,6 @@ const stops = (text, dialect) =>
 // Lines BASIC IV runs that are marked on purpose (see the README): what follows a complete instruction is ignored, and
 // an ELSE that no IF is waiting for.
 const StricterThanRom = [
-    // ELSE with no IF before it, which BASIC accepts and skips the rest of the line at (the README).
     "X%=6ELSE7",
     "PRINT 1 ELSE PRINT 2",
     "A=1:B=2 ELSE C=3",
