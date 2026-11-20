@@ -9,6 +9,9 @@ import {Lexer} from "./lexer.js";
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
 
+const StrayElse =
+    "ELSE is not after an IF without an ELSE of its own: BASIC accepts it and ignores the rest of the line";
+
 const names = text => new Set(text.split(" "));
 export const NoArgument = names(
     "PI TRUE FALSE POS VPOS COUNT ERL ERR TIME PAGE LOMEM HIMEM GET GET$",
@@ -201,6 +204,7 @@ export class Recogniser {
     // Reads the whole line and marks its errors; returns whether an assembler block is open at its end.
     line() {
         this.elseIsBranch = false;
+        this.unmatchedBranches = 0;
         if (this.inAssembler) this.inAssembler = this.assembler.block();
         while (!this.is("end")) {
             const statementStart = this.peek();
@@ -208,9 +212,13 @@ export class Recogniser {
                 this.depth = 0;
                 this.statement();
                 if (this.isKeyword("ELSE")) {
-                    this.next();
+                    const token = this.next();
                     // BASIC skips the rest of the line at an ELSE it runs into; only IF and ON jump past one.
-                    if (!this.elseIsBranch) return this.skipLine();
+                    if (this.unmatchedBranches === 0) {
+                        this.markStray(token);
+                        return this.skipLine();
+                    }
+                    this.unmatchedBranches--;
                     if (this.is("linenum")) this.next();
                     continue;
                 }
@@ -229,6 +237,20 @@ export class Recogniser {
         const problem = this.mark(e, statementStart, assembling);
         while (!atEnd()) this.next();
         this.redden(problem);
+    }
+
+    // BASIC stops at the first error of a line, so an ELSE after one is never read.
+    markStray(token) {
+        if (this.problems.some(problem => !problem.stricter)) return;
+        token.invalid = true;
+        this.problems.push({
+            message: StrayElse,
+            token,
+            end: token.end,
+            unfinished: false,
+            hole: false,
+            stricter: true,
+        });
     }
 
     skipLine() {
@@ -722,10 +744,12 @@ export class Recogniser {
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
         while (!this.atEnd()) this.next();
         this.elseIsBranch = true;
+        this.unmatchedBranches++;
     }
 
     IF() {
         this.elseIsBranch = true;
+        this.unmatchedBranches++;
         this.expression();
         if (this.isKeyword("THEN")) {
             this.next();

@@ -1,0 +1,63 @@
+[
+  ["X%=6ELSE7", "58 25 3d 36 8b 8d 54 47 40", "#319"],
+  ["PRINT 1 ELSE PRINT 2", "f1 20 31 20 8b 20 f1 20 32", "#319"],
+  ["A=1:B=2 ELSE C=3", "41 3d 31 3a 42 3d 32 20 8b 20 43 3d 33", "#319"],
+  ["X%=6ELSE )", "58 25 3d 36 8b 20 29", "#319"],
+  ["IF0ELSEPRINT\"X\"ELSEPRINT\"Y\"", "e7 30 8b f1 22 58 22 8b f1 22 59 22", "#319"],
+  [
+    "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+    "e7 20 30 20 8c 20 f1 20 31 20 8b 20 f1 20 32 20 8b 20 f1 20 33",
+    "#319"
+  ],
+  [
+    "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE )",
+    "e7 20 30 20 8c 20 f1 20 31 20 8b 20 f1 20 32 20 8b 20 29",
+    "#319"
+  ],
+  [
+    "IF 1 THEN IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+    "e7 20 31 20 8c 20 e7 20 30 20 8c 20 f1 20 31 20 8b 20 f1 20 32 20 8b 20 f1 20 33",
+    "#319"
+  ],
+  [
+    "IF 0 THEN PRINT 1 ELSE IF 0 THEN PRINT 2 ELSE PRINT 3",
+    "e7 20 30 20 8c 20 f1 20 31 20 8b 20 e7 20 30 20 8c 20 f1 20 32 20 8b 20 f1 20 33",
+    "#319"
+  ],
+  [
+    "IF 0 THEN A=1:B=2 ELSE C=3",
+    "e7 20 30 20 8c 20 41 3d 31 3a 42 3d 32 20 8b 20 43 3d 33",
+    "#319"
+  ],
+  [
+    "IF 0 THEN A=1 ELSE C=3:D=4 ELSE E=5",
+    "e7 20 30 20 8c 20 41 3d 31 20 8b 20 43 3d 33 3a 44 3d 34 20 8b 20 45 3d 35",
+    "#319"
+  ],
+  [
+    "IF 0 THEN A=1 ELSE C=3:IF 0 THEN D=4 ELSE E=5",
+    "e7 20 30 20 8c 20 41 3d 31 20 8b 20 43 3d 33 3a e7 20 30 20 8c 20 44 3d 34 20 8b 20 45 3d 35",
+    "#319"
+  ],
+  [
+    "ON A GOTO 10,20 ELSE PRINT 3",
+    "ee 20 41 20 e5 20 8d 54 4a 40 2c 8d 54 54 40 20 8b 20 f1 20 33",
+    "#319"
+  ],
+  [
+    "ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+    "ee 20 41 20 e5 20 8d 54 4a 40 2c 8d 54 54 40 20 8b 20 f1 20 33 20 8b 20 f1 20 34",
+    "#319"
+  ],
+  [
+    "ON A GOTO 10,20 ELSE PRINT 3:PRINT 4 ELSE PRINT 5",
+    "ee 20 41 20 e5 20 8d 54 4a 40 2c 8d 54 54 40 20 8b 20 f1 20 33 3a f1 20 34 20 8b 20 f1 20 35",
+    "#319"
+  ],
+  ["IF 0 THEN 10 ELSE 20", "e7 20 30 20 8c 20 8d 54 4a 40 20 8b 20 8d 54 54 40", "#319"],
+  [
+    "IF 0 THEN 10 ELSE 20 ELSE 30",
+    "e7 20 30 20 8c 20 8d 54 4a 40 20 8b 20 8d 54 54 40 20 8b 20 8d 54 5e 40",
+    "#319"
+  ]
+]
