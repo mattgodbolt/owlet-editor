@@ -67,6 +67,12 @@ const StricterThanRom = [
     "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
     "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE )",
     "IF 0 THEN A=1 ELSE C=3:D=4 ELSE E=5",
+    'IF0THENIF1PRINT"X"ELSEPRINT"Y"ELSEPRINT"UNREACHABLE"',
+    'IF0ELSEELSEPRINT"UNREACHABLE"',
+    'IF1ELSEELSEPRINT"UNREACHABLE"',
+    "IF 1 THEN IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+    "IF 0 THEN IF 1 THEN PRINT 1 ELSE PRINT 2 ELSE )",
+    "IF 0 THEN ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
     "[OPT0:LDA #1 ; LOAD THE ACCUMULATOR:]",
     '[OPT0:LDA #1 ; "x:]',
     "[OPT0:LDA #1 ; ]:]",
@@ -378,7 +384,8 @@ const Typed = [
     ["X=1 THEN", ["X=1 T", "X=1 TH", "X=1 THE", "X=1 THEN"]],
 ];
 
-// BASIC skips the rest of the line at an ELSE that no IF or ON is waiting for, which is red on purpose (the README).
+// BASIC does not nest IF: the first ELSE after an IF or ON belongs to it, so the next is one that none is waiting
+// for. BASIC skips the rest of the line at it, which is red on purpose (the README).
 describe("ELSE that no IF is waiting for", () => {
     const strays = text =>
         programProblems(readLines(text, ModelBDialect))
@@ -393,6 +400,12 @@ describe("ELSE that no IF is waiting for", () => {
         'IF0ELSEPRINT"X"ELSEPRINT"Y"',
         "IF 0 THEN A=1 ELSE C=3:D=4 ELSE E=5",
         "ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+        'IF0THENIF1PRINT"X"ELSEPRINT"Y"ELSEPRINT"UNREACHABLE"',
+        "IF 1 THEN IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+        'IF0ELSEELSEPRINT"UNREACHABLE"',
+        'IF1ELSEELSEPRINT"UNREACHABLE"',
+        "IF 0 THEN PRINT 1 ELSE IF 1 THEN PRINT 2 ELSE PRINT 3 ELSE PRINT 4",
+        "IF 0 THEN ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
     ])("%s should be red on the ELSE alone, and on nothing after it", text => {
         assert.deepStrictEqual(strays(text), ["ELSE"]);
         assert.deepStrictEqual(red(text), ["ELSE"]);
@@ -401,7 +414,6 @@ describe("ELSE that no IF is waiting for", () => {
         "IF A THEN B=1 ELSE C=2",
         "IF A THEN B=1:PRINT 2 ELSE C=2",
         "IF A THEN 10 ELSE 20",
-        "IF A THEN IF B THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
         "IF A THEN PRINT 1 ELSE IF B THEN PRINT 2 ELSE PRINT 3",
         "IF A THEN B=1 ELSE C=2:IF D THEN E=1 ELSE F=2",
         "ON A GOTO 10,20 ELSE PRINT 3",

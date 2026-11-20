@@ -176,6 +176,11 @@ describe("Completions", () => {
             ["IF X ERR‸", [], ["ERROR"]],
             ["ON X GOTO 10 ELS‸", ["ELSE"], []],
             ["A=1 ELS‸", [], ["ELSE"]],
+            ["IF X THEN A=1 ELSE B=2 ELS‸", [], ["ELSE"]],
+            ["ON X GOTO 10,20 ELSE PRINT 3 ELS‸", [], ["ELSE"]],
+            ["ON ERROR PRINT 1 ELS‸", [], ["ELSE"]],
+            ["TRACE ON:PRINT 1 ELS‸", [], ["ELSE"]],
+            ["IF X THEN A=1 ELSE IF Y THEN B=2 ELS‸", ["ELSE"], []],
             ["PRINT SPC 3:S‸", ["SOUND", "STOP"], ["SPC", "STEP", "SQR"]],
         ];
         for (const [text, shown, hidden] of cases) {
@@ -234,7 +239,7 @@ describe("Completions", () => {
             both("INPUT S‸", ["SPC"]),
             both("INPUT T‸", ["TAB("]),
             both("INPUT A‸", []),
-            both("ON E‸", ["ELSE", "EOF", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]),
+            both("ON E‸", ["EOF", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]),
             both("ON X G‸", ["GOSUB", "GOTO"]),
             ["ON X P‸", [], ["PROC"]],
             // No binary operator starts an expression or a subexpression.
