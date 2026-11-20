@@ -22,6 +22,18 @@ const stops = (text, dialect) =>
 
 // Lines BASIC IV runs that are marked on purpose (see the README): what follows a complete instruction is ignored.
 const StricterThanRom = [
+    "[OPT0:NOP;x:]",
+    "[OPT0:NOP ;x:]",
+    "[OPT0:BNE &70;x:]",
+    "[OPT0:JMP &70 ;x:]",
+    "[OPT0:EQUB 1;x:]",
+    '[OPT0:EQUS "a";x:]',
+    "[OPT0:ASL A;x:]",
+    "[OPT0:LDA (&70),Y;x:]",
+    "[OPT0:LDA #1;PRINT:]",
+    "[OPT0:LDA #1;:NOP:]",
+    "[OPT0:LDA #1;x",
+    "[OPT0:LDA #1|x:]",
     "[OPT0:ADC (&70)+1:]",
     "[OPT0:AND (&70)+1:]",
     "[OPT0:CMP (&70)+1:]",

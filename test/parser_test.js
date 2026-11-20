@@ -54,6 +54,27 @@ const KnownGaps = ["X=FNf (1)", "PROCp (1)", 'LIST IF "a"'];
 // Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
 // instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
 const StricterThanRom = [
+    "[OPT0:LDA #1 ; LOAD THE ACCUMULATOR:]",
+    '[OPT0:LDA #1 ; "x:]',
+    "[OPT0:LDA #1 ; ]:]",
+    "[OPT0:EQUB 1 ; FOR:]",
+    "[OPT0:LDA #1;x:]",
+    "[OPT0:LDA 1,X;x:]",
+    "[OPT0:ROR A ; Anagram of ROAR:]",
+    "[OPT0:LDA #1 ;c:]",
+    "[OPT0:NOP ; c: NOP:]",
+    "[OPT0:NOP;x:]",
+    "[OPT0:NOP ;x:]",
+    "[OPT0:BNE &70;x:]",
+    "[OPT0:JMP &70 ;x:]",
+    "[OPT0:EQUB 1;x:]",
+    '[OPT0:EQUS "a";x:]',
+    "[OPT0:ASL A;x:]",
+    "[OPT0:LDA (&70),Y;x:]",
+    "[OPT0:LDA #1;PRINT:]",
+    "[OPT0:LDA #1;:NOP:]",
+    "[OPT0:LDA #1;x",
+    "[OPT0:LDA #1|x:]",
     "[OPT0:JMP (&70)+1:]",
     ...["(1)+(2,X)", "(1)+2", "(1)+(2)", "(1) LDA 2", "(1))+2", "(1)(2)", "(1)+(2,Y)"].map(
         o => `[OPT0:JMP ${o}:]`,
@@ -790,17 +811,27 @@ describe("Junk after a complete instruction", () => {
         ["[OPT0:LDA #1 PRINT 2:]", "PRINT"],
         ["[OPT0:NOP]:NOP", "]"],
         ["[OPT0:LDA #1]]", "]"],
+        ["[OPT0:LDA #1 ;comment:]", ";"],
+        ["[OPT0:LDA #1;comment ; x:]", ";"],
     ])("%s should be red on its first junk token only", (text, junk) => {
         assert.deepStrictEqual(red(text), [junk]);
     });
     it.each([
-        "[OPT0:LDA #1 ;comment:]",
         "[OPT0:LDA #1 \\comment:]",
         "[OPT0:LDA #1:]:tax=1",
         "[OPT0:NOP:]:P%=P%+5",
-        "[OPT0:LDA #1:LDX #2 ;c:NOP:]",
+        "[OPT0:LDA #1:LDX #2 \\c:NOP:]",
     ])("%s should not be red", text => {
         assert.deepStrictEqual(red(text), []);
+    });
+    it("should say that a ; only appears to start a comment, and that \\ is the one", () => {
+        const [problem] = stricter("[OPT0:LDA #1 ;comment:]");
+        assert.strictEqual(problem.code, "junk-after-instruction");
+        assert.match(
+            problem.message,
+            /only appears to start a comment: the assembler's comment character is \\\./,
+        );
+        assert.match(problem.message, /ARM assembler in BASIC V, do accept ;/);
     });
     it("should mark the second ] of NOP]:] as closing the block, not as junk", () => {
         assert.deepStrictEqual(red("[OPT0:NOP]:]:P%=P%+5"), ["]"]);
@@ -814,7 +845,7 @@ describe("Junk after a complete instruction", () => {
         assert.strictEqual(text.slice(problem.start, problem.end), junk);
         assert.strictEqual(problem.code, "junk-after-instruction");
         assert.ok(problem.message.startsWith(begins), problem.message);
-        assert.match(problem.message, junk === "]" ? /a : is missing/ : /a ; is missing/);
+        assert.match(problem.message, junk === "]" ? /a : is missing/ : /a \\ is missing/);
     });
     // BASIC tokenises a keyword only at the start of a word, so one straight after a mnemonic is a variable's name.
     it.each([
