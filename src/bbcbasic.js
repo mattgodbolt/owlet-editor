@@ -132,15 +132,15 @@ export const codeActionProviderFor = dialect => ({
             .filter(marker => QuickFixCodes.has(marker.code));
         const actions = fixable.map(marker => {
             const text = model.getValueInRange(marker);
+            const atStart = {
+                ...marker,
+                endLineNumber: marker.startLineNumber,
+                endColumn: marker.startColumn,
+            };
             if (marker.code === SpaceAfterAbbreviationCode) {
                 const abbreviation = text.slice(0, text.indexOf(".") + 1);
                 const column = marker.startColumn + abbreviation.length;
-                const at = {
-                    startLineNumber: marker.startLineNumber,
-                    startColumn: column,
-                    endLineNumber: marker.startLineNumber,
-                    endColumn: column,
-                };
+                const at = {...atStart, startColumn: column, endColumn: column};
                 return quickFix(model, marker, `Insert a space after ${abbreviation}`, at, " ");
             }
             if (marker.code === SpaceAfterMnemonicCode) {
@@ -148,39 +148,20 @@ export const codeActionProviderFor = dialect => ({
                     .getLineContent(marker.startLineNumber)
                     .slice(0, marker.startColumn - 1);
                 const [mnemonic] = before.match(/EQU[BDSW]$|.{3}$/i);
-                const at = {
-                    ...marker,
-                    endLineNumber: marker.startLineNumber,
-                    endColumn: marker.startColumn,
-                };
-                return quickFix(model, marker, `Insert a space after ${mnemonic}`, at, " ");
+                return quickFix(model, marker, `Insert a space after ${mnemonic}`, atStart, " ");
             }
             if (marker.code === SpaceBeforeKeywordCode) {
                 const keyword = text.startsWith("TO") ? "TO" : "STEP";
-                const at = {
-                    ...marker,
-                    endLineNumber: marker.startLineNumber,
-                    endColumn: marker.startColumn,
-                };
-                return quickFix(model, marker, `Insert a space before ${keyword}`, at, " ");
+                return quickFix(model, marker, `Insert a space before ${keyword}`, atStart, " ");
             }
             if (marker.code === JunkAfterInstructionCode) {
-                const at = {
-                    ...marker,
-                    endLineNumber: marker.startLineNumber,
-                    endColumn: marker.startColumn,
-                };
                 return text[0] === "]"
-                    ? quickFix(model, marker, "Insert : before ]", at, ":")
-                    : quickFix(model, marker, "Insert \\ before the junk", at, "\\");
+                    ? quickFix(model, marker, "Insert : before ]", atStart, ":")
+                    : quickFix(model, marker, "Insert \\ before the junk", atStart, "\\");
             }
             if (marker.code === CapitaliseRegisterCode) {
                 const register = text[0];
-                const at = {
-                    ...marker,
-                    endLineNumber: marker.startLineNumber,
-                    endColumn: marker.startColumn + 1,
-                };
+                const at = {...atStart, endColumn: marker.startColumn + 1};
                 return quickFix(
                     model,
                     marker,
@@ -192,9 +173,8 @@ export const codeActionProviderFor = dialect => ({
             if (marker.code === CapitaliseMnemonicCode) {
                 const written = text.slice(0, MnemonicLength);
                 const at = {
-                    ...marker,
+                    ...atStart,
                     startColumn: marker.startColumn + MnemonicLength - 1,
-                    endLineNumber: marker.startLineNumber,
                     endColumn: marker.startColumn + MnemonicLength,
                 };
                 const capitals = written.toUpperCase();

@@ -802,14 +802,14 @@ describe("Tokenisation", () => {
             // BASIC ignores the rest of a complete instruction, but anything there but a comment is a mistake.
             assert.deepStrictEqual(spans("[NOP PRINT", "invalid"), ["PRINT"]);
         });
-        it("should mark a ; after a complete instruction as junk, as BASIC only appears to take it as a comment", () => {
-            // The ROM runs all of these, so ; is as much junk as | is.
-            assert.deepStrictEqual(spans("[OPT3:LDA #1 ; LOAD THE ACCUMULATOR:]", "invalid"), [
-                ";",
-            ]);
-            assert.deepStrictEqual(spans("[OPT3:LDA #1;x:NOP:]", "invalid"), [";"]);
-            assert.deepStrictEqual(spans("[OPT3:LDA #1|x:NOP:]", "invalid"), ["|"]);
-            assert.deepStrictEqual(spans("[NOP ; a\nRTS ; b", "invalid"), [";", ";"]);
+        // The ROM runs all of these, so ; is as much junk as | is, though BASIC only appears to take it as a comment.
+        it.each([
+            ["[OPT3:LDA #1 ; LOAD THE ACCUMULATOR:]", [";"]],
+            ["[OPT3:LDA #1;x:NOP:]", [";"]],
+            ["[OPT3:LDA #1|x:NOP:]", ["|"]],
+            ["[NOP ; a\nRTS ; b", [";", ";"]],
+        ])("should mark the junk after a complete instruction in %j", (text, junk) => {
+            assert.deepStrictEqual(spans(text, "invalid"), junk);
         });
         it("should read letters in the case BASIC takes them", () => {
             // Mnemonics, OPT and EQU in any case; the accumulator, an index register and EQU's size only in upper
@@ -1279,30 +1279,6 @@ describe("Quick fixes and syntax markers", () => {
     it("should offer only the space for a keyword straight after a mnemonic", () => {
         assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
     });
-    // The fixes offered for the junk markers of the text, applied one at a time, with the text each leaves.
-    function fixed(text) {
-        const model = editor.createModel(text, LanguageId);
-        try {
-            const markers = getSyntaxMarkers(text, ModelBDialect).filter(marker => marker.code);
-            const {actions} = codeActionProviderFor(ModelBDialect).provideCodeActions(
-                model,
-                markers[0],
-                {markers},
-            );
-            return actions.map(({title, edit}) => {
-                const {range, text: inserted} = edit.edits[0].textEdit;
-                const lines = text.split("\n");
-                const line = lines[range.startLineNumber - 1];
-                lines[range.startLineNumber - 1] =
-                    line.slice(0, range.startColumn - 1) +
-                    inserted +
-                    line.slice(range.endColumn - 1);
-                return [title, lines.join("\n")];
-            });
-        } finally {
-            model.dispose();
-        }
-    }
     it.each([
         ["[OPT0:LDA#1]", "Insert : before ]", "[OPT0:LDA#1:]"],
         ["[LDA #1]\ntax=1\n]", "Insert : before ]", "[LDA #1:]\ntax=1\n]"],
@@ -1316,7 +1292,7 @@ describe("Quick fixes and syntax markers", () => {
         ["[OPT0:NOPPAGE:]", "Insert \\ before the junk", "[OPT0:NOP\\PAGE:]"],
         ["[OPT0:LDAP.,X:]", "Insert \\ before the junk", "[OPT0:LDAP\\.,X:]"],
     ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
-        const [offer] = fixed(text).filter(([name]) => name === title);
+        const [offer] = fixes(text, ModelBDialect).filter(([name]) => name === title);
         assert.deepStrictEqual(offer, [title, result]);
         assert.deepStrictEqual(
             getSyntaxMarkers(result, ModelBDialect).filter(marker => marker.code),

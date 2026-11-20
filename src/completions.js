@@ -140,7 +140,7 @@ function statementStartIn(tokens) {
     const split = tokens.findLastIndex(
         token => (token.kind === "punct" && token.text === ":") || token.kw?.keyword === "ELSE",
     );
-    return tokens[split + 1]?.start ?? Infinity;
+    return tokens[split + 1]?.start;
 }
 
 const isSubsequence = (word, candidate) => {
@@ -163,7 +163,7 @@ let tried = {key: null, results: new Map()};
 function keepingLineReadable(candidates, reading, word, dialect) {
     const typed = reading.lexer.text;
     const tokens = reading.tokens.filter(token => token.kind !== "white");
-    const from = Math.min(statementStartIn(tokens), typed.length);
+    const from = statementStartIn(tokens) ?? typed.length;
     const inAssembler = statementState(
         tokens.filter(token => token.start < from),
         reading.startsInAssembler,
