@@ -14,7 +14,7 @@ test.describe("3D button", () => {
 
     test("opens the 3D emulator with the editor's text", async ({page, context}) => {
         const popup = context.waitForEvent("page");
-        await page.locator("[data-action=virtualbeeb]").click();
+        await page.getByRole("button", {name: "Open in the 3D virtual BBC Micro"}).click();
         const url = new URL((await popup).url());
         expect(url.origin).toBe("https://virtual.bbcmic.ro");
         expect(url.searchParams.get("embedBasic")).toContain("EDIT");
