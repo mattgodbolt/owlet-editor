@@ -433,7 +433,6 @@
   ["colour", "Mistake"],
   ["A=8MOD.3", "Syntax error"],
   ["ON ERR.", "ok"],
-  ["FORJ%=2E4TO22400STEP100", "No TO"],
   ["GOTO 10*2", "Syntax error"],
   ["GOTO 10 ,, 20", "Syntax error"],
   ["!", "No such variable"],

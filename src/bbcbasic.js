@@ -6,7 +6,7 @@ import {ILanguageService} from "monaco-editor/editor/common/languages/language";
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
-import {ForeignOperators} from "./parser/recogniser";
+import {ForeignOperators, SpaceBeforeKeywordCode} from "./parser/recogniser";
 import {
     CapitaliseMnemonicCode,
     CapitaliseRegisterCode,
@@ -155,6 +155,15 @@ export const codeActionProviderFor = dialect => ({
                 };
                 return quickFix(model, marker, `Insert a space after ${mnemonic}`, at, " ");
             }
+            if (marker.code === SpaceBeforeKeywordCode) {
+                const keyword = text.startsWith("TO") ? "TO" : "STEP";
+                const at = {
+                    ...marker,
+                    endLineNumber: marker.startLineNumber,
+                    endColumn: marker.startColumn,
+                };
+                return quickFix(model, marker, `Insert a space before ${keyword}`, at, " ");
+            }
             if (marker.code === JunkAfterInstructionCode) {
                 const at = {
                     ...marker,
@@ -223,6 +232,7 @@ const QuickFixCodes = new Set([
     ForeignOperatorCode,
     JunkAfterInstructionCode,
     SpaceAfterMnemonicCode,
+    SpaceBeforeKeywordCode,
     CapitaliseRegisterCode,
     CapitaliseMnemonicCode,
 ]);

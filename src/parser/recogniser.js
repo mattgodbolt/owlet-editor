@@ -8,6 +8,7 @@ import {Lexer} from "./lexer.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
+export const SpaceBeforeKeywordCode = "space-before-keyword";
 
 const names = text => new Set(text.split(" "));
 export const NoArgument = names(
@@ -738,13 +739,34 @@ export class Recogniser {
         this.variable(null);
         this.expectPunct("=");
         this.expression();
-        if (!this.isKeyword("TO")) this.fail("No TO");
+        if (!this.isKeyword("TO")) {
+            const token = this.peek();
+            this.fail("No TO", token, undefined, undefined, this.spaceFix(token, "TO"));
+        }
         this.next();
         this.expression();
         if (this.isKeyword("STEP")) {
             this.next();
             this.expression();
         }
+        // BASIC reads the STEP after a number such as 2E4 as part of a name.
+        const token = this.peek();
+        if (this.is("name")) {
+            const code = this.spaceFix(token, "STEP");
+            if (code) this.fail("Syntax error", token, undefined, undefined, code);
+        }
+    }
+
+    // The quick fix code for a name that starts with the keyword and follows other text directly, if a space before
+    // it leaves the statement with no error (other than a line that ends too soon).
+    spaceFix(token, keyword) {
+        if (this.probing || token.kind !== "name" || !token.text.startsWith(keyword))
+            return undefined;
+        const {text} = this.lexer;
+        const candidate = `${text.slice(0, token.start)} ${text.slice(token.start)}`;
+        return token.start > 0 && this.valid(candidate, token, token.start)
+            ? SpaceBeforeKeywordCode
+            : undefined;
     }
 
     NEXT() {

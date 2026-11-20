@@ -1,0 +1,12 @@
+[
+  ["FORJ%=2E4TO22400STEP100", "No TO", "#318"],
+  ["FORJ%=2E4 TO22400STEP100", "ok", "#318"],
+  ["FORJ%=1TO2E4STEP100", "Syntax error", "#318"],
+  ["FORJ%=1TO2E4 STEP100", "ok", "#318"],
+  ["FORJ%=1TO2E4STEP", "Syntax error", "#318"],
+  ["FORJ%=1TO2E4 STEP", "No such variable", "#318"],
+  ["FORJ%=1to10", "No TO", "#318"],
+  ["FORJ%=1 to10", "No TO", "#318"],
+  ["FORJ%=2E4TOA", "No TO", "#318"],
+  ["FORJ%=2E4 TOA", "ok", "#318"]
+]

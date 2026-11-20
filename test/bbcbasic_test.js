@@ -1396,6 +1396,53 @@ describe("Quick fix for a lower case index register", () => {
     });
 });
 
+describe("Quick fix for a TO or STEP that a number or name runs into", () => {
+    // Each is a recorded row that stops at the keyword on both ROMs. The line with a space before it is read on, so the
+    // fix is offered and what the ROM says of it, if not ok, is that the line ends.
+    it.each([
+        ["FORJ%=2E4TO22400STEP100", "No TO", "TO", "FORJ%=2E4 TO22400STEP100", "ok"],
+        ["FORJ%=2E4TOA", "No TO", "TO", "FORJ%=2E4 TOA", "ok"],
+        ["FORJ%=1TO2E4STEP100", "Syntax error", "STEP", "FORJ%=1TO2E4 STEP100", "ok"],
+        ["FORJ%=1TO2E4STEP", "Syntax error", "STEP", "FORJ%=1TO2E4 STEP", "No such variable"],
+    ])("%s should offer a space before %s, leaving %s", (text, verdict, keyword, result, after) => {
+        for (const [dialect, table] of [
+            [BasicIIDialect, verdicts],
+            [BasicIVDialect, masterVerdicts],
+        ]) {
+            assert.strictEqual(table.get(text), verdict);
+            assert.strictEqual(table.get(result), after);
+            assert.deepStrictEqual(fixes(text, dialect), [
+                [`Insert a space before ${keyword}`, result],
+            ]);
+            assert.strictEqual(
+                getSyntaxMarkers(result, dialect).filter(
+                    marker => marker.severity === MarkerSeverity.Error,
+                ).length,
+                0,
+            );
+        }
+    });
+    // A recorded row that stops with No TO with the space as well, so no fix is offered.
+    it("should offer no fix where the keyword is in lower case", () => {
+        const text = "FORJ%=1to10";
+        assert.deepStrictEqual(
+            [verdicts.get(text), verdicts.get("FORJ%=1 to10")],
+            ["No TO", "No TO"],
+        );
+        assert.strictEqual(getSyntaxMarkers(text, BasicIIDialect).length, 1);
+        assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+    });
+    it("should leave the marker an error, and mend the line it is on", () => {
+        assert.deepStrictEqual(
+            getSyntaxMarkers("FORJ%=2E4TO22400STEP100", BasicIIDialect).map(m => m.severity),
+            [MarkerSeverity.Error],
+        );
+        assert.deepStrictEqual(fixes("10 X=1\n20 FORJ%=1TO2E4STEP100", BasicIIDialect), [
+            ["Insert a space before STEP", "10 X=1\n20 FORJ%=1TO2E4 STEP100"],
+        ]);
+    });
+});
+
 describe("BASIC IV's assembler on BASIC II", () => {
     const BasicIVOnly = "BRA CLR DEA INA PHX PHY PLX PLY STZ TRB TSB".split(" ");
     const iv = mnemonic => `${mnemonic} is a BASIC IV instruction, which BASIC II does not have`;
