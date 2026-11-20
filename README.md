@@ -265,12 +265,12 @@ message that says what BASIC does, and shows as an error.
 
 - **Anything but a comment after a complete assembler instruction** (`NOP PRINT`, `LDA #1 hello`, `NOP 5`,
   `LDA #1 ,X`, `LDA #1]`). BASIC ignores the rest of the statement up to the next `:`; the first thing there that is
-  not a `;` or `\` comment is red (just that token), probably a comment missing its `;`. A `]` there is the commonest
+  not a `\` comment is red (just that token), probably a comment missing its `\`. A `;` is red too: BASIC II ignores it like any other junk, so it only appears to start a comment (later BASICs, such as the ARM assembler in BASIC V, do accept it). A `]` there is the commonest
   case. It does not close the block: BASIC ignores it like the rest and goes on assembling, so after
   `[LDA #1]` the next line `tax=1` is assembled as `TAX` followed by ignored junk, not run as an assignment
   (`[OPT0:NOP]:tax=1` assembles `EA AA`). A `]` after the colon closes it (`[OPT0:NOP]:]:P%=P%+5` runs the
   assignment), as `[LDA #1:]` does. The hover for a `]` says that a `:` is probably missing before it. Flagging the junk
-  and the two quick fixes, "Insert : before ]" for a `]` and "Insert ; before the junk" for the rest, were suggested by
+  and the two quick fixes, "Insert : before ]" for a `]` and "Insert \ before the junk" for the rest, were suggested by
   Olly Betts on #174. The oracle takes these marks on trust as ignored text (cutting the statement there changes
   nothing, so it cannot test them) and lists them as STRICTER.
   - **A keyword straight after a mnemonic** (`STAH.,X`, `LDAUSR@%+GET`). BASIC tokenises a keyword only at the start of
@@ -366,5 +366,5 @@ highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with t
 
 ## Known Issues
 
-- In assembler, anything but a `;` or `\` comment after a complete instruction, as in `LDA #1 FOR`, `NOP 5` or `LDA #1]`, is highlighted as invalid on purpose. BBC BASIC ignores the rest of the statement, but this is almost always a mistake, such as a comment missing its `;` or a `:` missing before the `]`.
+- In assembler, anything but a `\` comment after a complete instruction, as in `LDA #1 FOR`, `NOP 5` or `LDA #1]`, is highlighted as invalid on purpose. BBC BASIC ignores the rest of the statement, but this is almost always a mistake, such as a comment missing its `\`, a `;` that only appears to be a comment, or a `:` missing before the `]`.
 - When running tests, you may see warnings about missing source maps for Monaco Editor. This is a [known issue with Monaco Editor 0.52.0+](https://github.com/microsoft/monaco-editor/issues/4712) and doesn't affect functionality.
