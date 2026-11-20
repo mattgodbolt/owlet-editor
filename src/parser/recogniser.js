@@ -11,7 +11,7 @@ const MaxDepth = 64;
 export const SpaceBeforeKeywordCode = "space-before-keyword";
 
 const StrayElse =
-    "ELSE is not after an IF without an ELSE of its own: BASIC accepts it and ignores the rest of the line";
+    "ELSE is not after an IF or ON that has no ELSE yet: BASIC accepts it and ignores the rest of the line";
 
 const names = text => new Set(text.split(" "));
 export const NoArgument = names(
@@ -205,7 +205,7 @@ export class Recogniser {
     // Reads the whole line and marks its errors; returns whether an assembler block is open at its end.
     line() {
         this.elseIsBranch = false;
-        this.unmatchedBranches = 0;
+        this.waitingForElse = false;
         if (this.inAssembler) this.inAssembler = this.assembler.block();
         while (!this.is("end")) {
             const statementStart = this.peek();
@@ -214,12 +214,12 @@ export class Recogniser {
                 this.statement();
                 if (this.isKeyword("ELSE")) {
                     const token = this.next();
-                    // BASIC skips the rest of the line at an ELSE it runs into; only IF and ON jump past one.
-                    if (this.unmatchedBranches === 0) {
+                    // BASIC skips the rest of the line at an ELSE it runs into; an IF or ON jumps past the first one after it.
+                    if (!this.waitingForElse) {
                         this.markStray(token);
                         return this.skipLine();
                     }
-                    this.unmatchedBranches--;
+                    this.waitingForElse = false;
                     if (this.is("linenum")) this.next();
                     continue;
                 }
@@ -745,12 +745,12 @@ export class Recogniser {
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
         while (!this.atEnd()) this.next();
         this.elseIsBranch = true;
-        this.unmatchedBranches++;
+        this.waitingForElse = true;
     }
 
     IF() {
         this.elseIsBranch = true;
-        this.unmatchedBranches++;
+        this.waitingForElse = true;
         this.expression();
         if (this.isKeyword("THEN")) {
             this.next();

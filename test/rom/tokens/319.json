@@ -59,5 +59,40 @@
     "IF 0 THEN 10 ELSE 20 ELSE 30",
     "e7 20 30 20 8c 20 8d 54 4a 40 20 8b 20 8d 54 54 40 20 8b 20 8d 54 5e 40",
     "#319"
+  ],
+  [
+    "IF0THENIF1PRINT\"X\"ELSEPRINT\"Y\"ELSEPRINT\"UNREACHABLE\"",
+    "e7 30 8c e7 31 f1 22 58 22 8b f1 22 59 22 8b f1 22 55 4e 52 45 41 43 48 41 42 4c 45 22",
+    "#319"
+  ],
+  [
+    "IF0ELSEELSEPRINT\"UNREACHABLE\"",
+    "e7 30 8b 8b f1 22 55 4e 52 45 41 43 48 41 42 4c 45 22",
+    "#319"
+  ],
+  [
+    "IF1ELSEELSEPRINT\"UNREACHABLE\"",
+    "e7 31 8b 8b f1 22 55 4e 52 45 41 43 48 41 42 4c 45 22",
+    "#319"
+  ],
+  [
+    "IF 0 THEN IF 1 THEN PRINT 1 ELSE PRINT 2 ELSE )",
+    "e7 20 30 20 8c 20 e7 20 31 20 8c 20 f1 20 31 20 8b 20 f1 20 32 20 8b 20 29",
+    "#319"
+  ],
+  [
+    "IF 0 THEN PRINT 1 ELSE IF 1 THEN PRINT 2 ELSE PRINT 3 ELSE PRINT 4",
+    "e7 20 30 20 8c 20 f1 20 31 20 8b 20 e7 20 31 20 8c 20 f1 20 32 20 8b 20 f1 20 33 20 8b 20 f1 20 34",
+    "#319"
+  ],
+  [
+    "IF 0 THEN ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+    "e7 20 30 20 8c 20 ee 20 41 20 e5 20 8d 54 4a 40 2c 8d 54 54 40 20 8b 20 f1 20 33 20 8b 20 f1 20 34",
+    "#319"
+  ],
+  [
+    "IF 0 THEN 10 ELSE ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+    "e7 20 30 20 8c 20 8d 54 4a 40 20 8b 20 ee 20 41 20 e5 20 8d 54 4a 40 2c 8d 54 54 40 20 8b 20 f1 20 33 20 8b 20 f1 20 34",
+    "#319"
   ]
 ]

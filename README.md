@@ -277,8 +277,9 @@ message that says what BASIC does, and shows as an error.
     a word, so `STAH.` is the word `STAH`: `STA`, then the variable `H` (an undefined one reads as `P%` unless `OPT` has
     bit 1 set, when it is "No such variable"), and `.,X` is ignored; the same text with a space, `STA H.,X`, is
     `STA HIMEM,X`. Where a space would leave nothing red, the junk is red as before but the hover says that, and the
-    fix is "Insert a space after STA" in place of the `;`. A mnemonic that takes no operand (`NOPPAGE`) keeps the `;`
-    fix. `STAPAGE` and `LDAGET` have no junk after the variable, so they are not red. Suggested by Olly Betts on #174.
+    fix is "Insert a space after STA" in place of "Insert \ before the junk". A mnemonic that takes no operand
+    (`NOPPAGE`) keeps the `\` fix. `STAPAGE` and `LDAGET` have no junk after the variable, so they are not red.
+    Suggested by Olly Betts on #174.
 - **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`). BASIC compares only
   the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A` and so on: `LD89` is `LDX 9`, but
   is an easy typo for `LDA89`, `LDX89` or `LDY89`. Olly Betts suggested on #174 marking this, and marking the `LD` (in
@@ -293,9 +294,10 @@ message that says what BASIC does, and shows as an error.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
   `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into, which is right at the end
   of the `THEN` part of an `IF` (or after an `ON` list) and a quirk anywhere else. The `ELSE` is red and the text after
-  it is not, since BASIC does not read it. An `ELSE` is waiting for an `IF` (or `ON`) earlier on the line that has not
-  had one yet, so `IF A THEN IF B THEN x ELSE y ELSE z` and `IF A THEN x ELSE IF B THEN y ELSE z` are not marked.
-  Suggested by Olly Betts on #319.
+  it is not, since BASIC does not read it. BASIC does not nest `IF`: it scans forward for the first `ELSE`, so an `IF`
+  or `ON` waits for one `ELSE` and the first it meets is its own. `IF A THEN IF B THEN x ELSE y ELSE z` has its second
+  `ELSE` marked, as `IF0ELSEELSEPRINT"x"` does, but an `IF` or `ON` after an `ELSE` waits for another, so
+  `IF A THEN x ELSE IF B THEN y ELSE z` is not marked. Suggested by Olly Betts on #319.
 
 #### The other way: lenient on purpose
 
