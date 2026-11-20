@@ -250,6 +250,11 @@ export class OwletEditor {
                 previousSelections,
             );
             this.editor.pushUndoStop();
+            // Monaco colours the lines of a replaced text in idle time, which a running emulator can leave it no
+            // chance of, so the whole text is coloured here.
+            this.editor
+                .getModel()
+                .tokenization.forceTokenization(this.editor.getModel().getLineCount());
         } else {
             this.setProgram(newText);
         }
