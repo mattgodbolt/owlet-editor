@@ -181,12 +181,10 @@ function keepingLineReadable(candidates, reading, word, dialect) {
     };
     if (!readable("")) return candidates;
     const wanted = word.toUpperCase();
-    // ELSE is only a branch after an IF or ON, and a line that has neither skips the rest of it.
-    const branches = tokens.some(token => ["IF", "ON"].includes(token.kw?.keyword));
     return candidates.filter(
         candidate =>
             (!wanted || (candidate[0] === wanted[0] && isSubsequence(wanted, candidate))) &&
-            (candidate !== "ELSE" || branches) &&
+            (candidate !== "ELSE" || reading.waitingForElse) &&
             readable(candidate),
     );
 }
