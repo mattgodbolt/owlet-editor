@@ -113,7 +113,7 @@ const LogicalTokenChars = new Set(
     keywords.filter(kw => ["AND", "EOR", "OR"].includes(kw.keyword)).map(tokenChar),
 );
 const Label = /\. *(?:[A-Za-z_`][\w`]*%?|@%)/y;
-const Comment = /[;\\][^:]*/y;
+const Comment = /\\[^:]*/y;
 
 export class Assembler {
     constructor(recogniser) {
@@ -168,23 +168,23 @@ export class Assembler {
 
     statement() {
         const r = this.recogniser;
-        if (this.comment("\\")) return;
+        if (this.comment()) return;
         this.labels();
-        if (r.is("end") || r.isPunct(":", "]") || this.comment("\\")) return;
+        if (r.is("end") || r.isPunct(":", "]") || this.comment()) return;
         const first = r.peek();
         const mnemonic = this.mnemonic();
         const operand = r.peek();
         this.operand(mnemonic);
-        if (this.comment("\\")) return;
+        if (this.comment()) return;
         let junk = null;
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (junk) continue;
             junk = token;
             const space = this.keywordAfterMnemonic(first, mnemonic, operand);
-            if (space) this.stricter(token, space, SpaceAfterMnemonicCode, operand);
+            if (space) r.stricter(token, space, SpaceAfterMnemonicCode, operand);
             else
-                this.stricter(
+                r.stricter(
                     token,
                     JunkMessages.get(token.text) ?? JunkMessage,
                     JunkAfterInstructionCode,
@@ -211,9 +211,9 @@ export class Assembler {
     }
 
     // A comment runs to the next colon, whatever the tokeniser made of it.
-    comment(...starts) {
+    comment() {
         const r = this.recogniser;
-        if (!r.isPunct(...starts)) return false;
+        if (!r.isPunct("\\")) return false;
         r.lexer.raw(Comment, "comment");
         return true;
     }
@@ -350,22 +350,8 @@ export class Assembler {
                 Math.min(end, ...cuts.filter(at => at > token.start)) - token.start,
             );
             r.next().type = type;
-            if (mark) this.stricter(token, mark.message);
+            if (mark) r.stricter(token, mark.message);
         }
-    }
-
-    // Marks a token that BASIC accepts but that is almost certainly a mistake; the problem's text starts at `from`.
-    stricter(token, message, code, from = token) {
-        token.invalid = true;
-        this.recogniser.problems.push({
-            message,
-            token: from,
-            end: token.end,
-            unfinished: false,
-            hole: false,
-            stricter: true,
-            code,
-        });
     }
 
     operand(mnemonic) {

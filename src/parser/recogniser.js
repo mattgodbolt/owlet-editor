@@ -242,15 +242,20 @@ export class Recogniser {
 
     // BASIC stops at the first error of a line, so an ELSE after one is never read.
     markStray(token) {
-        if (this.problems.some(problem => !problem.stricter)) return;
+        if (this.problems.every(problem => problem.stricter)) this.stricter(token, StrayElse);
+    }
+
+    // Marks a token that BASIC accepts but that is almost certainly a mistake; the problem's text starts at `from`.
+    stricter(token, message, code, from = token) {
         token.invalid = true;
         this.problems.push({
-            message: StrayElse,
-            token,
+            message,
+            token: from,
             end: token.end,
             unfinished: false,
             hole: false,
             stricter: true,
+            code,
         });
     }
 
@@ -775,22 +780,18 @@ export class Recogniser {
         }
         // BASIC reads the STEP after a number such as 2E4 as part of a name.
         const token = this.peek();
-        if (this.is("name")) {
-            const code = this.spaceFix(token, "STEP");
-            if (code) this.fail("Syntax error", token, undefined, undefined, code);
-        }
+        const code = this.spaceFix(token, "STEP");
+        if (code) this.fail("Syntax error", token, undefined, undefined, code);
     }
 
-    // The quick fix code for a name that starts with the keyword and follows other text directly, if a space before
-    // it leaves the statement with no error (other than a line that ends too soon).
+    // The quick fix code for a name that starts with the keyword, if a space before it leaves the statement with no
+    // error (other than a line that ends too soon).
     spaceFix(token, keyword) {
         if (this.probing || token.kind !== "name" || !token.text.startsWith(keyword))
             return undefined;
         const {text} = this.lexer;
         const candidate = `${text.slice(0, token.start)} ${text.slice(token.start)}`;
-        return token.start > 0 && this.valid(candidate, token, token.start)
-            ? SpaceBeforeKeywordCode
-            : undefined;
+        return this.valid(candidate, token, token.start) ? SpaceBeforeKeywordCode : undefined;
     }
 
     NEXT() {
