@@ -219,7 +219,7 @@ describe("Tokenisation", () => {
                 ['ON ERROR PRINT "x"', []],
                 ["TIME=0", []],
                 ["PTR#0=0:HIMEM=HIMEM", []],
-                ["ELSE", []],
+                ["ELSE", ["ELSE"]],
                 ["IF 1 THEN ELSE", []],
                 ["RNDX=1", []],
                 ["MODE 7", []],

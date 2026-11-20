@@ -52,8 +52,21 @@ describe("Lexer", () => {
 const KnownGaps = ["X=FNf (1)", "PROCp (1)", 'LIST IF "a"'];
 
 // Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
-// instruction, and a character in a mnemonic that is not a letter but that BASIC reads as one.
+// instruction, a character in a mnemonic that is not a letter but that BASIC reads as one, and an ELSE that no IF is
+// waiting for.
 const StricterThanRom = [
+    // ELSE with no IF before it, which BASIC accepts and skips the rest of the line at (the README).
+    "P.1:ELSE",
+    "PRINT X ELSE",
+    "ELSE",
+    "ELSE*HELP",
+    "X%=6ELSE7",
+    "PRINT 1 ELSE PRINT 2",
+    "A=1:B=2 ELSE C=3",
+    "X%=6ELSE )",
+    "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+    "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE )",
+    "IF 0 THEN A=1 ELSE C=3:D=4 ELSE E=5",
     "[OPT0:JMP (&70)+1:]",
     ...["(1)+(2,X)", "(1)+2", "(1)+(2)", "(1) LDA 2", "(1))+2", "(1)(2)", "(1)+(2,Y)"].map(
         o => `[OPT0:JMP ${o}:]`,
@@ -343,6 +356,39 @@ const Typed = [
     ["GOTO 20 30", ["GOTO 20 3", "GOTO 20 30"]],
     ["X=1 THEN", ["X=1 T", "X=1 TH", "X=1 THE", "X=1 THEN"]],
 ];
+
+// BASIC skips the rest of the line at an ELSE that no IF or ON is waiting for, which is red on purpose (the README).
+describe("ELSE that no IF is waiting for", () => {
+    const strays = text =>
+        programProblems(readLines(text, ModelBDialect))
+            .filter(problem => problem.stricter)
+            .map(({start, end}) => text.slice(start, end));
+
+    it.each([
+        "X%=6ELSE7",
+        "A=1:B=2 ELSE C=3",
+        "ELSE PRINT 1",
+        "IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+        'IF0ELSEPRINT"X"ELSEPRINT"Y"',
+        "IF 0 THEN A=1 ELSE C=3:D=4 ELSE E=5",
+        "ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+    ])("%s should be red on the ELSE alone, and on nothing after it", text => {
+        assert.deepStrictEqual(strays(text), ["ELSE"]);
+        assert.deepStrictEqual(red(text), ["ELSE"]);
+    });
+    it.each([
+        "IF A THEN B=1 ELSE C=2",
+        "IF A THEN B=1:PRINT 2 ELSE C=2",
+        "IF A THEN 10 ELSE 20",
+        "IF A THEN IF B THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
+        "IF A THEN PRINT 1 ELSE IF B THEN PRINT 2 ELSE PRINT 3",
+        "IF A THEN B=1 ELSE C=2:IF D THEN E=1 ELSE F=2",
+        "ON A GOTO 10,20 ELSE PRINT 3",
+        "X=RND(1,2 ELSE )",
+    ])("%s should have no ELSE marked", text => {
+        assert.deepStrictEqual(strays(text), []);
+    });
+});
 
 describe("A line typed a key at a time", () => {
     it.each(Typed)(
@@ -868,18 +914,8 @@ describe.each([
     const spellings = rows => [...new Set(rows.map(kw => kw.keyword))].sort();
 
     // The statements read as far as their end of line with no rule: AUTO to SAVE are commands for the prompt, which
-    // a program that runs into one stops at, DATA and REM are text, and ELSE ends the statement before it.
-    const WithoutRule = [
-        "AUTO",
-        "DATA",
-        "DELETE",
-        "ELSE",
-        "LIST",
-        "LOAD",
-        "REM",
-        "RENUMBER",
-        "SAVE",
-    ];
+    // a program that runs into one stops at, and DATA and REM are text.
+    const WithoutRule = ["AUTO", "DATA", "DELETE", "LIST", "LOAD", "REM", "RENUMBER", "SAVE"];
     // The words that are neither a value nor a statement, each with text that BASIC reads it after.
     const ReadInsideStatement = {
         ERROR: "ON ",

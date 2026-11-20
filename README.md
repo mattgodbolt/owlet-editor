@@ -290,6 +290,12 @@ message that says what BASIC does, and shows as an error.
   rejects it in a mnemonic (`ST` and byte 0x81), except the tokens AND (0x80), EOR (0x82) and OR (0x84) as the first,
   second or third character, which it reads as the mnemonic itself, dropping what comes before (`ST` and byte 0x80
   assembles `AND`). The dropped characters are red, with a hover that says so (recorded for #202).
+- **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
+  `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into, which is right at the end
+  of the `THEN` part of an `IF` (or after an `ON` list) and a quirk anywhere else. The `ELSE` is red and the text after
+  it is not, since BASIC does not read it. An `ELSE` is waiting for an `IF` (or `ON`) earlier on the line that has not
+  had one yet, so `IF A THEN IF B THEN x ELSE y ELSE z` and `IF A THEN x ELSE IF B THEN y ELSE z` are not marked.
+  Suggested by Olly Betts on #319.
 
 #### The other way: lenient on purpose
 

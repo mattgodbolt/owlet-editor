@@ -1,0 +1,19 @@
+[
+  ["X%=6ELSE7", "ok", "#319"],
+  ["PRINT 1 ELSE PRINT 2", "ok", "#319"],
+  ["A=1:B=2 ELSE C=3", "ok", "#319"],
+  ["X%=6ELSE )", "ok", "#319"],
+  ["IF0ELSEPRINT\"X\"ELSEPRINT\"Y\"", "ok", "#319"],
+  ["IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3", "ok", "#319"],
+  ["IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE )", "ok", "#319"],
+  ["IF 1 THEN IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3", "ok", "#319"],
+  ["IF 0 THEN PRINT 1 ELSE IF 0 THEN PRINT 2 ELSE PRINT 3", "ok", "#319"],
+  ["IF 0 THEN A=1:B=2 ELSE C=3", "ok", "#319"],
+  ["IF 0 THEN A=1 ELSE C=3:D=4 ELSE E=5", "ok", "#319"],
+  ["IF 0 THEN A=1 ELSE C=3:IF 0 THEN D=4 ELSE E=5", "ok", "#319"],
+  ["ON A GOTO 10,20 ELSE PRINT 3", "ok", "#319"],
+  ["ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4", "ok", "#319"],
+  ["ON A GOTO 10,20 ELSE PRINT 3:PRINT 4 ELSE PRINT 5", "ok", "#319"],
+  ["IF 0 THEN 10 ELSE 20", "ok", "#319"],
+  ["IF 0 THEN 10 ELSE 20 ELSE 30", "ok", "#319"]
+]
