@@ -1,10 +1,11 @@
 // The assembler between [ and ], as BBC BASIC II reads it: each statement is an optional label, then a mnemonic or
-// directive, then its operand. A "\" comment can start a statement, and a ";" comment can follow a complete
-// instruction; either runs to the next colon.
+// directive, then its operand. A "\" comment can start a statement or follow a complete instruction, and runs to the
+// next colon.
 //
 // Stricter than the ROM, on purpose (the problems that say so have `stricter` set):
 // - BASIC ignores the rest of a statement after a complete instruction, but the first thing there that is not a
-//   comment is marked, since it is almost always a mistake (NOP PRINT, LDA #1 hello, LDA #1] with a : missing);
+//   "\" comment is marked, since it is almost always a mistake (NOP PRINT, LDA #1 hello, LDA #1] with a : missing);
+//   that includes ";", which BASIC II ignores as it does any junk, so it only appears to be a comment;
 // - BASIC compares only the low five bits of each character of a mnemonic, so it reads 8 as X and ! as A, but a
 //   character that is not a letter there is marked, since LD89 is far more likely a mistyped LDA89 than LDX 9. Where
 //   it is the third character, the two letters before it are marked instead (LD is not an instruction);
@@ -13,6 +14,19 @@
 
 import {keywords, tokenChar} from "../tokens.js";
 import {matchKeyword} from "./lexer.js";
+
+const JunkMessage =
+    "BASIC ignores everything after a complete instruction; probably a \\ is missing before a comment";
+const JunkMessages = new Map([
+    [
+        "]",
+        "BASIC ignores this ] and goes on assembling, as it ignores everything after a complete instruction; probably a : is missing before it",
+    ],
+    [
+        ";",
+        "BASIC ignores everything after a complete instruction, so this ; only appears to start a comment: the assembler's comment character is \\. Later BASICs, such as the ARM assembler in BASIC V, do accept ;",
+    ],
+]);
 
 export const JunkAfterInstructionCode = "junk-after-instruction";
 export const SpaceAfterMnemonicCode = "space-after-mnemonic";
@@ -161,7 +175,7 @@ export class Assembler {
         const mnemonic = this.mnemonic();
         const operand = r.peek();
         this.operand(mnemonic);
-        if (this.comment(";", "\\")) return;
+        if (this.comment("\\")) return;
         let junk = null;
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
@@ -172,9 +186,7 @@ export class Assembler {
             else
                 this.stricter(
                     token,
-                    token.text === "]"
-                        ? "BASIC ignores this ] and goes on assembling, as it ignores everything after a complete instruction; probably a : is missing before it"
-                        : "BASIC ignores everything after a complete instruction; probably a ; is missing before a comment",
+                    JunkMessages.get(token.text) ?? JunkMessage,
                     JunkAfterInstructionCode,
                 );
         }

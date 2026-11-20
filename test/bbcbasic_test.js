@@ -745,10 +745,10 @@ describe("Tokenisation", () => {
                         "0:delimiter.square 1:keyword 4:white 5:number 7:comment 15:symbol 16:keyword 19:number 21:comment 29:symbol 30:delimiter.square 31:keyword",
                     ],
                 ],
-                // ; starts a comment only after a mnemonic or directive, and each line starts a new statement.
+                // ; starts no comment, and each line starts a new statement.
                 ["[;notacomment", ["0:delimiter.square 1:invalid"], "[OPT0:;notacomment:]"],
                 [
-                    "[NOP ; a\n;notacomment",
+                    "[NOP \\ a\n;notacomment",
                     ["0:delimiter.square 1:keyword 4:white 5:comment", "0:invalid"],
                     "[OPT0:;notacomment:]",
                 ],
@@ -777,7 +777,7 @@ describe("Tokenisation", () => {
             ]);
             backedByRom("[\nLDA #\u00e0\n]", "[OPT0:LDA #END:]");
         });
-        it("should treat a ; comment as text up to the next colon, whatever it says", () => {
+        it("should treat a \\ comment as text up to the next colon, whatever it says", () => {
             for (const comment of [
                 "LOAD THE ACCUMULATOR",
                 "END OF LOOP",
@@ -787,20 +787,29 @@ describe("Tokenisation", () => {
                 "]",
             ])
                 assert.deepStrictEqual(
-                    spans(`[OPT3:LDA #1 ; ${comment}:]`, "invalid"),
+                    spans(`[OPT3:LDA #1 \\ ${comment}:]`, "invalid"),
                     [],
                     comment,
                 );
             for (const text of [
-                "[LDA &70,X ; LOAD THE",
-                "[.l LDA #1 ; if x",
-                "[NOP\nRTS ; END OF LOOP",
-                "[EQUB 1 ; FOR",
+                "[LDA &70,X \\ LOAD THE",
+                "[.l LDA #1 \\ if x",
+                "[NOP\nRTS \\ END OF LOOP",
+                "[EQUB 1 \\ FOR",
             ])
                 assert.deepStrictEqual(spans(text, "invalid"), [], text);
-            assert.deepStrictEqual(spans("[OPT3:LDA #1 ; fine:FOR:]", "invalid"), ["FOR"]);
+            assert.deepStrictEqual(spans("[OPT3:LDA #1 \\ fine:FOR:]", "invalid"), ["FOR"]);
             // BASIC ignores the rest of a complete instruction, but anything there but a comment is a mistake.
             assert.deepStrictEqual(spans("[NOP PRINT", "invalid"), ["PRINT"]);
+        });
+        it("should mark a ; after a complete instruction as junk, as BASIC only appears to take it as a comment", () => {
+            // The ROM runs all of these, so ; is as much junk as | is.
+            assert.deepStrictEqual(spans("[OPT3:LDA #1 ; LOAD THE ACCUMULATOR:]", "invalid"), [
+                ";",
+            ]);
+            assert.deepStrictEqual(spans("[OPT3:LDA #1;x:NOP:]", "invalid"), [";"]);
+            assert.deepStrictEqual(spans("[OPT3:LDA #1|x:NOP:]", "invalid"), ["|"]);
+            assert.deepStrictEqual(spans("[NOP ; a\nRTS ; b", "invalid"), [";", ";"]);
         });
         it("should read letters in the case BASIC takes them", () => {
             // Mnemonics, OPT and EQU in any case; the accumulator, an index register and EQU's size only in upper
@@ -1263,9 +1272,9 @@ describe("Quick fixes and syntax markers", () => {
     it("should offer a fix for junk after a complete instruction, and a ] fix when it is a ]", () => {
         assert.deepStrictEqual(offered("[OPT0:LDA #1]:tax=1"), [
             "Insert : before ]",
-            "Insert ; before the junk",
+            "Insert \\ before the junk",
         ]);
-        assert.deepStrictEqual(offered("[OPT0:NOP hello:]"), ["Insert ; before the junk"]);
+        assert.deepStrictEqual(offered("[OPT0:NOP hello:]"), ["Insert \\ before the junk"]);
     });
     it("should offer only the space for a keyword straight after a mnemonic", () => {
         assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
@@ -1297,15 +1306,15 @@ describe("Quick fixes and syntax markers", () => {
     it.each([
         ["[OPT0:LDA#1]", "Insert : before ]", "[OPT0:LDA#1:]"],
         ["[LDA #1]\ntax=1\n]", "Insert : before ]", "[LDA #1:]\ntax=1\n]"],
-        ["[OPT0:NOP hello:]", "Insert ; before the junk", "[OPT0:NOP ;hello:]"],
-        ["[OPT0:LDA #1 ,X:]", "Insert ; before the junk", "[OPT0:LDA #1 ;,X:]"],
+        ["[OPT0:NOP hello:]", "Insert \\ before the junk", "[OPT0:NOP \\hello:]"],
+        ["[OPT0:LDA #1 ,X:]", "Insert \\ before the junk", "[OPT0:LDA #1 \\,X:]"],
         ["[OPT0:STAH.,X:]", "Insert a space after STA", "[OPT0:STA H.,X:]"],
         ["[OPT0:LDAUSR@%+GET:]", "Insert a space after LDA", "[OPT0:LDA USR@%+GET:]"],
         ["[OPT0:LDAH.:]", "Insert a space after LDA", "[OPT0:LDA H.:]"],
         ["[OPT0:EQUBH.:]", "Insert a space after EQUB", "[OPT0:EQUB H.:]"],
         ["[OPT0:.lab STAH.,X:]", "Insert a space after STA", "[OPT0:.lab STA H.,X:]"],
-        ["[OPT0:NOPPAGE:]", "Insert ; before the junk", "[OPT0:NOP;PAGE:]"],
-        ["[OPT0:LDAP.,X:]", "Insert ; before the junk", "[OPT0:LDAP;.,X:]"],
+        ["[OPT0:NOPPAGE:]", "Insert \\ before the junk", "[OPT0:NOP\\PAGE:]"],
+        ["[OPT0:LDAP.,X:]", "Insert \\ before the junk", "[OPT0:LDAP\\.,X:]"],
     ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
         const [offer] = fixed(text).filter(([name]) => name === title);
         assert.deepStrictEqual(offer, [title, result]);
@@ -1783,7 +1792,7 @@ describe("Syntax markers", () => {
             );
             assert.deepStrictEqual(
                 actions.map(action => action.title),
-                ["Insert ; before the junk"],
+                ["Insert \\ before the junk"],
             );
         } finally {
             model.dispose();

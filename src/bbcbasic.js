@@ -163,7 +163,7 @@ export const codeActionProviderFor = dialect => ({
                 };
                 return text[0] === "]"
                     ? quickFix(model, marker, "Insert : before ]", at, ":")
-                    : quickFix(model, marker, "Insert ; before the junk", at, ";");
+                    : quickFix(model, marker, "Insert \\ before the junk", at, "\\");
             }
             if (marker.code === CapitaliseRegisterCode) {
                 const register = text[0];

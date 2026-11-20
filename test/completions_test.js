@@ -1,6 +1,6 @@
 import {registerBbcBasicLanguage} from "../src/bbcbasic";
 import {completionContext, completionItems} from "../src/completions";
-import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
+import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {readLines} from "../src/parser/highlight";
 import {expandCode} from "../src/expand-code";
 import Examples from "../src/examples.yaml";
@@ -17,13 +17,13 @@ registerBbcBasicLanguage(ModelBDialect);
 const Cursor = "‸";
 
 // The completions offered with the cursor at the "‸" that keep what has been typed of the word, as Monaco filters them.
-function offered(textWithCursor) {
+function offered(textWithCursor, dialect = ModelBDialect) {
     const lines = textWithCursor.split("\n");
     const lineIndex = lines.findIndex(line => line.includes(Cursor));
     const position = {lineNumber: lineIndex + 1, column: lines[lineIndex].indexOf(Cursor) + 1};
     const model = editor.createModel(textWithCursor.replace(Cursor, ""), "BBCBASIC");
     try {
-        return completionItems(model, position, ModelBDialect)
+        return completionItems(model, position, dialect)
             .filter(item =>
                 item.label
                     .toUpperCase()
@@ -92,36 +92,22 @@ describe("Completions", () => {
             ["10 PRI‸", ["PRINT"]],
             ["X=1:PRI‸", ["PRINT"]],
             ["X=PRI‸", []],
-            ["PRINT A‸", ["AND", "ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
+            ["PRINT A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
             ["MOD‸", ["MODE"]],
-            ["X=MOD‸", ["MOD"]],
+            ["X=MOD‸", []],
             ["X=RN‸", ["RND"]],
             ["RN‸", []],
             ["TI‸", ["TIME"]],
             ["X=TI‸", ["TIME"]],
             ["X=INS‸", ["INSTR("]],
             // An E straight after a number starts a word: 7ELSE is 7 then ELSE.
-            ["X=E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT"]],
-            ["X=7E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT"]],
-            ["GCOL0,7E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT"]],
-            ["X=1.5E‸", ["ELSE", "EOF", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT"]],
-            ["PRINT 7EL‸", ["ELSE"]],
-            [
-                "IF0E‸",
-                [
-                    "ELSE",
-                    "END",
-                    "ENDPROC",
-                    "ENVELOPE",
-                    "EOF",
-                    "EOR",
-                    "ERL",
-                    "ERR",
-                    "EVAL",
-                    "EXP",
-                    "EXT",
-                ],
-            ],
+            ["X=E‸", ["EOF", "ERL", "ERR", "EVAL", "EXP", "EXT"]],
+            ["X=7E‸", ["EOR"]],
+            ["GCOL0,7E‸", ["EOR"]],
+            ["X=1.5E‸", ["EOR"]],
+            ["PRINT 7EL‸", []],
+            ["IF X PRINT 7EL‸", ["ELSE"]],
+            ["IF0E‸", ["ELSE", "END", "ENDPROC", "ENVELOPE", "EOR"]],
             ["LIS‸", []],
             ["REPEAT PRI‸", ["PRINT"]],
             ["IFX THENPRI‸", ["PRINT"]],
@@ -131,10 +117,11 @@ describe("Completions", () => {
             ["ON ERROR PRI‸", ["PRINT"]],
             ["ON ERROR OF‸", ["OFF"]],
             ["ON X GOS‸", ["GOSUB"]],
-            ["GOTO 10 A‸", ["AND", "ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
-            ["TRACE O‸", ["OFF", "ON", "OPENIN", "OPENOUT", "OPENUP", "OR"]],
-            ["DEF PR‸", ["PRINT", "PROC"]],
-            ["FORI=1T‸", ["TAN", "TIME", "TO", "TOP", "TRUE"]],
+            ["GOTO 10 A‸", []],
+            ["GOTO X A‸", ["AND"]],
+            ["TRACE O‸", ["OFF", "ON", "OPENIN", "OPENOUT", "OPENUP"]],
+            ["DEF PR‸", ["PROC"]],
+            ["FORI=1T‸", ["TO", "TOP"]],
             ["IFA%THE‸", ["THEN"]],
             ['PRINT"A"TA‸', ["TAN", "TAB("]],
             ["[OPT 0:LDA #AS‸", ["ASC", "ASN"]],
@@ -161,34 +148,34 @@ describe("Completions", () => {
             ["PRINT 1;T‸", ["TAB(", "TAN"], ["TO", "THEN"]],
             ["PRINT 1:A=S‸", ["SQR"], ["SPC"]],
             ["INPUT S‸", ["SPC"], ["STEP"]],
-            ["INPUT L‸", ["LINE", "LEFT$(", "LEN"], ["LOCAL", "LIST"]],
+            ["INPUT L‸", ["LINE"], ["LEFT$(", "LEN", "LOCAL", "LIST"]],
             ["PRINT L‸", ["LEFT$(", "LEN"], ["LINE"]],
             ["IFX THENPRINT S‸", ["SPC"], ["STEP"]],
-            ["FOR I=1 TO 10 S‸", ["STEP", "SQR"], ["SPC"]],
-            ["FOR I=1 T‸", ["TO", "TAN"], ["THEN", "TAB("]],
+            ["FOR I=1 TO 10 S‸", ["STEP"], ["SQR", "SPC"]],
+            ["FOR I=1 T‸", ["TO"], ["TAN", "THEN", "TAB("]],
             ["IFX FORI=1T‸", ["TO"], ["THEN"]],
             ["DEFPROCa(X)FORI=1T‸", ["TO"], ["THEN"]],
-            ["FORI=1TO10ST‸", ["STEP", "STR$"], ["STOP"]],
+            ["FORI=1TO10ST‸", ["STEP"], ["STR$", "STOP"]],
             ["PRINT I T‸", ["TAN", "TAB("], ["TO", "THEN"]],
-            ["IF X T‸", ["THEN", "TAN"], ["TO", "TAB("]],
+            ["IF X T‸", ["THEN"], ["TAN", "TO", "TAB("]],
             ["IF X THEN A=T‸", ["TAN"], ["THEN", "TO"]],
             ["PRINT X T‸", ["TAN"], ["THEN"]],
             ["ON ERROR O‸", ["OFF", "ON", "OSCLI"], ["OR", "OPENIN"]],
             ["ON ERROR OFF:O‸", ["ON", "OSCLI"], ["OFF", "OR", "OPENIN"]],
-            ["ON ERROR PRINT O‸", ["OR"], ["OFF", "ON"]],
-            ["TRACE O‸", ["OFF", "ON", "OR", "OPENIN"], ["OSCLI"]],
+            ["ON ERROR PRINT O‸", ["OPENIN"], ["OR", "OFF", "ON"]],
+            ["TRACE O‸", ["OFF", "ON", "OPENIN"], ["OR", "OSCLI"]],
             ["TRACE ON:O‸", ["ON", "OSCLI"], ["OFF", "OR"]],
-            ["A=O‸", ["OPENIN", "OR"], ["ON", "OFF", "OSCLI"]],
+            ["A=O‸", ["OPENIN"], ["OR", "ON", "OFF", "OSCLI"]],
             ["PRINT X O‸", ["OR"], ["ON", "OFF"]],
-            ["ON X G‸", ["GOTO", "GOSUB", "GET"], ["GCOL"]],
-            ["ON X P‸", ["PI", "POS"], ["PRINT", "PLOT", "PROC"]],
+            ["ON X G‸", ["GOTO", "GOSUB"], ["GET", "GCOL"]],
+            ["ON X P‸", [], ["PI", "POS", "PRINT", "PLOT", "PROC"]],
             ["ON E‸", ["ERROR", "EOF"], []],
             ["A=E‸", ["EOF", "ERL", "ERR"], ["ERROR", "END", "ENVELOPE"]],
             ["ERR‸", [], ["ERROR", "ERL"]],
             ["IF X THEN ERR‸", [], ["ERROR"]],
             ["IF X ERR‸", [], ["ERROR"]],
             ["ON X GOTO 10 ELS‸", ["ELSE"], []],
-            ["A=1 ELS‸", ["ELSE"], []],
+            ["A=1 ELS‸", [], ["ELSE"]],
             ["PRINT SPC 3:S‸", ["SOUND", "STOP"], ["SPC", "STEP", "SQR"]],
         ];
         for (const [text, shown, hidden] of cases) {
@@ -202,17 +189,17 @@ describe("Completions", () => {
     it("should offer a word only where the recogniser looks for it", () => {
         const cases = [
             // [text, offered, not offered]
-            ["IF X X=0 T‸", ["TAN", "TIME", "TOP", "TRUE"], ["THEN", "TRACE", "TO"]],
+            ["IF X X=0 T‸", [], ["TAN", "TIME", "TOP", "TRUE", "THEN", "TRACE", "TO"]],
             ["IF X X=T‸", ["TAN", "TIME", "TOP", "TRUE"], ["THEN", "TRACE"]],
             ["IF X T‸", ["THEN", "TRACE"], []],
             ["IF T‸", ["TAN", "TOP"], ["THEN", "TRACE"]],
             ["IF X PRINT 1 T‸", ["TAN"], ["THEN"]],
             ["FOR T‸", [], ["TO", "STEP"]],
-            ["FOR I=1 S‸", ["SQR"], ["STEP"]],
+            ["FOR I=1 S‸", [], ["SQR", "STEP"]],
             ["FOR I=1 T‸", ["TO"], ["STEP"]],
             ["FOR I=1 TO 2 S‸", ["STEP"], []],
             ["FOR I=1 TO 2 T‸", [], ["TO"]],
-            ["PRINT (1 T‸", ["TAN"], ["TAB("]],
+            ["PRINT (1 T‸", [], ["TAN", "TAB("]],
             ["INPUT LINE S‸", ["SPC"], ["LINE"]],
             ["INPUT LINE L‸", [], ["LINE"]],
             ["ON X S‸", [], ["STEP"]],
@@ -222,6 +209,52 @@ describe("Completions", () => {
             const items = offered(text);
             for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
             for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
+        }
+    });
+
+    // The cases of #320: the words BASIC would read next, tried one at a time on the current line.
+    it("should offer only the keywords that keep the line valid (#320)", () => {
+        const both = (text, expected) => [text, expected, expected];
+        const cases = [
+            // [text, offered on BASIC II, offered on BASIC IV]
+            both("X=0 A‸", ["AND"]),
+            both("X=0 D‸", ["DIV"]),
+            both("X=0 M‸", ["MOD"]),
+            both("X=0 O‸", ["OR"]),
+            both("X=0 E‸", ["EOR"]),
+            both("IF X X=0 E‸", ["ELSE", "EOR"]),
+            both("X=0 T‸", []),
+            both("IF X X=0 T‸", []),
+            both("DEF F‸", ["FN"]),
+            both("DEF P‸", ["PROC"]),
+            both("DEF A‸", []),
+            both("DEF X‸", []),
+            both("FOR X = 0 TO 10 S‸", ["STEP"]),
+            both("INPUT L‸", ["LINE"]),
+            both("INPUT S‸", ["SPC"]),
+            both("INPUT T‸", ["TAB("]),
+            both("INPUT A‸", []),
+            both("ON E‸", ["ELSE", "EOF", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]),
+            both("ON X G‸", ["GOSUB", "GOTO"]),
+            ["ON X P‸", [], ["PROC"]],
+            // No binary operator starts an expression or a subexpression.
+            both("X = A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]),
+            both("PRINT A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]),
+            both("IF A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]),
+            both("IF X OR A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]),
+            both("X = (A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]),
+            both("X = 1 + D‸", ["DEG"]),
+            // The same in inline assembly.
+            both("[LDA #A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]),
+            both("[LDA #0 A‸", ["AND"]),
+            both("[\nLDA #0 O‸", ["OR"]),
+            both("[OPT 0:LDA #0 T‸", []),
+            // The text before the word being wrong tells us nothing, so nothing is dropped.
+            both("PRINT ) A‸", ["ABS", "ACS", "ADVAL", "AND", "ASC", "ASN", "ATN"]),
+        ];
+        for (const [text, basicII, basicIV] of cases) {
+            assert.deepStrictEqual(offered(text, BasicIIDialect), basicII, `BASIC II: ${text}`);
+            assert.deepStrictEqual(offered(text, BasicIVDialect), basicIV, `BASIC IV: ${text}`);
         }
     });
 
@@ -325,7 +358,9 @@ describe("Completions", () => {
             .filter(kw => kw.startsWith("E"))
             .flatMap(kw =>
                 ["X=7", "GCOL0,7", "A=16", "IF0", "X=1.5", "?s=12", "PRINT .5"].map(
-                    lead => lead + kw,
+                    // ELSE is only read after an IF or ON.
+                    lead =>
+                        (kw === "ELSE" && !lead.startsWith("IF") ? "IF X THEN " : "") + lead + kw,
                 ),
             );
         return [
