@@ -153,17 +153,17 @@ export class Assembler {
     // Called with the "]" that ends the block.
     closed() {}
 
-    // Whether the token ends an assembler statement: the end of the line, a colon, the "]" or the ELSE of an IF.
+    // Whether the token ends an assembler statement: the end of the line, a colon, the "]" or the ELSE that an IF or ON waits for.
     endsStatement(token) {
         if (token.kind === "punct") return [":", "]"].includes(token.text);
         if (token.kind === "keyword")
-            return this.recogniser.elseIsBranch && token.kw.keyword === "ELSE";
+            return this.recogniser.waitingForElse && token.kw.keyword === "ELSE";
         return token.kind === "end";
     }
 
-    // The ELSE of an IF, which BASIC takes wherever it is on the line: if the condition is false the block is never read.
+    // The ELSE that an IF or ON waits for, which BASIC takes wherever it is on the line: if the condition is false the block is never read.
     isBranchElse() {
-        return this.recogniser.elseIsBranch && this.recogniser.isKeyword("ELSE");
+        return this.recogniser.waitingForElse && this.recogniser.isKeyword("ELSE");
     }
 
     statement() {

@@ -72,6 +72,9 @@ const StricterThanRom = [
     "IF 1 THEN IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
     "IF 0 THEN IF 1 THEN PRINT 1 ELSE PRINT 2 ELSE )",
     "IF 0 THEN ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+    "DIM P% 99:IF 0 THEN B=1 ELSE [NOP ELSE X=1",
+    "DIM P% 99:IF 0 THEN B=1 ELSE [NOP:LDA #1 ELSE X=1:]",
+    "[NOP ELSE X=1",
     "[OPT0:LDA #1 ; LOAD THE ACCUMULATOR:]",
     '[OPT0:LDA #1 ; "x:]',
     "[OPT0:LDA #1 ; ]:]",
@@ -452,6 +455,7 @@ describe("A statement BASIC stops at", () => {
         ["X Y REM hi", ["Y"]],
         ["[LDA CLEAR 1 2:NOP:]", ["CLEAR 1 2"]],
         ["IF A THEN [LDA CLEAR 1 ELSE PRINT 2", ["CLEAR 1"]],
+        ["IF A THEN B=1 ELSE [NOP ELSE X=1", ["ELSE"]],
     ])("%s should be red on %j", (text, expected) => {
         assert.deepStrictEqual(redRuns(text), expected);
         const {tokens} = highlightLine(text, ModelBDialect);
@@ -462,6 +466,16 @@ describe("A statement BASIC stops at", () => {
         assert.deepStrictEqual(
             marked.map(({start, end}) => text.slice(start, end)),
             expected,
+        );
+    });
+    it("should read the next line as assembler after an ELSE in a block that follows the ELSE of an IF", () => {
+        const text = "IF A THEN B=1 ELSE [NOP ELSE X=1\nLDA CLEAR 1 2:]";
+        const problems = programProblems(readLines(text, ModelBDialect)).filter(
+            problem => !problem.stricter,
+        );
+        assert.deepStrictEqual(
+            problems.map(({line, start, end}) => [line, start, end]),
+            [[2, 4, 13]],
         );
     });
     it("should leave the marker at the single [ of a block that is never closed", () => {
