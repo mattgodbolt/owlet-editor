@@ -204,7 +204,6 @@ export class Recogniser {
 
     // Reads the whole line and marks its errors; returns whether an assembler block is open at its end.
     line() {
-        this.elseIsBranch = false;
         this.waitingForElse = false;
         if (this.inAssembler) this.inAssembler = this.assembler.block();
         while (!this.is("end")) {
@@ -749,12 +748,10 @@ export class Recogniser {
         else this.GOTO();
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
         while (!this.atEnd()) this.next();
-        this.elseIsBranch = true;
         this.waitingForElse = true;
     }
 
     IF() {
-        this.elseIsBranch = true;
         this.waitingForElse = true;
         this.expression();
         if (this.isKeyword("THEN")) {

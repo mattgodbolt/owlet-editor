@@ -1,0 +1,7 @@
+[
+  ["DIM P% 99:IF 0 THEN B=1 ELSE [NOP ELSE X=1", "ok", "#330"],
+  ["DIM P% 99:IF 1 THEN B=1 ELSE [NOP ELSE X=1", "ok", "#330"],
+  ["DIM P% 99:IF 0 THEN B=1 ELSE [NOP:LDA #1 ELSE X=1:]", "ok", "#330"],
+  ["DIM P% 99:ON 3 GOTO 10,20 ELSE [NOP ELSE X=1", "ok", "#330"],
+  ["[NOP ELSE X=1", "ok", "ea", "#330"]
+]
