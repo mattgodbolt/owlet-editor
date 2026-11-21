@@ -397,3 +397,7 @@ highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with t
 
 - In assembler, anything but a `\` comment after a complete instruction is red on purpose; see "Deliberate deviations" above.
 - When running tests, you may see warnings about missing source maps for Monaco Editor. This is a [known issue with Monaco Editor 0.52.0+](https://github.com/microsoft/monaco-editor/issues/4712) and doesn't affect functionality.
+
+## License
+
+Owlet is free software, licensed under the GNU General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).

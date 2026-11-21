@@ -6,7 +6,7 @@
   "bugs": {
     "url": "https://github.com/mattgodbolt/owlet-editor/issues"
   },
-  "license": "BSD-2-Clause",
+  "license": "GPL-3.0-or-later",
   "author": {
     "name": "Matt Godbolt",
     "email": "matt@godbolt.org",
