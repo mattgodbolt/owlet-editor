@@ -308,7 +308,7 @@ message that says what BASIC does, and shows as an error.
   if it is a string, a name ending in `$`, a function ending in `$`, `$X` or a bracket round one; a number if it is a
   number, any other name, any other function or an operator's result. Anything else, such as a `FN`, `TIME` (`TIME$` on
   the Master) or what follows a `?` or `!`, is not known and is never marked, nor are the arguments of `LEFT$(`, `MID$(`,
-  `INSTR(` and the like, assignments, or `IF` conditions. The oracle cannot test these marks: a statement that stops with
+  `INSTR(` and the like, assignments, or a condition that is itself the wrong type (`IF "A" THEN`). The oracle cannot test these marks: a statement that stops with
   Type mismatch is inconclusive, and in one that does not run (`IF 0 THEN`) the mark is in text BASIC never reads. The
   rows recorded for #331 are the other half, strings that BASIC runs without complaint (`PRINT"X"D`, `X$="A"+"B"`,
   `X=ASC GET$`), which must stay unmarked. Suggested by Olly Betts on #323; because completions drop a word that makes

@@ -684,7 +684,7 @@ export class Recogniser {
             if (this.isPunct("~")) this.next().type = "operator";
             return this.argument(token, Str);
         }
-        if (keyword === "FN") return this.call();
+        if (keyword === "FN") return (this.call(), void (this.type = undefined));
         if (keyword === "TO" && this.top()) return void (this.type = Num);
         this.fail("No such variable", token);
     }
