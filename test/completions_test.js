@@ -50,9 +50,11 @@ const isMachineCode = token =>
 function hiddenKeywords(program) {
     const lines = program.split("\n");
     const hidden = [];
-    readLines(program, ModelBDialect).forEach(({tokens}, lineIndex) => {
+    readLines(program, ModelBDialect).forEach(({tokens, problems}, lineIndex) => {
         const line = lines[lineIndex];
         if (tokens.some(isMachineCode)) return;
+        // The generator mixes strings and numbers at random, and a keyword that would be a Type mismatch is hidden.
+        if (problems.some(problem => problem.message?.startsWith("Type mismatch"))) return;
         for (const item of keywordTokens({tokens})) {
             if (!/^[A-Z]/.test(item.text)) continue;
             const typed = item.text.replace(/[.(]$/, "");
@@ -182,6 +184,36 @@ describe("Completions", () => {
             ["TRACE ON:PRINT 1 ELS‸", [], ["ELSE"]],
             ["IF X THEN A=1 ELSE IF Y THEN B=2 ELS‸", ["ELSE"], []],
             ["PRINT SPC 3:S‸", ["SOUND", "STOP"], ["SPC", "STEP", "SQR"]],
+        ];
+        for (const [text, shown, hidden] of cases) {
+            const items = offered(text);
+            for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
+            for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
+        }
+    });
+
+    // BASIC raises Type mismatch when it runs a binary operator after a string (or a string function argument that
+    // is a number), so the recogniser marks it and the word is dropped (#331).
+    it("should not offer a word that would be a Type mismatch", () => {
+        const cases = [
+            // [text, offered, not offered]
+            ['PRINT"X"D‸', ["DEG"], ["DIV"]],
+            ['PRINT"X"M‸', [], ["MOD"]],
+            ['PRINT"X"A‸', ["ABS"], ["AND"]],
+            ['PRINT"X"O‸', ["OPENIN"], ["OR"]],
+            ['PRINT"X"E‸', ["EXP"], ["EOR"]],
+            ["PRINT A$ D‸", ["DEG"], ["DIV"]],
+            ["PRINT(A$)A‸", ["ABS"], ["AND"]],
+            ['PRINT"X"+"Y"A‸', ["ABS"], ["AND"]],
+            ["PRINT LEFT$(A$,1)A‸", ["ABS"], ["AND"]],
+            ["PRINT 1D‸", ["DEG", "DIV"], []],
+            ["PRINT A%A‸", ["AND"], []],
+            ['PRINT LEN"X"A‸', ["AND"], []],
+            ['X=1="X"A‸', ["AND"], []],
+            ["PRINT LEN G‸", ["GET$"], ["GET"]],
+            ["PRINT ABS G‸", ["GET"], ["GET$"]],
+            ["PRINT X$(1)+A‸", ["ABS", "ASC"], []],
+            ["PRINT FNx D‸", ["DIV"], []],
         ];
         for (const [text, shown, hidden] of cases) {
             const items = offered(text);

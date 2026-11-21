@@ -532,11 +532,16 @@ describe("A line typed in an editor that closes brackets", () => {
         ['PRINT TAB(1,2);"x"'],
         ["PROCbox(1,2)"],
         ["DIM a(10)"],
-        ["PRINT LEFT$(A$,LEN(B$))"],
     ])("%s should be red on no key", typed => {
         assert.deepStrictEqual(
             keysTyped(typed).filter(text => invalid(text).length),
             [],
+        );
+    });
+    it("should be red only where the text so far is a Type mismatch", () => {
+        assert.deepStrictEqual(
+            keysTyped("PRINT LEFT$(A$,LEN(B$))").filter(text => invalid(text).length),
+            ["PRINT LEFT$(A$,LEN(B))"],
         );
     });
     it("should be unfinished at the ) with the last argument missing, and red with one too many", () => {
@@ -1062,5 +1067,71 @@ describe("The spellings the grammar names", () => {
             [...rules, ...spellingsIn.ExpressionCount].filter(name => !statements.has(name)),
             [],
         );
+    });
+});
+
+// BASIC raises Type mismatch when it runs the line, so what is marked is stricter than the ROM (the README says so).
+describe("Type mismatches", () => {
+    const marked = text =>
+        programProblems(readLines(text, ModelBDialect))
+            .filter(problem => problem.stricter)
+            .map(problem => text.slice(problem.start, problem.end));
+    it.each([
+        ['PRINT"X"DIV 2', ["DIV"]],
+        ['PRINT"X"DIV', ["DIV"]],
+        ["X=A$ MOD 2", ["MOD"]],
+        ['PRINT"X"AND 1', ["AND"]],
+        ["PRINT LEFT$(A$,1)OR 1", ["OR"]],
+        ['PRINT"X"EOR 1', ["EOR"]],
+        ['X$="A"-1', ["-"]],
+        ["PRINT X$*2", ["*"]],
+        ["X=1/A$", ["/"]],
+        ["X=2^A$(1)", ["^"]],
+        ['X=1+"A"', ["+"]],
+        ["X$=A$+1", ["+"]],
+        ["PRINT A$=1", ["="]],
+        ['IF 1<>"A" THEN END', ["<>"]],
+        ["PRINT 1 AND A$", ["AND"]],
+        ["X=LEN 5", ["LEN"]],
+        ["X=ASC A%", ["ASC"]],
+        ["X=VAL X", ["VAL"]],
+        ["PRINT STR$A$", ["STR$"]],
+        ["PRINT STR$~A$", ["STR$"]],
+        ["PRINT CHR$A$", ["CHR$"]],
+        ["PRINT ABS GET$", ["ABS"]],
+        ["PRINT LEN GET", ["LEN"]],
+        ["PRINT (A$)+1", ["+"]],
+        ["PRINT GET$+1", ["+"]],
+        ["PRINT 1D", []],
+        ['PRINT"X"D', []],
+        ["PRINT A$D", []],
+        ["PRINT A$ D", []],
+        ['X$="A"+"B"', []],
+        ['X=A$="B"', []],
+        ['X=(A$="B")AND 1', []],
+        ['X=A$<"B"AND X', []],
+        ["X=LEN A$+1", []],
+        ["X=ASC GET$", []],
+        ["PRINT STR$ 5+A$", []],
+        ["PRINT A$(1)+B$+C$", []],
+        ["PRINT A$?1+1", []],
+        ["X=FNa+1", []],
+        ["X=FNa$+1", []],
+        ["X=EVAL A$+1", []],
+        ["X=EVAL A$+B$", []],
+        ["PRINT TIME$+1", []],
+        ["X=INSTR(A$,B$)+1", []],
+        ["X=ABS(A)+LEN(A$)", []],
+    ])("%s should mark %j", (text, expected) => {
+        assert.deepStrictEqual(marked(text), expected);
+    });
+
+    it("should say what BASIC does and which way round", () => {
+        const [problem] = programProblems(readLines('PRINT"X"DIV 2', ModelBDialect));
+        assert.strictEqual(
+            problem.message,
+            "Type mismatch: DIV needs numbers, but a string is before it",
+        );
+        assert.strictEqual(problem.stricter, true);
     });
 });

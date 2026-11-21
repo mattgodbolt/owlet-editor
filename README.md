@@ -299,6 +299,21 @@ message that says what BASIC does, and shows as an error.
   or `ON` waits for one `ELSE` and the first it meets is its own. `IF A THEN IF B THEN x ELSE y ELSE z` has its second
   `ELSE` marked, as `IF0ELSEELSEPRINT"x"` does, but an `IF` or `ON` after an `ELSE` waits for another, so
   `IF A THEN x ELSE IF B THEN y ELSE z` is not marked. Suggested by Olly Betts on #319.
+- **A string where BASIC wants a number, or the other way round** (`PRINT"X"DIV 2`, `X=1+"A"`, `X$="A"+1`, `X=LEN 5`,
+  `PRINT STR$A$`). BASIC raises "Type mismatch" when it runs such a statement, not when it reads it, so a program that
+  never gets there is fine. The operator or function word is red, with a hover that says what is wrong. It is marked for
+  a binary operator (`- * / ^ MOD DIV AND OR EOR`) with a string on either side, for `+` and a comparison between a
+  string and a number, and for a function given the wrong kind (`ASC`, `LEN`, `VAL`, `OPENIN`, `OPENOUT` and `OPENUP`
+  take a string; the other functions and `STR$` and `CHR$` take a number; `EVAL` takes either). A value is a string
+  if it is a string, a name ending in `$`, a function ending in `$`, `$X` or a bracket round one; a number if it is a
+  number, any other name, any other function or an operator's result. Anything else, such as a `FN`, `TIME` (`TIME$` on
+  the Master) or what follows a `?` or `!`, is not known and is never marked, nor are the arguments of `LEFT$(`, `MID$(`,
+  `INSTR(` and the like, assignments, or `IF` conditions. The oracle cannot test these marks: a statement that stops with
+  Type mismatch is inconclusive, and in one that does not run (`IF 0 THEN`) the mark is in text BASIC never reads. The
+  rows recorded for #331 are the other half, strings that BASIC runs without complaint (`PRINT"X"D`, `X$="A"+"B"`,
+  `X=ASC GET$`), which must stay unmarked. Suggested by Olly Betts on #323; because completions drop a word that makes
+  the statement red, `PRINT"X"D` no longer offers `DIV`, `AND`, `OR`, `EOR` or `MOD`. While a line is typed in the editor
+  `LEN(B` is red until the `$` is typed.
 
 #### The other way: lenient on purpose
 

@@ -62,6 +62,15 @@ export const ForeignOperators = new Map([
 ]);
 const Relations = names("= < > <= >= <>");
 const Arithmetic = names("+ - * / ^");
+// What a value is, where BASIC would give "Type mismatch" if the line ran and it were the other; undefined is not known.
+const Str = "a string";
+const Num = "a number";
+const StringArgument = names("ASC LEN VAL OPENIN OPENOUT OPENUP");
+const AnyArgument = names("EVAL");
+const UnknownResult = names("EVAL TIME");
+const typeOfName = text => (text.endsWith("$") ? Str : Num);
+const typeOfKeyword = keyword =>
+    UnknownResult.has(keyword) ? undefined : typeOfName(keyword.replace(/\($/, ""));
 
 // `unfinished` is an error only because the line ends: more text could still make it valid.
 // What the ROM says when it does not find the punctuation, and when what should be an operand is a & with no digits or
@@ -91,7 +100,7 @@ function completions(assembling, dialect) {
 const AnotherArgument = "a comma or a closing )";
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
-const Fillers = ["1", "A", ",1", "1,1", ",1,1"];
+const Fillers = ["1", "A", "A$", ",1", "1,1", ",1,1"];
 
 export const ColorSpelling = "COLOR";
 const ColourSpelling = "COLOUR";
@@ -548,29 +557,59 @@ export class Recogniser {
     expression() {
         this.relation();
         while (this.isKeyword("AND", "OR", "EOR")) {
-            this.next();
+            const operator = this.next();
+            this.numeric(operator, this.type, "before");
             this.relation();
+            this.numeric(operator, this.type, "after");
+            this.type = Num;
         }
+    }
+
+    // BASIC raises "Type mismatch" when it runs a line (not when it reads it) that gives a string to something that
+    // wants a number, or the other way round, so these are stricter than the ROM.
+    mismatch(token, message) {
+        if (!token.invalid) this.stricter(token, `Type mismatch: ${message}`);
+    }
+
+    numeric(operator, type, side) {
+        const what = operator.kw ? operator.kw.keyword : operator.text;
+        if (type === Str)
+            this.mismatch(operator, `${what} needs numbers, but ${type} is ${side} it`);
     }
 
     // BASIC compares only two values: X<Y<Z is an error.
     relation() {
         this.sum();
         if (this.peek().kind === "punct" && Relations.has(this.peek().text)) {
-            this.next();
+            const left = this.type;
+            const operator = this.next();
             this.sum();
+            if (left && this.type && left !== this.type)
+                this.mismatch(
+                    operator,
+                    `${operator.text} cannot compare ${left} with ${this.type}`,
+                );
+            this.type = Num;
         }
     }
 
     sum() {
         this.operand();
+        let left = this.type;
         while (
             (this.peek().kind === "punct" && Arithmetic.has(this.peek().text)) ||
             this.isKeyword("MOD", "DIV")
         ) {
-            this.next();
+            const operator = this.next();
+            const adds = operator.text === "+";
+            if (!adds) this.numeric(operator, left, "before");
             this.operand();
+            if (!adds) this.numeric(operator, this.type, "after");
+            else if (left && this.type && left !== this.type)
+                this.mismatch(operator, `+ cannot add ${this.type} to ${left}`);
+            left = adds ? (left === this.type ? left : undefined) : Num;
         }
+        this.type = left;
     }
 
     // A ? or ! between two values must touch the first, which must be a variable: X=D ?1 and X=1?D are errors. What
@@ -580,6 +619,7 @@ export class Recogniser {
         if (!variable || !this.isPunct("?", "!") || !this.adjacent()) return variable;
         this.next();
         this.unworded(() => this.operand());
+        this.type = undefined;
         return false;
     }
 
@@ -589,9 +629,11 @@ export class Recogniser {
 
     unnestedPrimary() {
         const token = this.peek();
+        this.type = undefined;
         if (this.isPunct("?", "!", "$")) {
             this.next();
             this.primary();
+            this.type = token.text === "$" ? Str : Num;
             return token.text !== "$";
         }
         // One sign only: BASIC rejects --1 and -+1.
@@ -601,33 +643,61 @@ export class Recogniser {
             return this.primary();
         }
         if (this.isPunct("(")) return this.bracket(this.next(), 1, 1);
-        if (token.kind === "number" || (token.kind === "string" && token.closed))
-            return void this.next();
-        if (token.kind === "hex" && token.text.length > 1) return void this.next();
-        if (token.kind === "name") return (this.name(), true);
+        if (token.kind === "number" || (token.kind === "string" && token.closed)) {
+            this.next();
+            this.type = token.kind === "string" ? Str : Num;
+            return;
+        }
+        if (token.kind === "hex" && token.text.length > 1) {
+            this.next();
+            this.type = Num;
+            return;
+        }
+        if (token.kind === "name") {
+            this.name();
+            this.type = typeOfName(token.text);
+            return true;
+        }
         if (token.kind !== "keyword" || isStatementKeyword(token.kw))
             this.fail(this.operandError(token), token, this.unfinishedOperand(token));
         this.next();
         const {keyword} = token.kw;
         this.timeString(keyword);
-        if (NoArgument.has(keyword)) return;
-        if (OneArgument.has(keyword)) return this.operand();
+        const result = typeOfKeyword(keyword);
+        if (NoArgument.has(keyword)) return void (this.type = result);
+        if (OneArgument.has(keyword)) return this.argument(token, result);
         if (ChannelFunction.has(keyword)) {
             this.expectPunct("#");
-            return this.operand();
+            const variable = this.operand();
+            this.type = Num;
+            return variable;
         }
-        if (keyword in BracketFunction) return this.bracket(token, ...BracketFunction[keyword]);
+        if (keyword in BracketFunction) {
+            this.bracket(token, ...BracketFunction[keyword]);
+            return void (this.type = result);
+        }
         if (keyword === "RND") {
             if (this.isPunct("(") && this.adjacent()) this.bracket(this.next(), 1, 1);
-            return;
+            return void (this.type = Num);
         }
         if (keyword === "STR$") {
             if (this.isPunct("~")) this.next().type = "operator";
-            return this.operand();
+            return this.argument(token, Str);
         }
         if (keyword === "FN") return this.call();
-        if (keyword === "TO" && this.top()) return;
+        if (keyword === "TO" && this.top()) return void (this.type = Num);
         this.fail("No such variable", token);
+    }
+
+    // The operand of a function that takes one value, and what the function gives.
+    argument(token, result) {
+        const keyword = token.kw.keyword;
+        const wanted = StringArgument.has(keyword) ? Str : Num;
+        const variable = this.operand();
+        if (!AnyArgument.has(keyword) && this.type && this.type !== wanted)
+            this.mismatch(token, `${keyword} needs ${wanted}, but is given ${this.type}`);
+        this.type = result;
+        return variable;
     }
 
     operandError(token) {
