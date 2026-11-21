@@ -266,14 +266,14 @@ message that says what BASIC does, and shows as an error.
 - **Anything but a comment after a complete assembler instruction** (`NOP PRINT`, `LDA #1 hello`, `NOP 5`,
   `LDA #1 ,X`, `LDA #1]`). BASIC ignores the rest of the statement up to the next `:`; the first thing there that is
   not a `\` comment is red (just that token), probably a comment missing its `\`. That includes `;`, which BASIC II
-  ignores like any other junk (later BASICs, such as the ARM assembler in BASIC V, take it as a comment). A `]` there is
-  the commonest case. It does not close the block: BASIC ignores it like the rest and goes on assembling, so after
+  ignores like any other junk (later BASICs, such as the ARM assembler in BASIC V, take it as a comment, so its fix
+  replaces the `;` with a `\`). A `]` there is the commonest case. It does not close the block: BASIC ignores it like the rest and goes on assembling, so after
   `[LDA #1]` the next line `tax=1` is assembled as `TAX` followed by ignored junk, not run as an assignment
   (`[OPT0:NOP]:tax=1` assembles `EA AA`). A `]` after the colon closes it (`[OPT0:NOP]:]:P%=P%+5` runs the
   assignment), as `[LDA #1:]` does. The hover for a `]` says that a `:` is probably missing before it. Flagging the junk
-  and the two quick fixes, "Insert : before ]" for a `]` and "Insert \ before the junk" for the rest, were suggested by
-  Olly Betts on #174. The oracle takes these marks on trust as ignored text (cutting the statement there changes
-  nothing, so it cannot test them) and lists them as STRICTER.
+  and the quick fixes, "Insert : before ]" for a `]`, "Replace ; with \" for a `;` and "Insert \ before the junk" for
+  the rest, were suggested by Olly Betts on #174 and #327. The oracle takes these marks on trust as ignored text
+  (cutting the statement there changes nothing, so it cannot test them) and lists them as STRICTER.
   - **A keyword straight after a mnemonic** (`STAH.,X`, `LDAUSR@%+GET`). BASIC tokenises a keyword only at the start of
     a word, so `STAH.` is the word `STAH`: `STA`, then the variable `H` (an undefined one reads as `P%` unless `OPT` has
     bit 1 set, when it is "No such variable"), and `.,X` is ignored; the same text with a space, `STA H.,X`, is

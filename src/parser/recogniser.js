@@ -9,6 +9,18 @@ import {Lexer} from "./lexer.js";
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
 export const SpaceBeforeKeywordCode = "space-before-keyword";
+export const SpacedKeywords = [
+    "TO",
+    "STEP",
+    "AND",
+    "DIV",
+    "EOR",
+    "MOD",
+    "OR",
+    "GOTO",
+    "GOSUB",
+    "PROC",
+];
 
 const StrayElse =
     "ELSE is not after an IF or ON that has no ELSE yet: BASIC accepts it and ignores the rest of the line";
@@ -222,7 +234,7 @@ export class Recogniser {
                     if (this.is("linenum")) this.next();
                     continue;
                 }
-                if (!this.atEnd()) this.fail("Syntax error");
+                if (!this.atEnd()) this.failBeforeKeyword("Syntax error");
             } catch (e) {
                 this.recover(e, statementStart, () => this.atEnd());
             }
@@ -743,7 +755,7 @@ export class Recogniser {
             return this.statement();
         }
         this.expression();
-        if (!this.isKeyword(...this.dialect.onBranches)) this.fail("ON syntax");
+        if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
         if (this.next().kw.keyword === "PROC") this.call();
         else this.GOTO();
         // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
@@ -765,26 +777,30 @@ export class Recogniser {
         this.variable(null);
         this.expectPunct("=");
         this.expression();
-        if (!this.isKeyword("TO")) {
-            const token = this.peek();
-            this.fail("No TO", token, undefined, undefined, this.spaceFix(token, "TO"));
-        }
+        if (!this.isKeyword("TO")) this.failBeforeKeyword("No TO");
         this.next();
         this.expression();
         if (this.isKeyword("STEP")) {
             this.next();
             this.expression();
         }
-        // BASIC reads the STEP after a number such as 2E4 as part of a name.
-        const token = this.peek();
-        const code = this.spaceFix(token, "STEP");
-        if (code) this.fail("Syntax error", token, undefined, undefined, code);
     }
 
-    // The quick fix code for a name that starts with the keyword, if a space before it leaves the statement with no
+    // BASIC reads a keyword after a number such as 2E4 as part of a name: fails at the token, with the quick fix that
+    // inserts a space before the keyword if there is one.
+    failBeforeKeyword(message) {
+        const token = this.peek();
+        this.fail(message, token, undefined, undefined, this.spaceFix(token));
+    }
+
+    // The quick fix code for a name that starts with a keyword, if a space before it leaves the statement with no
     // error (other than a line that ends too soon).
-    spaceFix(token, keyword) {
-        if (this.probing || token.kind !== "name" || !token.text.startsWith(keyword))
+    spaceFix(token) {
+        if (
+            this.probing ||
+            token.kind !== "name" ||
+            !SpacedKeywords.some(keyword => token.text.startsWith(keyword))
+        )
             return undefined;
         const {text} = this.lexer;
         const candidate = `${text.slice(0, token.start)} ${text.slice(token.start)}`;

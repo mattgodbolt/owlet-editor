@@ -1276,6 +1276,9 @@ describe("Quick fixes and syntax markers", () => {
         ]);
         assert.deepStrictEqual(offered("[OPT0:NOP hello:]"), ["Insert \\ before the junk"]);
     });
+    it("should offer to replace a ; with a \\, as the ARM assembler of BASIC V takes it as a comment", () => {
+        assert.deepStrictEqual(offered("[OPT0:NOP ; hello:]"), ["Replace ; with \\"]);
+    });
     it("should offer only the space for a keyword straight after a mnemonic", () => {
         assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
     });
@@ -1284,6 +1287,8 @@ describe("Quick fixes and syntax markers", () => {
         ["[LDA #1]\ntax=1\n]", "Insert : before ]", "[LDA #1:]\ntax=1\n]"],
         ["[OPT0:NOP hello:]", "Insert \\ before the junk", "[OPT0:NOP \\hello:]"],
         ["[OPT0:LDA #1 ,X:]", "Insert \\ before the junk", "[OPT0:LDA #1 \\,X:]"],
+        ["[OPT0:LDA #1 ; load:]", "Replace ; with \\", "[OPT0:LDA #1 \\ load:]"],
+        ["[OPT0:LDA #1;x:NOP:]", "Replace ; with \\", "[OPT0:LDA #1\\x:NOP:]"],
         ["[OPT0:STAH.,X:]", "Insert a space after STA", "[OPT0:STA H.,X:]"],
         ["[OPT0:LDAUSR@%+GET:]", "Insert a space after LDA", "[OPT0:LDA USR@%+GET:]"],
         ["[OPT0:LDAH.:]", "Insert a space after LDA", "[OPT0:LDA H.:]"],
@@ -1381,10 +1386,19 @@ describe("Quick fix for a lower case index register", () => {
     });
 });
 
-describe("Quick fix for a TO or STEP that a number or name runs into", () => {
+describe("Quick fix for a keyword that a number or name runs into", () => {
     // Each is a recorded row that stops at the keyword on both ROMs. The line with a space before it is read on, so the
     // fix is offered and what the ROM says of it, if not ok, is that the line ends.
     it.each([
+        ["FORJ%=1E4TO", "No TO", "TO", "FORJ%=1E4 TO", "No such variable"],
+        ["X=1E4AND3", "Syntax error", "AND", "X=1E4 AND3", "ok"],
+        ["X=1E4DIV3", "Syntax error", "DIV", "X=1E4 DIV3", "ok"],
+        ["X=1E4EOR3", "Syntax error", "EOR", "X=1E4 EOR3", "ok"],
+        ["X=1E4MOD3", "Syntax error", "MOD", "X=1E4 MOD3", "ok"],
+        ["X=1E4OR3", "Syntax error", "OR", "X=1E4 OR3", "ok"],
+        ["X=1E4AND", "Syntax error", "AND", "X=1E4 AND", "No such variable"],
+        ["ONX/1E1GOTO10,20ELSEPRINT", "ON syntax", "GOTO", "ONX/1E1 GOTO10,20ELSEPRINT", "ok"],
+        ["ONX/1E1GOSUB10,20ELSEPRINT", "ON syntax", "GOSUB", "ONX/1E1 GOSUB10,20ELSEPRINT", "ok"],
         ["FORJ%=2E4TO22400STEP100", "No TO", "TO", "FORJ%=2E4 TO22400STEP100", "ok"],
         ["FORJ%=2E4TOA", "No TO", "TO", "FORJ%=2E4 TOA", "ok"],
         ["FORJ%=1TO2E4STEP100", "Syntax error", "STEP", "FORJ%=1TO2E4 STEP100", "ok"],
@@ -1407,15 +1421,35 @@ describe("Quick fix for a TO or STEP that a number or name runs into", () => {
             );
         }
     });
-    // A recorded row that stops with No TO with the space as well, so no fix is offered.
-    it("should offer no fix where the keyword is in lower case", () => {
-        const text = "FORJ%=1to10";
-        assert.deepStrictEqual(
-            [verdicts.get(text), verdicts.get("FORJ%=1 to10")],
-            ["No TO", "No TO"],
-        );
-        assert.strictEqual(getSyntaxMarkers(text, BasicIIDialect).length, 1);
+    it("should offer a space before PROC after ON only on BASIC IV", () => {
+        const text = "ONX/1E1PROCa ELSEPRINT";
+        assert.strictEqual(masterVerdicts.get(text), "ON syntax");
+        assert.strictEqual(masterVerdicts.get("ONX/1E1 PROCa ELSEPRINT"), "ok");
+        assert.deepStrictEqual(fixes(text, BasicIVDialect), [
+            ["Insert a space before PROC", "ONX/1E1 PROCa ELSEPRINT"],
+        ]);
+        assert.strictEqual(verdicts.get("ONX/1E1 PROCa ELSEPRINT"), "ON syntax");
         assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+    });
+    // Recorded rows that stop with the same error with the space as well, so no fix is offered.
+    it.each([
+        ["FORJ%=1to10", "FORJ%=1 to10"],
+        ["X=1E4and3", "X=1E4 and3"],
+        ["ONX/1E1goto10,20ELSEPRINT", "ONX/1E1 goto10,20ELSEPRINT"],
+    ])("should offer no fix where the keyword is in lower case in %s", (text, spaced) => {
+        for (const [dialect, table] of [
+            [BasicIIDialect, verdicts],
+            [BasicIVDialect, masterVerdicts],
+        ]) {
+            assert.strictEqual(table.get(text), table.get(spaced));
+            assert.notStrictEqual(table.get(text), "ok");
+            assert.strictEqual(getSyntaxMarkers(text, dialect).length, 1);
+            assert.deepStrictEqual(fixes(text, dialect), []);
+        }
+    });
+    it("should offer no fix where the ROM reads the line as it is", () => {
+        for (const text of ["ONX%GOTOERL+2E1ELSE30"])
+            assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
     });
     it("should leave the marker an error, and mend the line it is on", () => {
         assert.deepStrictEqual(
