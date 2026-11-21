@@ -1462,6 +1462,46 @@ describe("Quick fix for a keyword that a number or name runs into", () => {
     });
 });
 
+describe("Quick fix for GCOL with one argument", () => {
+    // Each is a recorded row that both ROMs stop at with Missing , (#340); with 0, before the argument it is read.
+    it.each([
+        ["C=1:GCOL C", "C=1:GCOL 0,C"],
+        ["C=1:GC.C", "C=1:GC.0,C"],
+        ["C=1:GCOL C+1", "C=1:GCOL 0,C+1"],
+        ["GCOL 1:PRINT", "GCOL 0,1:PRINT"],
+        ["IF 1 THEN GCOL 1 ELSE PRINT", "IF 1 THEN GCOL 0,1 ELSE PRINT"],
+        ["10 X=1\n20 GCOL   1", "10 X=1\n20 GCOL   0,1"],
+    ])("%s should offer 0, before the argument, leaving %s", (text, result) => {
+        for (const [dialect, table] of [
+            [BasicIIDialect, verdicts],
+            [BasicIVDialect, masterVerdicts],
+        ]) {
+            if (!text.includes("\n")) assert.strictEqual(table.get(text), "Missing ,");
+            assert.deepStrictEqual(fixes(text, dialect), [
+                ["Insert 0, before the argument", result],
+            ]);
+        }
+    });
+    it.each(["C=1:GCOL C,C,C", "C=1:GCOL 0,C", "GCOL 1 2", "GCOL"])(
+        "%s should offer no fix",
+        text => {
+            for (const dialect of [BasicIIDialect, BasicIVDialect])
+                assert.deepStrictEqual(fixes(text, dialect), []);
+        },
+    );
+    it("should say that BASIC V accepts one argument, after the ROM's words", () => {
+        assert.deepStrictEqual(
+            getSyntaxMarkers("C=1:GCOL C", BasicIIDialect).map(m => [m.severity, m.message]),
+            [
+                [
+                    MarkerSeverity.Warning,
+                    "GCOL needs two arguments here, as in GCOL 0,C; BASIC V accepts a single argument, and GCOL C means GCOL 0,C there (BASIC: Missing ,)",
+                ],
+            ],
+        );
+    });
+});
+
 describe("BASIC IV's assembler on BASIC II", () => {
     const BasicIVOnly = "BRA CLR DEA INA PHX PHY PLX PLY STZ TRB TSB".split(" ");
     const iv = mnemonic => `${mnemonic} is a BASIC IV instruction, which BASIC II does not have`;

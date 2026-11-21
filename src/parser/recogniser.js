@@ -9,6 +9,7 @@ import {Lexer} from "./lexer.js";
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
 export const SpaceBeforeKeywordCode = "space-before-keyword";
+export const ZeroBeforeGcolArgumentCode = "zero-before-gcol-argument";
 export const SpacedKeywords = [
     "TO",
     "STEP",
@@ -92,6 +93,8 @@ const OperandErrors = {hex: "Bad HEX", string: 'Missing "'};
 // BASIC IV words one of its errors differently.
 const BadHexIV = "Bad Hex";
 const TooMany = "Too many arguments before )";
+const GcolOneArgument =
+    "GCOL needs two arguments here, as in GCOL 0,C; BASIC V accepts a single argument, and GCOL C means GCOL 0,C there";
 const MissingAfterOperand = new Set([...Object.values(OperandErrors), BadHexIV]);
 
 // The words a name at the end of a line might be the start of.
@@ -452,7 +455,7 @@ export class Recogniser {
         this.next();
         // The lexer has made these the statement forms of the pseudo-variables; EXT can only be BASIC IV's EXT#.
         if (pseudoVariables.has(keyword) || keyword === "EXT") return this.pseudoVariable(keyword);
-        if (keyword in ExpressionCount) return this.expressions(ExpressionCount[keyword]);
+        if (keyword in ExpressionCount) return this.expressions(ExpressionCount[keyword], token);
         if (this[keyword]) return this[keyword]();
         while (!this.atEnd()) this.next();
     }
@@ -493,11 +496,37 @@ export class Recogniser {
         this.expression();
     }
 
-    expressions(count) {
+    expressions(count, statementToken) {
+        const first = this.peek();
         for (let n = 0; n < count; n++) {
-            if (n > 0) this.expectPunct(",");
+            if (n > 0) {
+                if (
+                    statementToken.kw.keyword === "GCOL" &&
+                    count === 2 &&
+                    this.endsStatement(this.peek())
+                )
+                    this.fail(
+                        "Missing ,",
+                        undefined,
+                        undefined,
+                        GcolOneArgument,
+                        this.gcolFix(statementToken, first),
+                    );
+                this.expectPunct(",");
+            }
             this.expression();
         }
+    }
+
+    // The quick fix code for GCOL with one argument, if 0, before it leaves the statement with no error (other than a
+    // line that ends too soon).
+    gcolFix(statementToken, argument) {
+        if (this.probing) return undefined;
+        const {text} = this.lexer;
+        const candidate = `${text.slice(0, argument.start)}0,${text.slice(argument.start)}`;
+        return this.valid(candidate, statementToken, argument.start)
+            ? ZeroBeforeGcolArgumentCode
+            : undefined;
     }
 
     // The arguments of a bracket, then its ")"; an unclosed bracket is shown at its "(".

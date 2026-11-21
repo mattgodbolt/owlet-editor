@@ -22,6 +22,7 @@ import {
     LenientThanRom,
     RomTokens,
     RomVerdicts,
+    masterVerdicts,
     verdicts,
     wrongMessages,
     wrongRows,
@@ -1138,4 +1139,39 @@ describe("Type mismatches", () => {
         );
         assert.strictEqual(problem.stricter, true);
     });
+});
+
+// GCOL with one argument is a recorded Missing , on both ROMs; BASIC V takes it as GCOL 0,C (#340).
+describe("GCOL with one argument", () => {
+    const problemsOf = (text, dialect) => programProblems(readLines(text, dialect));
+    it.each([
+        ["C=1:GCOL C", "zero-before-gcol-argument"],
+        ["C=1:GC.C", "zero-before-gcol-argument"],
+        ["C=1:GCOL C+1", "zero-before-gcol-argument"],
+        ["GCOL 1:PRINT", "zero-before-gcol-argument"],
+        ["IF 1 THEN GCOL 1 ELSE PRINT", "zero-before-gcol-argument"],
+        ["GCOL 1 2", undefined],
+        ["GCOL (1,2", undefined],
+    ])("%s should name BASIC V and offer the fix %s", (text, code) => {
+        for (const [dialect, table] of [
+            [BasicIIDialect, verdicts],
+            [BasicIVDialect, masterVerdicts],
+        ]) {
+            const [problem, ...rest] = problemsOf(text, dialect);
+            assert.strictEqual(rest.length, 0);
+            assert.strictEqual(problem.code, code);
+            if (code) {
+                assert.strictEqual(table.get(text), "Missing ,");
+                assert.match(problem.explanation, /BASIC V accepts a single argument/);
+                assert.match(problem.explanation, /GCOL C means GCOL 0,C/);
+            }
+        }
+    });
+    it.each([["C=1:GCOL C,C,C"], ["C=1:GCOL 0,C"], ["GCOL"], ["GCOL 1,"]])(
+        "%s should have no fix",
+        text => {
+            for (const problem of problemsOf(text, BasicIIDialect))
+                assert.notStrictEqual(problem.code, "zero-before-gcol-argument");
+        },
+    );
 });
