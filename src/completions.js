@@ -9,6 +9,9 @@ import {ExpectingRecogniser, Recogniser} from "./parser/recogniser";
 
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
+// The keywords where BASIC stops with "Missing #" if no # follows (checked on BASIC II and the Master's BASIC IV).
+const ChannelKeywords = new Set(["BGET", "BPUT", "CLOSE", "EOF", "EXT", "PTR"]);
+
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
 // The ROM has no token for TOP: it reads TO, then a P where a value is expected, so the table cannot offer it, and it
 // is dropped where TO is readable, as there it would be read as TO then P.
@@ -153,6 +156,13 @@ const isSubsequence = (word, candidate) => {
     return true;
 };
 
+// Whether BASIC stops at the ELSE that ends the text, the first token after the statement.
+function endsInError(text, inAssembler, dialect, statement) {
+    const probe = new Recogniser(text, inAssembler, dialect, true);
+    probe.line();
+    return probe.problems.some(problem => problem.token.start === statement.length);
+}
+
 // What was read of the statement last typed in: each word tried after it, so that typing the rest of a word reads
 // the statement once, not once per key.
 let tried = {key: null, results: new Map()};
@@ -176,7 +186,12 @@ function keepingLineReadable(candidates, reading, word, dialect) {
         if (!tried.results.has(candidate)) {
             const text = statement + candidate;
             const probe = new Recogniser(text, inAssembler, dialect, true);
-            tried.results.set(candidate, probe.valid(text, {start: 0}, statement.length));
+            // valid() stops at the ELSE, so it never sees that IF ELSE and ON ELSE have no value before it.
+            tried.results.set(
+                candidate,
+                probe.valid(text, {start: 0}, statement.length) &&
+                    !(candidate === "ELSE" && endsInError(text, inAssembler, dialect, statement)),
+            );
         }
         return tried.results.get(candidate);
     };
@@ -225,7 +240,14 @@ export function completionItems(model, position, dialect) {
               languages.CompletionItemKind.Function,
           ]
         : [context.labels, languages.CompletionItemKind.Keyword];
-    return labels.map(label => ({label, kind, insertText: label, range}));
+    const hashFollows = /^\s*#/.test(
+        model.getLineContent(position.lineNumber).slice(position.column - 1),
+    );
+    return labels.map(name => {
+        const label =
+            !context.nameKind && ChannelKeywords.has(name) && !hashFollows ? `${name}#` : name;
+        return {label, kind, insertText: label, range};
+    });
 }
 
 let registration = null;

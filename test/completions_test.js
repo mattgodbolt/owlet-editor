@@ -103,7 +103,7 @@ describe("Completions", () => {
             ["X=TI‸", ["TIME"]],
             ["X=INS‸", ["INSTR("]],
             // An E straight after a number starts a word: 7ELSE is 7 then ELSE.
-            ["X=E‸", ["EOF", "ERL", "ERR", "EVAL", "EXP", "EXT"]],
+            ["X=E‸", ["EOF#", "ERL", "ERR", "EVAL", "EXP", "EXT#"]],
             ["X=7E‸", ["EOR"]],
             ["GCOL0,7E‸", ["EOR"]],
             ["X=1.5E‸", ["EOR"]],
@@ -177,8 +177,8 @@ describe("Completions", () => {
             ["PRINT X O‸", ["OR"], ["ON", "OFF"]],
             ["ON X G‸", ["GOTO", "GOSUB"], ["GET", "GCOL"]],
             ["ON X P‸", [], ["PI", "POS", "PRINT", "PLOT", "PROC"]],
-            ["ON E‸", ["ERROR", "EOF"], []],
-            ["A=E‸", ["EOF", "ERL", "ERR"], ["ERROR", "END", "ENVELOPE"]],
+            ["ON E‸", ["ERROR", "EOF#"], []],
+            ["A=E‸", ["EOF#", "ERL", "ERR"], ["ERROR", "END", "ENVELOPE"]],
             ["ERR‸", [], ["ERROR", "ERL"]],
             ["IF X THEN ERR‸", [], ["ERROR"]],
             ["IF X ERR‸", [], ["ERROR"]],
@@ -277,7 +277,22 @@ describe("Completions", () => {
             both("INPUT S‸", ["SPC"]),
             both("INPUT T‸", ["TAB("]),
             both("INPUT A‸", []),
-            both("ON E‸", ["EOF", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT"]),
+            both("ON E‸", ["EOF#", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT#"]),
+            // An ELSE straight after the IF, or the ON, has no value before it (ojwb, #337).
+            both("IF E‸", ["EOF#", "ERL", "ERR", "EVAL", "EXP", "EXT#"]),
+            [
+                "IF X E‸",
+                ["ELSE", "END", "ENDPROC", "ENVELOPE", "EOR"],
+                ["ELSE", "END", "ENDPROC", "ENVELOPE", "EOR", "EXT#"],
+            ],
+            [
+                "IF X THEN E‸",
+                ["ELSE", "END", "ENDPROC", "ENVELOPE"],
+                ["ELSE", "END", "ENDPROC", "ENVELOPE", "EXT#"],
+            ],
+            both("IF X PRINT 1 E‸", ["ELSE", "EOF#", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT#"]),
+            both("ON X GOTO 10 E‸", ["ELSE", "EOF#", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT#"]),
+            both("IF T‸", ["TAN", "TIME", "TOP", "TRUE"]),
             both("ON X G‸", ["GOSUB", "GOTO"]),
             ["ON X P‸", [], ["PROC"]],
             // No binary operator starts an expression or a subexpression.
@@ -298,6 +313,35 @@ describe("Completions", () => {
         for (const [text, basicII, basicIV] of cases) {
             assert.deepStrictEqual(offered(text, BasicIIDialect), basicII, `BASIC II: ${text}`);
             assert.deepStrictEqual(offered(text, BasicIVDialect), basicIV, `BASIC IV: ${text}`);
+        }
+    });
+
+    // ojwb, #339: a keyword that BASIC stops at with "Missing #" without one (BGET, BPUT, CLOSE, EOF, EXT and PTR on both
+    // BASIC II and the Master) is offered with it, unless one follows already.
+    it("should offer the keywords that need a # with the # (#339)", () => {
+        const cases = [
+            // [text, offered]
+            ["X=B‸", ["BGET#"]],
+            ["X=BG‸", ["BGET#"]],
+            ["X=BGET‸", ["BGET#"]],
+            ["X=BGET‸#H", ["BGET"]],
+            ["X=BGET‸ #H", ["BGET"]],
+            ["BP‸", ["BPUT#"]],
+            ["BPUT‸", ["BPUT#"]],
+            ["CLO‸", ["CLOSE#"]],
+            ["CLOSE‸#0", ["CLOSE"]],
+            ["X=EO‸", ["EOF#"]],
+            ["X=EXT‸", ["EXT#"]],
+            ["X=PT‸", ["PTR#"]],
+            ["PT‸", ["PTR#"]],
+            ["PTR‸", ["PTR#"]],
+            ["PRINT BG‸", ["BGET#"]],
+            ["PRINT PTR‸", ["PTR#"]],
+            ["PRIN‸", ["PRINT"]],
+            ["INPU‸", ["INPUT"]],
+        ];
+        for (const [text, expected] of cases) {
+            assert.deepStrictEqual(offered(text, BasicIIDialect), expected, `BASIC II: ${text}`);
         }
     });
 
