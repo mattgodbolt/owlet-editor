@@ -10,7 +10,8 @@ import {ExpectingRecogniser, Recogniser} from "./parser/recogniser";
 const TextKinds = new Set(["string", "comment", "data", "oscli"]);
 
 const labels = kws => [...new Set(kws.map(kw => kw.keyword))];
-// The ROM has no token for TOP: it reads TO, then a P where a value is expected, so the table cannot offer it.
+// The ROM has no token for TOP: it reads TO, then a P where a value is expected, so the table cannot offer it, and it
+// is dropped where TO is readable, as there it would be read as TO then P.
 const Top = "TOP";
 // All that BASIC reads after DEF.
 const DefinitionWords = ["FN", "PROC"];
@@ -183,6 +184,7 @@ function keepingLineReadable(candidates, reading, word, dialect) {
     const wanted = word.toUpperCase();
     return candidates.filter(
         candidate =>
+            (candidate !== Top || !(candidates.includes("TO") && readable("TO"))) &&
             (!wanted || (candidate[0] === wanted[0] && isSubsequence(wanted, candidate))) &&
             (candidate !== "ELSE" || reading.waitingForElse) &&
             readable(candidate),

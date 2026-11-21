@@ -121,7 +121,7 @@ describe("Completions", () => {
             ["GOTO X A‸", ["AND"]],
             ["TRACE O‸", ["OFF", "ON", "OPENIN", "OPENOUT", "OPENUP"]],
             ["DEF PR‸", ["PROC"]],
-            ["FORI=1T‸", ["TO", "TOP"]],
+            ["FORI=1T‸", ["TO"]],
             ["IFA%THE‸", ["THEN"]],
             ['PRINT"A"TA‸', ["TAN", "TAB("]],
             ["[OPT 0:LDA #AS‸", ["ASC", "ASN"]],
@@ -143,7 +143,13 @@ describe("Completions", () => {
             ["PRINT T‸", ["TAB(", "TOP"], ["TO"]],
             ["[LDA #T‸", ["TOP"], ["TO"]],
             ["T‸", [], ["TOP"]],
-            ["FOR I=1 T‸", ["TO"], []],
+            ["FOR I=1 T‸", ["TO"], ["TOP"]],
+            ["FORI=1T‸", ["TO"], ["TOP"]],
+            ["FORI=1TO‸", ["TO"], ["TOP"]],
+            ["FORI=1+T‸", ["TOP"], ["TO"]],
+            ["FORI=T‸", ["TOP"], ["TO"]],
+            ["FORI=1TO10+T‸", ["TOP"], ["TO"]],
+            ["FOR I=1 TO 2:X=T‸", ["TOP"], ["TO"]],
             ["PRINT S‸", ["SPC", "SQR"], ["STEP", "STOP"]],
             ["PRINT 1;T‸", ["TAB(", "TAN"], ["TO", "THEN"]],
             ["PRINT 1:A=S‸", ["SQR"], ["SPC"]],
@@ -261,6 +267,33 @@ describe("Completions", () => {
             assert.deepStrictEqual(offered(text, BasicIIDialect), basicII, `BASIC II: ${text}`);
             assert.deepStrictEqual(offered(text, BasicIVDialect), basicIV, `BASIC IV: ${text}`);
         }
+    });
+
+    // ojwb, #323: an ELSE after the IF's own ELSE is junk, so it is not offered.
+    it("should offer ELSE only while an IF or ON is waiting for one", () => {
+        const cases = [
+            // [text, ELSE offered]
+            ['IFX%=Y%PRINT"YES"ELSEPRINT"NO"E‸', false],
+            ['IFX%=Y%THENPRINT"YES"ELSEPRINT"NO"E‸', false],
+            ["IFX%=Y%PRINT 1 ELSEPRINT X E‸", false],
+            ["IFA IFB PRINT 1 ELSE PRINT 2 E‸", false],
+            ["IF X THEN IF Y THEN PRINT 1 ELSE PRINT 2 E‸", false],
+            ["IF X THEN A=1 ELSE IF Y THEN B=2 ELSE B=3 E‸", false],
+            ["IF X THEN A=1 ELSE IF Y THEN B=2 ELSE E‸", false],
+            ["IF X THEN A=1 ELSE IF Y THEN B=2 ELSE B=3:E‸", false],
+            ["IF X THEN A=1 ELSE IF Y THEN B=2 E‸", true],
+            ["IF X PRINT 1 E‸", true],
+            ['IFX%=Y%PRINT"YES"E‸', true],
+            ["ON X GOTO 10 E‸", true],
+        ];
+        for (const [text, shown] of cases)
+            for (const [name, dialect] of [
+                ["II", BasicIIDialect],
+                ["IV", BasicIVDialect],
+            ])
+                expect(offered(text, dialect).includes("ELSE"), `BASIC ${name}: ${text}`).toBe(
+                    shown,
+                );
     });
 
     it("should not offer THEN after the EXT# statement that follows IF on BASIC IV", () => {
