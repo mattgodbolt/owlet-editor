@@ -3,6 +3,7 @@ import prettier from "prettier";
 import {describe, expect, it} from "vitest";
 import {
     Tables,
+    allNames,
     fileFor,
     nameForSource,
     readFile,
@@ -13,11 +14,26 @@ import {
 
 // The recorded rows are one file per source so that two pull requests recording rows never change the same lines;
 // record.mjs writes this layout, and this checks that nobody has put a row anywhere else or written a file by hand.
+describe("nameForSource", () => {
+    it.each([
+        ["#319", ["319", "else-without-if-319"], "else-without-if-319"],
+        ["#319", ["else-without-if-319", "319"], "else-without-if-319"],
+        ["#319", ["319"], "319"],
+        ["#319", ["320"], "319"],
+        ["#31", ["else-without-if-319"], "31"],
+        ["else-nesting", ["else-nesting-319"], "else-nesting"],
+        [null, ["319"], "unsourced"],
+    ])("puts %s among %j in %s", (source, names, expected) => {
+        expect(nameForSource(source, names)).toBe(expected);
+    });
+});
+
 describe("recorded ROM rows", () => {
     describe.each(Tables)("%s", table => {
         const names = tableNames(table);
+        const sourceNames = allNames();
 
-        it("has only files named for a source or unsourced", () => {
+        it("has only files named for a source or a topic, or unsourced", () => {
             expect(fs.readdirSync(tableDirectory(table)).length).toBe(names.length);
             expect(names.length).toBeGreaterThan(0);
         });
@@ -25,7 +41,9 @@ describe("recorded ROM rows", () => {
         it.each(names)("keeps each row of %s in the file for its source", name => {
             const rows = readFile(table, name);
             expect(rows.length).toBeGreaterThan(0);
-            expect(rows.filter(row => nameForSource(rowSource(row)) !== name)).toEqual([]);
+            expect(rows.filter(row => nameForSource(rowSource(row), sourceNames) !== name)).toEqual(
+                [],
+            );
         });
 
         it("has no statement twice", () => {

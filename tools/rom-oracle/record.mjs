@@ -15,13 +15,15 @@
 // bytes of 0x80 and above, which the shell would turn into U+FFFD; the row's text is those bytes as Owlet shows them
 // (U+0100 plus the byte for a control, DEL or token byte below 0xA0), which the ROM reads back as the same bytes. With
 // --tokens each row is [text, bytes] in test/rom/tokens: the ROM's tokenisation of the text as a line of a
-// program, in hex. --file reads one statement per line. --source '#123' ends each row with the issue or pull
-// request it comes from and keeps it in 123.json, so that a report seen again is found as a row and rows from
-// different pull requests do not conflict; give one. A row already in the table keeps its verdict, and gets the source
-// if it has none.
+// program, in hex. --file reads one statement per line. --source ends each row with where it comes from and keeps it
+// in the file of that name, so that a report seen again is found as a row and rows from different pull requests do
+// not conflict; give one. It is a topic in lowercase words joined by hyphens, such as --source else-without-if, which
+// keeps the rows in else-without-if.json (name the issue too, as else-without-if-319, to find its history), or an issue
+// or pull request such as '#319', which keeps them in the file of the topic ending -319 if there is one, else in
+// 319.json. A row already in the table keeps its verdict, and gets the source if it has none.
 import fs from "fs";
 import {createRom, SyntaxErrors} from "./rom.mjs";
-import {nameForSource, readTable, rowSource, writeTable} from "./tables.mjs";
+import {allNames, isSource, nameForSource, readTable, rowSource, writeTable} from "./tables.mjs";
 
 const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 const owletRawByte = b => (b < 0x20 || (b >= 0x7f && b < 0xa0) ? b + 0x100 : b);
@@ -39,8 +41,10 @@ const asHex = args.includes("--hex");
 const fileIndex = args.indexOf("--file");
 const sourceIndex = args.indexOf("--source");
 const source = sourceIndex < 0 ? null : args[sourceIndex + 1];
-if (source !== null && !/^#\d+$/.test(source))
-    throw new Error(`--source is an issue or pull request such as '#123': ${source}`);
+if (source !== null && !isSource(source))
+    throw new Error(
+        `--source is a topic such as 'else-without-if' (lowercase words joined by hyphens) or an issue or pull request such as '#123': ${source}`,
+    );
 const isOptionValue = i => [fileIndex, sourceIndex].some(index => index >= 0 && i === index + 1);
 const texts = args.filter((arg, i) => !arg.startsWith("--") && !isOptionValue(i));
 if (fileIndex >= 0)
@@ -69,6 +73,7 @@ async function main() {
     const known = new Map(
         [...files].flatMap(([name, rows]) => rows.map(row => [row[0], {name, row}])),
     );
+    const names = allNames();
     const rom = await createRom(master ? "Master" : undefined);
     const add = (name, row) => files.set(name, [...(files.get(name) ?? []), row]);
     for (const text of texts) {
@@ -80,7 +85,7 @@ async function main() {
                     files.get(name).filter(other => other !== row),
                 );
                 row.push(source);
-                add(nameForSource(source), row);
+                add(nameForSource(source, names), row);
             }
             console.log(`already recorded: ${JSON.stringify(row)}`);
             continue;
@@ -92,8 +97,9 @@ async function main() {
         }
         if (source) row.push(source);
         console.log(JSON.stringify(row));
-        add(nameForSource(source), row);
-        known.set(text, {name: nameForSource(source), row});
+        const name = nameForSource(source, names);
+        add(name, row);
+        known.set(text, {name, row});
     }
     rom.destroy();
     await writeTable(table, files);

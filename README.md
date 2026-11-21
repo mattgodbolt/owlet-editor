@@ -382,10 +382,15 @@ statement on BBC BASIC II and records its verdict (the error's name or `ok`) in 
 `--tokens` records the ROM's tokenisation of a line in `test/rom/tokens`; nobody types a verdict. A byte of 0x80
 or above cannot go through the shell, so `--hex '53 54 8d 20 39'` takes the statement as hex bytes (also for each
 `--file` line); the row's text is those bytes as Owlet shows them, U+0100 plus the byte below 0xA0.
-`--source '#149'` ends each row with the issue it comes from, so that a report seen before is one search of the tables
-away, and keeps the row in that table's `149.json` (rows without a source go in `unsourced.json`): each table is a
-directory with a file per source, so pull requests that record rows do not conflict. Always give `--source`, and do
-not edit the files by hand; a test fails if a row is in the wrong file. Before a change to
+`--source` ends each row with where it comes from, so that a report seen before is one search of the tables away, and
+keeps the row in the file of that name in that table (rows without a source go in `unsourced.json`): each table is a
+directory with a file per source, so pull requests that record rows do not conflict. Name the topic, in lowercase words
+joined by hyphens: `--source else-without-if-319` records into `else-without-if-319.json` of the table, so that the file
+says what its rows are for. The existing files are named `<topic>-<issue>.json` (the issue or pull request the topic
+began with, so that its history is easy to find), and their rows end with `#319`: `--source '#319'` finds the file of
+that topic whichever table it is in, and where there is none it makes `319.json`. A topic's files in the four tables
+share a name. Always give `--source`, and do not edit the files by hand; a test fails if a row is in the wrong file.
+Before a change to
 highlighting, `node tools/rom-oracle/oracle.mjs` compares the highlighter with the ROM on generated statements (see the comment at its top).
 
 ## Known Issues
