@@ -182,10 +182,9 @@ function keepingLineReadable(candidates, reading, word, dialect) {
     };
     if (!readable("")) return candidates;
     const wanted = word.toUpperCase();
-    const toReadable = candidates.includes("TO") && readable("TO");
     return candidates.filter(
         candidate =>
-            (candidate !== Top || !toReadable) &&
+            (candidate !== Top || !(candidates.includes("TO") && readable("TO"))) &&
             (!wanted || (candidate[0] === wanted[0] && isSubsequence(wanted, candidate))) &&
             (candidate !== "ELSE" || reading.waitingForElse) &&
             readable(candidate),
