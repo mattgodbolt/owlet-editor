@@ -28,7 +28,7 @@ export const nameForSource = (source, names) => {
     if (!source) return UnsourcedName;
     if (!IssuePattern.test(source)) return source;
     const issue = source.slice(1);
-    return names.find(name => name === issue || name.endsWith(`-${issue}`)) ?? issue;
+    return names.find(name => name.endsWith(`-${issue}`)) ?? issue;
 };
 
 // The issue number a file name ends with orders the files, so that a file keeps its place when it is named for its topic.

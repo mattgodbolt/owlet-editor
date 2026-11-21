@@ -14,6 +14,20 @@ import {
 
 // The recorded rows are one file per source so that two pull requests recording rows never change the same lines;
 // record.mjs writes this layout, and this checks that nobody has put a row anywhere else or written a file by hand.
+describe("nameForSource", () => {
+    it.each([
+        ["#319", ["319", "else-without-if-319"], "else-without-if-319"],
+        ["#319", ["else-without-if-319", "319"], "else-without-if-319"],
+        ["#319", ["319"], "319"],
+        ["#319", ["320"], "319"],
+        ["#31", ["else-without-if-319"], "31"],
+        ["else-nesting", ["else-nesting-319"], "else-nesting"],
+        [null, ["319"], "unsourced"],
+    ])("puts %s among %j in %s", (source, names, expected) => {
+        expect(nameForSource(source, names)).toBe(expected);
+    });
+});
+
 describe("recorded ROM rows", () => {
     describe.each(Tables)("%s", table => {
         const names = tableNames(table);
