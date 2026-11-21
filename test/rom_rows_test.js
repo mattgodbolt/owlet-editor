@@ -3,6 +3,7 @@ import prettier from "prettier";
 import {describe, expect, it} from "vitest";
 import {
     Tables,
+    allNames,
     fileFor,
     nameForSource,
     readFile,
@@ -16,8 +17,9 @@ import {
 describe("recorded ROM rows", () => {
     describe.each(Tables)("%s", table => {
         const names = tableNames(table);
+        const sourceNames = allNames();
 
-        it("has only files named for a source or unsourced", () => {
+        it("has only files named for a source or a topic, or unsourced", () => {
             expect(fs.readdirSync(tableDirectory(table)).length).toBe(names.length);
             expect(names.length).toBeGreaterThan(0);
         });
@@ -25,7 +27,9 @@ describe("recorded ROM rows", () => {
         it.each(names)("keeps each row of %s in the file for its source", name => {
             const rows = readFile(table, name);
             expect(rows.length).toBeGreaterThan(0);
-            expect(rows.filter(row => nameForSource(rowSource(row)) !== name)).toEqual([]);
+            expect(rows.filter(row => nameForSource(rowSource(row), sourceNames) !== name)).toEqual(
+                [],
+            );
         });
 
         it("has no statement twice", () => {
