@@ -503,6 +503,10 @@ describe("Text BASIC ignores in an ON list", () => {
         ["ON X PROCa(1)2,PROCb ELSE PRINT", [["2"]]],
         ["ON X PROCa,PROCb JUNK,PROCc", [["JUNK"]]],
         ["ON X PROCa,b JUNK", []],
+        // BASIC IV reads a string as one item, so a comma inside it does not split the list (BASIC II's does).
+        ['ON X GOTO 10 JUNK,"a,b",20 JUNK', [["JUNK"], ["JUNK"]]],
+        ['ON X GOTO "a,b",20 JUNK', [["JUNK"]]],
+        ['ON X GOTO 10 "a,b" JUNK,20 JUNK', [['"a,b"'], ["JUNK"]]],
         ["ON X PROCa,PROCb", []],
     ])("%s should mark %j on BASIC IV", (text, expected) => {
         assert.deepStrictEqual(

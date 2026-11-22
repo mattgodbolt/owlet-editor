@@ -314,7 +314,9 @@ message that says what BASIC does, and shows as an error.
   there, so the `ELSE` is not read and is red as the first of the ignored text, and where a space before it leaves
   nothing ignored (an `ON` or `IF` is waiting for the `ELSE`) the fix is "Insert a space before ELSE". A target after
   the first on `PROC` that does not start with `PROC`, or that does not parse, is left alone, as BASIC reads it only
-  if it is the one it counts to. Suggested by Olly Betts on #335; the rows recorded for it include the ones that must
+  if it is the one it counts to. BASIC II counts commas in the raw text, so one inside a string splits a target there
+  (`ON 3 GOTO 10,"x,y",30` reads `y"` as the third), and nothing after it is marked; BASIC IV reads a string as one item.
+  Suggested by Olly Betts on #335; the rows recorded for it include the ones that must
   stay unmarked (`ON 5 GOTO 10ELSE30`, where the `ELSE` is read). The oracle takes the marks on trust as ignored text,
   as it does the assembler's, and lists them as STRICTER.
 - **A string where BASIC wants a number, or the other way round** (`PRINT"X"DIV 2`, `X=1+"A"`, `X$="A"+1`, `X=LEN 5`,

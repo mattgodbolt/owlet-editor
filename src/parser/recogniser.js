@@ -869,11 +869,11 @@ export class Recogniser {
         let target = this.onTarget(procedures);
         this.waitingForElse = true;
         for (;;) {
-            // BASIC counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
-            // which target it is reading and mark nothing more.
-            if (this.stringComma(from)) break;
+            // BASIC II counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
+            // which target it is reading and mark nothing more. BASIC IV reads a string as one item.
+            if (this.splitsAtStringComma(from)) break;
             this.ignoredAfter(target);
-            if (this.stringComma(from)) break;
+            if (this.splitsAtStringComma(from)) break;
             if (!this.isPunct(",")) return;
             this.next();
             from = this.peek().start;
@@ -890,8 +890,9 @@ export class Recogniser {
         while (!this.atEnd()) this.next();
     }
 
-    // Whether a string with a comma in it lies between `from` and the next token.
-    stringComma(from) {
+    // Whether a string with a comma in it lies between `from` and the next token, on BASIC II, which splits it there.
+    splitsAtStringComma(from) {
+        if (this.basicIV) return false;
         const text = this.lexer.text.slice(from, this.peek().start);
         return (text.match(/"(?:[^"]|"")*"/g) ?? []).some(string => string.includes(","));
     }
