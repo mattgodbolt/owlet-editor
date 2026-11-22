@@ -836,12 +836,18 @@ export class Recogniser {
         this.expression();
         if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
         const procedures = this.next().kw.keyword === "PROC";
+        let from = this.peek().start;
         let target = this.onTarget(procedures);
         this.waitingForElse = true;
         for (;;) {
+            // BASIC counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
+            // which target it is reading and mark nothing more.
+            if (this.stringComma(from)) break;
             this.ignoredAfter(target);
+            if (this.stringComma(from)) break;
             if (!this.isPunct(",")) return;
             this.next();
+            from = this.peek().start;
             if (procedures && !this.isKeyword("PROC")) break;
             // BASIC reads only the target it counts to, so a later one that does not parse is not an error.
             try {
@@ -853,6 +859,12 @@ export class Recogniser {
             }
         }
         while (!this.atEnd()) this.next();
+    }
+
+    // Whether a string with a comma in it lies between `from` and the next token.
+    stringComma(from) {
+        const text = this.lexer.text.slice(from, this.peek().start);
+        return (text.match(/"(?:[^"]|"")*"/g) ?? []).some(string => string.includes(","));
     }
 
     // Reads a target of an ON list and returns what it is.

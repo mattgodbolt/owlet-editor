@@ -449,6 +449,8 @@ describe("Text BASIC ignores in an ON list", () => {
         ["ON X GOTO 10 JUNK ELSE PRINT", [["JUNK"]]],
         ["ON X GOTO 10 PRINT 1:PRINT 2", [["PRINT"]]],
         ["ON X GOTO 10 A B,20 C D", [["A"], ["C"]]],
+        ['ON X GOTO 10 JUNK,"a,b",20 JUNK', [["JUNK"]]],
+        ['ON X GOTO 10 "a,b" JUNK,20 JUNK', [['"a,b"']]],
         ["ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1 ELSE30", [["E1"], ["JUNK"]]],
         [
             "ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30",
@@ -473,6 +475,8 @@ describe("Text BASIC ignores in an ON list", () => {
         "ON X GOTO A+1,B*2",
         "ON X GOTO 10ELSE30",
         "ON X GOTO 10,A+2E1 ELSE30",
+        'ON X GOTO "a,b",20 JUNK',
+        'ON X GOTO 10,"a,b" JUNK,20 JUNK',
         "ON X GOTO 10,",
         "ON X GOTO 10,A$+",
         "ON X GOSUB 10,(1+",
