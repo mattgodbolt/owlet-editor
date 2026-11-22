@@ -6,7 +6,12 @@ import {ILanguageService} from "monaco-editor/editor/common/languages/language";
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
 import {problemMessage} from "./problem-messages";
-import {ForeignOperators, SpaceBeforeKeywordCode, SpacedKeywords} from "./parser/recogniser";
+import {
+    ForeignOperators,
+    SpaceBeforeKeywordCode,
+    SpacedKeywords,
+    ZeroBeforeGcolArgumentCode,
+} from "./parser/recogniser";
 import {
     CapitaliseMnemonicCode,
     CapitaliseRegisterCode,
@@ -154,6 +159,19 @@ export const codeActionProviderFor = dialect => ({
                 const keyword = SpacedKeywords.find(word => text.startsWith(word));
                 return quickFix(model, marker, `Insert a space before ${keyword}`, atStart, " ");
             }
+            if (marker.code === ZeroBeforeGcolArgumentCode) {
+                const line = model.getLineContent(marker.startLineNumber);
+                const tokens = lexLine(line, dialect);
+                const gcol = tokens.findLast(
+                    token => token.kw?.keyword === "GCOL" && token.end < marker.startColumn,
+                );
+                const argument = tokens.find(
+                    token => token.start >= gcol.end && token.kind !== "white",
+                );
+                const column = argument.start + 1;
+                const at = {...atStart, startColumn: column, endColumn: column};
+                return quickFix(model, marker, "Insert 0, before the argument", at, "0,");
+            }
             if (marker.code === JunkAfterInstructionCode) {
                 if (text[0] === "]")
                     return quickFix(model, marker, "Insert : before ]", atStart, ":");
@@ -215,6 +233,7 @@ const QuickFixCodes = new Set([
     JunkAfterInstructionCode,
     SpaceAfterMnemonicCode,
     SpaceBeforeKeywordCode,
+    ZeroBeforeGcolArgumentCode,
     CapitaliseRegisterCode,
     CapitaliseMnemonicCode,
 ]);

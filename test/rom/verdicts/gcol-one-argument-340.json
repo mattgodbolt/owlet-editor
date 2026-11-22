@@ -1,0 +1,18 @@
+[
+  ["GCOL 1", "Missing ,", "gcol-one-argument-340"],
+  ["GCOL 0", "Missing ,", "gcol-one-argument-340"],
+  ["GC.1", "Missing ,", "gcol-one-argument-340"],
+  ["GCOL 1,2,3", "Syntax error", "gcol-one-argument-340"],
+  ["GCOL 0,1", "ok", "gcol-one-argument-340"],
+  ["GCOL 1:PRINT", "Missing ,", "gcol-one-argument-340"],
+  ["GCOL 1 ELSE PRINT", "Missing ,", "gcol-one-argument-340"],
+  ["GCOL 1 2", "Missing ,", "gcol-one-argument-340"],
+  ["IF 1 THEN GCOL 1", "Missing ,", "gcol-one-argument-340"],
+  ["IF 1 THEN GCOL 1 ELSE PRINT", "Missing ,", "gcol-one-argument-340"],
+  ["GC.1:GC.2", "Missing ,", "gcol-one-argument-340"],
+  ["C=1:GCOL C", "Missing ,", "gcol-one-argument-340"],
+  ["C=1:GC.C", "Missing ,", "gcol-one-argument-340"],
+  ["C=1:GCOL 0,C", "ok", "gcol-one-argument-340"],
+  ["C=1:GCOL C+1", "Missing ,", "gcol-one-argument-340"],
+  ["C=1:GCOL C,C,C", "Syntax error", "gcol-one-argument-340"]
+]
