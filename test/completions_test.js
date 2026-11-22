@@ -220,6 +220,16 @@ describe("Completions", () => {
             ["PRINT ABS G‸", ["GET"], ["GET$"]],
             ["PRINT X$(1)+A‸", ["ABS", "ASC"], []],
             ["PRINT FNx D‸", ["DIV"], []],
+            // The argument is what is red, so a word of the wrong type is dropped from the candidates (#331).
+            ["X=ABS S‸", ["SQR", "SIN"], ["STR$", "STRING$("]],
+            ["X=ASC I‸", ["INKEY$"], ["INKEY", "INT", "INSTR("]],
+            ["X=EVAL A‸", [], ["ASC", "ABS"]],
+            ["X=EOF#S‸", ["SQR"], ["STR$", "STRING$("]],
+            ["X=BGET#L‸", ["LEN", "LN"], ["LEFT$("]],
+            ["P.SPCS‸", ["SQR"], ["STR$"]],
+            ["P.$S‸", ["SQR"], ["STR$"]],
+            ["P.-S‸", ["SQR"], ["STR$"]],
+            ["X=ASC T‸", [], ["TIME", "TAN"]],
         ];
         for (const [text, shown, hidden] of cases) {
             const items = offered(text);
