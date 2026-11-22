@@ -139,120 +139,104 @@ describe("Completions", () => {
     // Each word that is not a value is offered only in the statements BBC BASIC II reads it in (see StatementWords).
     it("should offer TOP, SPC, TAB(, LINE, TO, STEP, THEN, ON, OFF and ERROR only where the ROM reads them", () => {
         const cases = [
-            // [text, offered, not offered]
-            ["A=S‸", ["SQR", "STR$", "STRING$("], ["SPC", "STEP", "STOP", "SOUND"]],
-            ["A=T‸", ["TAN", "TIME", "TOP", "TRUE"], ["TAB(", "TO", "THEN", "TRACE"]],
-            ["PRINT T‸", ["TAB(", "TOP"], ["TO"]],
-            ["[LDA #T‸", ["TOP"], ["TO"]],
-            ["T‸", [], ["TOP"]],
-            ["FOR I=1 T‸", ["TO"], ["TOP"]],
-            ["FORI=1T‸", ["TO"], ["TOP"]],
-            ["FORI=1TO‸", ["TO"], ["TOP"]],
-            ["FORI=1+T‸", ["TOP"], ["TO"]],
-            ["FORI=T‸", ["TOP"], ["TO"]],
-            ["FORI=1TO10+T‸", ["TOP"], ["TO"]],
-            ["FOR I=1 TO 2:X=T‸", ["TOP"], ["TO"]],
-            ["PRINT S‸", ["SPC", "SQR"], ["STEP", "STOP"]],
-            ["PRINT 1;T‸", ["TAB(", "TAN"], ["TO", "THEN"]],
-            ["PRINT 1:A=S‸", ["SQR"], ["SPC"]],
-            ["INPUT S‸", ["SPC"], ["STEP"]],
-            ["INPUT L‸", ["LINE"], ["LEFT$(", "LEN", "LOCAL", "LIST"]],
-            ["PRINT L‸", ["LEFT$(", "LEN"], ["LINE"]],
-            ["IFX THENPRINT S‸", ["SPC"], ["STEP"]],
-            ["FOR I=1 TO 10 S‸", ["STEP"], ["SQR", "SPC"]],
-            ["FOR I=1 T‸", ["TO"], ["TAN", "THEN", "TAB("]],
-            ["IFX FORI=1T‸", ["TO"], ["THEN"]],
-            ["DEFPROCa(X)FORI=1T‸", ["TO"], ["THEN"]],
-            ["FORI=1TO10ST‸", ["STEP"], ["STR$", "STOP"]],
-            ["PRINT I T‸", ["TAN", "TAB("], ["TO", "THEN"]],
-            ["IF X T‸", ["THEN"], ["TAN", "TO", "TAB("]],
-            ["IF X THEN A=T‸", ["TAN"], ["THEN", "TO"]],
-            ["PRINT X T‸", ["TAN"], ["THEN"]],
-            ["ON ERROR O‸", ["OFF", "ON", "OSCLI"], ["OR", "OPENIN"]],
-            ["ON ERROR OFF:O‸", ["ON", "OSCLI"], ["OFF", "OR", "OPENIN"]],
-            ["ON ERROR PRINT O‸", ["OPENIN"], ["OR", "OFF", "ON"]],
-            ["TRACE O‸", ["OFF", "ON", "OPENIN"], ["OR", "OSCLI"]],
-            ["TRACE ON:O‸", ["ON", "OSCLI"], ["OFF", "OR"]],
-            ["A=O‸", ["OPENIN"], ["OR", "ON", "OFF", "OSCLI"]],
-            ["PRINT X O‸", ["OR"], ["ON", "OFF"]],
-            ["ON X G‸", ["GOTO", "GOSUB"], ["GET", "GCOL"]],
-            ["ON X P‸", [], ["PI", "POS", "PRINT", "PLOT", "PROC"]],
-            ["ON E‸", ["ERROR", "EOF#"], []],
-            ["A=E‸", ["EOF#", "ERL", "ERR"], ["ERROR", "END", "ENVELOPE"]],
-            ["ERR‸", [], ["ERROR", "ERL"]],
-            ["IF X THEN ERR‸", [], ["ERROR"]],
-            ["IF X ERR‸", [], ["ERROR"]],
-            ["ON X GOTO 10 ELS‸", ["ELSE"], []],
-            ["A=1 ELS‸", [], ["ELSE"]],
-            ["IF X THEN A=1 ELSE B=2 ELS‸", [], ["ELSE"]],
-            ["ON X GOTO 10,20 ELSE PRINT 3 ELS‸", [], ["ELSE"]],
-            ["ON ERROR PRINT 1 ELS‸", [], ["ELSE"]],
-            ["TRACE ON:PRINT 1 ELS‸", [], ["ELSE"]],
-            ["IF X THEN A=1 ELSE IF Y THEN B=2 ELS‸", ["ELSE"], []],
-            ["PRINT SPC 3:S‸", ["SOUND", "STOP"], ["SPC", "STEP", "SQR"]],
+            // [text, every completion offered]
+            ["A=S‸", ["SGN", "SIN", "SQR", "STR$", "STRING$("]],
+            ["A=T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["PRINT T‸", ["TAB(", "TAN", "TIME", "TOP", "TRUE"]],
+            ["[LDA #T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["T‸", ["TIME", "TRACE"]],
+            ["FOR I=1 T‸", ["TO"]],
+            ["FORI=1T‸", ["TO"]],
+            ["FORI=1TO‸", ["TO"]],
+            ["FORI=1+T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["FORI=T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["FORI=1TO10+T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["FOR I=1 TO 2:X=T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["PRINT S‸", ["SGN", "SIN", "SPC", "SQR", "STR$", "STRING$("]],
+            ["PRINT 1;T‸", ["TAB(", "TAN", "TIME", "TOP", "TRUE"]],
+            ["PRINT 1:A=S‸", ["SGN", "SIN", "SQR", "STR$", "STRING$("]],
+            ["INPUT S‸", ["SPC"]],
+            ["INPUT L‸", ["LINE"]],
+            ["PRINT L‸", ["LEFT$(", "LEN", "LN", "LOG", "LOMEM"]],
+            ["IFX THENPRINT S‸", ["SGN", "SIN", "SPC", "SQR", "STR$", "STRING$("]],
+            ["FOR I=1 TO 10 S‸", ["STEP"]],
+            ["IFX FORI=1T‸", ["TO"]],
+            ["DEFPROCa(X)FORI=1T‸", ["TO"]],
+            ["FORI=1TO10ST‸", ["STEP"]],
+            ["PRINT I T‸", ["TAB(", "TAN", "TIME", "TOP", "TRUE"]],
+            ["IF X T‸", ["THEN", "TRACE"]],
+            ["IF X THEN A=T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["PRINT X T‸", ["TAB(", "TAN", "TIME", "TOP", "TRUE"]],
+            ["ON ERROR O‸", ["OFF", "ON", "OSCLI"]],
+            ["ON ERROR OFF:O‸", ["ON", "OSCLI"]],
+            ["ON ERROR PRINT O‸", ["OPENIN", "OPENOUT", "OPENUP"]],
+            ["TRACE O‸", ["OFF", "ON", "OPENIN", "OPENOUT", "OPENUP"]],
+            ["TRACE ON:O‸", ["ON", "OSCLI"]],
+            ["A=O‸", ["OPENIN", "OPENOUT", "OPENUP"]],
+            ["PRINT X O‸", ["OPENIN", "OPENOUT", "OPENUP", "OR"]],
+            ["ON X G‸", ["GOSUB", "GOTO"]],
+            ["ON X P‸", []],
+            ["ON E‸", ["EOF#", "ERL", "ERR", "ERROR", "EVAL", "EXP", "EXT#"]],
+            ["A=E‸", ["EOF#", "ERL", "ERR", "EVAL", "EXP", "EXT#"]],
+            ["ERR‸", []],
+            ["IF X THEN ERR‸", []],
+            ["IF X ERR‸", []],
+            ["ON X GOTO 10 ELS‸", ["ELSE"]],
+            ["A=1 ELS‸", []],
+            ["IF X THEN A=1 ELSE B=2 ELS‸", []],
+            ["ON X GOTO 10,20 ELSE PRINT 3 ELS‸", []],
+            ["ON ERROR PRINT 1 ELS‸", []],
+            ["TRACE ON:PRINT 1 ELS‸", []],
+            ["IF X THEN A=1 ELSE IF Y THEN B=2 ELS‸", ["ELSE"]],
+            ["PRINT SPC 3:S‸", ["SOUND", "STOP"]],
         ];
-        for (const [text, shown, hidden] of cases) {
-            const items = offered(text);
-            for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
-            for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
-        }
+        for (const [text, expected] of cases) assert.deepStrictEqual(offered(text), expected, text);
     });
 
     // BASIC raises Type mismatch when it runs a binary operator after a string (or a string function argument that
     // is a number), so the recogniser marks it and the word is dropped (#331).
     it("should not offer a word that would be a Type mismatch", () => {
         const cases = [
-            // [text, offered, not offered]
-            ['PRINT"X"D‸', ["DEG"], ["DIV"]],
-            ['PRINT"X"M‸', [], ["MOD"]],
-            ['PRINT"X"A‸', ["ABS"], ["AND"]],
-            ['PRINT"X"O‸', ["OPENIN"], ["OR"]],
-            ['PRINT"X"E‸', ["EXP"], ["EOR"]],
-            ["PRINT A$ D‸", ["DEG"], ["DIV"]],
-            ["PRINT(A$)A‸", ["ABS"], ["AND"]],
-            ['PRINT"X"+"Y"A‸', ["ABS"], ["AND"]],
-            ["PRINT LEFT$(A$,1)A‸", ["ABS"], ["AND"]],
-            ["PRINT 1D‸", ["DEG", "DIV"], []],
-            ["PRINT A%A‸", ["AND"], []],
-            ['PRINT LEN"X"A‸', ["AND"], []],
-            ['X=1="X"A‸', ["AND"], []],
-            ["PRINT LEN G‸", ["GET$"], ["GET"]],
-            ["PRINT ABS G‸", ["GET"], ["GET$"]],
-            ["PRINT X$(1)+A‸", ["ABS", "ASC"], []],
-            ["PRINT FNx D‸", ["DIV"], []],
+            // [text, every completion offered]
+            ['PRINT"X"D‸', ["DEG"]],
+            ['PRINT"X"M‸', ["MID$("]],
+            ['PRINT"X"A‸', ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
+            ['PRINT"X"O‸', ["OPENIN", "OPENOUT", "OPENUP"]],
+            ['PRINT"X"E‸', ["EOF#", "ERL", "ERR", "EVAL", "EXP", "EXT#"]],
+            ["PRINT A$ D‸", ["DEG"]],
+            ["PRINT(A$)A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
+            ['PRINT"X"+"Y"A‸', ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
+            ["PRINT LEFT$(A$,1)A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
+            ["PRINT 1D‸", ["DEG", "DIV"]],
+            ["PRINT A%A‸", ["ABS", "ACS", "ADVAL", "AND", "ASC", "ASN", "ATN"]],
+            ['PRINT LEN"X"A‸', ["ABS", "ACS", "ADVAL", "AND", "ASC", "ASN", "ATN"]],
+            ["PRINT LEN G‸", ["GET$"]],
+            ["PRINT ABS G‸", ["GET"]],
+            ["PRINT X$(1)+A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
+            ["PRINT FNx D‸", ["DEG", "DIV"]],
         ];
-        for (const [text, shown, hidden] of cases) {
-            const items = offered(text);
-            for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
-            for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
-        }
+        for (const [text, expected] of cases) assert.deepStrictEqual(offered(text), expected, text);
     });
 
     // What BASIC reads next is what the recogniser looks for where the text stops (#238, #260).
     it("should offer a word only where the recogniser looks for it", () => {
         const cases = [
-            // [text, offered, not offered]
-            ["IF X X=0 T‸", [], ["TAN", "TIME", "TOP", "TRUE", "THEN", "TRACE", "TO"]],
-            ["IF X X=T‸", ["TAN", "TIME", "TOP", "TRUE"], ["THEN", "TRACE"]],
-            ["IF X T‸", ["THEN", "TRACE"], []],
-            ["IF T‸", ["TAN", "TOP"], ["THEN", "TRACE"]],
-            ["IF X PRINT 1 T‸", ["TAN"], ["THEN"]],
-            ["FOR T‸", [], ["TO", "STEP"]],
-            ["FOR I=1 S‸", [], ["SQR", "STEP"]],
-            ["FOR I=1 T‸", ["TO"], ["STEP"]],
-            ["FOR I=1 TO 2 S‸", ["STEP"], []],
-            ["FOR I=1 TO 2 T‸", [], ["TO"]],
-            ["PRINT (1 T‸", [], ["TAN", "TAB("]],
-            ["INPUT LINE S‸", ["SPC"], ["LINE"]],
-            ["INPUT LINE L‸", [], ["LINE"]],
-            ["ON X S‸", [], ["STEP"]],
-            ["ON 1 E‸", [], ["ERROR"]],
+            // [text, every completion offered]
+            ["IF X X=0 T‸", []],
+            ["IF X X=T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["IF T‸", ["TAN", "TIME", "TOP", "TRUE"]],
+            ["IF X PRINT 1 T‸", ["TAB(", "TAN", "TIME", "TOP", "TRUE"]],
+            ["FOR T‸", []],
+            ["FOR I=1 S‸", []],
+            ["FOR I=1 TO 2 S‸", ["STEP"]],
+            ["FOR I=1 TO 2 T‸", []],
+            ["PRINT (1 T‸", []],
+            ["INPUT LINE S‸", ["SPC"]],
+            ["INPUT LINE L‸", []],
+            ["ON X S‸", []],
+            ["ON 1 E‸", ["EOR"]],
         ];
-        for (const [text, shown, hidden] of cases) {
-            const items = offered(text);
-            for (const word of shown) assert(items.includes(word), `${text} offers ${word}`);
-            for (const word of hidden) assert(!items.includes(word), `${text} hides ${word}`);
-        }
+        for (const [text, expected] of cases) assert.deepStrictEqual(offered(text), expected, text);
     });
 
     // The cases of #320: the words BASIC would read next, tried one at a time on the current line.
@@ -340,8 +324,24 @@ describe("Completions", () => {
             ["PRIN‸", ["PRINT"]],
             ["INPU‸", ["INPUT"]],
         ];
+        // EXT is also a statement on BASIC IV (EXT#F=1), where it is offered with its # at the start of a statement.
+        const statements = [
+            // [text, offered on BASIC II, offered on BASIC IV]
+            ["EXT‸", [], ["EXT#"]],
+            ["EX‸", [], ["EXT#"]],
+            ["EXT‸#F=1", [], ["EXT"]],
+            ["X=1:EXT‸", [], ["EXT#"]],
+            ["EXT#F=1:EXT‸", [], ["EXT#"]],
+            ["IF X EXT‸", [], ["EXT#"]],
+            ["IF X THEN EX‸", [], ["EXT#"]],
+        ];
         for (const [text, expected] of cases) {
             assert.deepStrictEqual(offered(text, BasicIIDialect), expected, `BASIC II: ${text}`);
+            assert.deepStrictEqual(offered(text, BasicIVDialect), expected, `BASIC IV: ${text}`);
+        }
+        for (const [text, basicII, basicIV] of statements) {
+            assert.deepStrictEqual(offered(text, BasicIIDialect), basicII, `BASIC II: ${text}`);
+            assert.deepStrictEqual(offered(text, BasicIVDialect), basicIV, `BASIC IV: ${text}`);
         }
     });
 
