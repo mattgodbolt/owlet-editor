@@ -292,6 +292,10 @@ message that says what BASIC does, and shows as an error.
   rejects it in a mnemonic (`ST` and byte 0x81), except the tokens AND (0x80), EOR (0x82) and OR (0x84) as the first,
   second or third character, which it reads as the mnemonic itself, dropping what comes before (`ST` and byte 0x80
   assembles `AND`). The dropped characters are red, with a hover that says so (recorded for #202).
+- **`GCOL` with one argument** (`GCOL C`, `GC.1`). BASIC II and IV stop with `Missing ,` at the end of the statement
+  (recorded on both ROMs); the hover says that BASIC V accepts one argument, with `GCOL C` meaning `GCOL 0,C` (from
+  #340; BASIC V is not emulated here), and the quick fix is "Insert 0, before the argument", offered only where the
+  statement then has no error (so not for `GCOL 1 2`). `GCOL 1,2,3` is a different error and has no fix.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
   `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into, which is right at the end
   of the `THEN` part of an `IF` (or after an `ON` list) and a quirk anywhere else. The `ELSE` is red and the text after
