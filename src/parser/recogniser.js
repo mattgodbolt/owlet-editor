@@ -9,6 +9,7 @@ import {Lexer} from "./lexer.js";
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
 export const SpaceBeforeKeywordCode = "space-before-keyword";
+const IgnoredInOnListCode = "ignored-in-on-list";
 export const SpacedKeywords = [
     "TO",
     "STEP",
@@ -20,10 +21,18 @@ export const SpacedKeywords = [
     "GOTO",
     "GOSUB",
     "PROC",
+    "ELSE",
 ];
 
 const StrayElse =
     "ELSE is not after an IF or ON that has no ELSE yet: BASIC accepts it and ignores the rest of the line";
+
+const OnTargets = {
+    lineNumber:
+        "BASIC ignores everything after the line number here, up to the next comma (20E1 is line 20, not 200)",
+    expression: "BASIC ignores everything after the expression here, up to the next comma",
+    procedure: "BASIC ignores everything after the procedure call here, up to the next comma",
+};
 
 const names = text => new Set(text.split(" "));
 export const NoArgument = names(
@@ -826,11 +835,49 @@ export class Recogniser {
         }
         this.expression();
         if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
-        if (this.next().kw.keyword === "PROC") this.call();
-        else this.GOTO();
-        // BASIC jumps as soon as it has found its target, so it never reads the rest of the list.
-        while (!this.atEnd()) this.next();
+        const procedures = this.next().kw.keyword === "PROC";
+        let target = this.onTarget(procedures);
         this.waitingForElse = true;
+        for (;;) {
+            this.ignoredAfter(target);
+            if (!this.isPunct(",")) return;
+            this.next();
+            if (procedures && !this.isKeyword("PROC")) break;
+            // BASIC reads only the target it counts to, so a later one that does not parse is not an error.
+            try {
+                if (procedures) this.next();
+                target = this.onTarget(procedures);
+            } catch (e) {
+                if (!(e instanceof Failure)) throw e;
+                break;
+            }
+        }
+        while (!this.atEnd()) this.next();
+    }
+
+    // Reads a target of an ON list and returns what it is.
+    onTarget(procedures) {
+        if (procedures) {
+            this.call();
+            return OnTargets.procedure;
+        }
+        const target = this.is("linenum") ? OnTargets.lineNumber : OnTargets.expression;
+        this.GOTO();
+        return target;
+    }
+
+    // BASIC jumps once it has a target and skips the others by their commas, so what follows a target up to the next
+    // comma is never read. The first of it is marked, as it is after an assembler instruction.
+    ignoredAfter(target) {
+        if (this.atEnd() || this.isPunct(",")) return;
+        const token = this.peek();
+        const code = this.spaceFix(token);
+        const keyword = SpacedKeywords.find(word => token.text.startsWith(word));
+        const message = code
+            ? `${token.text} is read as a name, not the keyword ${keyword}: BASIC recognises a keyword only at the start of a word, and there is no space before this one. ${target}; probably a space was meant before ${keyword}`
+            : `${target}; probably a space or comma is missing`;
+        this.stricter(this.next(), message, code ?? IgnoredInOnListCode);
+        while (!this.atEnd() && !this.isPunct(",")) this.next();
     }
 
     IF() {
@@ -869,7 +916,8 @@ export class Recogniser {
         if (
             this.probing ||
             token.kind !== "name" ||
-            !SpacedKeywords.some(keyword => token.text.startsWith(keyword))
+            !SpacedKeywords.some(keyword => token.text.startsWith(keyword)) ||
+            (token.text.startsWith("ELSE") && !this.waitingForElse)
         )
             return undefined;
         const {text} = this.lexer;

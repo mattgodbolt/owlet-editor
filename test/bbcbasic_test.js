@@ -1447,9 +1447,22 @@ describe("Quick fix for a keyword that a number or name runs into", () => {
             assert.deepStrictEqual(fixes(text, dialect), []);
         }
     });
-    it("should offer no fix where the ROM reads the line as it is", () => {
-        for (const text of ["ONX%GOTOERL+2E1ELSE30"])
-            assert.deepStrictEqual(fixes(text, BasicIIDialect), []);
+    // BASIC reads E1ELSE30 as part of a name and ignores it, with no error: the mark is on purpose (the README), and the
+    // fix is offered only where an ON or IF is waiting for the ELSE.
+    it("should offer a space before an ELSE that a number runs into after an ON list", () => {
+        const text = "X%=5:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30";
+        const spaced = "X%=5:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1 ELSE30";
+        for (const [dialect, table] of [
+            [BasicIIDialect, verdicts],
+            [BasicIVDialect, masterVerdicts],
+        ]) {
+            assert.strictEqual(table.get(spaced), "ok");
+            assert.deepStrictEqual(fixes(text, dialect), [["Insert a space before ELSE", spaced]]);
+            assert.deepStrictEqual(fixes(spaced, dialect), []);
+        }
+    });
+    it("should offer no ELSE fix where no IF or ON is waiting for it", () => {
+        assert.deepStrictEqual(fixes("X=1E1ELSE30", BasicIIDialect), []);
     });
     it("should leave the marker an error, and mend the line it is on", () => {
         assert.deepStrictEqual(

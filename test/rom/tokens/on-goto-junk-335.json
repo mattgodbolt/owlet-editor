@@ -1,0 +1,90 @@
+[
+  ["ON 1 GOTO 10E1", "ee 20 31 20 e5 20 8d 54 4a 40 45 31", "on-goto-junk-335"],
+  ["ON 1 GOTO 10 JUNK", "ee 20 31 20 e5 20 8d 54 4a 40 20 4a 55 4e 4b", "on-goto-junk-335"],
+  ["ON 1 GOTO 10+X", "ee 20 31 20 e5 20 8d 54 4a 40 2b 58", "on-goto-junk-335"],
+  [
+    "ON 2 GOTO 99,10JUNK",
+    "ee 20 32 20 e5 20 8d 44 63 40 2c 8d 54 4a 40 4a 55 4e 4b",
+    "on-goto-junk-335"
+  ],
+  ["ON 2 GOTO 99,10E1", "ee 20 32 20 e5 20 8d 44 63 40 2c 8d 54 4a 40 45 31", "on-goto-junk-335"],
+  [
+    "ON 2 GOTO 99,X+9JUNK",
+    "ee 20 32 20 e5 20 8d 44 63 40 2c 58 2b 39 4a 55 4e 4b",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 2 GOTO 99,X+9 JUNK",
+    "ee 20 32 20 e5 20 8d 44 63 40 2c 58 2b 39 20 4a 55 4e 4b",
+    "on-goto-junk-335"
+  ],
+  ["ON 1 GOSUB 10E1", "ee 20 31 20 e4 20 8d 54 4a 40 45 31", "on-goto-junk-335"],
+  ["ON 1 GOSUB 10 JUNK", "ee 20 31 20 e4 20 8d 54 4a 40 20 4a 55 4e 4b", "on-goto-junk-335"],
+  [
+    "ON 5 GOTO 10 JUNK ELSE PRINT 1",
+    "ee 20 35 20 e5 20 8d 54 4a 40 20 4a 55 4e 4b 20 8b 20 f1 20 31",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 5 GOTO 10 PRINT 1 ELSE PRINT 2",
+    "ee 20 35 20 e5 20 8d 54 4a 40 20 f1 20 31 20 8b 20 f1 20 32",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 5 GOTO 10,20JUNK ELSE PRINT 1",
+    "ee 20 35 20 e5 20 8d 54 4a 40 2c 8d 54 54 40 4a 55 4e 4b 20 8b 20 f1 20 31",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 5 GOTO 10,5+5E1 ELSE PRINT 1",
+    "ee 20 35 20 e5 20 8d 54 4a 40 2c 8d 54 45 40 2b 35 45 31 20 8b 20 f1 20 31",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 5 GOTO 10,5+5 E1ELSE PRINT 1",
+    "ee 20 35 20 e5 20 8d 54 4a 40 2c 8d 54 45 40 2b 35 20 45 31 45 4c 53 45 20 f1 20 31",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 2 GOTO 99 JUNK,10 ELSE PRINT 1",
+    "ee 20 32 20 e5 20 8d 44 63 40 20 4a 55 4e 4b 2c 31 30 20 8b 20 f1 20 31",
+    "on-goto-junk-335"
+  ],
+  [
+    "ON 5 GOTO 2E1 ELSE30",
+    "ee 20 35 20 e5 20 8d 54 42 40 45 31 20 8b 8d 54 5e 40",
+    "on-goto-junk-335"
+  ],
+  ["ON 5 GOTO 10ELSE PRINT 1", "ee 20 35 20 e5 20 8d 54 4a 40 8b 20 f1 20 31", "on-goto-junk-335"],
+  ["ON 5 GOTO 10ELSE30", "ee 20 35 20 e5 20 8d 54 4a 40 8b 8d 54 5e 40", "on-goto-junk-335"],
+  [
+    "ON 5 GOTO 10,2E1 ELSE30",
+    "ee 20 35 20 e5 20 8d 54 4a 40 2c 8d 54 42 40 45 31 20 8b 8d 54 5e 40",
+    "on-goto-junk-335"
+  ],
+  [
+    "X%=2:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30",
+    "58 25 3d 32 3a ee 58 25 e5 8d 54 54 40 45 31 2c 32 30 2c 2b 2e 32 45 32 4a 55 4e 4b 2c 9e 2b 32 45 31 45 4c 53 45 33 30",
+    "on-goto-junk-335"
+  ],
+  [
+    "X%=3:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30",
+    "58 25 3d 33 3a ee 58 25 e5 8d 54 54 40 45 31 2c 32 30 2c 2b 2e 32 45 32 4a 55 4e 4b 2c 9e 2b 32 45 31 45 4c 53 45 33 30",
+    "on-goto-junk-335"
+  ],
+  [
+    "X%=4:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30",
+    "58 25 3d 34 3a ee 58 25 e5 8d 54 54 40 45 31 2c 32 30 2c 2b 2e 32 45 32 4a 55 4e 4b 2c 9e 2b 32 45 31 45 4c 53 45 33 30",
+    "on-goto-junk-335"
+  ],
+  [
+    "X%=5:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1 ELSE30",
+    "58 25 3d 35 3a ee 58 25 e5 8d 54 54 40 45 31 2c 32 30 2c 2b 2e 32 45 32 4a 55 4e 4b 2c 9e 2b 32 45 31 20 8b 8d 54 5e 40",
+    "on-goto-junk-335"
+  ],
+  [
+    "X%=1:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1 ELSE30",
+    "58 25 3d 31 3a ee 58 25 e5 8d 54 54 40 45 31 2c 32 30 2c 2b 2e 32 45 32 4a 55 4e 4b 2c 9e 2b 32 45 31 20 8b 8d 54 5e 40",
+    "on-goto-junk-335"
+  ]
+]
