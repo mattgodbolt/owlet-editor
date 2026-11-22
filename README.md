@@ -303,6 +303,22 @@ message that says what BASIC does, and shows as an error.
   or `ON` waits for one `ELSE` and the first it meets is its own. `IF A THEN IF B THEN x ELSE y ELSE z` has its second
   `ELSE` marked, as `IF0ELSEELSEPRINT"x"` does, but an `IF` or `ON` after an `ELSE` waits for another, so
   `IF A THEN x ELSE IF B THEN y ELSE z` is not marked. Suggested by Olly Betts on #319.
+- **Text after a target in an `ON ... GOTO`, `GOSUB` or (BASIC IV) `PROC` list** (`ON X GOTO 20E1,30`, `ON X GOTO
+  10,A+1JUNK`, `ON X PROCa JUNK`). BASIC counts commas to find the target it wants, evaluates it and jumps, so what
+  follows a target up to the next comma, or to the `ELSE` or the end of the statement, is never read and is not an
+  error. The first token of it is red, with a hover that says what BASIC does. A number straight after `GOTO` or
+  `GOSUB`, and after a comma while every target so far has been a bare line number, is a line number token and ends
+  the target there: `20E1` is line 20, not 200, and `5+5` is line 5, not 10. A target after an expression or after
+  text that is ignored is read as an expression (`20E1,20,+.2E2JUNK` has two line numbers and two expressions), so
+  BASIC's RENUMBER does not touch it. A keyword that runs into an exponent number (`ERL+2E1ELSE30`) is part of a name
+  there, so the `ELSE` is not read and is red as the first of the ignored text, and where a space before it leaves
+  nothing ignored (an `ON` or `IF` is waiting for the `ELSE`) the fix is "Insert a space before ELSE". A target after
+  the first on `PROC` that does not start with `PROC`, or that does not parse, is left alone, as BASIC reads it only
+  if it is the one it counts to. BASIC II counts commas in the raw text, so one inside a string splits a target there
+  (`ON 3 GOTO 10,"x,y",30` reads `y"` as the third), and nothing after it is marked; BASIC IV reads a string as one item.
+  Suggested by Olly Betts on #335; the rows recorded for it include the ones that must
+  stay unmarked (`ON 5 GOTO 10ELSE30`, where the `ELSE` is read). The oracle takes the marks on trust as ignored text,
+  as it does the assembler's, and lists them as STRICTER.
 - **A string where BASIC wants a number, or the other way round** (`PRINT"X"DIV 2`, `X=1+"A"`, `X$="A"+1`, `X=LEN 5`,
   `PRINT STR$A$`). BASIC raises "Type mismatch" when it runs such a statement, not when it reads it, so a program that
   never gets there is fine. The operator or function word is red, with a hover that says what is wrong. It is marked for

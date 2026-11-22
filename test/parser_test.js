@@ -73,6 +73,11 @@ const StricterThanRom = [
     "IF 1 THEN IF 0 THEN PRINT 1 ELSE PRINT 2 ELSE PRINT 3",
     "IF 0 THEN IF 1 THEN PRINT 1 ELSE PRINT 2 ELSE )",
     "IF 0 THEN ON A GOTO 10,20 ELSE PRINT 3 ELSE PRINT 4",
+    "ON 1 GOTO 10E1",
+    "ON 1 GOTO 10 JUNK",
+    "ON 1 GOTO 10+X",
+    "ON 1 GOSUB 10E1",
+    "ON 1 GOSUB 10 JUNK",
     "DIM P% 99:IF 0 THEN B=1 ELSE [NOP ELSE X=1",
     "DIM P% 99:IF 0 THEN B=1 ELSE [NOP:LDA #1 ELSE X=1:]",
     "[NOP ELSE X=1",
@@ -423,6 +428,91 @@ describe("ELSE that no IF is waiting for", () => {
         "X=RND(1,2 ELSE )",
     ])("%s should have no ELSE marked", text => {
         assert.deepStrictEqual(strays(text), []);
+    });
+});
+
+// BASIC jumps once it has a target and skips the others by their commas, so what follows a target up to the next comma
+// is ignored: red on purpose, on its first token (the README). A line number is a token of its own, so 5+5 is line 5.
+describe("Text BASIC ignores in an ON list", () => {
+    const ignored = (text, dialect = ModelBDialect) =>
+        programProblems(readLines(text, dialect))
+            .filter(problem => problem.stricter)
+            .map(({start, end, code}) => [text.slice(start, end), code]);
+    const SpaceBeforeElse = "space-before-keyword";
+    const IgnoredInList = "ignored-in-on-list";
+
+    it.each([
+        ["ON X GOTO 20E1", [["E1"]]],
+        ["ON X GOSUB 10 JUNK", [["JUNK"]]],
+        ["ON X GOTO 5+5", [["+"]]],
+        ["ON X GOTO 10,20E1,30 ELSE PRINT", [["E1"]]],
+        ["ON X GOTO 10,A+1JUNK", [["JUNK"]]],
+        ["ON X GOTO 10 JUNK ELSE PRINT", [["JUNK"]]],
+        ["ON X GOTO 10 PRINT 1:PRINT 2", [["PRINT"]]],
+        ["ON X GOTO 10 A B,20 C D", [["A"], ["C"]]],
+        ['ON X GOTO 10 JUNK,"a,b",20 JUNK', [["JUNK"]]],
+        ['ON X GOTO 10 "a,b" JUNK,20 JUNK', [['"a,b"']]],
+        ["ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1 ELSE30", [["E1"], ["JUNK"]]],
+        [
+            "ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30",
+            [["E1"], ["JUNK"], ["ELSE30", SpaceBeforeElse]],
+        ],
+        ["ON X GOTO A+2E1ELSE30", [["ELSE30", SpaceBeforeElse]]],
+        ["ON X GOTO 10E1ELSE30", [["E1ELSE30"]]],
+    ])("%s should mark %j", (text, expected) => {
+        assert.deepStrictEqual(
+            ignored(text),
+            expected.map(([token, code = IgnoredInList]) => [token, code]),
+        );
+        assert.deepStrictEqual(
+            red(text),
+            expected.map(([token]) => token),
+        );
+    });
+    it.each([
+        "ON X GOTO 10",
+        "ON X GOTO 10,20 ELSE PRINT",
+        "ON X GOTO 10 , 20 : PRINT",
+        "ON X GOTO A+1,B*2",
+        "ON X GOTO 10ELSE30",
+        "ON X GOTO 10,A+2E1 ELSE30",
+        'ON X GOTO "a,b",20 JUNK',
+        'ON X GOTO 10,"a,b" JUNK,20 JUNK',
+        "ON X GOTO 10,",
+        "ON X GOTO 10,A$+",
+        "ON X GOSUB 10,(1+",
+    ])("%s should have nothing ignored", text => {
+        assert.deepStrictEqual(ignored(text), []);
+        assert.deepStrictEqual(red(text), []);
+    });
+    it("should say what BASIC does", () => {
+        const [{message}] = programProblems(readLines("ON X GOTO 20E1", ModelBDialect));
+        assert.strictEqual(
+            message,
+            "BASIC ignores everything after the line number here, up to the next comma (20E1 is line 20, not 200); probably a space or comma is missing",
+        );
+    });
+    it("should leave ELSE30 unmarked as a name where an IF is not waiting for it", () => {
+        assert.deepStrictEqual(
+            programProblems(readLines("X=1E1ELSE30", ModelBDialect)).map(({code}) => code),
+            [undefined],
+        );
+    });
+    it.each([
+        ["ON X PROCa JUNK", [["JUNK"]]],
+        ["ON X PROCa(1)2,PROCb ELSE PRINT", [["2"]]],
+        ["ON X PROCa,PROCb JUNK,PROCc", [["JUNK"]]],
+        ["ON X PROCa,b JUNK", []],
+        // BASIC IV reads a string as one item, so a comma inside it does not split the list (BASIC II's does).
+        ['ON X GOTO 10 JUNK,"a,b",20 JUNK', [["JUNK"], ["JUNK"]]],
+        ['ON X GOTO "a,b",20 JUNK', [["JUNK"]]],
+        ['ON X GOTO 10 "a,b" JUNK,20 JUNK', [['"a,b"'], ["JUNK"]]],
+        ["ON X PROCa,PROCb", []],
+    ])("%s should mark %j on BASIC IV", (text, expected) => {
+        assert.deepStrictEqual(
+            ignored(text, BasicIVDialect),
+            expected.map(([token]) => [token, IgnoredInList]),
+        );
     });
 });
 

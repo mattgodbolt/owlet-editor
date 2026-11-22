@@ -78,7 +78,7 @@ async function romVerdicts(texts) {
 }
 
 // For each text: its invalid tokens as [start, end], and the spans of its problems that are unfinished, stricter than
-// the ROM on purpose, or text the ROM ignores (junk after an assembler instruction); and whether it is lenient on
+// the ROM on purpose, or text the ROM ignores (junk after an assembler instruction or an ON target); and whether it is lenient on
 // purpose, which is where it read a COLOR as COLOUR, which BASIC II does not.
 function highlighterVerdicts(texts) {
     return texts.map(text => {
