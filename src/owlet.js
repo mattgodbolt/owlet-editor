@@ -458,7 +458,7 @@ export class OwletEditor {
         ) {
             this.emulator.pause();
             $play.addClass("play");
-            $play.html('<i class="fa-solid fa-play" style="pointer-events: none;"></i>');
+            $play.html('<i class="fa-solid fa-play"></i>');
         } else {
             this.emulator.start();
             $play.removeClass("play");

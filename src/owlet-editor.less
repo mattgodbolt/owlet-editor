@@ -9,6 +9,7 @@
   --color-buttons: #595959;
   --color-editor-bg: #171717;
   --font-color: #bbb;
+  --color-button-text: #fff;
   --color-highlight: #5e8040;
   --button-highlight: #6f2020;
   --button-blue: #00536f;
@@ -43,7 +44,7 @@ body {
   height: 90vh;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px 32px;
+  grid-template-rows: 80px 32px minmax(320px, 90vh) 32px 32px;
 }
 
 .header {
@@ -122,10 +123,28 @@ button:active {
   padding-left: 16px;
   margin-right: 4px;
   text-decoration: none;
-  color: var(--font-color);
+  color: var(--color-button-text);
   border: 0px solid var(--color-toolbar);
   background-color: var(--color-buttons);
   //    background-color: #8064A2 !important;
+}
+
+button[data-action] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  // Clicks should land on the button, whichever part of it was hit.
+  > * {
+    pointer-events: none;
+  }
+}
+
+// The global *:focus rule removes outlines, so keyboard focus needs its own, and to win it must be !important.
+button:focus-visible {
+  outline: 2px solid #fff !important;
+  outline-offset: -2px;
 }
 
 button:active {
@@ -146,11 +165,6 @@ canvas.screen {
 
 #sound {
   white-space: nowrap;
-
-  // Clicks should land on the button, whichever part of it was hit.
-  * {
-    pointer-events: none;
-  }
 
   .sound-icon-on {
     display: none;
@@ -174,20 +188,45 @@ canvas.screen {
 #debug {
   white-space: nowrap;
 
-  * {
-    pointer-events: none;
-  }
-
   &[aria-pressed="true"] {
     background-color: var(--color-highlight);
   }
 }
 
-// On a phone the icon alone has to do, as the footer has no room for its words.
-@media (orientation: portrait) {
+// A bar shows its words when it is wide enough for them, whatever the orientation.
+#editor_toolbar,
+#editor_footer,
+#emu_toolbar,
+#emu_footer {
+  container-type: inline-size;
+}
+
+.label,
+#sound-label,
+#debug-label {
+  display: none;
+}
+
+@container (min-width: 340px) {
+  #editor_toolbar .label {
+    display: inline;
+  }
+}
+
+@container (min-width: 480px) {
   #sound-label,
   #debug-label {
-    display: none;
+    display: inline;
+  }
+}
+
+@container (max-width: 520px) {
+  #editor_toolbar button,
+  #emu_toolbar button,
+  #editor_footer button,
+  #emu_footer button {
+    padding-inline: 10px;
+    margin-right: 3px;
   }
 }
 
@@ -484,6 +523,18 @@ input {
   color: var(--color-background);
 }
 
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    flex: 1 1 9rem;
+    height: 40px;
+    margin: 0;
+  }
+}
+
 /* The Close Button */
 .close {
   color: var(--color-background);
@@ -508,7 +559,7 @@ input {
     height: 90vh;
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: 80px 32px 32px 80vw 32px 32px minmax(288px, 90vh) 32px 50vh;
+    grid-template-rows: 80px 40px 44px 80vw 32px 40px minmax(288px, 90vh) 48px 50vh;
   }
 
   .header {
