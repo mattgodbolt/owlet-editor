@@ -45,7 +45,8 @@ export const BasicIIDialect = Object.freeze({
     usColor: false,
 });
 // The editor's Model B: BASIC II, and a COLOR that starts a statement and can only be COLOUR is COLOUR (the recogniser
-// decides which), as it is on the Master. The ROM says Mistake to that, so this is lenient on purpose (see the README).
+// decides which), as it is on the Master. The ROM says Mistake to that, so this is lenient on purpose (see
+// docs/rom-deviations.md).
 export const ModelBDialect = Object.freeze({...BasicIIDialect, usColor: true});
 export const BasicIVDialect = Object.freeze({
     basicIV: true,

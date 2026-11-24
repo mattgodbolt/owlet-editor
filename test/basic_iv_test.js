@@ -20,8 +20,8 @@ const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 const stops = (text, dialect) =>
     programProblems(readLines(text, dialect)).some(problem => !problem.stricter);
 
-// Lines BASIC IV runs that are marked on purpose (see the README): what follows a complete instruction is ignored, and
-// an ELSE that no IF is waiting for.
+// Lines BASIC IV runs that are marked on purpose (see docs/rom-deviations.md): what follows a complete instruction is
+// ignored, and an ELSE that no IF is waiting for.
 const StricterThanRom = [
     "X%=6ELSE7",
     "PRINT 1 ELSE PRINT 2",

@@ -62,7 +62,8 @@ describe("Tokeniser", () => {
 });
 
 // COLOR, the US spelling of COLOUR, is read as it on the Model B where it starts a statement, is followed by an expression
-// and then the end of the statement, and could not be a variable; BASIC II's ROM says Mistake to it (README).
+// and then the end of the statement, and could not be a variable; BASIC II's ROM says Mistake to it
+// (docs/rom-deviations.md).
 describe("COLOR on a Model B", () => {
     // The text, and the text as if the COLOR that is COLOUR were written so.
     it.each([
