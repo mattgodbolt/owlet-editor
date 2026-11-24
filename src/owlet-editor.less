@@ -9,6 +9,7 @@
   --color-buttons: #595959;
   --color-editor-bg: #171717;
   --font-color: #bbb;
+  --color-button-text: #eee;
   --color-highlight: #5e8040;
   --button-highlight: #6f2020;
   --button-blue: #00536f;
@@ -122,10 +123,28 @@ button:active {
   padding-left: 16px;
   margin-right: 4px;
   text-decoration: none;
-  color: var(--font-color);
+  color: var(--color-button-text);
   border: 0px solid var(--color-toolbar);
   background-color: var(--color-buttons);
   //    background-color: #8064A2 !important;
+}
+
+button[data-action] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  // Clicks should land on the button, whichever part of it was hit.
+  > * {
+    pointer-events: none;
+  }
+}
+
+// The global *:focus rule removes outlines, so keyboard focus needs its own, and to win it must be !important.
+button:focus-visible {
+  outline: 2px solid #fff !important;
+  outline-offset: -2px;
 }
 
 button:active {
@@ -146,11 +165,6 @@ canvas.screen {
 
 #sound {
   white-space: nowrap;
-
-  // Clicks should land on the button, whichever part of it was hit.
-  * {
-    pointer-events: none;
-  }
 
   .sound-icon-on {
     display: none;
@@ -174,10 +188,6 @@ canvas.screen {
 #debug {
   white-space: nowrap;
 
-  * {
-    pointer-events: none;
-  }
-
   &[aria-pressed="true"] {
     background-color: var(--color-highlight);
   }
@@ -186,7 +196,8 @@ canvas.screen {
 // On a phone the icon alone has to do, as the footer has no room for its words.
 @media (orientation: portrait) {
   #sound-label,
-  #debug-label {
+  #debug-label,
+  #editor_toolbar .label {
     display: none;
   }
 }
