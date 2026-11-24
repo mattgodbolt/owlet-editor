@@ -1515,6 +1515,91 @@ describe("Quick fix for GCOL with one argument", () => {
     });
 });
 
+describe("Quick fix for a BASIC V statement", () => {
+    // Each is a recorded row that both ROMs stop at (#348), and the fixed line is one that both run. CIRCLE has a fix only
+    // on BASIC IV, as the circle codes of PLOT are the Master's.
+    it.each([
+        ["OFF", "VDU 23,1,0;0;0;0;"],
+        ["ON", "VDU 23,1,1;0;0;0;"],
+        ["OFF:PRINT", "VDU 23,1,0;0;0;0;:PRINT"],
+        ["IF 1 THEN OFF ELSE PRINT", "IF 1 THEN VDU 23,1,0;0;0;0; ELSE PRINT"],
+        ["BY=1:MOVE BY 1,2", "BY=1:PLOT0,1,2"],
+        ["BY=1:MOVE BY X+1,Y*2", "BY=1:PLOT0,X+1,Y*2"],
+        ["BY=1:DRAW BY 1,2", "BY=1:PLOT1,1,2"],
+        ["BY=1:IF 1 THEN DRAW BY 1,2 ELSE PRINT", "BY=1:IF 1 THEN PLOT1,1,2 ELSE PRINT"],
+        ["POINT 1,2", "PLOT&65,1,2"],
+        ["POINT 1,2:PRINT", "PLOT&65,1,2:PRINT"],
+        ["POINT (1),(2)", "PLOT&65,(1),(2)"],
+        ["POINT BY 1,2", "PLOT&61,1,2"],
+        ["ORIGIN 1,2", "VDU29,1;2;"],
+        ["ORIGIN X+1,Y*2", "VDU29,X+1;Y*2;"],
+        ["LINE 1,2,3,4", "MOVE 1,2:DRAW 3,4"],
+        ["LINE X,Y+1,X+2,FNg(1)", "MOVE X,Y+1:DRAW X+2,FNg(1)"],
+        ["LINE 1,2,3,4:PRINT", "MOVE 1,2:DRAW 3,4:PRINT"],
+        ["IF 1 THEN LINE 1,2,3,4 ELSE PRINT", "IF 1 THEN MOVE 1,2:DRAW 3,4 ELSE PRINT"],
+        ["CIRCLE 1,2,3", "MOVE 1,2:PLOT&91,3,0"],
+        ["CIRCLE X,Y,FNg(2)", "MOVE X,Y:PLOT&91,FNg(2),0"],
+        ["CIRCLE FILL 1,2,3", "MOVE 1,2:PLOT&99,3,0"],
+        ["CIRCLE 1,2,3:PRINT", "MOVE 1,2:PLOT&91,3,0:PRINT"],
+        ["10 X=1\n20 ORIGIN  1 , 2", "10 X=1\n20 VDU29,1;2;"],
+    ])("%s should offer %s", (text, result) => {
+        const onlyBasicIV = text.includes("CIRCLE");
+        for (const [dialect, table] of [
+            [BasicIIDialect, verdicts],
+            [BasicIVDialect, masterVerdicts],
+        ]) {
+            if (!text.includes("\n")) {
+                assert.notStrictEqual(table.get(text), "ok");
+                // The rows that define BY to be a variable have the fixed text without that, which is the same.
+                assert.strictEqual(table.get(result.replace(/^BY=1:/, "")), "ok");
+            }
+            const offered = fixes(text, dialect).map(([, fixed]) => fixed);
+            const wanted = onlyBasicIV && dialect === BasicIIDialect ? [] : [result];
+            assert.deepStrictEqual(offered, wanted);
+        }
+    });
+    it("should title the fix with the text it replaces", () => {
+        assert.deepStrictEqual(fixes("OFF", BasicIIDialect), [
+            ["Replace OFF with VDU 23,1,0;0;0;0;", "VDU 23,1,0;0;0;0;"],
+        ]);
+        assert.deepStrictEqual(fixes("X=1:LINE 1,2,3,4:PRINT", BasicIIDialect), [
+            ["Replace LINE 1,2,3,4 with MOVE 1,2:DRAW 3,4", "X=1:MOVE 1,2:DRAW 3,4:PRINT"],
+        ]);
+    });
+    // Each is an error with no fix: the arguments do not split into the form's count (so that nothing is guessed), the
+    // statement is not the BASIC V form (MOVE BY1,2 and MOVE BY,2 are variables), or it is valid.
+    it.each([
+        "OFF 1",
+        "LINE 1,2,3",
+        "LINE 1,2,3,4,5",
+        "LINE 1,,3,4",
+        "POINT 1",
+        "POINT (1,2)",
+        "POINT 1,2 REM x",
+        "MOVE BY",
+        "BY=1:MOVE BY,2",
+        "BY=1:MOVE BY -1,2",
+        "BY1=1:MOVE BY1,2",
+        "ON ERROR OFF",
+        "ON ERROR LINE 1,2",
+        "TRACE OFF",
+    ])("%s should offer no fix", text => {
+        for (const dialect of [BasicIIDialect, BasicIVDialect])
+            assert.deepStrictEqual(fixes(text, dialect), []);
+    });
+    it("should say that BASIC V accepts the statement, after the ROM's words", () => {
+        assert.deepStrictEqual(
+            getSyntaxMarkers("ORIGIN 1,2", BasicIIDialect).map(m => [m.severity, m.message]),
+            [
+                [
+                    MarkerSeverity.Error,
+                    "BASIC V accepts ORIGIN X,Y, which sets the graphics origin; BASIC II and IV have no such statement, but VDU29,X;Y; does the same (BASIC: Syntax error)",
+                ],
+            ],
+        );
+    });
+});
+
 describe("BASIC IV's assembler on BASIC II", () => {
     const BasicIVOnly = "BRA CLR DEA INA PHX PHY PLX PLY STZ TRB TSB".split(" ");
     const iv = mnemonic => `${mnemonic} is a BASIC IV instruction, which BASIC II does not have`;

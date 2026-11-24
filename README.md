@@ -296,6 +296,16 @@ message that says what BASIC does, and shows as an error.
   (recorded on both ROMs); the hover says that BASIC V accepts one argument, with `GCOL C` meaning `GCOL 0,C` (from
   #340; BASIC V is not emulated here), and the quick fix is "Insert 0, before the argument", offered only where the
   statement then has no error (so not for `GCOL 1 2`). `GCOL 1,2,3` is a different error and has no fix.
+- **BASIC V statements** (`OFF`, `ON`, `MOVE BY`, `DRAW BY`, `POINT`, `POINT BY`, `ORIGIN`, `LINE`, `CIRCLE`,
+  `CIRCLE FILL`). BASIC II and IV stop at each with the error it has always had (`Syntax error`, `No such variable`,
+  `Missing ,` or `Mistake`; recorded on both ROMs). The hover says that BASIC V accepts it (BASIC V is not emulated here)
+  and the quick fix replaces the statement with the one that does the same, as listed in #348: `OFF` and `ON` become
+  `VDU 23,1,0;0;0;0;` and `VDU 23,1,1;0;0;0;`, `MOVE BY X,Y` becomes `PLOT0,X,Y`, `ORIGIN X,Y` becomes `VDU29,X;Y;`,
+  `LINE X,Y,X2,Y2` becomes `MOVE X,Y:DRAW X2,Y2`, and so on (the table is in `src/parser/basic-v.js`). The fix is
+  offered only where the arguments split at commas outside brackets into the right number, and the line with the
+  replacement has no error. `CIRCLE` and `CIRCLE FILL` use the circle codes of the Master's PLOT (and the GXR), so they
+  have a fix on BASIC IV only. `ELLIPSE`, `FILL` and `RECTANGLE` have none, as they cannot be written without repeating
+  an argument or leaving the graphics cursor elsewhere.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
   `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into, which is right at the end
   of the `THEN` part of an `IF` (or after an `ON` list) and a quirk anywhere else. The `ELSE` is red and the text after

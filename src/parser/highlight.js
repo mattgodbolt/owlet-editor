@@ -161,6 +161,7 @@ export function programProblems(recognisers) {
                 missingAfter,
                 stricter,
                 code,
+                fix,
             }) => ({
                 line: i + 1,
                 start: unfinished && !hole ? last.start : token.start,
@@ -172,6 +173,7 @@ export function programProblems(recognisers) {
                 missingAfter: Boolean(missingAfter),
                 stricter: Boolean(stricter),
                 code,
+                ...(fix && {fix}),
             }),
         );
     });
