@@ -743,3 +743,77 @@ input {
 .monaco-editor .marker-widget .descriptioncontainer .message {
   white-space: pre-wrap;
 }
+
+// The "Save memory" dialog's range, preview and problem bytes.
+#save {
+  .save-range {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+
+    input {
+      width: 14ch;
+      font-family: monospace;
+    }
+  }
+
+  #saveSummary {
+    margin: 8px 0 4px;
+
+    &[data-state="problem"] {
+      color: #b05a00;
+      font-weight: bold;
+    }
+
+    &[data-state="error"] {
+      color: #b03a3a;
+    }
+  }
+
+  #saveProblems button {
+    height: auto;
+    margin: 0 4px 4px 0;
+    padding: 0 6px;
+    font-family: monospace;
+  }
+
+  #savePreview {
+    display: grid;
+    grid-template-columns: repeat(16, 3ch);
+    font-family: monospace;
+    margin: 4px 0;
+
+    span {
+      text-align: center;
+    }
+
+    .lf {
+      background: #d08020;
+    }
+
+    .cr {
+      background: #c04040;
+      color: #fff;
+    }
+  }
+
+  #saveText {
+    margin: 4px 0 8px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: rgba(0, 0, 0, 0.08);
+    color: #111;
+    padding: 4px;
+  }
+}
+
+@media (orientation: portrait) {
+  #save #savePreview {
+    grid-template-columns: repeat(8, 3ch);
+  }
+
+  #save .modal-content {
+    margin: 4% auto;
+    width: 90%;
+  }
+}

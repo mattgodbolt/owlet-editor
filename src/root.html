@@ -121,10 +121,20 @@
 <div class="modal" id="save">
     <div class="modal-content">
         <p><b>Save memory from the emulator (to clipboard)</b></p>
-        <p id="save-content">Start address and length (default is BASIC program).</p>
-        <input id="saveStartAddr" type="text" value="">
-        <input id="saveLen" type="text" value="">
-        <button data-action="copyMem">Copy</button>
+        <p id="save-content">Give the range as BASIC expressions, such as <code>D%</code> to <code>P%-1</code>, or <code>D%</code> length <code>P%-D%</code>. &amp;hex works too.</p>
+        <div class="save-range">
+            <input id="saveStartAddr" type="text" aria-label="First address" spellcheck="false" autocomplete="off">
+            <select id="saveMode" aria-label="Whether the second box is the last address or a length">
+                <option value="end">to</option>
+                <option value="length">length</option>
+            </select>
+            <input id="saveLen" type="text" aria-label="Last address, or length" spellcheck="false" autocomplete="off">
+        </div>
+        <p id="saveSummary"></p>
+        <div id="saveProblems"></div>
+        <div id="savePreview" aria-label="The bytes that will be copied"></div>
+        <pre id="saveText" aria-label="The text that will be copied"></pre>
+        <button id="saveCopy" data-action="copyMem">Copy</button>
         <button data-action="closeModal">Cancel</button>
     </div>
 
