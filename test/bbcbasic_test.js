@@ -1447,8 +1447,8 @@ describe("Quick fix for a keyword that a number or name runs into", () => {
             assert.deepStrictEqual(fixes(text, dialect), []);
         }
     });
-    // BASIC reads E1ELSE30 as part of a name and ignores it, with no error: the mark is on purpose (the README), and the
-    // fix is offered only where an ON or IF is waiting for the ELSE.
+    // BASIC reads E1ELSE30 as part of a name and ignores it, with no error: the mark is on purpose
+    // (docs/rom-deviations.md), and the fix is offered only where an ON or IF is waiting for the ELSE.
     it("should offer a space before an ELSE that a number runs into after an ON list", () => {
         const text = "X%=5:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1ELSE30";
         const spaced = "X%=5:ONX%GOTO20E1,20,+.2E2JUNK,ERL+2E1 ELSE30";

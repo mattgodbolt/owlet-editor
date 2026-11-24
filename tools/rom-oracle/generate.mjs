@@ -223,8 +223,9 @@ export function generate({seed = 1, count = 3000} = {}) {
     return out;
 }
 
-// The Model B's editor reads COLOR that starts a statement as COLOUR where it can only be that (the README), which the
-// ROM rejects: Olly Betts's examples on #245, and the variables and operands that must stay what they are.
+// The Model B's editor reads COLOR that starts a statement as COLOUR where it can only be that
+// (docs/rom-deviations.md), which the ROM rejects: Olly Betts's examples on #245, and the variables and operands that
+// must stay what they are.
 export const generateColor = () =>
     `COLOR 1 | COLOR7 | COLOR X | COLOR(1) | COLOR 1:COLOR 2 | X=1:COLOR X | IF X THEN COLOR 1 ELSE COLOR 2
     | IF X COLOR 1 | IFX COLORX ELSE COLORX | REPEAT COLOR 1 | ON ERROR COLOR 7:GOTO 1000 | ONERRORCOLOR7:GOTO1000

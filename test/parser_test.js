@@ -48,13 +48,13 @@ describe("Lexer", () => {
     });
 });
 
-// Lines BASIC II rejects that the recogniser does not mark: false-valids are measured, not gated (see the README).
-// A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
+// Lines BASIC II rejects that the recogniser does not mark: false-valids are measured, not gated (see
+// docs/highlighting.md). A "(" after a space can belong to a FN or PROC call or not, depending on its DEF.
 const KnownGaps = ["X=FNf (1)", "PROCp (1)", 'LIST IF "a"'];
 
-// Lines BASIC II runs that are marked on purpose (see the README): anything but a comment after a complete assembler
-// instruction, a character in a mnemonic that is not a letter but that BASIC reads as one, and an ELSE that no IF is
-// waiting for.
+// Lines BASIC II runs that are marked on purpose (see docs/rom-deviations.md): anything but a comment after a complete
+// assembler instruction, a character in a mnemonic that is not a letter but that BASIC reads as one, and an ELSE that
+// no IF is waiting for.
 const StricterThanRom = [
     "P.1:ELSE",
     "PRINT X ELSE",
@@ -393,7 +393,7 @@ const Typed = [
 ];
 
 // BASIC does not nest IF: the first ELSE after an IF or ON belongs to it, so the next is one that none is waiting
-// for. BASIC skips the rest of the line at it, which is red on purpose (the README).
+// for. BASIC skips the rest of the line at it, which is red on purpose (docs/rom-deviations.md).
 describe("ELSE that no IF is waiting for", () => {
     const strays = text =>
         programProblems(readLines(text, ModelBDialect))
@@ -432,7 +432,8 @@ describe("ELSE that no IF is waiting for", () => {
 });
 
 // BASIC jumps once it has a target and skips the others by their commas, so what follows a target up to the next comma
-// is ignored: red on purpose, on its first token (the README). A line number is a token of its own, so 5+5 is line 5.
+// is ignored: red on purpose, on its first token (docs/rom-deviations.md). A line number is a token of its own, so 5+5
+// is line 5.
 describe("Text BASIC ignores in an ON list", () => {
     const ignored = (text, dialect = ModelBDialect) =>
         programProblems(readLines(text, dialect))
@@ -516,7 +517,7 @@ describe("Text BASIC ignores in an ON list", () => {
     });
 });
 
-// ON ERROR LOCAL is BASIC V. BASIC II and IV take LOCAL as the handler, so the first error loops forever (the README).
+// ON ERROR LOCAL is BASIC V. BASIC II and IV take LOCAL as the handler, so the first error loops forever (docs/rom-deviations.md).
 describe("ON ERROR LOCAL", () => {
     const marked = (text, dialect) =>
         programProblems(readLines(text, dialect))
@@ -1209,7 +1210,8 @@ describe("The spellings the grammar names", () => {
     });
 });
 
-// BASIC raises Type mismatch when it runs the line, so what is marked is stricter than the ROM (the README says so).
+// BASIC raises Type mismatch when it runs the line, so what is marked is stricter than the ROM, as
+// docs/rom-deviations.md says.
 describe("Type mismatches", () => {
     const marked = text =>
         programProblems(readLines(text, ModelBDialect))
@@ -1231,14 +1233,64 @@ describe("Type mismatches", () => {
         ["PRINT A$=1", ["="]],
         ['IF 1<>"A" THEN END', ["<>"]],
         ["PRINT 1 AND A$", ["AND"]],
-        ["X=LEN 5", ["LEN"]],
-        ["X=ASC A%", ["ASC"]],
-        ["X=VAL X", ["VAL"]],
-        ["PRINT STR$A$", ["STR$"]],
-        ["PRINT STR$~A$", ["STR$"]],
-        ["PRINT CHR$A$", ["CHR$"]],
-        ["PRINT ABS GET$", ["ABS"]],
-        ["PRINT LEN GET", ["LEN"]],
+        ["X=LEN 5", ["5"]],
+        ["X=ASC A%", ["A%"]],
+        ["X=VAL X", ["X"]],
+        ["PRINT STR$A$", ["A$"]],
+        ["PRINT STR$~A$", ["A$"]],
+        ["PRINT CHR$A$", ["A$"]],
+        ["PRINT ABS GET$", ["GET$"]],
+        ["PRINT LEN GET", ["GET"]],
+        // The argument is marked, as soon as it is known to be the wrong type (#331).
+        ["X=ABS STR$1", ["STR$"]],
+        ["X=ABS STR$", ["STR$"]],
+        ["X=ASC INTX", ["INT"]],
+        ["X=ASC INSTR(A$,B$)", ["INSTR("]],
+        ["X=ABS(1)+ASC(1)", ["("]],
+        ["X=ASC -A", ["-"]],
+        ["X=ASC (1)", ["("]],
+        ["X=EVAL 1", ["1"]],
+        ["X=EVAL A", ["A"]],
+        ["X=EOF#STR$1", ["STR$"]],
+        ["X=EXT#A$", ["A$"]],
+        ["X=PTR#GET$", ["GET$"]],
+        ["X=BGET#STR$1", ["STR$"]],
+        ["X=ASC TIME", ["TIME"]],
+        ["X=ASC PAGE", ["PAGE"]],
+        ["P.SPCA$", ["A$"]],
+        ["P.SPC(A$)", ["("]],
+        ["P.SPC$@%", ["$"]],
+        ["P.SPCSTR$1", ["STR$"]],
+        ["P.?A$", ["A$"]],
+        ["X=A%?A$", ["A$"]],
+        ["X=!(A$)", ["("]],
+        ["X=A%!STR$1", ["STR$"]],
+        ["P.$A$", ["A$"]],
+        ["X$=$(A$)", ["("]],
+        ["?A$=1", ["A$"]],
+        ["P.-A$", ["A$"]],
+        ["P.-(A$)", ["("]],
+        ["P.-STR$1", ["STR$"]],
+        ["X=ABS -A$", ["A$"]],
+        ["X=?A+1", []],
+        ["X=A?1+1", []],
+        ["X$=$A", []],
+        ["P.SPC1", []],
+        ["P.SPC(1)", []],
+        ["P.SPC A%", []],
+        ["P.+A$", []],
+        ["P.+GET$", []],
+        ["X=ASC +A$", []],
+        ["X=ABS -A", []],
+        ["X=ASC GET$", []],
+        ["X=LEN(A$)", []],
+        ["X=EVAL A$", []],
+        ["X=EVAL FNa", []],
+        ["X=ASC FNa", []],
+        ["X=ABS FNa$", []],
+        ["X=EOF#A", []],
+        ["X=EOF#FNa", []],
+        ["P.A$?1", []],
         ["PRINT (A$)+1", ["+"]],
         ["PRINT GET$+1", ["+"]],
         ["PRINT 1D", []],
@@ -1263,6 +1315,7 @@ describe("Type mismatches", () => {
         ["X=EVAL A$+1", []],
         ["X=EVAL A$+B$", []],
         ["PRINT TIME$+1", []],
+        ["X=ABS TIME", []],
         ["X=INSTR(A$,B$)+1", []],
         ["X=ABS(A)+LEN(A$)", []],
     ])("%s should mark %j", (text, expected) => {

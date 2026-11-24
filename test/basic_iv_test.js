@@ -20,8 +20,8 @@ const hex = bytes => bytes.map(b => b.toString(16).padStart(2, "0")).join(" ");
 const stops = (text, dialect) =>
     programProblems(readLines(text, dialect)).some(problem => !problem.stricter);
 
-// Lines BASIC IV runs that are marked on purpose (see the README): what follows a complete instruction is ignored, and
-// an ELSE that no IF is waiting for.
+// Lines BASIC IV runs that are marked on purpose (see docs/rom-deviations.md): what follows a complete instruction is
+// ignored, and an ELSE that no IF is waiting for.
 const StricterThanRom = [
     "X%=6ELSE7",
     "PRINT 1 ELSE PRINT 2",
@@ -212,6 +212,22 @@ describe("BASIC IV", () => {
     });
     it("should give the error BASIC IV gives, or none where it does not know it", () => {
         assert.deepStrictEqual(wrongMessages(MasterVerdicts, [], BasicIVDialect), []);
+    });
+    // TIME$ is a string on BASIC IV, so what is given a string or a number is marked, and TIME alone is a number (#331).
+    it.each([
+        ["X=CHR$ TIME$", ["TIME"]],
+        ["X=ABS TIME$", ["TIME"]],
+        ["X=1+TIME$", ["+"]],
+        ["X=ASC TIME", ["TIME"]],
+        ["X=ASC TIME$", []],
+        ["X=LEN TIME$", []],
+        ["X$=TIME$+A$", []],
+        ["X=CHR$ TIME", []],
+    ])("should type %s: marks %j", (text, expected) => {
+        const marked = programProblems(readLines(text, BasicIVDialect))
+            .filter(problem => problem.stricter)
+            .map(problem => text.slice(problem.start, problem.end));
+        expect(marked).toEqual(expected);
     });
     it.each([["EDITED=FALSE"], ["EDIT 10"], ["A=1:ED."], ["IF A THEN EDIT"]])(
         "should say Syntax error at %j, where a program starts a statement with EDIT",

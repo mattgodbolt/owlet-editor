@@ -214,6 +214,17 @@ describe("Completions", () => {
             ["PRINT ABS G‸", ["GET"]],
             ["PRINT X$(1)+A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
             ["PRINT FNx D‸", ["DEG", "DIV"]],
+            // The argument is what is red, so a word of the wrong type is dropped from the candidates (#331).
+            ["X=ABS S‸", ["SGN", "SIN", "SQR"]],
+            ["X=ASC I‸", ["INKEY$"]],
+            ["X=ASC G‸", ["GET$"]],
+            ["X=EVAL A‸", []],
+            ["X=EOF#S‸", ["SGN", "SIN", "SQR"]],
+            ["X=BGET#L‸", ["LEN", "LN", "LOG", "LOMEM"]],
+            ["P.SPCS‸", ["SGN", "SIN", "SQR"]],
+            ["P.$S‸", ["SGN", "SIN", "SQR"]],
+            ["P.-S‸", ["SGN", "SIN", "SQR"]],
+            ["X=ASC T‸", []],
         ];
         for (const [text, expected] of cases) assert.deepStrictEqual(offered(text), expected, text);
     });
@@ -275,7 +286,8 @@ describe("Completions", () => {
                 ["ELSE", "END", "ENDPROC", "ENVELOPE", "EXT#"],
             ],
             both("IF X PRINT 1 E‸", ["ELSE", "EOF#", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT#"]),
-            // Anything but ELSE after a target is text BASIC ignores, which is red (the README), so only ELSE is offered.
+            // Anything but ELSE after a target is text BASIC ignores, which is red (docs/rom-deviations.md), so only
+            // ELSE is offered.
             both("ON X GOTO 10 E‸", ["ELSE"]),
             both("IF T‸", ["TAN", "TIME", "TOP", "TRUE"]),
             both("ON X G‸", ["GOSUB", "GOTO"]),
