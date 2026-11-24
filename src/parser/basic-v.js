@@ -39,7 +39,7 @@ const isStatementEnd = token =>
 
 // The arguments of a statement whose words end at `leadEnd`, split at the commas outside brackets, and where it ends; or
 // null if it has arguments that cannot be told apart.
-function readArguments(text, leadEnd, dialect) {
+function readArguments(text, source, leadEnd, dialect) {
     const args = [];
     let argumentStart = leadEnd;
     let end = leadEnd;
@@ -49,14 +49,14 @@ function readArguments(text, leadEnd, dialect) {
         if (isStatementEnd(token)) break;
         const isOpener = token.text === "(" || token.kw?.keyword.endsWith("(");
         if (token.kind === "punct" && token.text === "," && depth === 0) {
-            args.push(text.slice(argumentStart, end).trim());
+            args.push(source.slice(argumentStart, end).trim());
             argumentStart = token.end;
         }
         if (isOpener) depth++;
         if (token.kind === "punct" && token.text === ")") depth--;
         end = token.end;
     }
-    if (end > leadEnd || args.length > 0) args.push(text.slice(argumentStart, end).trim());
+    if (end > leadEnd || args.length > 0) args.push(source.slice(argumentStart, end).trim());
     return depth === 0 ? {args, end} : null;
 }
 
@@ -64,9 +64,10 @@ function readArguments(text, leadEnd, dialect) {
  * The quick fix for the BASIC V statement that starts at `start` in `text`, which BASIC II or IV stops at:
  * {start, end, text, title, explanation}, where `text` takes the place of the statement's text from `start` to `end`.
  * It is null if the statement is not one of BASIC V's, its arguments cannot be told apart, or `isValid(candidate,
- * from)` says the line with the replacement made still has an error.
+ * from)` says the line with the replacement made still has an error. `text` is the line as the lexer reads it, for
+ * matching; `source` is the line as typed (the same length), which the edit copies from.
  */
-export function basicVFix(text, start, dialect, isValid) {
+export function basicVFix(text, start, dialect, isValid, source = text) {
     const rest = text.slice(start);
     const statement = Statements.find(
         ({pattern, needsBasicIV}) => pattern.test(rest) && (dialect.basicIV || !needsBasicIV),
@@ -74,13 +75,13 @@ export function basicVFix(text, start, dialect, isValid) {
     if (!statement) return null;
     const {form, names, means} = statement;
     const leadEnd = start + rest.match(statement.pattern)[0].length;
-    const parsed = readArguments(text, leadEnd, dialect);
+    const parsed = readArguments(text, source, leadEnd, dialect);
     if (!parsed || parsed.args.length !== names.length || parsed.args.includes("")) return null;
     const given = new Map(names.map((name, i) => [name, parsed.args[i]]));
     const replacement = statement.replacement.replace(/\b[XYR]2?\b/g, name => given.get(name));
-    const candidate = text.slice(0, start) + replacement + text.slice(parsed.end);
+    const candidate = source.slice(0, start) + replacement + source.slice(parsed.end);
     if (!isValid(candidate, start + replacement.length)) return null;
-    const written = text.slice(start, parsed.end);
+    const written = source.slice(start, parsed.end);
     return {
         start,
         end: parsed.end,

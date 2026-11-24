@@ -449,8 +449,12 @@ export class Recogniser {
     // Adds to the error of a BASIC V statement the quick fix that writes it for BASIC II or IV, if there is one.
     offerBasicVFix(failure, start) {
         if (this.probing || failure.explanation || failure.code) return;
-        const fix = basicVFix(this.lexer.text, start.start, this.dialect, (candidate, from) =>
-            this.valid(candidate, start, from, true),
+        const fix = basicVFix(
+            this.lexer.text,
+            start.start,
+            this.dialect,
+            (candidate, from) => this.valid(candidate, start, from, true),
+            this.lexer.source,
         );
         if (!fix) return;
         const {explanation, ...edit} = fix;

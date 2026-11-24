@@ -1558,6 +1558,19 @@ describe("Quick fix for a BASIC V statement", () => {
             assert.deepStrictEqual(offered, wanted);
         }
     });
+
+    // The edit copies the arguments as typed, not as the lexer reads them (it reads U+0141 as A), which Copilot noticed.
+    it.each([
+        ["ORIGIN \u0141,2", "VDU29,\u0141;2;"],
+        ['ORIGIN LEN"\u0141\u014a",2', 'VDU29,LEN"\u0141\u014a";2;'],
+    ])("%s should offer %s, with the characters as typed", (text, result) => {
+        for (const dialect of [BasicIIDialect, BasicIVDialect]) {
+            assert.deepStrictEqual(
+                fixes(text, dialect).map(([, fixed]) => fixed),
+                [result],
+            );
+        }
+    });
     it("should title the fix with the text it replaces", () => {
         assert.deepStrictEqual(fixes("OFF", BasicIIDialect), [
             ["Replace OFF with VDU 23,1,0;0;0;0;", "VDU 23,1,0;0;0;0;"],
