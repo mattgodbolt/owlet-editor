@@ -10,8 +10,8 @@ export const MasterVerdicts = readRows("verdicts-master");
 export const RomTokens = readRows("tokens");
 export const MasterTokens = readRows("tokens-master");
 
-// The recorded rows where the editor's Model B is lenient on purpose (the README): it reads a COLOR that starts a
-// statement as COLOUR where that is all it can be, as the Master does and BASIC II's ROM does not.
+// The recorded rows where the editor's Model B is lenient on purpose (docs/rom-deviations.md): it reads a COLOR that
+// starts a statement as COLOUR where that is all it can be, as the Master does and BASIC II's ROM does not.
 export const LenientThanRom = [
     "COLOR 1",
     "COLOR1",
@@ -33,7 +33,8 @@ export const masterVerdicts = new Map(MasterVerdicts.map(([text, verdict]) => [t
 
 // The invalid spans, as [start, end], that the ROM says are wrong to show as invalid: it ran the line without error
 // and read them. Our lexer's bytes are the ROM's tokenisation (test/rom/tokens checks that). The recorded rows are
-// the ROM's, so they are read by the ROM's own dialect: the editor's can be more lenient (the README says where).
+// the ROM's, so they are read by the ROM's own dialect: the editor's can be more lenient, where
+// docs/rom-deviations.md says.
 export function falseInvalid(text, invalid, table, dialect) {
     if (table.get(text) !== "ok") return [];
     const ranges = unreadRanges(text, romBytes(lexLine(text, dialect)));
@@ -59,7 +60,7 @@ export function wrongRows(rows, {stricter = [], gaps = [], lenient = [], dialect
         const marked = invalidSpans(text, dialect);
         const problems = programProblems(readLines(text, dialect));
         if (verdict === "ok") {
-            // Text BASIC skips can be unfinished, as it can be wrong (see the README).
+            // Text BASIC skips can be unfinished, as it can be wrong (see docs/highlighting.md).
             const unfinished = problems.filter(problem => problem.unfinished);
             const ends = unfinished.map(({start, end}) => [start, end]);
             // What is red on purpose says so, with a message.

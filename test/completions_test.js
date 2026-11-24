@@ -286,7 +286,8 @@ describe("Completions", () => {
                 ["ELSE", "END", "ENDPROC", "ENVELOPE", "EXT#"],
             ],
             both("IF X PRINT 1 E‸", ["ELSE", "EOF#", "EOR", "ERL", "ERR", "EVAL", "EXP", "EXT#"]),
-            // Anything but ELSE after a target is text BASIC ignores, which is red (the README), so only ELSE is offered.
+            // Anything but ELSE after a target is text BASIC ignores, which is red (docs/rom-deviations.md), so only
+            // ELSE is offered.
             both("ON X GOTO 10 E‸", ["ELSE"]),
             both("IF T‸", ["TAN", "TIME", "TOP", "TRUE"]),
             both("ON X G‸", ["GOSUB", "GOTO"]),
