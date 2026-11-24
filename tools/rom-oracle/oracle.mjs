@@ -15,7 +15,7 @@
 // runs too long) is inconclusive, since BASIC reads a statement only as far as it runs it. A statement that runs says
 // nothing about what BASIC skips (see unread.mjs and dropMarksNeverRead), so invalid tokens there are left out. A
 // disagreement is per statement: it does not say where the error is. A statement can also be UNFINISHED or STRICTER,
-// and only a mark's first token is evidence; the README ("Highlighting: what red means") has the policy for both.
+// and only a mark's first token is evidence; docs/highlighting.md ("Checking against the ROM") has the policy for both.
 // Not run by npm test.
 import fs from "fs";
 import path from "path";
@@ -156,7 +156,7 @@ function report(results, examples) {
             r => r.rom === "syntax error" && !r.invalid && !r.unfinished && !r.lenient,
         ],
         [
-            "LENIENT (the ROM rejects it, accepted on purpose as COLOR for COLOUR; see the README)",
+            "LENIENT (the ROM rejects it, accepted on purpose as COLOR for COLOUR; see docs/rom-deviations.md)",
             r => r.rom === "syntax error" && !r.invalid && !r.unfinished && r.lenient,
         ],
         [
@@ -164,7 +164,7 @@ function report(results, examples) {
             r => r.rom === "valid" && r.invalid,
         ],
         [
-            "STRICTER (the ROM accepts it, highlighted invalid on purpose; see the README)",
+            "STRICTER (the ROM accepts it, highlighted invalid on purpose; see docs/rom-deviations.md)",
             r => r.rom === "valid" && r.stricter,
         ],
         [

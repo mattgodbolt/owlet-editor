@@ -3,6 +3,7 @@ import {lexLine} from "./parser/lexer.js";
 
 const FirstTokenByte = 0x80;
 const QuoteByte = 0x22;
+const DataLinefeed = "\u010A";
 const LineNumberBytes = 3;
 // What BASIC leaves as it is to the end of the line.
 const RestOfLineKinds = new Set(["comment", "data", "oscli"]);
@@ -70,7 +71,7 @@ function detokeniseLine(line, handler, dialect) {
         const ch = String.fromCodePoint(charCode);
         if (charCode === 10 && lineNumberBuffer === null) {
             // U+010A stands for the byte &0A (data), and only a real newline ends a line.
-            handler.onCharacter(char);
+            handler.onCharacter(char === "\n" ? DataLinefeed : char);
             continue;
         }
         if (afterConditionalToken) {
@@ -184,7 +185,7 @@ export function partialDetokenise(rawText, dialect) {
     const lines = [];
     forEachBasicLine(rawText, (lineNum, line) => {
         const handler = new PartialHandler(dialect);
-        detokeniseInternal(line, handler, dialect);
+        detokeniseLine(line, handler, dialect);
         lines.push({num: lineNum, line: handler.output});
     });
     let lineno = 0;

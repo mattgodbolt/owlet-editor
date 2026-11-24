@@ -88,9 +88,13 @@ const Arithmetic = names("+ - * / ^");
 // What a value is, where BASIC would give "Type mismatch" if the line ran and it were the other; undefined is not known.
 const Str = "a string";
 const Num = "a number";
-const StringArgument = names("ASC LEN VAL OPENIN OPENOUT OPENUP");
-const AnyArgument = names("EVAL");
-const UnknownResult = names("EVAL TIME");
+const StringArgument = names("ASC EVAL LEN VAL OPENIN OPENOUT OPENUP");
+const UnknownResult = names("EVAL FN");
+// What takes a value, to say what it needs if it is given the other.
+const needs = (by, type = Num) => ({by, type});
+const Indirection = {"?": needs("?"), "!": needs("!"), $: needs("$")};
+const MinusNeeds = needs("-");
+const SpcNeeds = needs("SPC");
 const typeOfName = text => (text.endsWith("$") ? Str : Num);
 const typeOfKeyword = keyword =>
     UnknownResult.has(keyword) ? undefined : typeOfName(keyword.replace(/\($/, ""));
@@ -510,7 +514,7 @@ export class Recogniser {
     pseudoVariable(keyword) {
         if (keyword === "PTR" || keyword === "EXT") {
             this.expectPunct("#");
-            this.operand();
+            this.operand(needs(`${keyword}#`));
         }
         this.timeString(keyword);
         this.expectPunct("=");
@@ -519,8 +523,10 @@ export class Recogniser {
 
     // BASIC IV reads TIME$, the clock as a string, as one word, with the $ straight after TIME.
     timeString(keyword) {
-        if (this.basicIV && keyword === "TIME" && this.isPunct("$") && this.adjacent())
-            this.next().type = "keyword";
+        if (!this.basicIV || keyword !== "TIME" || !this.isPunct("$") || !this.adjacent())
+            return false;
+        this.next().type = "keyword";
+        return true;
     }
 
     assignment() {
@@ -616,15 +622,17 @@ export class Recogniser {
     variable(message) {
         if (this.isPunct("$")) {
             this.next();
-            return this.primary();
+            return this.primary(Indirection.$);
         }
-        if (this.isPunct("?", "!")) {
-            this.next();
-            this.primary();
-        } else this.name(message);
-        if (this.isPunct("?", "!") && this.adjacent()) {
-            this.next();
-            this.unworded(() => this.operand());
+        let string = false;
+        if (this.isPunct("?", "!")) this.primary(Indirection[this.next().text]);
+        else {
+            string = this.peek().text?.endsWith("$") ?? false;
+            this.name(message);
+        }
+        if (!string && this.isPunct("?", "!") && this.adjacent()) {
+            const operator = this.next();
+            this.unworded(() => this.operand(Indirection[operator.text]));
         }
     }
 
@@ -686,90 +694,120 @@ export class Recogniser {
         this.type = left;
     }
 
-    // A ? or ! between two values must touch the first, which must be a variable: X=D ?1 and X=1?D are errors. What
-    // follows is an operand in turn, so X?Y?Z is fine and X?1?Z is not. Returns whether a ? or ! can follow.
-    operand() {
-        const variable = this.primary();
-        if (!variable || !this.isPunct("?", "!") || !this.adjacent()) return variable;
-        this.next();
-        this.unworded(() => this.operand());
-        this.type = undefined;
+    // A ? or ! between two values must touch the first, which must be a number variable: X=D ?1, X=1?D and X=A$?1 are
+    // errors (but PRINT A$?1 is two items). What follows is an operand in turn, so X?Y?Z is fine and X?1?Z is not.
+    // Returns whether a ? or ! can follow. `want` is what the operand is for, and marks it if it is the other type.
+    operand(want) {
+        const variable = this.primary(want);
+        if (!variable || this.type === Str || !this.isPunct("?", "!") || !this.adjacent())
+            return variable && this.type !== Str;
+        const operator = this.next();
+        this.unworded(() => this.operand(Indirection[operator.text]));
+        this.type = Num;
         return false;
     }
 
-    primary() {
-        return this.nested(() => this.unnestedPrimary());
+    primary(want) {
+        return this.nested(() => this.unnestedPrimary(want));
     }
 
-    unnestedPrimary() {
+    // Gives the operand its type and, if `want` is the other, marks `token`, the operand's first (so that a word being
+    // typed that gives the wrong one is red, whatever comes after it).
+    typed(token, type, want) {
+        this.type = type;
+        if (want && type && type !== want.type)
+            this.mismatch(token, `${want.by} needs ${want.type}, but is given ${type}`);
+    }
+
+    unnestedPrimary(want) {
         const token = this.peek();
         this.type = undefined;
         if (this.isPunct("?", "!", "$")) {
             this.next();
-            this.primary();
-            this.type = token.text === "$" ? Str : Num;
-            return token.text !== "$";
+            const result = token.text === "$" ? Str : Num;
+            this.typed(token, result, want);
+            this.primary(Indirection[token.text]);
+            this.type = result;
+            return result === Num;
         }
-        // One sign only: BASIC rejects --1 and -+1.
+        // One sign only: BASIC rejects --1 and -+1, and a string constant after one.
         if (this.isPunct("-", "+")) {
             this.next();
             if (this.isPunct("-", "+")) this.fail("No such variable");
-            return this.primary();
+            if (this.peek().kind === "string")
+                this.fail(
+                    "No such variable",
+                    this.peek(),
+                    false,
+                    token.text === "-"
+                        ? "Type mismatch: - needs a number, but is given a string"
+                        : "Type mismatch: + cannot be given a string constant",
+                );
+            const variable = this.primary(token.text === "-" ? MinusNeeds : undefined);
+            this.typed(token, token.text === "-" ? Num : this.type, want);
+            return variable;
         }
-        if (this.isPunct("(")) return this.bracket(this.next(), 1, 1);
+        if (this.isPunct("(")) {
+            const variable = this.bracket(this.next(), 1, 1);
+            this.typed(token, this.type, want);
+            return variable;
+        }
         if (token.kind === "number" || (token.kind === "string" && token.closed)) {
             this.next();
-            this.type = token.kind === "string" ? Str : Num;
+            this.typed(token, token.kind === "string" ? Str : Num, want);
             return;
         }
         if (token.kind === "hex" && token.text.length > 1) {
             this.next();
-            this.type = Num;
+            this.typed(token, Num, want);
             return;
         }
         if (token.kind === "name") {
+            const type = typeOfName(token.text);
+            this.typed(token, type, want);
             this.name();
-            this.type = typeOfName(token.text);
+            this.type = type;
             return true;
         }
         if (token.kind !== "keyword" || isStatementKeyword(token.kw))
             this.fail(this.operandError(token), token, this.unfinishedOperand(token));
         this.next();
         const {keyword} = token.kw;
-        this.timeString(keyword);
-        const result = typeOfKeyword(keyword);
-        if (NoArgument.has(keyword)) return void (this.type = result);
-        if (OneArgument.has(keyword)) return this.argument(token, result);
+        const result = this.timeString(keyword) ? Str : typeOfKeyword(keyword);
+        if (NoArgument.has(keyword)) return this.typed(token, result, want);
+        if (OneArgument.has(keyword)) return this.argument(token, result, want);
         if (ChannelFunction.has(keyword)) {
+            this.typed(token, Num, want);
             this.expectPunct("#");
-            const variable = this.operand();
+            const variable = this.operand(needs(`${keyword}#`));
             this.type = Num;
             return variable;
         }
         if (keyword in BracketFunction) {
+            this.typed(token, result, want);
             this.bracket(token, ...BracketFunction[keyword]);
             return void (this.type = result);
         }
         if (keyword === "RND") {
+            this.typed(token, Num, want);
             if (this.isPunct("(") && this.adjacent()) this.bracket(this.next(), 1, 1);
             return void (this.type = Num);
         }
         if (keyword === "STR$") {
+            this.typed(token, Str, want);
             if (this.isPunct("~")) this.next().type = "operator";
             return this.argument(token, Str);
         }
         if (keyword === "FN") return (this.call(), void (this.type = undefined));
-        if (keyword === "TO" && this.top()) return void (this.type = Num);
+        if (keyword === "TO" && this.top()) return this.typed(token, Num, want);
         this.fail("No such variable", token);
     }
 
     // The operand of a function that takes one value, and what the function gives.
-    argument(token, result) {
+    argument(token, result, want) {
         const keyword = token.kw.keyword;
-        const wanted = StringArgument.has(keyword) ? Str : Num;
-        const variable = this.operand();
-        if (!AnyArgument.has(keyword) && this.type && this.type !== wanted)
-            this.mismatch(token, `${keyword} needs ${wanted}, but is given ${this.type}`);
+        if (want) this.typed(token, result, want);
+        const variable = this.operand(needs(keyword, StringArgument.has(keyword) ? Str : Num));
         this.type = result;
         return variable;
     }
@@ -806,7 +844,7 @@ export class Recogniser {
     // TAB( and SPC, which only PRINT and INPUT take.
     printItem() {
         if (this.isKeyword("TAB(")) return (this.bracket(this.next(), 1, 2), true);
-        if (this.isKeyword("SPC")) return (this.next(), this.operand(), true);
+        if (this.isKeyword("SPC")) return (this.next(), this.operand(SpcNeeds), true);
         return false;
     }
 

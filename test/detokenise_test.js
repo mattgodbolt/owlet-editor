@@ -1,3 +1,4 @@
+import {tokeniseBasicII} from "../src/tokeniser";
 import {detokenise, forEachBasicLine, partialDetokenise} from "../src/detokenise";
 import {BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
 import {describe, it} from "vitest";
@@ -178,5 +179,24 @@ describe("Partial detokenisation", () => {
             partialDetokenise(rawProgram, ModelBDialect),
             '\xf1"\u018dHello":\xe510',
         );
+    });
+});
+
+describe("Shrink and the characters for the bytes &0A and &0D", () => {
+    // The tokeniser maps U+010A and U+020A to &0A, and U+010D to &0D; neither may become a real line break.
+    it.each([
+        ['REMĊñ"NO"', "Ċ"],
+        ['REMȊñ"NO"', "Ċ"],
+        ['REMčñ"NO"', "č"],
+        ['PRINT"AĊB":REMĊC', "Ċ"],
+        ["DATAĊ,č", "Ċ"],
+    ])("should keep %j as visible characters", (source, visible) => {
+        const tokenised = tokeniseBasicII(source);
+        const shrunk = partialDetokenise(tokenised, ModelBDialect);
+        assert.ok(!shrunk.includes("\n"), JSON.stringify(shrunk));
+        assert.ok(!shrunk.includes("\r"), JSON.stringify(shrunk));
+        assert.ok(shrunk.includes(visible), JSON.stringify(shrunk));
+        assert.strictEqual(tokeniseBasicII(shrunk), tokenised);
+        assert.strictEqual(tokeniseBasicII(detokenise(shrunk, ModelBDialect)), tokenised);
     });
 });
