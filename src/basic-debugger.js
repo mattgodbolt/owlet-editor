@@ -1,6 +1,7 @@
 import {editor as monacoEditor, Range} from "monaco-editor/editor/editor.api";
 import ResizeObserver from "resize-observer-polyfill";
 import {BasicWatch} from "./basic-watch";
+import {MemoryPanel} from "./memory-panel";
 import {programStatements, statementAt} from "./statement-map";
 
 // The classes and scroll bar colour of each kind of mark: the statement running, the one an error stopped the program
@@ -90,6 +91,9 @@ export class BasicDebugger {
         this.variables = this.panel.querySelector(".debug-variables");
         this.routines = this.panel.querySelector(".debug-routines");
         this.button = document.getElementById("debug");
+        this.memory = new MemoryPanel(this.panel.querySelector(".debug-memory"));
+        for (const tab of this.panel.querySelectorAll(".debug-tabs [data-tab]"))
+            tab.addEventListener("click", () => this.showTab(tab.dataset.tab));
         this.on = false;
         this.screenShown = true;
         this.program = null;
@@ -112,6 +116,13 @@ export class BasicDebugger {
             this.handledMark.clear();
         }
         this.showPanel();
+    }
+
+    showTab(name) {
+        this.panel.dataset.tab = name;
+        for (const tab of this.panel.querySelectorAll(".debug-tabs [data-tab]"))
+            tab.setAttribute("aria-selected", String(tab.dataset.tab === name));
+        if (this.on) this.update();
     }
 
     forgetShown() {
@@ -153,6 +164,7 @@ export class BasicDebugger {
         const {cpu} = this.emulator;
         if (!cpu || this.emulator.rebuilding) return;
         const state = this.watch.read(cpu);
+        if (this.panel.dataset.tab === "memory") this.memory.update(cpu, state.basic);
         const line = state.line ?? state.error?.line;
         const range = state.basic && line ? statementAt(this.statements(), line) : null;
         const mark = state.error ? markFor(state.error) : "running";

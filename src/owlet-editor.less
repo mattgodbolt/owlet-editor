@@ -743,3 +743,192 @@ input {
 .monaco-editor .marker-widget .descriptioncontainer .message {
   white-space: pre-wrap;
 }
+
+// The debugger's tabs, and its memory browser.
+#debugger {
+  .debug-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 4px;
+
+    button {
+      height: auto;
+      padding: 2px 10px;
+      color: #999;
+      background: none;
+      border: 0;
+      border-bottom: 2px solid transparent;
+
+      &[aria-selected="true"] {
+        color: var(--color-highlight);
+        border-bottom-color: var(--color-highlight);
+      }
+    }
+  }
+
+  .debug-memory {
+    display: none;
+  }
+
+  &[data-tab="memory"] {
+    height: 60%;
+
+    > :not(.debug-tabs, .debug-memory) {
+      display: none;
+    }
+
+    .debug-memory {
+      display: block;
+    }
+  }
+
+  .mem-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+  }
+
+  .mem-label {
+    color: #999;
+  }
+
+  .mem-field,
+  .mem-mode,
+  .mem-view,
+  .mem-controls button,
+  .mem-problem {
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 6px;
+    font: inherit;
+    color: #eee;
+    background: #1a1a1a;
+    border: 1px solid #555;
+    border-radius: 3px;
+  }
+
+  .mem-field {
+    width: 11ch;
+    font-family: monospace;
+  }
+
+  .mem-controls button:disabled {
+    opacity: 0.4;
+  }
+
+  .mem-summary {
+    display: inline-block;
+    margin: 4px 8px 4px 0;
+    color: #bbb;
+
+    &[data-problems="yes"] {
+      color: #f0b060;
+    }
+
+    &[data-copied="yes"]::after {
+      content: " (copied)";
+      color: #7c7;
+    }
+  }
+
+  .mem-error {
+    color: #e06060;
+  }
+
+  .mem-dump {
+    font-family: monospace;
+    white-space: pre;
+    line-height: 1.25;
+    outline: none;
+  }
+
+  .mem-row {
+    display: flex;
+    gap: 1ch;
+  }
+
+  .mem-addr {
+    color: #bb8844;
+  }
+
+  .mem-byte {
+    color: #888;
+    margin-right: 1ch;
+    margin-right: 0;
+
+    &.in-range {
+      color: #eee;
+    }
+  }
+
+  .mem-byte,
+  .mem-text span {
+    &.in-range {
+      background: rgba(94, 128, 64, 0.35);
+    }
+
+    &.zero {
+      color: #555;
+    }
+
+    &.lf {
+      background: #d08020;
+      color: #000;
+    }
+
+    &.cr {
+      background: #c04040;
+      color: #fff;
+    }
+  }
+
+  .mem-text {
+    margin-left: 1ch;
+    color: #999;
+  }
+
+  .mem-byte + .mem-byte {
+    margin-left: 0;
+  }
+
+  .mem-row {
+    gap: 0;
+  }
+
+  .mem-row .mem-byte {
+    padding: 0 0.5ch;
+  }
+
+  .mem-row .mem-addr {
+    margin-right: 1ch;
+  }
+}
+
+// On a phone the pane is short, so the memory browser takes all of it and packs its controls tighter.
+@media (orientation: portrait) {
+  #debugger[data-tab="memory"] {
+    height: 100%;
+    font-size: 12px;
+
+    .mem-field {
+      width: 9ch;
+    }
+
+    .mem-controls {
+      gap: 3px;
+    }
+
+    .mem-label {
+      display: none;
+    }
+
+    .mem-problem {
+      height: 20px;
+    }
+
+    .mem-summary {
+      margin: 2px 4px 2px 0;
+    }
+  }
+}

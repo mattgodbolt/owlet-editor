@@ -43,11 +43,16 @@
 
         </div>
         <div id="reference"></div>
-        <div id="debugger" hidden>
+        <div id="debugger" hidden data-tab="variables">
+            <div class="debug-tabs" role="tablist">
+                <button type="button" role="tab" data-tab="variables" aria-selected="true">Variables</button>
+                <button type="button" role="tab" data-tab="memory" aria-selected="false">Memory</button>
+            </div>
             <div class="debug-status"></div>
             <div class="debug-handled" hidden></div>
             <div class="debug-variables"></div>
             <div class="debug-routines"></div>
+            <div class="debug-memory"></div>
         </div>
         <div id="examples">
             <div class="template example" style="cursor: pointer;">
