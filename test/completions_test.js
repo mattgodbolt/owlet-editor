@@ -214,6 +214,17 @@ describe("Completions", () => {
             ["PRINT ABS G‸", ["GET"]],
             ["PRINT X$(1)+A‸", ["ABS", "ACS", "ADVAL", "ASC", "ASN", "ATN"]],
             ["PRINT FNx D‸", ["DEG", "DIV"]],
+            // The argument is what is red, so a word of the wrong type is dropped from the candidates (#331).
+            ["X=ABS S‸", ["SGN", "SIN", "SQR"]],
+            ["X=ASC I‸", ["INKEY$"]],
+            ["X=ASC G‸", ["GET$"]],
+            ["X=EVAL A‸", []],
+            ["X=EOF#S‸", ["SGN", "SIN", "SQR"]],
+            ["X=BGET#L‸", ["LEN", "LN", "LOG", "LOMEM"]],
+            ["P.SPCS‸", ["SGN", "SIN", "SQR"]],
+            ["P.$S‸", ["SGN", "SIN", "SQR"]],
+            ["P.-S‸", ["SGN", "SIN", "SQR"]],
+            ["X=ASC T‸", []],
         ];
         for (const [text, expected] of cases) assert.deepStrictEqual(offered(text), expected, text);
     });

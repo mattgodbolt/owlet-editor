@@ -320,20 +320,31 @@ message that says what BASIC does, and shows as an error.
   stay unmarked (`ON 5 GOTO 10ELSE30`, where the `ELSE` is read). The oracle takes the marks on trust as ignored text,
   as it does the assembler's, and lists them as STRICTER.
 - **A string where BASIC wants a number, or the other way round** (`PRINT"X"DIV 2`, `X=1+"A"`, `X$="A"+1`, `X=LEN 5`,
-  `PRINT STR$A$`). BASIC raises "Type mismatch" when it runs such a statement, not when it reads it, so a program that
-  never gets there is fine. The operator or function word is red, with a hover that says what is wrong. It is marked for
-  a binary operator (`- * / ^ MOD DIV AND OR EOR`) with a string on either side, for `+` and a comparison between a
-  string and a number, and for a function given the wrong kind (`ASC`, `LEN`, `VAL`, `OPENIN`, `OPENOUT` and `OPENUP`
-  take a string; the other functions and `STR$` and `CHR$` take a number; `EVAL` takes either). A value is a string
-  if it is a string, a name ending in `$`, a function ending in `$`, `$X` or a bracket round one; a number if it is a
-  number, any other name, any other function or an operator's result. Anything else, such as a `FN`, `TIME` (`TIME$` on
-  the Master) or what follows a `?` or `!`, is not known and is never marked, nor are the arguments of `LEFT$(`, `MID$(`,
-  `INSTR(` and the like, assignments, or a condition that is itself the wrong type (`IF "A" THEN`). The oracle cannot test these marks: a statement that stops with
-  Type mismatch is inconclusive, and in one that does not run (`IF 0 THEN`) the mark is in text BASIC never reads. The
-  rows recorded for #331 are the other half, strings that BASIC runs without complaint (`PRINT"X"D`, `X$="A"+"B"`,
-  `X=ASC GET$`), which must stay unmarked. Suggested by Olly Betts on #323; because completions drop a word that makes
-  the statement red, `PRINT"X"D` no longer offers `DIV`, `AND`, `OR`, `EOR` or `MOD`. While a line is typed in the editor
-  `LEN(B` is red until the `$` is typed.
+  `PRINT STR$A$`, `X=EVAL 1`, `P.SPCA$`, `X=EOF#STR$1`, `P.?A$`, `P.$A$`, `P.-A$`). BASIC raises "Type mismatch" when it
+  runs such a statement, not when it reads it, so a program that never gets there is fine. A binary operator
+  (`- * / ^ MOD DIV AND OR EOR`) with a string on either side, and `+` or a comparison between a string and a number,
+  are red at the operator. What is given to a function or a prefix operator is red at its own first token (the
+  argument, not the function: `ABS` is fine in `X=ABS STR$1`, and `STR$` is red), as soon as that token is known to be
+  the wrong type, so a word being typed is red whatever follows it, and completions do not offer `STR$` or `STRING$(`
+  after `X=ABS S`, or `INT` and `INKEY` after `X=ASC I`. The functions `ASC`, `EVAL`, `LEN`, `VAL`, `OPENIN`, `OPENOUT`
+  and `OPENUP` take a string; the other functions, `STR$`, `CHR$`, `SPC`, the channel of `BGET#`, `EOF#`, `EXT#` and
+  `PTR#`, the operand of `?`, `!` and `$` (and the right of a binary `?` or `!`) and a unary `-` take a number. A value
+  is a string if it is a string, a name ending in `$`, a function ending in `$`, `$X`, `TIME$` (BASIC IV, where `TIME`
+  and the `$` after it are one word) or a bracket round one; a number if it is a number, any other name, any other
+  function (`TIME` included), what `?` and `!` give, or an operator's result. Anything else, such as a `FN`'s result
+  or the result of `EVAL`, is not known and is never marked, nor are the arguments of a `FN`, `LEFT$(`, `MID$(`,
+  `INSTR(`, `STRING$(` and `TAB(`, assignments, or a condition that is itself the wrong type (`IF "A" THEN`). A unary
+  `+` passes a string through (`P.+A$` runs), so it is not marked. The oracle cannot test these marks: a statement that
+  stops with Type mismatch is inconclusive, and in one that does not run (`IF 0 THEN`) the mark is in text BASIC never
+  reads. The rows recorded for #331 and in `type-follow-ups` are the other half, what BASIC runs without complaint
+  (`PRINT"X"D`, `X$="A"+"B"`, `X=ASC GET$`, `P.A$?1`, `P.+A$`, `P.SPC1`), which must stay unmarked. Suggested by Olly
+  Betts on #323, #331 and #334; because completions drop a word that makes the statement red, `PRINT"X"D` no longer
+  offers `DIV`, `AND`, `OR`, `EOR` or `MOD`. While a line is typed in the editor `LEN(B` is red until the `$` is typed.
+  - **Not a deviation, because BASIC stops on the line anyway**: a string constant after a sign (`PRINT -"A"`,
+    `PRINT +"A"`, "No such variable") and `?` or `!` after a string variable (`X=A$?1`, `X=ASC A$?1`, "Syntax error";
+    `A$?1=2` is a Mistake). They are red as errors, not marked as stricter. A string variable does not take a `?` or `!`,
+    so `PRINT A$?1` is two items (`A$` then `?1`), which BASIC runs. The red is on the string after the sign, and
+    on the `?` after the variable.
 
 #### The other way: lenient on purpose
 
