@@ -9,6 +9,8 @@
   --color-buttons: #595959;
   --color-editor-bg: #171717;
   --font-color: #bbb;
+  --color-button-text: #fff;
+  --color-run: #4a6a30;
   --color-highlight: #5e8040;
   --button-highlight: #6f2020;
   --button-blue: #00536f;
@@ -43,7 +45,7 @@ body {
   height: 90vh;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px 32px;
+  grid-template-rows: 80px 32px minmax(320px, 90vh) 32px 32px;
 }
 
 .header {
@@ -122,10 +124,28 @@ button:active {
   padding-left: 16px;
   margin-right: 4px;
   text-decoration: none;
-  color: var(--font-color);
+  color: var(--color-button-text);
   border: 0px solid var(--color-toolbar);
   background-color: var(--color-buttons);
   //    background-color: #8064A2 !important;
+}
+
+button[data-action] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  // Clicks should land on the button, whichever part of it was hit.
+  > * {
+    pointer-events: none;
+  }
+}
+
+// The global *:focus rule removes outlines, so keyboard focus needs its own, and to win it must be !important.
+button:focus-visible {
+  outline: 2px solid #fff !important;
+  outline-offset: -2px;
 }
 
 button:active {
@@ -146,11 +166,6 @@ canvas.screen {
 
 #sound {
   white-space: nowrap;
-
-  // Clicks should land on the button, whichever part of it was hit.
-  * {
-    pointer-events: none;
-  }
 
   .sound-icon-on {
     display: none;
@@ -174,20 +189,68 @@ canvas.screen {
 #debug {
   white-space: nowrap;
 
-  * {
-    pointer-events: none;
-  }
-
   &[aria-pressed="true"] {
     background-color: var(--color-highlight);
   }
 }
 
-// On a phone the icon alone has to do, as the footer has no room for its words.
+// The editor toolbar is the main set of actions, so it always has its words; Run stands out.
+#editor_toolbar .label {
+  display: inline;
+}
+
+#editor_toolbar button[data-action="run"] {
+  background-color: var(--color-run);
+}
+
 @media (orientation: portrait) {
   #sound-label,
   #debug-label {
     display: none;
+  }
+
+  // The editor toolbar becomes an action bar fixed to the bottom of the screen, so Run, Share and 3D are always in reach.
+  #editor_toolbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    height: 60px;
+    box-sizing: content-box;
+    padding-bottom: env(safe-area-inset-bottom);
+    border: 0;
+    border-top: 1px solid var(--color-background);
+
+    button {
+      flex-direction: column;
+      gap: 2px;
+      margin: 0;
+      padding: 0;
+      font-size: 11px;
+
+      i {
+        font-size: 18px;
+      }
+    }
+  }
+
+  #emu_toolbar button,
+  #editor_footer button,
+  #emu_footer button {
+    min-width: 44px;
+  }
+
+  .modal-actions button {
+    height: 48px;
+  }
+
+  // Monaco's own layers must stay beneath the fixed bar.
+  .code-editor {
+    isolation: isolate;
   }
 }
 
@@ -484,6 +547,18 @@ input {
   color: var(--color-background);
 }
 
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    flex: 1 1 9rem;
+    height: 40px;
+    margin: 0;
+  }
+}
+
 /* The Close Button */
 .close {
   color: var(--color-background);
@@ -508,7 +583,7 @@ input {
     height: 90vh;
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: 80px 32px 32px 80vw 32px 32px minmax(288px, 90vh) 32px 50vh;
+    grid-template-rows: 80px 44px 44px 80vw 32px 44px minmax(288px, 90vh) 72px 50vh;
   }
 
   .header {
