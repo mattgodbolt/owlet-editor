@@ -25,6 +25,9 @@ export const SpacedKeywords = [
     "ELSE",
 ];
 
+const OnErrorLocal =
+    "BASIC V accepts ON ERROR LOCAL (not emulated here), but BASIC II and IV take LOCAL as the error handler: the first error fails with Not LOCAL, which runs the handler again, so the program loops forever and Escape does not stop it";
+
 const StrayElse =
     "ELSE is not after an IF or ON that has no ELSE yet: BASIC accepts it and ignores the rest of the line";
 
@@ -860,6 +863,7 @@ export class Recogniser {
         if (this.isKeyword("ERROR")) {
             this.next();
             if (this.isKeyword("OFF")) return void this.next();
+            if (this.isKeyword("LOCAL")) this.stricter(this.peek(), OnErrorLocal);
             return this.statement();
         }
         this.expression();

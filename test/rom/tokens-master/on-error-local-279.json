@@ -1,0 +1,12 @@
+[
+  ["ON ERROR LOCAL", "ee 20 85 20 ea", "on-error-local-279"],
+  ["ON ERROR LOCAL PRINT 1", "ee 20 85 20 ea 20 f1 20 31", "on-error-local-279"],
+  ["ON ERROR LOCAL REPORT", "ee 20 85 20 ea 20 f6", "on-error-local-279"],
+  ["ON ERROR LOCAL OFF", "ee 20 85 20 ea 20 87", "on-error-local-279"],
+  ["ON ERROR LOC.", "ee 20 85 20 ea", "on-error-local-279"],
+  ["ON ERROR LOCAL X", "ee 20 85 20 ea 20 58", "on-error-local-279"],
+  ["ON ERROR LOCAL X,Y", "ee 20 85 20 ea 20 58 2c 59", "on-error-local-279"],
+  ["ON ERROR LOCAL:PRINT 1", "ee 20 85 20 ea 3a f1 20 31", "on-error-local-279"],
+  ["ONERRORLOCAL", "ee 85 ea", "on-error-local-279"],
+  ["ON ERR. LOC.", "ee 20 85 20 ea", "on-error-local-279"]
+]
