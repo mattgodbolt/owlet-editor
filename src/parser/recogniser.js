@@ -863,7 +863,10 @@ export class Recogniser {
         if (this.isKeyword("ERROR")) {
             this.next();
             if (this.isKeyword("OFF")) return void this.next();
-            if (this.isKeyword("LOCAL")) this.stricter(this.peek(), OnErrorLocal);
+            if (this.isKeyword("LOCAL")) {
+                this.stricter(this.peek(), OnErrorLocal);
+                return void this.skipLine();
+            }
             return this.statement();
         }
         this.expression();

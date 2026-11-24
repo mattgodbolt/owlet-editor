@@ -535,6 +535,22 @@ describe("ON ERROR LOCAL", () => {
             assert.match(message, /^BASIC V accepts ON ERROR LOCAL.*loops forever/);
         }
     });
+    // The handler stops at LOCAL, so what follows it is never read and must not be marked too.
+    it.each([ModelBDialect, BasicIVDialect])(
+        "should mark only the LOCAL, whatever follows it, on %#",
+        dialect => {
+            for (const text of [
+                "ON ERROR LOCAL",
+                "ON ERROR LOCAL PRINT 1",
+                "ON ERROR LOCAL OFF",
+                "ON ERROR LOCAL REPORT:END",
+                'ON ERROR LOC. PRINT "A"',
+                "ON ERROR LOCAL:PRINT 1",
+            ]) {
+                assert.strictEqual(programProblems(readLines(text, dialect)).length, 1, text);
+            }
+        },
+    );
     it.each([
         "ON ERROR OFF",
         "ON ERROR PRINT 1",
