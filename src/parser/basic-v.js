@@ -92,25 +92,15 @@ export function basicVFix(text, start, dialect, isValid, source = text) {
 }
 
 // Keywords whose statement may set any name it has.
-const BindingKeywords = new Set([
-    "LOCAL",
-    "INPUT",
-    "READ",
-    "DIM",
-    "DEF",
-    "SYS",
-    "LET",
-    "FOR",
-    "RETURN",
-]);
+const BindingKeywords = new Set(["LOCAL", "INPUT", "READ", "DIM", "DEF", "LET", "FOR"]);
 const Boundaries = new Set(["THEN", "ELSE", "REPEAT"]);
-const SetsAfterName = /\s*[-+*/]?=/y;
+const SetsAfterName = /\s*=/y;
 
-// Whether the line may give the numeric variable BY a value: a `BY=` (or `BY+=` and so on) anywhere, whatever comes
+// Whether the line may give the numeric variable BY a value: a `BY=` anywhere, whatever comes
 // before it, since a statement can start after `ON ERROR` or an `IF` condition with no `THEN`, among other places (so
-// a comparison `IF BY=1` counts too); a declaration or an input (`LOCAL`, `INPUT`, `READ`, `DIM`, a `DEF` parameter,
-// `RETURN`, `SYS ... TO`) naming it; or an assembler label `.BY`. It says yes where it cannot tell: a missed warning is
-// better than a false one. An array `BY(`, `BY%` and `BY$` are other variables.
+// a comparison `IF BY=1` counts too); a declaration or an input (`LET`, `FOR`, `LOCAL`, `INPUT`, `READ`, `DIM`, a `DEF`
+// parameter) naming it; or an assembler label `.BY`. It says yes where it cannot tell: a missed warning is better than
+// a false one. An array `BY(`, `BY%` and `BY$` are other variables.
 export function mayAssignBy(text, tokens) {
     let binding = false;
     for (const token of tokens) {

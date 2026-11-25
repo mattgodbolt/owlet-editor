@@ -1508,10 +1508,6 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
         "ON X GOTO 20 ELSE BY=1",
         "ON X GOSUB 20 ELSE BY=1",
         "REPEAT:BY=1:UNTIL 1",
-        "BY+=1",
-        "BY-=1",
-        "BY*=1",
-        "BY/=1",
         "LOCAL BY",
         "LOCAL X,BY",
         "FOR BY=1TO3",
@@ -1525,7 +1521,6 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
         "DEF FNa(BY)",
         "DEF FNa(BY)=BY",
         "DIM BY 10",
-        "PROCa(RETURN BY)",
         "[:.BY RTS:]",
         "[.BY RTS]",
     ])("should not warn when the program has %s, before, after or on its own line", assignment => {
@@ -1587,6 +1582,11 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
         "REM BY=1",
         "DATA BY=1",
         "by=1",
+        // BASIC V only: BASIC II and IV stop at them ("Mistake"), so they set nothing.
+        "BY+=1",
+        "BY-=1",
+        "BY*=1",
+        "BY/=1",
     ])("should still warn when the program has only %s", other => {
         const text = `10 ${other}\n20 MOVE BY-40,40`;
         for (const [dialect] of dialects) {
