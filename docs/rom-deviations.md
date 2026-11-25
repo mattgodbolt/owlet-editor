@@ -66,8 +66,12 @@ BASIC does, and shows as an error.
     time with `No such variable` on both ROMs unless the program sets `BY`, which most programs do not, and a relative
     move is very often negative (suggested by Olly Betts on #354). So, as an extension, they get a warning (never an
     error, and not counted against the ROM) with the same fix, "Replace MOVE BY-40,40 with PLOT0,-40,40", but only when
-    nothing in the whole program may give the numeric variable `BY` a value: `BY=`, `LET BY=`, `LOCAL`, `FOR`, `INPUT`,
-    `READ`, `DIM`, a `DEF` parameter, `RETURN` or `SYS` naming `BY`, an assembler label `.BY`, and `BY+=` and the like.
+    nothing in the whole program may give the numeric variable `BY` a value: a `BY=` (or `BY+=` and the like) anywhere,
+    whatever comes before it (a statement can start after a line number, `:`, `THEN`, `ELSE`, `REPEAT`, `ON ERROR`, an
+    `IF` condition with no `THEN`, as in `IF1BY=1`, and an `ON ... GOTO ... ELSE`, each checked in the ROM, so the scan
+    does not look at what precedes), which also means a comparison such as `IF BY=1 THEN` or `PRINT BY=1` counts as
+    setting it; `LET BY=`, or `LOCAL`, `FOR`, `INPUT`, `READ`, `DIM`, a `DEF` parameter, `RETURN` or `SYS` naming `BY`; and
+    an assembler label `.BY`. (`[LDA#BY=1]` sets nothing, but is a `BY=` too, so it counts.)
     Where it cannot tell it does not warn, since a missed warning costs less than a false one. The other operators
     (`BY+1`, `BY!1`, `BY AND 1` and so on) get none, and neither does `BY(1)`. An array `BY(`, `BY%`, `BY$` and `BYE`
     are other variables, so they do not count as setting `BY`. The program is searched once, and only when it has such

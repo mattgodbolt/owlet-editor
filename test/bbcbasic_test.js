@@ -1492,7 +1492,26 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
         "IF X THEN BY=1",
         "IF X THEN 10 ELSE BY=1",
         "REPEAT BY=BY+1",
+        "ON ERROR BY=1",
+        "ONERRORBY=1",
+        "ON ERROR BY=1:GOTO 20",
+        "ON ERROR LOCAL BY=1",
+        "IF1BY=1",
+        "IF 1 BY=1",
+        "X=1:IFX BY=1.",
+        "IF X<2BY=1",
+        "IF(X)BY=1",
+        "IF X=1 BY=1",
+        "IF X THEN BY=1 ELSE BY=2",
+        "IF 0 ELSE BY=1",
+        "IF 0 THEN 20 ELSE BY=1",
+        "ON X GOTO 20 ELSE BY=1",
+        "ON X GOSUB 20 ELSE BY=1",
+        "REPEAT:BY=1:UNTIL 1",
         "BY+=1",
+        "BY-=1",
+        "BY*=1",
+        "BY/=1",
         "LOCAL BY",
         "LOCAL X,BY",
         "FOR BY=1TO3",
@@ -1526,6 +1545,34 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
             }
         }
     });
+    // A comparison looks the same as an assignment wherever the statement may start (IF1BY=1 sets BY, IF BY=1 THEN does
+    // not), so the scan does not tell them apart: no warning, a missed one being better than a false one. In the ROM
+    // the program stops at the move with No such variable (and `[LDA#BY=1]` does not set BY either).
+    it.each(["PRINT BY=1", "IF BY=1 THEN PRINT", "X=BY=1", "[OPT0:LDA#BY=1:]"])(
+        "should not warn when the program has %s, which may set BY",
+        other => {
+            for (const [dialect] of dialects) {
+                assert.deepStrictEqual(
+                    relativeMoveWarnings(`10 ${other}\n20 MOVE BY-40,40`, dialect),
+                    [],
+                    other,
+                );
+            }
+        },
+    );
+    // BY assigned in an ON ERROR handler is set by the time the move is run again, as in Olly Betts's programs on #354.
+    it.each(["ONERRORBY=1\nMOVE BY-1,-1", "IF1BY=1\nMOVE BY-1,-1", "X=1:IFX BY=1.\nMOVE BY-1,-1"])(
+        "should not warn on the program %j",
+        text => {
+            for (const [dialect] of dialects) {
+                assert.deepStrictEqual(relativeMoveWarnings(text, dialect), [], text);
+                assert.deepStrictEqual(
+                    getWarnings(text, dialect).filter(warning => warning.code === "basic-v-fix"),
+                    [],
+                );
+            }
+        },
+    );
     // A different variable does not set BY: an array, another name, or the integer or string BY.
     it.each([
         "DIM BY(3):BY(1)=1",
@@ -1536,8 +1583,6 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
         "BY%=1",
         "X=BY(1)",
         "BY?1=2",
-        "PRINT BY=1",
-        "IF BY=1 THEN PRINT",
         'PRINT "BY=1"',
         "REM BY=1",
         "DATA BY=1",

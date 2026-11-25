@@ -91,8 +91,7 @@ export function basicVFix(text, start, dialect, isValid, source = text) {
     };
 }
 
-// Keywords after which a name starts a statement's assignment, and those whose statement may set any name it has.
-const AssignmentLeads = new Set(["THEN", "ELSE", "REPEAT", "LET"]);
+// Keywords whose statement may set any name it has.
 const BindingKeywords = new Set([
     "LOCAL",
     "INPUT",
@@ -107,13 +106,13 @@ const BindingKeywords = new Set([
 const Boundaries = new Set(["THEN", "ELSE", "REPEAT"]);
 const SetsAfterName = /\s*[-+*/]?=/y;
 
-// Whether the line may give the numeric variable BY a value, as a statement does (`BY=`, `LET BY=`, `FOR BY=`), as a
-// declaration or an input does (`LOCAL`, `INPUT`, `READ`, `DIM`, a `DEF` parameter, `RETURN`, `SYS ... TO`), or as an
-// assembler label (`.BY`). It says yes where it cannot tell: a missed warning is better than a false one. An array
-// `BY(`, `BY%` and `BY$` are other variables.
+// Whether the line may give the numeric variable BY a value: a `BY=` (or `BY+=` and so on) anywhere, whatever comes
+// before it, since a statement can start after `ON ERROR` or an `IF` condition with no `THEN`, among other places (so
+// a comparison `IF BY=1` counts too); a declaration or an input (`LOCAL`, `INPUT`, `READ`, `DIM`, a `DEF` parameter,
+// `RETURN`, `SYS ... TO`) naming it; or an assembler label `.BY`. It says yes where it cannot tell: a missed warning is
+// better than a false one. An array `BY(`, `BY%` and `BY$` are other variables.
 export function mayAssignBy(text, tokens) {
     let binding = false;
-    let previous = null;
     for (const token of tokens) {
         if (token.kind === "white") continue;
         const word = token.kind === "keyword" ? token.kw.keyword : null;
@@ -123,20 +122,9 @@ export function mayAssignBy(text, tokens) {
         if (token.kind === "label" && token.text === ".BY") return true;
         if (token.kind === "name" && token.text === "BY" && text[token.end] !== "(") {
             if (binding) return true;
-            const startsStatement =
-                !previous ||
-                previous.kind === "linenum" ||
-                (previous.kind === "punct" && [":", "[", "]"].includes(previous.text)) ||
-                AssignmentLeads.has(previous.kw?.keyword);
             SetsAfterName.lastIndex = token.end;
-            if (
-                startsStatement &&
-                SetsAfterName.test(text) &&
-                text[SetsAfterName.lastIndex] !== "="
-            )
-                return true;
+            if (SetsAfterName.test(text) && text[SetsAfterName.lastIndex] !== "=") return true;
         }
-        previous = token;
     }
     return false;
 }
