@@ -28,8 +28,8 @@
   },
   "dependencies": {
     "base2048": "^3.0.0",
-    "jquery": "^4.0.0",
-    "jsbeeb": "2.24.0",
+    "jquery": "^4.1.0",
+    "jsbeeb": "2.26.0",
     "monaco-editor": "^0.57.0",
     "promise": "^8.3.0",
     "resize-observer-polyfill": "^1.5.1",
@@ -38,7 +38,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@fortawesome/fontawesome-free": "^7.3.1",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.65.1",
     "@rollup/plugin-yaml": "^5.0.1",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
@@ -47,13 +47,13 @@
     "husky": "^9.1.7",
     "jsdom": "^31.0.1",
     "less": "^4.9.1",
-    "lint-staged": "^17.6.0",
+    "lint-staged": "^17.6.2",
     "prettier": "^3.10.1",
     "vite": "^8.3.8",
     "vite-plugin-html": "^3.2.2",
     "vite-plugin-node-polyfills": "^0.28.0",
     "vite-plugin-static-copy": "^4.1.1",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "scripts": {
     "dev": "vite",
