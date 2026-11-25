@@ -5,7 +5,7 @@ import {IStandaloneThemeService} from "monaco-editor/editor/standalone/common/st
 import {ILanguageService} from "monaco-editor/editor/common/languages/language";
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
-import {BasicVFixCode} from "./parser/basic-v";
+import {BasicVFixCode, relativeMoveWarnings} from "./parser/basic-v";
 import {problemMessage} from "./problem-messages";
 import {
     ForeignOperators,
@@ -262,12 +262,19 @@ const marker = (severity, line, start, end, details) => ({
     endColumn: end + 1,
 });
 
-// The warnings for each line of the program.
+// The warnings for each line of the program, and for the MOVE BY-x,y that nothing in the program makes valid.
 export function getWarnings(text, dialect) {
-    return readLines(text, dialect).flatMap(({lexer, tokens}, i) =>
+    const lines = readLines(text, dialect);
+    const byLine = lines.flatMap(({lexer, tokens}, i) =>
         lineWarnings(lexer.text, tokens, dialect).map(({start, end, ...details}) =>
             marker(MarkerSeverity.Warning, i + 1, start, end, details),
         ),
+    );
+    const moves = relativeMoveWarnings(lines).map(({line, start, end, ...details}) =>
+        marker(MarkerSeverity.Warning, line, start, end, details),
+    );
+    return [...byLine, ...moves].sort(
+        (a, b) => a.startLineNumber - b.startLineNumber || a.startColumn - b.startColumn,
     );
 }
 

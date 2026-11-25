@@ -1333,6 +1333,228 @@ function fixes(text, dialect) {
     }
 }
 
+// The warnings the editor shows on a MOVE BY- or DRAW BY-, with the text each quick fix for one leaves.
+function relativeMoveWarnings(text, dialect) {
+    const markers = getWarnings(text, dialect).filter(warning => warning.code === "basic-v-fix");
+    const model = editor.createModel(text, LanguageId);
+    try {
+        return markers.map(warning => {
+            const {actions} = codeActionProviderFor(dialect).provideCodeActions(model, warning, {
+                markers: [warning],
+            });
+            const {range, text: inserted} = actions[0].edit.edits[0].textEdit;
+            const lines = text.split("\n");
+            const line = lines[range.startLineNumber - 1];
+            lines[range.startLineNumber - 1] =
+                line.slice(0, range.startColumn - 1) + inserted + line.slice(range.endColumn - 1);
+            return {warning, title: actions[0].title, fixed: lines.join("\n")};
+        });
+    } finally {
+        model.dispose();
+    }
+}
+
+describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
+    const dialects = [
+        [BasicIIDialect, verdicts],
+        [ModelBNoGxrDialect, verdicts],
+        [ModelBDialect, verdicts],
+        [BasicIVDialect, masterVerdicts],
+    ];
+    // BASIC II and IV read BY as a variable, so the ROM accepts the line and stops only when it runs it (No such
+    // variable on both ROMs, checked with rom.mjs, which no row can hold: the statement is not a syntax verdict); with
+    // BY set the line runs (a recorded row), and so does the fixed one.
+    it.each([
+        [
+            "MOVE BY-40,40",
+            "PLOT0,-40,40",
+            "BY=1:MOVE BY-40,40",
+            "Replace MOVE BY-40,40 with PLOT0,-40,40",
+        ],
+        [
+            "DRAW BY-40,40",
+            "PLOT1,-40,40",
+            "BY=1:DRAW BY-40,40",
+            "Replace DRAW BY-40,40 with PLOT1,-40,40",
+        ],
+        [
+            "MOVE BY -40,40",
+            "PLOT0,-40,40",
+            "BY=1:MOVE BY -40,40",
+            "Replace MOVE BY -40,40 with PLOT0,-40,40",
+        ],
+        ["MOVE BY-X,Y", "PLOT0,-X,Y", "BY=1:MOVE BY-X,Y", "Replace MOVE BY-X,Y with PLOT0,-X,Y"],
+        [
+            "MOVE BY-40,40:PRINT",
+            "PLOT0,-40,40:PRINT",
+            "BY=1:MOVE BY-40,40:PRINT",
+            "Replace MOVE BY-40,40 with PLOT0,-40,40",
+        ],
+        [
+            "PRINT:MOVE BY-40,40",
+            "PRINT:PLOT0,-40,40",
+            null,
+            "Replace MOVE BY-40,40 with PLOT0,-40,40",
+        ],
+        [
+            "IF 1 THEN MOVE BY-40,40 ELSE PRINT",
+            "IF 1 THEN PLOT0,-40,40 ELSE PRINT",
+            "BY=1:IF 1 THEN MOVE BY-40,40 ELSE PRINT",
+            "Replace MOVE BY-40,40 with PLOT0,-40,40",
+        ],
+    ])("%s should be a warning with the fix %s", (text, fixed, withBy, title) => {
+        for (const [dialect, table] of dialects) {
+            const [found, ...others] = relativeMoveWarnings(text, dialect);
+            assert.deepStrictEqual(others, []);
+            assert.strictEqual(found.warning.severity, MarkerSeverity.Warning);
+            assert.match(
+                found.warning.message,
+                /BASIC II and IV have no (MOVE|DRAW) BY \(BASIC V's /,
+            );
+            assert.match(found.warning.message, /nothing in this program sets.*No such variable/);
+            assert.strictEqual(found.title, title);
+            assert.strictEqual(found.fixed, fixed);
+            assert.strictEqual(table.get(fixed), "ok");
+            if (withBy) assert.strictEqual(table.get(withBy), "ok");
+            // ROM-valid text is never an error.
+            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+            assert.deepStrictEqual(
+                withoutCodes(getWarnings(text, dialect)).map(w => w.code),
+                [undefined],
+            );
+        }
+    });
+    it("should mark the statement and say what BASIC V does", () => {
+        const [{warning}] = relativeMoveWarnings("X=1:MOVE BY-40,40:PRINT", ModelBDialect);
+        assert.deepStrictEqual(
+            [warning.startLineNumber, warning.startColumn, warning.endColumn],
+            [1, 5, 18],
+        );
+        assert.strictEqual(
+            warning.message,
+            "BASIC II and IV have no MOVE BY (BASIC V's MOVE BY moves the graphics cursor relative to where it is), so BY is read as a variable, which nothing in this program sets, and BASIC will stop with No such variable; PLOT0,-40,40 does the same",
+        );
+    });
+    it("should warn on the line of a program that has it, whatever the lines before and after", () => {
+        const found = relativeMoveWarnings("10 X=1\n20 DRAW BY-4,4\n30 MOVE BY-1,1", ModelBDialect);
+        assert.deepStrictEqual(
+            found.map(({warning, fixed}) => [
+                warning.startLineNumber,
+                fixed.split("\n")[warning.startLineNumber - 1],
+            ]),
+            [
+                [2, "20 PLOT1,-4,4"],
+                [3, "30 PLOT0,-1,1"],
+            ],
+        );
+    });
+    // Another operator is no BASIC V move written for BASIC II (and BY+1 is as likely to be the variable's): no warning.
+    it.each([
+        "MOVE BY+40,40",
+        "MOVE BY +40,40",
+        "MOVE BY!1,2",
+        "MOVE BY?1,2",
+        "MOVE BY*2,2",
+        "MOVE BY/2,2",
+        "MOVE BY^2,2",
+        "MOVE BY(1),2",
+        "MOVE BY AND 1,2",
+        "MOVE BY=1,2",
+        "MOVE BY,2",
+        "MOVE BY",
+        "MOVE BY-1",
+        "DRAW BY+1,2",
+        "DRAW BY!1,2",
+        "DRAW BY AND 1,2",
+        "MOVE BY%-1,2",
+        "MOVE BY$-1,2",
+        "MOVE BYE-1,2",
+        "MOVE BX-1,2",
+        "MOVE 1,BY-2",
+        "PRINT BY-1",
+        "X=BY-1",
+        "POINT BY -1,2",
+        "POINT BY-1,2",
+    ])("%s should have no warning for BY", text => {
+        for (const [dialect] of dialects) {
+            assert.deepStrictEqual(
+                getWarnings(text, dialect).filter(warning => warning.code === "basic-v-fix"),
+                [],
+            );
+        }
+    });
+    // Each way of giving BY a value, before the move or after it, or on another line, means no warning.
+    it.each([
+        "BY=1",
+        "BY = 1",
+        "LET BY=1",
+        "X=1:BY=1",
+        "IF X THEN BY=1",
+        "IF X THEN 10 ELSE BY=1",
+        "REPEAT BY=BY+1",
+        "BY+=1",
+        "LOCAL BY",
+        "LOCAL X,BY",
+        "FOR BY=1TO3",
+        "INPUT BY",
+        'INPUT "x",BY',
+        "INPUT LINE BY",
+        "READ BY",
+        "READ X,BY",
+        "DEF PROCa(BY)",
+        "DEF PROCa(X,BY)",
+        "DEF FNa(BY)",
+        "DEF FNa(BY)=BY",
+        "DIM BY 10",
+        "PROCa(RETURN BY)",
+        "[:.BY RTS:]",
+        "[.BY RTS]",
+    ])("should not warn when the program has %s, before, after or on its own line", assignment => {
+        for (const text of [
+            `${assignment}:MOVE BY-40,40`,
+            `MOVE BY-40,40:${assignment}`,
+            `10 ${assignment}\n20 MOVE BY-40,40`,
+            `10 MOVE BY-40,40\n20 ${assignment}`,
+            `10 MOVE BY-40,40\n20 X=1\n30 DRAW BY-4,4\n40 ${assignment}`,
+        ]) {
+            for (const [dialect] of dialects) {
+                assert.deepStrictEqual(
+                    getWarnings(text, dialect).filter(warning => warning.code === "basic-v-fix"),
+                    [],
+                    text,
+                );
+            }
+        }
+    });
+    // A different variable does not set BY: an array, another name, or the integer or string BY.
+    it.each([
+        "DIM BY(3):BY(1)=1",
+        "BY(1)=1",
+        "BYE=1",
+        "BX=1",
+        'BY$=""',
+        "BY%=1",
+        "X=BY(1)",
+        "BY?1=2",
+        "PRINT BY=1",
+        "IF BY=1 THEN PRINT",
+        'PRINT "BY=1"',
+        "REM BY=1",
+        "DATA BY=1",
+        "by=1",
+    ])("should still warn when the program has only %s", other => {
+        const text = `10 ${other}\n20 MOVE BY-40,40`;
+        for (const [dialect] of dialects) {
+            const found = relativeMoveWarnings(text, dialect);
+            assert.deepStrictEqual(
+                found.map(({warning}) => warning.startLineNumber),
+                [2],
+                other,
+            );
+        }
+    });
+});
+
 describe("Quick fix for a lower case index register", () => {
     // Each line is a recorded row: on BASIC II it stops with Index, and the capitalised line assembles.
     it.each([

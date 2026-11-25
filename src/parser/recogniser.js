@@ -71,6 +71,7 @@ export const ExpressionCount = {
     SOUND: 4,
     ENVELOPE: 14,
 };
+const RelativeMoveStart = /(?:MOVE|DRAW)\s+BY\s*-/y;
 const NotCode = names("comment data oscli");
 export const TextKeyword = names("REM DATA");
 // Operators from other languages, with what BASIC calls those it has (null for the rest).
@@ -178,6 +179,8 @@ export class Recogniser {
         this.problems = [];
         // Where the names that were read as COLOR (the Model B's alias for COLOUR) start.
         this.colors = [];
+        // The MOVE BY-x,y and DRAW BY-x,y statements of the line that have a fix, for the warning that BY is never set.
+        this.relativeMoves = [];
     }
 
     get tokens() {
@@ -448,6 +451,23 @@ export class Recogniser {
             if (e instanceof Failure) this.offerBasicVFix(e, start);
             throw e;
         }
+        this.noteRelativeMove(start);
+    }
+
+    // Records a MOVE BY-x,y or DRAW BY-x,y that BASIC II and IV read with BY as a variable, if the fix for BASIC V's
+    // reading is there; whether BY is ever set is for the program to say (see relativeMoveWarnings).
+    noteRelativeMove(start) {
+        if (this.probing || start.kind !== "keyword") return;
+        RelativeMoveStart.lastIndex = start.start;
+        if (!RelativeMoveStart.test(this.lexer.text)) return;
+        const fix = basicVFix(
+            this.lexer.text,
+            start.start,
+            this.dialect,
+            (candidate, from) => this.valid(candidate, start, from, true),
+            this.lexer.source,
+        );
+        if (fix) this.relativeMoves.push({word: start.kw.keyword, fix});
     }
 
     // Adds to the error of a BASIC V statement the quick fix that writes it for BASIC II or IV, if there is one.

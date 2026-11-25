@@ -57,11 +57,21 @@ BASIC does, and shows as an error.
   is drawn. `ModelBDialect` is the Model B with the GXR and `ModelBNoGxrDialect` is without it; `dialectFor` picks one.
   - `BY` is the BASIC V word only where the ROM stops. In BASIC II and IV it is a variable, so `MOVE BY -1,2`,
     `MOVE BY+1,2`, `MOVE BY!1,2`, `MOVE BY?1,2`, `MOVE BY(1),2` (an array element) and the same with `*`, `/`, `^`, `<`,
-    `>`, `=`, `AND`, `OR`, `EOR`, `DIV` or `MOD` run on both ROMs, as does `DRAW BY`; they have no error and so no fix.
+    `>`, `=`, `AND`, `OR`, `EOR`, `DIV` or `MOD` run on both ROMs, as does `DRAW BY`; they have no error and so no fix (but see the warning for `-` below).
     A space before `!`, `?`, `$` or `(`, or a number or name after a space, makes the ROM stop with `Missing ,`, and
     the fix is offered. `BY1` and `BY$` are other variables. `POINT` is no statement of either ROM (`Mistake`), so
     `POINT BY -1,2`, `POINT BY+1,2` and `POINT -1,2` have the fix whatever follows `BY`. Each is a recorded row in
     `basic-v-fixes-348`.
+  - `MOVE BY-40,40` and `DRAW BY-40,40` (a `-` right after `BY`, with or without a space) are ROM-valid but stop at run
+    time with `No such variable` on both ROMs unless the program sets `BY`, which most programs do not, and a relative
+    move is very often negative (suggested by Olly Betts on #354). So, as an extension, they get a warning (never an
+    error, and not counted against the ROM) with the same fix, "Replace MOVE BY-40,40 with PLOT0,-40,40", but only when
+    nothing in the whole program may give the numeric variable `BY` a value: `BY=`, `LET BY=`, `LOCAL`, `FOR`, `INPUT`,
+    `READ`, `DIM`, a `DEF` parameter, `RETURN` or `SYS` naming `BY`, an assembler label `.BY`, and `BY+=` and the like.
+    Where it cannot tell it does not warn, since a missed warning costs less than a false one. The other operators
+    (`BY+1`, `BY!1`, `BY AND 1` and so on) get none, and neither does `BY(1)`. An array `BY(`, `BY%`, `BY$` and `BYE`
+    are other variables, so they do not count as setting `BY`. The program is searched once, and only when it has such
+    a move.
   - `ELLIPSE`, `FILL` and `RECTANGLE` have none, as they cannot be written without repeating
   an argument or leaving the graphics cursor elsewhere.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
