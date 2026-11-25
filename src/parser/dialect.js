@@ -43,11 +43,15 @@ export const BasicIIDialect = Object.freeze({
     lineNumberLookups: lookedUpIn(keywords, basicIICommands),
     onBranches: ["GOTO", "GOSUB"],
     usColor: false,
+    gxr: false,
 });
 // The editor's Model B: BASIC II, and a COLOR that starts a statement and can only be COLOUR is COLOUR (the recogniser
 // decides which), as it is on the Master. The ROM says Mistake to that, so this is lenient on purpose (see
 // docs/rom-deviations.md).
-export const ModelBDialect = Object.freeze({...BasicIIDialect, usColor: true});
+// It has the GXR fitted, as the editor's Model B does unless the machine menu says otherwise, which gives it the circle
+// plotting of PLOT; ModelBNoGxrDialect is the Model B without it.
+export const ModelBDialect = Object.freeze({...BasicIIDialect, usColor: true, gxr: true});
+export const ModelBNoGxrDialect = Object.freeze({...ModelBDialect, gxr: false});
 export const BasicIVDialect = Object.freeze({
     basicIV: true,
     keywords: basicIVKeywords,
@@ -55,6 +59,7 @@ export const BasicIVDialect = Object.freeze({
     lineNumberLookups: lookedUpIn(basicIVKeywords, basicIVCommands),
     onBranches: ["GOTO", "GOSUB", "PROC"],
     usColor: false,
+    gxr: true,
 });
 
 // Whether a statement can start with the keyword: a token from &C6 up, ELSE (which skips the rest of the line), or on
@@ -62,5 +67,6 @@ export const BasicIVDialect = Object.freeze({
 export const canStartStatement = (dialect, kw) =>
     isStatementKeyword(kw) || kw.keyword === "ELSE" || (dialect.basicIV && kw.keyword === "EXT");
 
-/** The dialect of the BASIC that the model runs. */
-export const dialectFor = model => (model.isMaster ? BasicIVDialect : ModelBDialect);
+/** The dialect of the BASIC that the model runs, and for a Model B whether it has the GXR ROM (the Master's is built in). */
+export const dialectFor = (model, gxr = true) =>
+    model.isMaster ? BasicIVDialect : gxr ? ModelBDialect : ModelBNoGxrDialect;

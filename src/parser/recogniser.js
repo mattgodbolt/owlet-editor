@@ -5,6 +5,7 @@ import {Assembler, mnemonicsFor} from "./assembler.js";
 import {isFnProc, isStatementKeyword, pseudoVariables} from "../tokens.js";
 import {BasicIIDialect, canStartStatement} from "./dialect.js";
 import {Lexer} from "./lexer.js";
+import {BasicVFixCode, basicVFix} from "./basic-v.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
@@ -73,6 +74,7 @@ export const ExpressionCount = {
     SOUND: 4,
     ENVELOPE: 14,
 };
+const RelativeMoveStart = /(?:MOVE|DRAW)\s+BY\s*-/y;
 const NotCode = names("comment data oscli");
 export const TextKeyword = names("REM DATA");
 // Operators from other languages, with what BASIC calls those it has (null for the rest).
@@ -145,6 +147,7 @@ class Failure {
         this.at = at;
         this.explanation = explanation;
         this.code = code;
+        this.fix = undefined;
     }
 }
 
@@ -179,6 +182,8 @@ export class Recogniser {
         this.problems = [];
         // Where the names that were read as COLOR (the Model B's alias for COLOUR) start.
         this.colors = [];
+        // The MOVE BY-x,y and DRAW BY-x,y statements of the line that have a fix, for the warning that BY is never set.
+        this.relativeMoves = [];
     }
 
     get tokens() {
@@ -307,7 +312,7 @@ export class Recogniser {
     // read as an abbreviation (H.TO, where HIMEM cannot be followed by a letter) on the name.
     mark(failure, statementStart, assembling) {
         let {token} = failure;
-        const {message, explanation, code} = failure;
+        const {message, explanation, code, fix} = failure;
         const ended = failure.unfinished || this.completable(token, statementStart, assembling);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
@@ -331,6 +336,7 @@ export class Recogniser {
             missingAfter,
             ...(explanation && {explanation}),
             ...(code && {code}),
+            ...(fix && {fix}),
         };
         this.problems.push(problem);
         if (unfinished) return problem;
@@ -441,7 +447,45 @@ export class Recogniser {
     }
 
     statement() {
-        this.nested(() => this.unnestedStatement());
+        const start = this.peek();
+        try {
+            this.nested(() => this.unnestedStatement());
+        } catch (e) {
+            if (e instanceof Failure) this.offerBasicVFix(e, start);
+            throw e;
+        }
+        this.noteRelativeMove(start);
+    }
+
+    // Records a MOVE BY-x,y or DRAW BY-x,y that BASIC II and IV read with BY as a variable, if the fix for BASIC V's
+    // reading is there; whether BY is ever set is for the program to say (see relativeMoveWarnings).
+    noteRelativeMove(start) {
+        if (this.probing || start.kind !== "keyword") return;
+        RelativeMoveStart.lastIndex = start.start;
+        if (!RelativeMoveStart.test(this.lexer.text)) return;
+        const fix = basicVFix(
+            this.lexer.text,
+            start.start,
+            this.dialect,
+            (candidate, from) => this.valid(candidate, start, from, true),
+            this.lexer.source,
+        );
+        if (fix) this.relativeMoves.push({word: start.kw.keyword, fix});
+    }
+
+    // Adds to the error of a BASIC V statement the quick fix that writes it for BASIC II or IV, if there is one.
+    offerBasicVFix(failure, start) {
+        if (this.probing || failure.explanation || failure.code) return;
+        const fix = basicVFix(
+            this.lexer.text,
+            start.start,
+            this.dialect,
+            (candidate, from) => this.valid(candidate, start, from, true),
+            this.lexer.source,
+        );
+        if (!fix) return;
+        const {explanation, ...edit} = fix;
+        Object.assign(failure, {explanation, code: BasicVFixCode, fix: edit});
     }
 
     unnestedStatement() {

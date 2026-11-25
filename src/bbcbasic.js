@@ -5,6 +5,7 @@ import {IStandaloneThemeService} from "monaco-editor/editor/standalone/common/st
 import {ILanguageService} from "monaco-editor/editor/common/languages/language";
 import {programProblems, readLines, tokensProvider} from "./parser/highlight";
 import {lexLine} from "./parser/lexer";
+import {BasicVFixCode, relativeMoveWarnings} from "./parser/basic-v";
 import {problemMessage} from "./problem-messages";
 import {
     ForeignOperators,
@@ -121,8 +122,8 @@ export const codeActionProviderFor = dialect => ({
         // rewritten. The editor's markers carry no code (Monaco would show it in the hover), so it is found from the
         // text again.
         let known = null;
-        const codeOf = marker => {
-            if (marker.code) return marker.code;
+        const foundFor = marker => {
+            if (marker.code) return marker;
             const text = model.getValue();
             known = known || [...getWarnings(text, dialect), ...getSyntaxMarkers(text, dialect)];
             return known.find(
@@ -130,10 +131,13 @@ export const codeActionProviderFor = dialect => ({
                     found.message === marker.message &&
                     found.startLineNumber === marker.startLineNumber &&
                     found.startColumn === marker.startColumn,
-            )?.code;
+            );
         };
         const fixable = context.markers
-            .map(marker => ({...marker, code: codeOf(marker)}))
+            .map(marker => {
+                const {code, fix} = foundFor(marker) ?? {};
+                return {...marker, code, fix};
+            })
             .filter(marker => QuickFixCodes.has(marker.code));
         const actions = fixable.map(marker => {
             const text = model.getValueInRange(marker);
@@ -171,6 +175,11 @@ export const codeActionProviderFor = dialect => ({
                 const column = argument.start + 1;
                 const at = {...atStart, startColumn: column, endColumn: column};
                 return quickFix(model, marker, "Insert 0, before the argument", at, "0,");
+            }
+            if (marker.code === BasicVFixCode) {
+                const {start, end, text, title} = marker.fix;
+                const at = {...marker, startColumn: start + 1, endColumn: end + 1};
+                return quickFix(model, marker, title, at, text);
             }
             if (marker.code === JunkAfterInstructionCode) {
                 if (text[0] === "]")
@@ -234,13 +243,15 @@ const QuickFixCodes = new Set([
     SpaceAfterMnemonicCode,
     SpaceBeforeKeywordCode,
     ZeroBeforeGcolArgumentCode,
+    BasicVFixCode,
     CapitaliseRegisterCode,
     CapitaliseMnemonicCode,
 ]);
 const MnemonicLength = 3;
 
 // Markers as the editor shows them: the code is only for the quick fixes, and Monaco would add it to the hover text.
-export const withoutCodes = markers => markers.map(marker => ({...marker, code: undefined}));
+export const withoutCodes = markers =>
+    markers.map(marker => ({...marker, code: undefined, fix: undefined}));
 
 const marker = (severity, line, start, end, details) => ({
     severity,
@@ -251,12 +262,19 @@ const marker = (severity, line, start, end, details) => ({
     endColumn: end + 1,
 });
 
-// The warnings for each line of the program.
+// The warnings for each line of the program, and for the MOVE BY-x,y that nothing in the program makes valid.
 export function getWarnings(text, dialect) {
-    return readLines(text, dialect).flatMap(({lexer, tokens}, i) =>
+    const lines = readLines(text, dialect);
+    const byLine = lines.flatMap(({lexer, tokens}, i) =>
         lineWarnings(lexer.text, tokens, dialect).map(({start, end, ...details}) =>
             marker(MarkerSeverity.Warning, i + 1, start, end, details),
         ),
+    );
+    const moves = relativeMoveWarnings(lines).map(({line, start, end, ...details}) =>
+        marker(MarkerSeverity.Warning, line, start, end, details),
+    );
+    return [...byLine, ...moves].sort(
+        (a, b) => a.startLineNumber - b.startLineNumber || a.startColumn - b.startColumn,
     );
 }
 
@@ -268,7 +286,7 @@ export function getSyntaxMarkers(text, dialect, cursorLine = 0) {
         lineWarnings(lexer.text, tokens, dialect),
     );
     return programProblems(recognisers).flatMap(problem => {
-        const {line, start, end, unfinished, code} = problem;
+        const {line, start, end, unfinished, code, fix} = problem;
         const covered = warnings[line - 1].some(
             warning => warning.start < end && start < warning.end,
         );
@@ -288,7 +306,9 @@ export function getSyntaxMarkers(text, dialect, cursorLine = 0) {
             dialect,
         );
         const severity = unfinished ? MarkerSeverity.Warning : MarkerSeverity.Error;
-        return [marker(severity, line, start, end, {message, ...(code && {code})})];
+        return [
+            marker(severity, line, start, end, {message, ...(code && {code}), ...(fix && {fix})}),
+        ];
     });
 }
 

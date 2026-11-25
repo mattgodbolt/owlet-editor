@@ -44,6 +44,40 @@ BASIC does, and shows as an error.
   (recorded on both ROMs); the hover says that BASIC V, which is not emulated here, accepts one argument, with
   `GCOL C` meaning `GCOL 0,C` (from #340). The fix, "Insert 0, before the argument", is offered only where the
   statement then has no error (so not for `GCOL 1 2`). `GCOL 1,2,3` is a different error and has no fix.
+- **BASIC V statements** (`OFF`, `ON`, `MOVE BY`, `DRAW BY`, `POINT`, `POINT BY`, `ORIGIN`, `LINE`, `CIRCLE`,
+  `CIRCLE FILL`). BASIC II and IV stop at each with the error it has always had (`Syntax error`, `No such variable`,
+  `Missing ,` or `Mistake`; recorded on both ROMs). The hover says that BASIC V accepts it (BASIC V is not emulated here)
+  and the quick fix replaces the statement with the one that does the same, as listed in #348: `OFF` and `ON` become
+  `VDU 23,1,0;0;0;0;` and `VDU 23,1,1;0;0;0;`, `MOVE BY X,Y` becomes `PLOT0,X,Y`, `ORIGIN X,Y` becomes `VDU29,X;Y;`,
+  `LINE X,Y,X2,Y2` becomes `MOVE X,Y:DRAW X2,Y2`, and so on (the table is in `src/parser/basic-v.js`). The fix is
+  offered only where the arguments split at commas outside brackets into the right number, and the line with the
+  replacement has no error. `CIRCLE` and `CIRCLE FILL` use the circle codes of PLOT (`&91` and `&99`), which the Master
+  has and a Model B has with the GXR ROM fitted (checked by drawing on both, as on the Master), so they have a fix on
+  BASIC IV and on a Model B with the GXR (the machine menu's default), and none on a Model B without it, where nothing
+  is drawn. `ModelBDialect` is the Model B with the GXR and `ModelBNoGxrDialect` is without it; `dialectFor` picks one.
+  - `BY` is the BASIC V word only where the ROM stops. In BASIC II and IV it is a variable, so `MOVE BY -1,2`,
+    `MOVE BY+1,2`, `MOVE BY!1,2`, `MOVE BY?1,2`, `MOVE BY(1),2` (an array element) and the same with `*`, `/`, `^`, `<`,
+    `>`, `=`, `AND`, `OR`, `EOR`, `DIV` or `MOD` run on both ROMs, as does `DRAW BY`; they have no error and so no fix (but see the warning for `-` below).
+    A space before `!`, `?`, `$` or `(`, or a number or name after a space, makes the ROM stop with `Missing ,`, and
+    the fix is offered. `BY1` and `BY$` are other variables. `POINT` is no statement of either ROM (`Mistake`), so
+    `POINT BY -1,2`, `POINT BY+1,2` and `POINT -1,2` have the fix whatever follows `BY`. Each is a recorded row in
+    `basic-v-fixes-348`.
+  - `MOVE BY-40,40` and `DRAW BY-40,40` (a `-` right after `BY`, with or without a space) are ROM-valid but stop at run
+    time with `No such variable` on both ROMs unless the program sets `BY`, which most programs do not, and a relative
+    move is very often negative (suggested by Olly Betts on #354). So, as an extension, they get a warning (never an
+    error, and not counted against the ROM) with the same fix, "Replace MOVE BY-40,40 with PLOT0,-40,40", but only when
+    nothing in the whole program may give the numeric variable `BY` a value: a `BY=` anywhere, whatever comes before
+    it (a statement can start after a line number, `:`, `THEN`, `ELSE`, `REPEAT`, `ON ERROR`, an
+    `IF` condition with no `THEN`, as in `IF1BY=1`, and an `ON ... GOTO ... ELSE`, each checked in the ROM, so the scan
+    does not look at what precedes), which also means a comparison such as `IF BY=1 THEN` or `PRINT BY=1` counts as
+    setting it, as do `LET BY=` and `FOR BY=1TO3`; `LOCAL`, `INPUT`, `READ`, `DIM` or a `DEF` parameter naming `BY`; and
+    an assembler label `.BY`. (`[LDA#BY=1]` sets nothing, but is a `BY=` too, so it counts.)
+    Where it cannot tell it does not warn, since a missed warning costs less than a false one. The other operators
+    (`BY+1`, `BY!1`, `BY AND 1` and so on) get none, and neither does `BY(1)`. An array `BY(`, `BY%`, `BY$` and `BYE`
+    are other variables, so they do not count as setting `BY`. The program is searched once, and only when it has such
+    a move.
+  - `ELLIPSE`, `FILL` and `RECTANGLE` have none, as they cannot be written without repeating
+  an argument or leaving the graphics cursor elsewhere.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
   `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into: right at the end of the
   `THEN` part of an `IF` (or after an `ON` list), a quirk anywhere else. The `ELSE` is red; the text after it is not,
