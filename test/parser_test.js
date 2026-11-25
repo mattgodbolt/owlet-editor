@@ -517,6 +517,54 @@ describe("Text BASIC ignores in an ON list", () => {
     });
 });
 
+// ON ERROR LOCAL is BASIC V. BASIC II and IV take LOCAL as the handler, so the first error loops forever (docs/rom-deviations.md).
+describe("ON ERROR LOCAL", () => {
+    const marked = (text, dialect) =>
+        programProblems(readLines(text, dialect))
+            .filter(problem => problem.stricter)
+            .map(({start, end, message}) => [text.slice(start, end), message]);
+    it.each([ModelBDialect, BasicIVDialect])("should mark the LOCAL alone, on %#", dialect => {
+        for (const [text, local] of [
+            ["ON ERROR LOCAL", "LOCAL"],
+            ["ON ERROR LOCAL X,Y", "LOCAL"],
+            ["ON ERROR LOC.:PRINT 1", "LOC."],
+            ["ONERRORLOCAL", "LOCAL"],
+            ["10 ON ERR. LOC.", "LOC."],
+        ]) {
+            const [[at, message], ...rest] = marked(text, dialect);
+            assert.deepStrictEqual([at, rest], [local, []], text);
+            assert.match(message, /^BASIC V accepts ON ERROR LOCAL.*loops forever/);
+        }
+    });
+    // The handler stops at LOCAL, so what follows it is never read and must not be marked too.
+    it.each([ModelBDialect, BasicIVDialect])(
+        "should mark only the LOCAL, whatever follows it, on %#",
+        dialect => {
+            for (const text of [
+                "ON ERROR LOCAL",
+                "ON ERROR LOCAL PRINT 1",
+                "ON ERROR LOCAL OFF",
+                "ON ERROR LOCAL REPORT:END",
+                'ON ERROR LOC. PRINT "A"',
+                "ON ERROR LOCAL:PRINT 1",
+            ]) {
+                assert.strictEqual(programProblems(readLines(text, dialect)).length, 1, text);
+            }
+        },
+    );
+    it.each([
+        "ON ERROR OFF",
+        "ON ERROR PRINT 1",
+        "ON ERROR GOTO 10",
+        "LOCAL X",
+        "DEF PROCp:LOCAL X:ENDPROC",
+        "PRINT 1:ON ERROR OFF",
+    ])("should not mark %s", text => {
+        assert.deepStrictEqual(marked(text, ModelBDialect), []);
+        assert.deepStrictEqual(marked(text, BasicIVDialect), []);
+    });
+});
+
 describe("A line typed a key at a time", () => {
     it.each(Typed)(
         "%s should be red only where no ending could make it valid",

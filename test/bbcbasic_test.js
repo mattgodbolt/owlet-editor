@@ -1649,6 +1649,13 @@ describe("Syntax markers", () => {
             "LD is not an instruction: the register letter is missing. BASIC reads the 8 as X (LDX), so what follows is the address; probably LDA, LDX or LDY was meant";
         assert.deepStrictEqual(markers("[LD89"), [[MarkerSeverity.Error, reads, 1, 2, 4]]);
     });
+    it("should say what BASIC II and IV do with ON ERROR LOCAL, as an error on the LOCAL", () => {
+        const message =
+            "BASIC V accepts ON ERROR LOCAL (not emulated here), but BASIC II and IV take LOCAL as the error handler: the first error fails with Not LOCAL, which runs the handler again, so the program loops forever and Escape does not stop it";
+        assert.deepStrictEqual(markers("ON ERROR LOCAL X"), [
+            [MarkerSeverity.Error, message, 1, 10, 15],
+        ]);
+    });
     it("should say that a keyword straight after a mnemonic is read as a variable, and a space was meant", () => {
         const message =
             "H. here is read as the variable H, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows STA with no space, so the rest of the instruction is ignored; probably a space was meant after STA";

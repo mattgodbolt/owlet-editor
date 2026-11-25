@@ -66,6 +66,14 @@ BASIC does, and shows as an error.
   third), and nothing after it is marked; BASIC IV reads a string as one item. Suggested by Olly Betts on #335; its
   recorded rows include ones that must stay unmarked (`ON 5 GOTO 10ELSE30`, where the `ELSE` is read). As with the
   assembler's, the oracle takes these marks on trust as ignored text and lists them as STRICTER.
+- **`ON ERROR LOCAL`** (and its abbreviations, `ON ERROR LOC.`). It is BASIC V syntax, which BASIC II and IV accept with
+  another meaning: `ON ERROR` takes the rest of the line as the handler, so the handler is the statement `LOCAL`. An
+  error unwinds any procedure before the handler runs, so `LOCAL` is outside one even if the `ON ERROR` was inside a
+  `PROC`: it fails with `Not LOCAL`, which runs the handler again. The program loops forever with nothing printed, and
+  Escape raises one more error that goes to the same handler (seen on both ROMs by running a program, for #279). The
+  `LOCAL` is red, with a hover that says that BASIC V accepts it (not emulated here) and what BASIC II and IV do.
+  Nothing after it is marked, since the handler fails before reading it. Suggested by Olly Betts on #279. The handler
+  is text the ROM never reads, so the oracle takes the mark on trust, as it does the assembler's.
 - **A string where BASIC wants a number, or the other way round** (`PRINT"X"DIV 2`, `X=1+"A"`, `X$="A"+1`, `X=LEN 5`,
   `PRINT STR$A$`, `X=EVAL 1`, `P.SPCA$`, `X=EOF#STR$1`, `P.?A$`, `P.$A$`, `P.-A$`). BASIC raises "Type mismatch" when it
   runs such a statement, not when it reads it, so a program that never gets there is fine. A binary operator
