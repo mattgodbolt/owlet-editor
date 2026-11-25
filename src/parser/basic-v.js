@@ -5,7 +5,7 @@ import {lexLine} from "./lexer.js";
 export const BasicVFixCode = "basic-v-fix";
 
 // A form comes before any that starts with its words (POINT BY before POINT).
-// [form, replacement, what the form does, whether it needs the Master's (or GXR's) circle plotting]
+// [form, replacement, what the form does, whether it needs the circle plotting of the Master or the GXR]
 const Statements = [
     ["OFF", "VDU 23,1,0;0;0;0;", "turns the cursor off"],
     ["ON", "VDU 23,1,1;0;0;0;", "turns the cursor on"],
@@ -17,7 +17,7 @@ const Statements = [
     ["LINE X,Y,X2,Y2", "MOVE X,Y:DRAW X2,Y2", "draws a line between two points"],
     ["CIRCLE FILL X,Y,R", "MOVE X,Y:PLOT&99,R,0", "draws a filled circle", true],
     ["CIRCLE X,Y,R", "MOVE X,Y:PLOT&91,R,0", "draws a circle", true],
-].map(([form, replacement, means, needsBasicIV = false]) => {
+].map(([form, replacement, means, needsGxr = false]) => {
     // The argument names are the last word of a form that has a comma.
     const words = form.split(" ");
     const names = words.at(-1).includes(",") ? words.pop().split(",") : [];
@@ -28,7 +28,7 @@ const Statements = [
         names,
         replacement,
         means,
-        needsBasicIV,
+        needsGxr,
     };
 });
 
@@ -70,7 +70,7 @@ function readArguments(text, source, leadEnd, dialect) {
 export function basicVFix(text, start, dialect, isValid, source = text) {
     const rest = text.slice(start);
     const statement = Statements.find(
-        ({pattern, needsBasicIV}) => pattern.test(rest) && (dialect.basicIV || !needsBasicIV),
+        ({pattern, needsGxr}) => pattern.test(rest) && (dialect.gxr || !needsGxr),
     );
     if (!statement) return null;
     const {form, names, means} = statement;

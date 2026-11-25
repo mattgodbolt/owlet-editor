@@ -352,7 +352,7 @@ export class OwletEditor {
         $("#rocket")
             .prop("disabled", !sendable)
             .attr("title", sendable ? "send to beebjit" : "bbcmicrobot snapshots are of a Model B");
-        this.useDialect(dialectFor(this.emulator.model));
+        this.useDialect(dialectFor(this.emulator.model, this.emulator.useGxr));
         this.updateWarnings();
         this.showSyntaxMarkers();
         this.onMachineChangeHandler(choice);

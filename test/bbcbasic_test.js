@@ -7,7 +7,13 @@ import {
     rebuildBracketPairs,
     registerBbcBasicLanguage,
 } from "../src/bbcbasic";
-import {BasicIIDialect, BasicIVDialect, ModelBDialect} from "../src/parser/dialect";
+import {
+    BasicIIDialect,
+    BasicIVDialect,
+    dialectFor,
+    ModelBDialect,
+    ModelBNoGxrDialect,
+} from "../src/parser/dialect";
 import {mnemonicsFor} from "../src/parser/assembler";
 import {problemCount} from "../src/problem-count";
 import {highlightLine, readLines} from "../src/parser/highlight";
@@ -1516,8 +1522,9 @@ describe("Quick fix for GCOL with one argument", () => {
 });
 
 describe("Quick fix for a BASIC V statement", () => {
-    // Each is a recorded row that both ROMs stop at (#348), and the fixed line is one that both run. CIRCLE has a fix only
-    // on BASIC IV, as the circle codes of PLOT are the Master's.
+    // Each is a recorded row that both ROMs stop at (#348), and the fixed line is one that both run. CIRCLE has a fix
+    // only where PLOT has the circle codes: BASIC IV (the Master) and a Model B with the GXR, not on BASIC II or a
+    // Model B without it.
     it.each([
         ["OFF", "VDU 23,1,0;0;0;0;"],
         ["ON", "VDU 23,1,1;0;0;0;"],
@@ -1543,9 +1550,11 @@ describe("Quick fix for a BASIC V statement", () => {
         ["CIRCLE 1,2,3:PRINT", "MOVE 1,2:PLOT&91,3,0:PRINT"],
         ["10 X=1\n20 ORIGIN  1 , 2", "10 X=1\n20 VDU29,1;2;"],
     ])("%s should offer %s", (text, result) => {
-        const onlyBasicIV = text.includes("CIRCLE");
+        const needsCircles = text.includes("CIRCLE");
         for (const [dialect, table] of [
             [BasicIIDialect, verdicts],
+            [ModelBNoGxrDialect, verdicts],
+            [ModelBDialect, verdicts],
             [BasicIVDialect, masterVerdicts],
         ]) {
             if (!text.includes("\n")) {
@@ -1554,7 +1563,7 @@ describe("Quick fix for a BASIC V statement", () => {
                 assert.strictEqual(table.get(result.replace(/^BY=1:/, "")), "ok");
             }
             const offered = fixes(text, dialect).map(([, fixed]) => fixed);
-            const wanted = onlyBasicIV && dialect === BasicIIDialect ? [] : [result];
+            const wanted = needsCircles && !dialect.gxr ? [] : [result];
             assert.deepStrictEqual(offered, wanted);
         }
     });
@@ -1570,6 +1579,93 @@ describe("Quick fix for a BASIC V statement", () => {
                 [result],
             );
         }
+    });
+    // BY is a variable in BASIC II and IV, so a sign or operator after it is the variable's, and the ROM runs the line
+    // (#354). Each row is recorded on both ROMs with BY defined, and has no error and so no fix. A space before ! ?
+    // $ or ( makes it the BASIC V form, as the next table has.
+    const variableOperators = [
+        "-1", " -1", "+1", " +1", "!1", "?1", "*1", " *1", "/1", " /1", "^1", " ^1", "<1", " <1", ">1", " >1",
+        "=1", " =1", " AND 1", " OR 1", " EOR 1", " DIV 1", " MOD 1",
+    ]; // prettier-ignore
+    it.each(["MOVE", "DRAW"].flatMap(kw => variableOperators.map(operator => [kw, operator])))(
+        "%s BY%s,2 should be a variable and offer no fix",
+        (kw, operator) => {
+            const text = `BY=1:${kw} BY${operator},2`;
+            assert.strictEqual(verdicts.get(text), "ok");
+            assert.strictEqual(masterVerdicts.get(text), "ok");
+            for (const dialect of [
+                BasicIIDialect,
+                ModelBNoGxrDialect,
+                ModelBDialect,
+                BasicIVDialect,
+            ]) {
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+                assert.deepStrictEqual(fixes(text, dialect), []);
+            }
+        },
+    );
+    it.each([
+        "DIM BY(3):MOVE BY(1),2",
+        "DIM BY(3):MOVE BY(1)+1,2",
+        "DIM BY(3):DRAW BY(1),2",
+        "DIM BY(3):DRAW BY(1)+1,2",
+        "BY=1:MOVE BY-1,2:PRINT",
+        "BY=1:DRAW BY-1,2:PRINT",
+    ])("%s should be a variable and offer no fix", text => {
+        assert.strictEqual(verdicts.get(text), "ok");
+        assert.strictEqual(masterVerdicts.get(text), "ok");
+        for (const dialect of [BasicIIDialect, BasicIVDialect]) {
+            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+            assert.deepStrictEqual(fixes(text, dialect), []);
+        }
+    });
+    // Where the ROMs stop (a space before the sign or the bracket, or a number or name after BY), BY is the BASIC V
+    // word, and POINT BY has no variable reading with any operator, as POINT is not a statement of BASIC II or IV.
+    it.each([
+        ["BY=1:MOVE BY !1,2", "BY=1:PLOT0,!1,2"],
+        ["BY=1:MOVE BY ?1,2", "BY=1:PLOT0,?1,2"],
+        ["BY=1:MOVE BY (1),2", "BY=1:PLOT0,(1),2"],
+        ["BY=1:MOVE BY Y,2", "BY=1:PLOT0,Y,2"],
+        ["BY=1:DRAW BY !1,2", "BY=1:PLOT1,!1,2"],
+        ["BY=1:DRAW BY ?1,2", "BY=1:PLOT1,?1,2"],
+        ["BY=1:DRAW BY (1),2", "BY=1:PLOT1,(1),2"],
+        ["BY=1:DRAW BY Y,2", "BY=1:PLOT1,Y,2"],
+        ["POINT BY-1,2", "PLOT&61,-1,2"],
+        ["POINT BY+1,2", "PLOT&61,+1,2"],
+        ["POINT BY!1,2", "PLOT&61,!1,2"],
+        ["POINT BY?1,2", "PLOT&61,?1,2"],
+        ["POINT BY -1,2", "PLOT&61,-1,2"],
+        ["POINT BY +1,2", "PLOT&61,+1,2"],
+        ["POINT BY !1,2", "PLOT&61,!1,2"],
+        ["POINT BY ?1,2", "PLOT&61,?1,2"],
+        ["POINT BY (1),2", "PLOT&61,(1),2"],
+        ["POINT BY Y,2", "PLOT&61,Y,2"],
+        ["POINT -1,2", "PLOT&65,-1,2"],
+        ["POINT +1,2", "PLOT&65,+1,2"],
+        ["POINT !1,2", "PLOT&65,!1,2"],
+        ["POINT ?1,2", "PLOT&65,?1,2"],
+        ["POINT (1),2", "PLOT&65,(1),2"],
+    ])("%s should offer %s, as BY is not a variable there", (text, result) => {
+        assert.notStrictEqual(verdicts.get(text), "ok");
+        assert.notStrictEqual(masterVerdicts.get(text), "ok");
+        assert.strictEqual(verdicts.get(result.replace(/^BY=1:/, "")), "ok");
+        for (const dialect of [BasicIIDialect, ModelBNoGxrDialect, ModelBDialect, BasicIVDialect]) {
+            assert.deepStrictEqual(
+                fixes(text, dialect).map(([, fixed]) => fixed),
+                [result],
+            );
+        }
+    });
+    it("should read the circle codes of PLOT as the Master's and the GXR's", () => {
+        const model = {isMaster: false};
+        assert.strictEqual(dialectFor(model), ModelBDialect);
+        assert.strictEqual(dialectFor(model, true), ModelBDialect);
+        assert.strictEqual(dialectFor(model, false), ModelBNoGxrDialect);
+        assert.strictEqual(dialectFor({isMaster: true}, false), BasicIVDialect);
+        assert.deepStrictEqual(
+            [BasicIIDialect, ModelBNoGxrDialect, ModelBDialect, BasicIVDialect].map(({gxr}) => gxr),
+            [false, false, true, true],
+        );
     });
     it("should title the fix with the text it replaces", () => {
         assert.deepStrictEqual(fixes("OFF", BasicIIDialect), [
@@ -1593,6 +1689,9 @@ describe("Quick fix for a BASIC V statement", () => {
         "BY=1:MOVE BY,2",
         "BY=1:MOVE BY -1,2",
         "BY1=1:MOVE BY1,2",
+        "POINT BY,2",
+        "POINT BY*1,2",
+        "POINT BY AND 1,2",
         "ON ERROR OFF",
         "ON ERROR LINE 1,2",
         "TRACE OFF",

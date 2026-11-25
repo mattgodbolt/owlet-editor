@@ -51,8 +51,18 @@ BASIC does, and shows as an error.
   `VDU 23,1,0;0;0;0;` and `VDU 23,1,1;0;0;0;`, `MOVE BY X,Y` becomes `PLOT0,X,Y`, `ORIGIN X,Y` becomes `VDU29,X;Y;`,
   `LINE X,Y,X2,Y2` becomes `MOVE X,Y:DRAW X2,Y2`, and so on (the table is in `src/parser/basic-v.js`). The fix is
   offered only where the arguments split at commas outside brackets into the right number, and the line with the
-  replacement has no error. `CIRCLE` and `CIRCLE FILL` use the circle codes of the Master's PLOT (and the GXR), so they
-  have a fix on BASIC IV only. `ELLIPSE`, `FILL` and `RECTANGLE` have none, as they cannot be written without repeating
+  replacement has no error. `CIRCLE` and `CIRCLE FILL` use the circle codes of PLOT (`&91` and `&99`), which the Master
+  has and a Model B has with the GXR ROM fitted (checked by drawing on both, as on the Master), so they have a fix on
+  BASIC IV and on a Model B with the GXR (the machine menu's default), and none on a Model B without it, where nothing
+  is drawn. `ModelBDialect` is the Model B with the GXR and `ModelBNoGxrDialect` is without it; `dialectFor` picks one.
+  - `BY` is the BASIC V word only where the ROM stops. In BASIC II and IV it is a variable, so `MOVE BY -1,2`,
+    `MOVE BY+1,2`, `MOVE BY!1,2`, `MOVE BY?1,2`, `MOVE BY(1),2` (an array element) and the same with `*`, `/`, `^`, `<`,
+    `>`, `=`, `AND`, `OR`, `EOR`, `DIV` or `MOD` run on both ROMs, as does `DRAW BY`; they have no error and so no fix.
+    A space before `!`, `?`, `$` or `(`, or a number or name after a space, makes the ROM stop with `Missing ,`, and
+    the fix is offered. `BY1` and `BY$` are other variables. `POINT` is no statement of either ROM (`Mistake`), so
+    `POINT BY -1,2`, `POINT BY+1,2` and `POINT -1,2` have the fix whatever follows `BY`. Each is a recorded row in
+    `basic-v-fixes-348`.
+  - `ELLIPSE`, `FILL` and `RECTANGLE` have none, as they cannot be written without repeating
   an argument or leaving the graphics cursor elsewhere.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
   `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into: right at the end of the
