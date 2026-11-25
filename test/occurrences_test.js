@@ -238,6 +238,7 @@ describe("Rename notice", () => {
             value: text,
             language: "BBCBASIC",
             occurrencesHighlight: "off",
+            minimap: {enabled: false},
         });
         try {
             const shown = vi.spyOn(
@@ -432,6 +433,7 @@ describe("Change All Occurrences", () => {
             language: "BBCBASIC",
             // The word highlighter's pending update would be cancelled, and reported, by the disposal.
             occurrencesHighlight: "off",
+            minimap: {enabled: false},
         });
         try {
             codeEditor.setPosition({lineNumber: 1, column: 9});
