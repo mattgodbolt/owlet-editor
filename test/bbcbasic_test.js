@@ -1582,6 +1582,8 @@ describe("Warning for MOVE BY- and DRAW BY- when BY is never set", () => {
         "REM BY=1",
         "DATA BY=1",
         "by=1",
+        "FOR I=BY TO 3",
+        "LET X=BY",
         // BASIC V only: BASIC II and IV stop at them ("Mistake"), so they set nothing.
         "BY+=1",
         "BY-=1",

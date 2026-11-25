@@ -70,7 +70,7 @@ BASIC does, and shows as an error.
     it (a statement can start after a line number, `:`, `THEN`, `ELSE`, `REPEAT`, `ON ERROR`, an
     `IF` condition with no `THEN`, as in `IF1BY=1`, and an `ON ... GOTO ... ELSE`, each checked in the ROM, so the scan
     does not look at what precedes), which also means a comparison such as `IF BY=1 THEN` or `PRINT BY=1` counts as
-    setting it; `LET BY=`, `LOCAL`, `FOR`, `INPUT`, `READ`, `DIM` or a `DEF` parameter naming `BY`; and
+    setting it, as do `LET BY=` and `FOR BY=1TO3`; `LOCAL`, `INPUT`, `READ`, `DIM` or a `DEF` parameter naming `BY`; and
     an assembler label `.BY`. (`[LDA#BY=1]` sets nothing, but is a `BY=` too, so it counts.)
     Where it cannot tell it does not warn, since a missed warning costs less than a false one. The other operators
     (`BY+1`, `BY!1`, `BY AND 1` and so on) get none, and neither does `BY(1)`. An array `BY(`, `BY%`, `BY$` and `BYE`
