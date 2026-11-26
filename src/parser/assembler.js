@@ -175,21 +175,49 @@ export class Assembler {
         const mnemonic = this.mnemonic();
         const operand = r.peek();
         this.operand(mnemonic);
+        const operandEnd = r.last.end;
         if (this.comment()) return;
         let junk = null;
+        let spaceAdvised = false;
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (junk) continue;
             junk = token;
             const space = this.keywordAfterMnemonic(first, mnemonic, operand);
-            if (space) r.stricter(token, space, SpaceAfterMnemonicCode, operand);
-            else
+            if (space) {
+                spaceAdvised = true;
+                r.stricter(token, space, SpaceAfterMnemonicCode, operand);
+            } else
                 r.stricter(
                     token,
                     JunkMessages.get(token.text) ?? JunkMessage,
                     JunkAfterInstructionCode,
                 );
         }
+        if (!spaceAdvised) this.keywordNamedOperand(first, mnemonic, operand, operandEnd);
+    }
+
+    // Marks an operand that begins with a keyword spelled in full, straight after a mnemonic that takes one (STAPAGE,
+    // ASLTOP,X). BASIC reads the name as a variable, which no program can define, so it is the address P%, or "No
+    // such variable" with bit 1 of OPT set; a space after the mnemonic reads the keyword.
+    keywordNamedOperand(first, mnemonic, operand, operandEnd) {
+        const r = this.recogniser;
+        const {text} = r.lexer;
+        const keyword =
+            operand.kind === "name" &&
+            !operand.spaced &&
+            matchKeyword(text, operand.start, r.dialect);
+        if (!keyword || r.probing || this.rules.implied.has(mnemonic)) return;
+        const spelling = text.slice(operand.start, keyword.end);
+        if (spelling.endsWith(".") || spelling.length > operand.end - operand.start) return;
+        const spaced = `${text.slice(0, operand.start)} ${text.slice(operand.start, operandEnd)}`;
+        if (!r.valid(spaced, first, operand.start)) return;
+        const written = text.slice(first.start, operand.start);
+        r.stricter(
+            operand,
+            `${operand.text} here is read as a variable, not a keyword: BASIC recognises a keyword only at the start of a word, and this follows ${written} with no space. No program can define a variable with a keyword's name, so BASIC uses P% in its place, or stops with "No such variable" if bit 1 of OPT is set; probably a space was meant after ${written}`,
+            SpaceAfterMnemonicCode,
+        );
     }
 
     // The message for junk after an instruction whose operand begins with a name that spells a keyword, straight after

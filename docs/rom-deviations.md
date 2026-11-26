@@ -27,8 +27,14 @@ BASIC does, and shows as an error.
     a word, so `STAH.` is the word `STAH`: `STA`, then the variable `H` (an undefined one reads as `P%` unless `OPT` has
     bit 1 set, when it is "No such variable"), and `.,X` is ignored; with a space, `STA H.,X` is `STA HIMEM,X`. Where a
     space would leave nothing red, the junk is still red but the hover says so, and the fix is "Insert a space after
-    STA" in place of the generic junk fix. A mnemonic that takes no operand (`NOPPAGE`) keeps the `\` fix. `STAPAGE`
-    and `LDAGET` have no junk after the variable, so they are not red. Suggested by Olly Betts on #174.
+    STA" in place of the generic junk fix. A mnemonic that takes no operand (`NOPPAGE`) keeps the `\` fix. Suggested by
+    Olly Betts on #174.
+  - **An operand that is a keyword spelled in full, straight after a mnemonic** (`STAPAGE`, `LDAGET`, `ASLTOP,X`). The
+    name is a variable, which no program can define (BASIC would tokenise its own definition as the keyword), so BASIC
+    uses `P%` in its place, or stops with "No such variable" if bit 1 of `OPT` is set (`[OPT0:STAPAGE:]` assembles
+    `8D E8 19`, `[OPT3:STAPAGE:]` stops). It is red, with the same fix, "Insert a space after STA", where a space would
+    read the keyword and leave the operand valid; a name such as `STAPAGEX` or `LDAP`, which a program can define, is
+    not. Suggested by Olly Betts on #278; the oracle lists these as STRICTER.
 - **A character in a mnemonic that is not a letter** (`LD89`, `ST89`, `CP8 5`, `SEC` spelt `3EC`). BASIC compares only
   the low five bits of each character, so it reads `8` as `X`, `9` as `Y`, `!` as `A` and so on: `LD89` is `LDX 9`, but
   is an easy typo for `LDA89`, `LDX89` or `LDY89`. The `LD` is red (in `LD89`, `ST!76`, `CP8 5`) rather than the

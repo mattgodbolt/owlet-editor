@@ -743,8 +743,9 @@ describe("Tokenisation", () => {
                     "[\nEQUB LENA$",
                     ["0:delimiter.square", "0:keyword.directive 4:white 5:keyword 8:variable"],
                 ],
-                // The tokeniser makes no keyword inside a name, so FN is not one here.
-                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:variable"], "EQUSFNx"],
+                // The tokeniser makes no keyword inside a name, so FN is not one here, but no program can define
+                // a variable called FNx, so it is marked (see docs/rom-deviations.md).
+                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:invalid"], "EQUSFNx"],
                 [
                     "[ROR 80\\comment:ROR80\\comment:]P.",
                     [
@@ -1285,6 +1286,12 @@ describe("Quick fixes and syntax markers", () => {
     it("should offer to replace a ; with a \\, as the ARM assembler of BASIC V takes it as a comment", () => {
         assert.deepStrictEqual(offered("[OPT0:NOP ; hello:]"), ["Replace ; with \\"]);
     });
+    it("should offer both the space and the : for [STAPAGE], which has two things wrong", () => {
+        assert.deepStrictEqual(offered("[STAPAGE]").sort(), [
+            "Insert : before ]",
+            "Insert a space after STA",
+        ]);
+    });
     it("should offer only the space for a keyword straight after a mnemonic", () => {
         assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
     });
@@ -1301,6 +1308,10 @@ describe("Quick fixes and syntax markers", () => {
         ["[OPT0:EQUBH.:]", "Insert a space after EQUB", "[OPT0:EQUB H.:]"],
         ["[OPT0:.lab STAH.,X:]", "Insert a space after STA", "[OPT0:.lab STA H.,X:]"],
         ["[OPT0:NOPPAGE:]", "Insert \\ before the junk", "[OPT0:NOP\\PAGE:]"],
+        ["[OPT0:STAPAGE:]", "Insert a space after STA", "[OPT0:STA PAGE:]"],
+        ["[OPT0:LDAGET:]", "Insert a space after LDA", "[OPT0:LDA GET:]"],
+        ["[OPT0:ASLTOP,X:]", "Insert a space after ASL", "[OPT0:ASL TOP,X:]"],
+        ["[OPT0:.lab ADCLEN:]", "Insert a space after ADC", "[OPT0:.lab ADC LEN:]"],
         ["[OPT0:LDAP.,X:]", "Insert \\ before the junk", "[OPT0:LDAP\\.,X:]"],
     ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
         const [offer] = fixes(text, ModelBDialect).filter(([name]) => name === title);
@@ -2186,6 +2197,17 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Error, message, 1, 10, 12],
         ]);
     });
+    it.each([
+        ["[OPT0:STAPAGE:]", "PAGE", 10, 14, "STA"],
+        ["[OPT0:ASLTOP,X:]", "TOP", 10, 13, "ASL"],
+        ["[OPT0:LDAGET:]", "GET", 10, 13, "LDA"],
+    ])(
+        "should say that %s reads %s as a variable, which no program can define",
+        (text, name, from, to, mnemonic) => {
+            const message = `${name} here is read as a variable, not a keyword: BASIC recognises a keyword only at the start of a word, and this follows ${mnemonic} with no space. No program can define a variable with a keyword's name, so BASIC uses P% in its place, or stops with "No such variable" if bit 1 of OPT is set; probably a space was meant after ${mnemonic}`;
+            assert.deepStrictEqual(markers(text), [[MarkerSeverity.Error, message, 1, from, to]]);
+        },
+    );
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
             [MarkerSeverity.Warning, "Expected a comma before ) (BASIC: Missing ,)", 1, 12, 13],
