@@ -60,6 +60,15 @@ on. While Debug is off it costs nothing.
 
 Every status, and how Debug works it all out, is in [docs/debugger.md](docs/debugger.md).
 
+### Save memory: copying bytes into a program
+
+The Save memory button (the memory chip in the editor's toolbar) copies bytes from the emulated machine to the clipboard
+as text for a program line, such as machine code or a data table to keep in a `REM`. Give the range as BASIC
+expressions: after assembling with `DIM D% 99:P%=D%:[...]`, `D%` to `P%-1`, or `D%` length `P%-D%`. Before copying, the
+dialog shows the bytes and the text, and picks out each &0A and &0D, which can break a program line, so the code or data
+can be changed to avoid them. On the Master 128 it can also read shadow RAM, where the screen is in a shadow mode. More
+in [docs/debugger.md](docs/debugger.md#save-memory-copying-bytes-into-a-program).
+
 ## Share your creations with the BBC Micro Bot Mastodon community
 
 * One button tweet to share code (not yet updated for Mastodon)
@@ -128,7 +137,7 @@ and how the highlighter is checked against the real ROM in
 
 ## More documentation
 
-- [docs/debugger.md](docs/debugger.md): the Debug panel in full.
+- [docs/debugger.md](docs/debugger.md): the Debug panel and the Save memory dialog in full.
 - [docs/highlighting.md](docs/highlighting.md): what is red and why, BASIC IV on the Master, and how the highlighter is
   checked against the ROM.
 - [docs/rom-deviations.md](docs/rom-deviations.md): every place Owlet is stricter or more lenient than the ROM on

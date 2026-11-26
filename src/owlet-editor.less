@@ -484,6 +484,101 @@ input {
   color: var(--color-background);
 }
 
+// The Save memory dialog's range, the bytes it would copy and those that can break a program line.
+#save {
+  .save-range {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    input {
+      flex: 1 1 8ch;
+      min-width: 0;
+      max-width: 20ch;
+      margin: 0;
+      font-family: monospace;
+    }
+  }
+
+  #saveView {
+    max-width: 100%;
+  }
+
+  #saveSummary {
+    margin: 8px 0 4px;
+
+    &[data-state="problem"] {
+      color: #8a4400;
+      font-weight: bold;
+    }
+
+    &[data-state="error"] {
+      color: #8a1c1c;
+      font-weight: bold;
+    }
+  }
+
+  #saveProblems button {
+    height: auto;
+    margin: 0 4px 4px 0;
+    padding: 0 6px;
+    font-family: monospace;
+  }
+
+  #savePreview {
+    max-height: 10.5em;
+    overflow-y: auto;
+    margin: 4px 0;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+
+  .save-address {
+    margin-right: 1ch;
+    font-weight: bold;
+  }
+
+  .save-byte {
+    display: inline-block;
+    width: 3ch;
+    text-align: center;
+
+    &[data-byte="0A"] {
+      background: #d08020;
+    }
+
+    &[data-byte="0D"] {
+      background: #c04040;
+      color: #fff;
+    }
+
+    &.found {
+      outline: 2px solid var(--color-background);
+    }
+  }
+
+  #saveText {
+    max-height: 6em;
+    overflow-y: auto;
+    margin: 4px 0 8px;
+    padding: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--color-background);
+    background: rgba(0, 0, 0, 0.08);
+  }
+}
+
+@media (orientation: portrait) {
+  #save .modal-content {
+    margin: 4% auto;
+    width: 90%;
+    box-sizing: border-box;
+    padding: 12px;
+  }
+}
+
 /* The Close Button */
 .close {
   color: var(--color-background);
