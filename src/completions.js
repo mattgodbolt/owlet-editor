@@ -168,9 +168,9 @@ function endsInError(text, inAssembler, dialect, statement) {
 let tried = {key: null, results: new Map()};
 
 // The candidates that BASIC reads after what was typed before the word, one statement at a time: those that leave
-// the statement with no error other than that it ends too soon. Only words that the one being typed could become
-// are tried, as the editor drops the rest. If the statement is already wrong before the word it tells us nothing, so
-// nothing is dropped.
+// the innermost statement (the one after a THEN, say) with no error other than that it ends too soon. Only words that
+// the one being typed could become are tried, as the editor drops the rest. If that statement is already wrong before
+// the word, no word can mend it, so none is offered (ojwb, #345).
 function keepingLineReadable(candidates, reading, word, dialect) {
     const typed = reading.lexer.text;
     const tokens = reading.tokens.filter(token => token.kind !== "white");
@@ -180,7 +180,10 @@ function keepingLineReadable(candidates, reading, word, dialect) {
         reading.startsInAssembler,
     ).inAssembler;
     const statement = typed.slice(from);
-    const key = `${dialect.basicIV} ${dialect.usColor} ${inAssembler} ${statement}`;
+    // The probe reads from the last colon or ELSE, so that an IF before a THEN is still read, but only the statement
+    // the word is in is checked.
+    const innermost = {start: Math.max(reading.lastStatementStart, from) - from};
+    const key = `${dialect.basicIV} ${dialect.usColor} ${inAssembler} ${innermost.start} ${statement}`;
     if (tried.key !== key) tried = {key, results: new Map()};
     const readable = candidate => {
         if (!tried.results.has(candidate)) {
@@ -189,13 +192,13 @@ function keepingLineReadable(candidates, reading, word, dialect) {
             // valid() stops at the ELSE, so it never sees that IF ELSE and ON ELSE have no value before it.
             tried.results.set(
                 candidate,
-                probe.valid(text, {start: 0}, statement.length) &&
+                probe.valid(text, innermost, statement.length) &&
                     !(candidate === "ELSE" && endsInError(text, inAssembler, dialect, statement)),
             );
         }
         return tried.results.get(candidate);
     };
-    if (!readable("")) return candidates;
+    if (!readable("")) return [];
     const wanted = word.toUpperCase();
     return candidates.filter(
         candidate =>

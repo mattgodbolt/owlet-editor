@@ -304,12 +304,36 @@ describe("Completions", () => {
             both("[LDA #0 A‸", ["AND"]),
             both("[\nLDA #0 O‸", ["OR"]),
             both("[OPT 0:LDA #0 T‸", []),
-            // The text before the word being wrong tells us nothing, so nothing is dropped.
-            both("PRINT ) A‸", ["ABS", "ACS", "ADVAL", "AND", "ASC", "ASN", "ATN"]),
         ];
         for (const [text, basicII, basicIV] of cases) {
             assert.deepStrictEqual(offered(text, BasicIIDialect), basicII, `BASIC II: ${text}`);
             assert.deepStrictEqual(offered(text, BasicIVDialect), basicIV, `BASIC IV: ${text}`);
+        }
+    });
+
+    // ojwb, #345: no word mends a statement already marked before it, so nothing is offered there; a mark in another
+    // statement, or after the cursor, does not count.
+    it("should offer nothing after a mark in the same statement", () => {
+        const cases = [
+            // [text, offered]
+            ['X=1="X"A‸', []],
+            ['X=1="X":X=1A‸', ["AND"]],
+            ['X=1A‸="X"', ["AND"]],
+            ["PRINT ) A‸", []],
+            ['IF 1="X" THEN X=1A‸', ["AND"]],
+            ['IF 1="X" X=1A‸', ["AND"]],
+            ['IF X THEN X=1="X"A‸', []],
+            ["IF X THEN PRINT ) A‸", []],
+            // BASIC stops at the condition, so it never reads the statement after the THEN.
+            ["IF ) THEN X=1A‸", []],
+            ['IF X THEN X=1="X" ELSE X=1A‸', ["AND"]],
+            ['IF X THEN X=1 ELSE X=1="X"A‸', []],
+            ['REPEAT X=1="X"A‸', []],
+            ['10X=1="X"\n20X=1A‸', ["AND"]],
+        ];
+        for (const [text, expected] of cases) {
+            assert.deepStrictEqual(offered(text, BasicIIDialect), expected, `BASIC II: ${text}`);
+            assert.deepStrictEqual(offered(text, BasicIVDialect), expected, `BASIC IV: ${text}`);
         }
     });
 

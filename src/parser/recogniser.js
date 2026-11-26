@@ -1165,13 +1165,14 @@ export class Recogniser {
 
 Recogniser.prototype.GOSUB = Recogniser.prototype.GOTO;
 
-// Reads a line that stops where the text does, and notes the keywords BASIC looks for there and whether a statement
-// can start there, for completions.
+// Reads a line that stops where the text does, and notes the keywords BASIC looks for there, whether a statement can
+// start there and where the innermost statement it ends in starts (after THEN, or an IF's condition), for completions.
 export class ExpectingRecogniser extends Recogniser {
     constructor(text, inAssembler, dialect) {
         super(text, inAssembler, dialect);
         this.words = new Set();
         this.statementNext = false;
+        this.lastStatementStart = 0;
     }
 
     isKeyword(...keywords) {
@@ -1181,6 +1182,7 @@ export class ExpectingRecogniser extends Recogniser {
 
     statement() {
         if (this.peek().kind === "end") this.statementNext = true;
+        this.lastStatementStart = this.peek().start;
         super.statement();
     }
 }
