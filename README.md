@@ -60,6 +60,17 @@ on. While Debug is off it costs nothing.
 
 Every status, and how Debug works it all out, is in [docs/debugger.md](docs/debugger.md).
 
+### Disc export
+
+The Disc button in the Share dialog downloads `owletExport.ssd`, a DFS disc with the program as `PROGRAM`, a `!BOOT`
+that runs it on SHIFT+BREAK, and `SCREEN`: the 20K from `&3000` to `&7FFF`, where every mode's screen is, as the
+emulator was showing it when the button was pressed. On the Master in a shadow mode (`MODE 128` to `MODE 135`) that is
+the shadow RAM the picture is in, whatever the program has paged in for the CPU; on the Model B, and on the Master in
+any other mode, it is main RAM. It is screen memory only: the mode and any colours changed with `VDU 19` are not in it.
+
+`SCREEN` loads at `&3000` in the I/O processor. To see the picture again, `*LOAD SCREEN` in the mode it was taken in,
+or for a shadow mode in the same mode without the shadow (`MODE 1` for `MODE 129`), as `*LOAD` puts it in main RAM.
+
 ## Share your creations with the BBC Micro Bot Mastodon community
 
 * One button tweet to share code (not yet updated for Mastodon)
