@@ -15,6 +15,7 @@ import {chipBindings, restoreChipBindings} from "./chip-bindings";
 import {Sound, soundRequested} from "./sound";
 import {DefaultMachine, Machines} from "./machines";
 import {oneAtATime} from "./one-at-a-time";
+import {Picture} from "./picture";
 
 const MaxSecondsPerFrame = 0.1;
 const urlParams = new URLSearchParams(window.location.search);
@@ -69,6 +70,12 @@ export class Emulator {
         this.root = root;
         const screen = this.root.find(".screen");
         this.canvas = canvasLib.bestCanvas(screen[0], PassthroughFilter);
+        this.picture = new Picture(this.canvas.fb32);
+        // The latest paint's video chip and rows, to paint them again when the picture changes in between.
+        this.painted = null;
+        this.beamShown = false;
+        // The machine and cycle the beam was last painted at, so that a paused machine is not painted again.
+        this.beamPaintedAt = null;
         this.emuStatus = document.getElementById("emu_status");
         this.frames = 0;
         this.frameSkip = 0;
@@ -148,8 +155,8 @@ export class Emulator {
             this.model.isMaster,
             this.canvas.fb32.length,
             // jsbeeb's video chip paints into a framebuffer of its own, so copy it over to the canvas's.
-            function (minx, miny, maxx, maxy) {
-                emulator.paint(this, minx, miny, maxx, maxy);
+            function (minx, miny, maxx, maxy, paintedTo) {
+                emulator.paint(this, minx, miny, maxx, maxy, paintedTo);
             },
         );
         return new this.model.Cpu(this.model, {
@@ -348,6 +355,7 @@ export class Emulator {
             }
         }
         this.lastFrameTime = now;
+        this.paintBeam();
         if (this.onFrame) this.onFrame();
     }
 
@@ -360,11 +368,41 @@ export class Emulator {
         this.resizer.resizeScreen();
     }
 
-    paint(video, minx, miny, maxx, maxy) {
-        this.frames++;
-        if (this.frames < this.frameSkip) return;
-        this.frames = 0;
-        this.canvas.fb32.set(video.fb32.subarray(miny * 1024, maxy * 1024), miny * 1024);
+    /**
+     * Shows the beam while the machine is paused, as jsbeeb's debugger does when it stops: the screen has this field
+     * down to the beam, marked with a dot, and the last field below it. Running, the screen shows whole fields as ever;
+     * a paint to the beam after each animation frame would show only where the run happened to stop, and split even a
+     * picture that does not tear.
+     */
+    showBeam(shown) {
+        if (shown === this.beamShown) return;
+        this.beamShown = shown;
+        this.beamPaintedAt = null;
+        if (shown) this.paintBeam();
+        else if (this.picture.restoreWholeField()) this.present();
+    }
+
+    paintBeam() {
+        if (!this.beamShown || this.running || !this.cpu || this.rebuilding) return;
+        const at = {cpu: this.cpu, cycles: this.totalCycles};
+        if (at.cpu === this.beamPaintedAt?.cpu && at.cycles === this.beamPaintedAt.cycles) return;
+        this.beamPaintedAt = at;
+        this.cpu.video.debugPaint();
+    }
+
+    paint(video, minx, miny, maxx, maxy, paintedTo) {
+        if (paintedTo === undefined) {
+            this.frames++;
+            if (this.frames < this.frameSkip) return;
+            this.frames = 0;
+        }
+        this.picture.take(video, miny, maxy, paintedTo);
+        this.painted = {video, minx, miny, maxx, maxy};
+        this.present();
+    }
+
+    present() {
+        const {video, minx, miny, maxx, maxy} = this.painted;
         const teletextAdjustX = video.teletextMode ? 15 : 0;
         this.canvas.paint(
             minx + this.leftMargin + teletextAdjustX,

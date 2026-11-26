@@ -675,6 +675,7 @@ export class OwletEditor {
             rocket: () => this.rocket(),
             sound: () => this.toggleSound(),
             debug: () => this.basicDebugger.toggle(),
+            beam: () => this.basicDebugger.toggleBeam(),
             copy: () => {
                 this.copy();
                 this.closeModal();

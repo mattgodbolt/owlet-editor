@@ -171,7 +171,8 @@ canvas.screen {
   }
 }
 
-#debug {
+#debug,
+#show-beam {
   white-space: nowrap;
 
   * {
@@ -205,6 +206,13 @@ canvas.screen {
 
   &[hidden] {
     display: none;
+  }
+
+  #show-beam {
+    float: right;
+    height: auto;
+    margin: 0 0 4px 8px;
+    padding: 2px 8px;
   }
 
   .debug-status {

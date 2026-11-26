@@ -11,6 +11,7 @@ const Marks = {
     quiet: {line: "debug-quiet-line", statement: "debug-quiet-statement", colour: "#a08440"},
 };
 const EscapeError = 17;
+const ShowBeamKey = "showBeam";
 // The latest error an ON ERROR handler took is marked strongly for about a second of the program running on.
 const FreshFrames = 50;
 const HandledColour = "#e06060";
@@ -90,6 +91,9 @@ export class BasicDebugger {
         this.variables = this.panel.querySelector(".debug-variables");
         this.routines = this.panel.querySelector(".debug-routines");
         this.button = document.getElementById("debug");
+        this.beamButton = document.getElementById("show-beam");
+        this.beamWanted = localStorage.getItem(ShowBeamKey) === "true";
+        this.beamButton.setAttribute("aria-pressed", String(this.beamWanted));
         this.on = false;
         this.screenShown = true;
         this.program = null;
@@ -106,12 +110,24 @@ export class BasicDebugger {
         this.emulator.onFrame = this.on ? () => this.update() : null;
         if (!this.on) this.watch.untrack();
         this.forgetShown();
+        this.showBeam();
         if (this.on) this.update();
         else {
             this.decorations.clear();
             this.handledMark.clear();
         }
         this.showPanel();
+    }
+
+    toggleBeam() {
+        this.beamWanted = !this.beamWanted;
+        localStorage.setItem(ShowBeamKey, String(this.beamWanted));
+        this.beamButton.setAttribute("aria-pressed", String(this.beamWanted));
+        this.showBeam();
+    }
+
+    showBeam() {
+        this.emulator.showBeam(this.on && this.beamWanted);
     }
 
     forgetShown() {
