@@ -5,7 +5,7 @@ import {Assembler, mnemonicsFor} from "./assembler.js";
 import {isFnProc, isStatementKeyword, pseudoVariables} from "../tokens.js";
 import {BasicIIDialect, canStartStatement} from "./dialect.js";
 import {Lexer} from "./lexer.js";
-import {BasicVFixCode, basicVFix} from "./basic-v.js";
+import {BasicVFixCode, basicVFix, basicVOperator} from "./basic-v.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
 const MaxDepth = 64;
@@ -554,6 +554,9 @@ export class Recogniser {
 
     assignment() {
         this.variable();
+        const [sign, equals] = [this.peek(), this.peek(1)];
+        if (this.isPunct("+", "-") && equals.text === "=" && equals.start === sign.end)
+            this.fail("Mistake", undefined, undefined, basicVOperator(`${sign.text}=`));
         this.expectPunct("=");
         this.expression();
     }
@@ -793,7 +796,12 @@ export class Recogniser {
             return true;
         }
         if (token.kind !== "keyword" || isStatementKeyword(token.kw))
-            this.fail(this.operandError(token), token, this.unfinishedOperand(token));
+            this.fail(
+                this.operandError(token),
+                token,
+                this.unfinishedOperand(token),
+                this.shiftExplanation(token),
+            );
         this.next();
         const {keyword} = token.kw;
         const result = this.timeString(keyword) ? Str : typeOfKeyword(keyword);
@@ -833,6 +841,21 @@ export class Recogniser {
         const variable = this.operand(needs(keyword, StringArgument.has(keyword) ? Str : Num));
         this.type = result;
         return variable;
+    }
+
+    // The explanation for the second < or > of a BASIC V shift, where BASIC II and IV read the first as a comparison.
+    shiftExplanation(token) {
+        const first = this.last;
+        if (
+            token.kind !== "punct" ||
+            !["<", ">"].includes(token.text) ||
+            first?.text !== token.text ||
+            first.end !== token.start
+        )
+            return undefined;
+        const third = this.peek(1);
+        const logical = token.text === ">" && third.text === ">" && third.start === token.end;
+        return basicVOperator(`${first.text}${token.text}${logical ? ">" : ""}`);
     }
 
     operandError(token) {

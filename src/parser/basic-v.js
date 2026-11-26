@@ -91,6 +91,19 @@ export function basicVFix(text, start, dialect, isValid, source = text) {
     };
 }
 
+// BASIC V's operators that BASIC II and IV stop at (mattgodbolt/owlet-editor#364), with what each does. Why += and -=
+// have no fix is in docs/rom-deviations.md.
+const Operators = {
+    "<<": "shifts left",
+    ">>": "shifts right, keeping the sign",
+    ">>>": "shifts right, filling with zeros",
+    "+=": "adds to the variable",
+    "-=": "subtracts from the variable",
+};
+
+export const basicVOperator = operator =>
+    `BASIC V accepts ${operator}, which ${Operators[operator]}; BASIC II and IV have no such operator`;
+
 // Keywords whose statement may set any name it has.
 const BindingKeywords = new Set(["LOCAL", "INPUT", "READ", "DIM", "DEF"]);
 const Boundaries = new Set(["THEN", "ELSE", "REPEAT"]);
