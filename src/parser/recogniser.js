@@ -132,6 +132,10 @@ function completions(assembling, dialect) {
 
 const AnotherArgument = "a comma or a closing )";
 
+// What may follow the cursor on a line being typed for the line to be read as ending at the cursor: closing brackets,
+// which the editor adds as an opening one is typed, before a colon or the end of the line.
+export const TypedToEnd = /^[ )]*(?::|$)/;
+
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", "A$", ",1", "1,1", ",1,1"];
 
@@ -164,7 +168,7 @@ function readsStatement(text, dialect) {
 }
 
 export class Recogniser {
-    constructor(text, inAssembler, dialect, probing = false) {
+    constructor(text, inAssembler, dialect, probing = false, typingAt = null) {
         this.dialect = dialect;
         this.lexer = new Lexer(text, dialect);
         this.basicIV = dialect.basicIV;
@@ -174,6 +178,10 @@ export class Recogniser {
         this.assembling = false;
         this.startsInAssembler = inAssembler;
         this.probing = probing;
+        // Where the cursor is on a line being typed, as an offset, or null.
+        this.typingAt = typingAt;
+        // Whether a statement is unfinished only because it is read as ending at `typingAt`.
+        this.endsAtCursor = false;
         this.depth = 0;
         this.last = null;
         // The "[" that opened the assembler block this line leaves open, if it did.
@@ -313,7 +321,10 @@ export class Recogniser {
     mark(failure, statementStart, assembling) {
         let {token} = failure;
         const {message, explanation, code, fix} = failure;
-        const ended = failure.unfinished || this.completable(token, statementStart, assembling);
+        const ended =
+            failure.unfinished ||
+            this.completable(token, statementStart, assembling) ||
+            this.typedUpTo(statementStart);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
         const atEnd = token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE";
@@ -392,6 +403,24 @@ export class Recogniser {
                 return this.valid(text.slice(0, start) + word, statementStart, text.length);
             });
         });
+    }
+
+    // Whether the statement is the one being typed, with only `TypedToEnd` after the cursor, and is unfinished read as
+    // if the line ended at the cursor.
+    typedUpTo(statementStart) {
+        const at = this.typingAt;
+        const {text} = this.lexer;
+        if (this.probing || at === null || at <= statementStart.start) return false;
+        if (!TypedToEnd.test(text.slice(at))) return false;
+        const typed = new Recogniser(text.slice(0, at), this.startsInAssembler, this.dialect);
+        typed.line();
+        const inStatement = token => token.start >= statementStart.start;
+        const unfinished =
+            !typed.tokens.some(token => inStatement(token) && typed.endsStatement(token)) &&
+            typed.problems.every(problem => problem.unfinished || !inStatement(problem.token)) &&
+            !typed.tokens.some(token => token.invalid && inStatement(token));
+        if (unfinished) this.endsAtCursor = true;
+        return unfinished;
     }
 
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
