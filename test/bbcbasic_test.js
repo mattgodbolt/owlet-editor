@@ -2190,9 +2190,9 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Error, message, 1, 10, 15],
         ]);
     });
-    it("should say that a keyword straight after a mnemonic is read as a variable, and a space was meant", () => {
+    it("should say that a keyword straight after a mnemonic is not read as one without a space", () => {
         const message =
-            "H. here is read as the variable H, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows STA with no space, so the rest of the instruction is ignored; probably a space was meant after STA";
+            "BASIC won't read H. as a keyword here without a space after STA, so the rest of the instruction is ignored";
         assert.deepStrictEqual(markers("[OPT0:STAH.,X:]"), [
             [MarkerSeverity.Error, message, 1, 10, 12],
         ]);
@@ -2202,9 +2202,9 @@ describe("Syntax markers", () => {
         ["[OPT0:ASLTOP,X:]", "TOP", 10, 13, "ASL"],
         ["[OPT0:LDAGET:]", "GET", 10, 13, "LDA"],
     ])(
-        "should say that %s reads %s as a variable, which no program can define",
+        "should say that %s is not read as a keyword without a space after the mnemonic, naming %s",
         (text, name, from, to, mnemonic) => {
-            const message = `${name} here is read as a variable, not a keyword: BASIC recognises a keyword only at the start of a word, and this follows ${mnemonic} with no space. No program can define a variable with a keyword's name, so BASIC uses P% in its place, or stops with "No such variable" if bit 1 of OPT is set; probably a space was meant after ${mnemonic}`;
+            const message = `BASIC won't read ${name} as a keyword here without a space after ${mnemonic}`;
             assert.deepStrictEqual(markers(text), [[MarkerSeverity.Error, message, 1, from, to]]);
         },
     );

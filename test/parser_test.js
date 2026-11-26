@@ -1084,11 +1084,11 @@ describe("Junk after a complete instruction", () => {
         assert.ok(problem.message.startsWith(begins), problem.message);
         assert.match(problem.message, junk === "]" ? /a : is missing/ : /a \\ is missing/);
     });
-    // BASIC tokenises a keyword only at the start of a word, so one straight after a mnemonic is a variable's name.
+    // A keyword straight after a mnemonic is not tokenised, so it is read as a variable's name.
     it.each([
-        ["[OPT0:STAH.,X:]", "H.", ".", "H. here is read as the variable H, not the keyword"],
-        ["[OPT0:LDAUSR@%+GET:]", "USR@%", "@%", "USR here is read as the variable USR"],
-        ["[OPT0:EQUBH.:]", "H.", ".", "H. here is read as the variable H"],
+        ["[OPT0:STAH.,X:]", "H.", ".", "BASIC won't read H. as a keyword here"],
+        ["[OPT0:LDAUSR@%+GET:]", "USR@%", "@%", "BASIC won't read USR as a keyword here"],
+        ["[OPT0:EQUBH.:]", "H.", ".", "BASIC won't read H. as a keyword here"],
     ])(
         "%s should show %j as one problem, red on %j, that says a space was probably meant",
         (text, shown, junk, begins) => {
@@ -1097,8 +1097,11 @@ describe("Junk after a complete instruction", () => {
             assert.strictEqual(text.slice(problem.start, problem.end), shown);
             assert.strictEqual(problem.code, "space-after-mnemonic");
             assert.ok(problem.message.startsWith(begins), problem.message);
-            assert.match(problem.message, /follows (?:STA|LDA|EQUB) with no space/);
-            assert.match(problem.message, /probably a space was meant after (?:STA|LDA|EQUB)$/);
+            assert.match(problem.message, /without a space after (?:STA|LDA|EQUB)/);
+            assert.match(
+                problem.message,
+                /(?:STA|LDA|EQUB), so the rest of the instruction is ignored$/,
+            );
         },
     );
     it.each([
@@ -1129,11 +1132,11 @@ describe("Junk after a complete instruction", () => {
     ])("%s should mark %j as a keyword's name, with a space as the fix", (text, name) => {
         const problem = stricter(text).find(p => p.code === "space-after-mnemonic");
         assert.strictEqual(text.slice(problem.start, problem.end), name);
-        assert.match(problem.message, /^\w+ here is read as a variable, not a keyword: /);
         assert.match(
             problem.message,
-            /probably a space was meant after (?:STA|LDA|ASL|ADC|EQUB|\.lab)$/,
+            /^BASIC won't read \w+ as a keyword here without a space after /,
         );
+        assert.match(problem.message, /without a space after (?:STA|LDA|ASL|ADC|EQUB|\.lab)$/);
     });
     it.each([
         "[OPT0:LDA PAGE:]",

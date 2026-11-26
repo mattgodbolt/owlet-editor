@@ -23,8 +23,8 @@ BASIC does, and shows as an error.
   fixes are "Insert : before ]" for a `]`, "Replace ; with \" for a `;` and "Insert \ before the junk" for the rest;
   Olly Betts suggested the marks and fixes on #174 and #327. The oracle cannot test these marks (cutting the statement
   there changes nothing), so it takes them on trust as ignored text and lists them as STRICTER.
-  - **A keyword straight after a mnemonic** (`STAH.,X`, `LDAUSR@%+GET`). BASIC tokenises a keyword only at the start of
-    a word, so `STAH.` is the word `STAH`: `STA`, then the variable `H` (an undefined one reads as `P%` unless `OPT` has
+  - **A keyword straight after a mnemonic** (`STAH.,X`, `LDAUSR@%+GET`). BASIC does not read a name straight after a
+    mnemonic as a keyword, so `STAH.` is `STA`, then the variable `H` (an undefined one reads as `P%` unless `OPT` has
     bit 1 set, when it is "No such variable"), and `.,X` is ignored; with a space, `STA H.,X` is `STA HIMEM,X`. Where a
     space would leave nothing red, the junk is still red but the hover says so, and the fix is "Insert a space after
     STA" in place of the generic junk fix. A mnemonic that takes no operand (`NOPPAGE`) keeps the `\` fix. Suggested by

@@ -198,8 +198,7 @@ export class Assembler {
     }
 
     // Marks an operand that begins with a keyword spelled in full, straight after a mnemonic that takes one (STAPAGE,
-    // ASLTOP,X). BASIC reads the name as a variable, which no program can define, so it is the address P%, or "No
-    // such variable" with bit 1 of OPT set; a space after the mnemonic reads the keyword.
+    // ASLTOP,X); a space after the mnemonic reads the keyword.
     keywordNamedOperand(first, mnemonic, operand, operandEnd) {
         const r = this.recogniser;
         const {text} = r.lexer;
@@ -215,14 +214,14 @@ export class Assembler {
         const written = text.slice(first.start, operand.start);
         r.stricter(
             operand,
-            `${operand.text} here is read as a variable, not a keyword: BASIC recognises a keyword only at the start of a word, and this follows ${written} with no space. No program can define a variable with a keyword's name, so BASIC uses P% in its place, or stops with "No such variable" if bit 1 of OPT is set; probably a space was meant after ${written}`,
+            `BASIC won't read ${operand.text} as a keyword here without a space after ${written}`,
             SpaceAfterMnemonicCode,
         );
     }
 
     // The message for junk after an instruction whose operand begins with a name that spells a keyword, straight after
-    // a mnemonic that takes an operand, where a space before it would leave no junk; otherwise null. BASIC tokenises a
-    // keyword only at the start of a word, so STAH.,X is STA, the variable H, and junk.
+    // a mnemonic that takes an operand, where a space before it would leave no junk; otherwise null. STAH.,X is STA, the
+    // variable H, and junk.
     keywordAfterMnemonic(first, mnemonic, operand) {
         const r = this.recogniser;
         const {text} = r.lexer;
@@ -235,7 +234,7 @@ export class Assembler {
         if (!r.valid(spaced, first, operand.start)) return null;
         const written = text.slice(first.start, operand.start);
         const spelling = text.slice(operand.start, keyword.end);
-        return `${spelling} here is read as the variable ${operand.text}, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows ${written} with no space, so the rest of the instruction is ignored; probably a space was meant after ${written}`;
+        return `BASIC won't read ${spelling} as a keyword here without a space after ${written}, so the rest of the instruction is ignored`;
     }
 
     // A comment runs to the next colon, whatever the tokeniser made of it.
