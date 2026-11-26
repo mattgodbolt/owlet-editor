@@ -553,10 +553,10 @@ export class Recogniser {
     }
 
     assignment() {
-        this.variable();
+        const string = this.variable();
         const [sign, equals] = [this.peek(), this.peek(1)];
         if (this.isPunct("+", "-") && equals.text === "=" && equals.start === sign.end)
-            this.fail("Mistake", undefined, undefined, basicVOperator(`${sign.text}=`));
+            this.fail("Mistake", undefined, undefined, basicVOperator(`${sign.text}=`, string));
         this.expectPunct("=");
         this.expression();
     }
@@ -644,11 +644,13 @@ export class Recogniser {
         if (this.isPunct("(") && this.adjacent()) this.bracket(this.next());
     }
 
-    // Something that can be assigned to: X, X(1), $X, ?X, X?1, ?X!1, X?Y?Z (but X?1?2=3 is a Mistake).
+    // Something that can be assigned to: X, X(1), $X, ?X, X?1, ?X!1, X?Y?Z (but X?1?2=3 is a Mistake). Returns whether
+    // it holds a string.
     variable(message) {
         if (this.isPunct("$")) {
             this.next();
-            return this.primary(Indirection.$);
+            this.primary(Indirection.$);
+            return true;
         }
         let string = false;
         if (this.isPunct("?", "!")) this.primary(Indirection[this.next().text]);
@@ -660,6 +662,7 @@ export class Recogniser {
             const operator = this.next();
             this.unworded(() => this.operand(Indirection[operator.text]));
         }
+        return string;
     }
 
     expression() {

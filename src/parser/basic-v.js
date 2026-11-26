@@ -101,8 +101,15 @@ const Operators = {
     "-=": "subtracts from the variable",
 };
 
-export const basicVOperator = operator =>
-    `BASIC V accepts ${operator}, which ${Operators[operator]}; BASIC II and IV have no such operator`;
+// On a string, BASIC V's += appends and its -= stops with Type mismatch (BASIC V 1.05, run by Olly Betts on #365).
+const StringOperators = {"+=": "appends to the string"};
+
+export function basicVOperator(operator, string = false) {
+    const does = (string ? StringOperators : Operators)[operator];
+    return does
+        ? `BASIC V accepts ${operator}, which ${does}; BASIC II and IV have no such operator`
+        : `BASIC V accepts ${operator} only for a number, and stops with Type mismatch on a string; BASIC II and IV have no such operator`;
+}
 
 // Keywords whose statement may set any name it has.
 const BindingKeywords = new Set(["LOCAL", "INPUT", "READ", "DIM", "DEF"]);

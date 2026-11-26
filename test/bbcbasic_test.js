@@ -1986,9 +1986,13 @@ describe("BASIC V operators", () => {
         `BASIC V accepts ${operator}, which ${does}; BASIC II and IV have no such operator${rom ? ` (BASIC: ${rom})` : ""}`;
     const shiftLeft = rom => accepts("<<", "shifts left", rom);
     const adds = accepts("+=", "adds to the variable", "Mistake");
+    const appends = accepts("+=", "appends to the string", "Mistake");
+    const subtractsNoString =
+        "BASIC V accepts -= only for a number, and stops with Type mismatch on a string; BASIC II and IV have no such operator (BASIC: Mistake)";
     // Each is a recorded row that both ROMs stop at, with the same error (#364). BASIC V's operator is named only where
     // there is one: not with a space inside it, nor for the operators BASIC V does not have either.
-    // None has a fix: A=A+1 is not the same as A+=1 (docs/rom-deviations.md says why).
+    // None has a fix: A=A+1 is not the same as A+=1 (docs/rom-deviations.md says why). What the right side of a += or -=
+    // is plays no part, so A$+=1, a Type mismatch on BASIC V, still says that += appends.
     it.each([
         ["A=1<<3", shiftLeft("No such variable")],
         ["A=A>>2", accepts(">>", "shifts right, keeping the sign", "No such variable")],
@@ -1999,9 +2003,18 @@ describe("BASIC V operators", () => {
         ["A += 1", adds],
         ["X%(1)+=1", adds],
         ["!D+=1", adds],
-        ['A$+="x"', adds],
         ["LET A+=1", adds],
         ["A-=1", accepts("-=", "subtracts from the variable", "Mistake")],
+        ['A$+="x"', appends],
+        ['LETA$+="x"', appends],
+        ['X$(1)+="x"', appends],
+        ['$D+="x"', appends],
+        ["A$+=1", appends],
+        ['A$-="x"', subtractsNoString],
+        ['LETA$-="x"', subtractsNoString],
+        ['X$(1)-="x"', subtractsNoString],
+        ['$D-="x"', subtractsNoString],
+        ["A$-=1", subtractsNoString],
         ["A=1< <3", "Expected a value here, not < (BASIC: No such variable)"],
         ["A=1>>=3", "Expected a value here, not >= (BASIC: No such variable)"],
         ["A+ =1", "A is read as a variable, so + is not expected here (BASIC: Mistake)"],
