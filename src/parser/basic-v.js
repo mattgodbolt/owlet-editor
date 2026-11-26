@@ -91,6 +91,26 @@ export function basicVFix(text, start, dialect, isValid, source = text) {
     };
 }
 
+// BASIC V's operators that BASIC II and IV stop at (mattgodbolt/owlet-editor#364), with what each does. Why += and -=
+// have no fix is in docs/rom-deviations.md.
+const Operators = {
+    "<<": "shifts left",
+    ">>": "shifts right, keeping the sign",
+    ">>>": "shifts right, filling with zeros",
+    "+=": "adds to the variable",
+    "-=": "subtracts from the variable",
+};
+
+// On a string, BASIC V's += appends and its -= stops with Type mismatch (BASIC V 1.05, run by Olly Betts on #365).
+const StringOperators = {"+=": "appends to the string"};
+
+export function basicVOperator(operator, string = false) {
+    const does = (string ? StringOperators : Operators)[operator];
+    return does
+        ? `BASIC V accepts ${operator}, which ${does}; BASIC II and IV have no such operator`
+        : `BASIC V accepts ${operator} only for a number, and stops with Type mismatch on a string; BASIC II and IV have no such operator`;
+}
+
 // Keywords whose statement may set any name it has.
 const BindingKeywords = new Set(["LOCAL", "INPUT", "READ", "DIM", "DEF"]);
 const Boundaries = new Set(["THEN", "ELSE", "REPEAT"]);

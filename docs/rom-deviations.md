@@ -78,6 +78,20 @@ BASIC does, and shows as an error.
     a move.
   - `ELLIPSE`, `FILL` and `RECTANGLE` have none, as they cannot be written without repeating
   an argument or leaving the graphics cursor elsewhere.
+- **BASIC V operators** (`<<`, `>>`, `>>>`, `+=`, `-=`, as in `A=1<<3` and `A+=1`). BASIC II and IV stop at each with
+  the error they have always had (`No such variable` at the second `<` or `>` of a shift, `Mistake` at the `+` or `-`
+  of an assignment; recorded on both ROMs in `basic-v-operators-364`), and they are still red as errors. The hover
+  says that BASIC V accepts the operator (BASIC V is not emulated here) and what it does, then gives the ROM's error.
+  It does so only where the operator's characters touch: `A=1< <3` and `A+ =1` keep the plain message, as do `*=`,
+  `/=`, `^=`, `<<=` and `>>=`, which are a `Mistake` on BASIC V too. On a string (`A$`, `A$(1)` or `$D`, with or
+  without `LET`), the hover says that `+=` appends to it and that `-=` is for numbers only: BASIC V 1.05 appends with
+  `A$+="x"` and stops with `Type mismatch` at `A$-="x"` (Olly Betts on #365, who ran `A$` with and without `LET`). The
+  right side's type is not looked at, so `A$+=1`, also a `Type mismatch` on BASIC V, still says that `+=` appends; only
+  the hover's words change, not what is red. There is no quick fix, since `A=A+1` is not the same as `A+=1` (Olly
+  Betts on #364, from BASIC V): it reads the left side twice, so its side effects happen twice (`!FNX=!FNX+1` calls
+  `FNX` twice, `!FNX+=1` once); `+=` takes the whole expression after it, which `+` does not (from 1, `A+=1OR1` makes
+  2 and `A=A+1OR1` makes 3); and `A=A+1` runs where `A` has no value yet, which `A+=1` does not. The shifts have no
+  operator in BASIC II or IV to be written with.
 - **An `ELSE` that no `IF` is waiting for** (`X%=6ELSE7`, `PRINT 1 ELSE PRINT 2`, and the second `ELSE` of
   `IF0ELSEPRINT"X"ELSEPRINT"Y"`). BASIC skips the rest of the line at any `ELSE` it runs into: right at the end of the
   `THEN` part of an `IF` (or after an `ON` list), a quirk anywhere else. The `ELSE` is red; the text after it is not,
