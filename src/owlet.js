@@ -184,6 +184,7 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
+        this.emulator.onRunningChange = running => this.showRunning(running);
         this.basicDebugger = new BasicDebugger(this.editor, this.emulator, () => this.dialect);
 
         this.examples = {};
@@ -472,22 +473,26 @@ export class OwletEditor {
             .toggleClass("too_long", outputProgram.length > TweetMaximum);
     }
 
-    selectView(selected) {
+    /** Shows the play/pause icon and the screen button's name for whether the emulator is running, however it got so. */
+    showRunning(running) {
         const $play = $("#play-pause");
+        $play.toggleClass("play", !running);
+        $play.html(running ? "&#10074;&#10074;" : '<i class="fa-solid fa-play"></i>');
+        $("#screen-button").attr(
+            "aria-label",
+            running ? "Pause the emulator" : "Resume the emulator",
+        );
+    }
+
+    selectView(selected) {
         const $screenButton = $("#screen-button");
         if (
             selected !== "screen" ||
             (selected === "screen" && this.emulator.running && $screenButton.hasClass("selected"))
         ) {
             this.emulator.pause();
-            $play.addClass("play");
-            $play.html('<i class="fa-solid fa-play"></i>');
-            $screenButton.attr("aria-label", "Resume the emulator");
         } else {
             this.emulator.start();
-            $play.removeClass("play");
-            $play.html("&#10074;&#10074;");
-            $screenButton.attr("aria-label", "Pause the emulator");
         }
 
         for (const element of ["screen", "about", "examples", "reference"]) {

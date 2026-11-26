@@ -218,11 +218,13 @@ export class Emulator {
         this.running = true;
         this.sound.setRunning(true);
         requestAnimationFrame(this.onAnimFrame);
+        this.onRunningChange?.(true);
     }
 
     pause() {
         this.running = false;
         this.sound.setRunning(false);
+        this.onRunningChange?.(false);
     }
 
     async beebjit(tokenised) {
