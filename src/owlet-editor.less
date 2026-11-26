@@ -144,6 +144,16 @@ canvas.screen {
   border: none;
 }
 
+// Laid over the screen by VduOverlay, which matches its place and size to the screen's.
+canvas.screen-overlay {
+  position: absolute;
+  pointer-events: none;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
 #sound {
   white-space: nowrap;
 
@@ -218,6 +228,41 @@ canvas.screen {
     &[data-mark="quiet"] {
       color: #c0a060;
     }
+  }
+
+  .debug-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    margin-bottom: 4px;
+    color: #ccc;
+
+    input {
+      width: auto;
+      margin: 0 4px 0 0;
+      vertical-align: middle;
+    }
+  }
+
+  .debug-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .debug-legend-item::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 4px;
+    border: 2px solid var(--marker-colour);
+    vertical-align: middle;
   }
 
   .debug-handled {

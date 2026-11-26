@@ -113,6 +113,8 @@ export class Emulator {
         this.lastFrameTime = 0;
         // Called after each animation frame's run, while something watches the machine.
         this.onFrame = null;
+        // Called as each frame is painted, while something wants the machine as it was when the picture was finished.
+        this.onPaint = null;
         // Called when a program is about to start on a machine that has just booted, or has been given a saved state.
         this.onProgramStart = null;
         this.onAnimFrame = _.bind(this.frameFunc, this);
@@ -366,11 +368,19 @@ export class Emulator {
         this.frames = 0;
         this.canvas.fb32.set(video.fb32.subarray(miny * 1024, maxy * 1024), miny * 1024);
         const teletextAdjustX = video.teletextMode ? 15 : 0;
+        // The part of the framebuffer the canvas shows, edge to edge.
+        this.shownArea = {
+            left: minx + this.leftMargin + teletextAdjustX,
+            top: miny + this.topMargin,
+            right: maxx - this.rightMargin + teletextAdjustX,
+            bottom: maxy - this.bottomMargin,
+        };
+        this.onPaint?.(video);
         this.canvas.paint(
-            minx + this.leftMargin + teletextAdjustX,
-            miny + this.topMargin,
-            maxx - this.rightMargin + teletextAdjustX,
-            maxy - this.bottomMargin,
+            this.shownArea.left,
+            this.shownArea.top,
+            this.shownArea.right,
+            this.shownArea.bottom,
             {
                 fields: 1,
                 lineBaseEven: video.lineBaseEven,

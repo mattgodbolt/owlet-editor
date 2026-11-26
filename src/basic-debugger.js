@@ -2,6 +2,7 @@ import {editor as monacoEditor, Range} from "monaco-editor/editor/editor.api";
 import ResizeObserver from "resize-observer-polyfill";
 import {BasicWatch} from "./basic-watch";
 import {programStatements, statementAt} from "./statement-map";
+import {describeVduState, displayedArea, Markers, readVduState, VduOverlay} from "./vdu-overlay";
 
 // The classes and scroll bar colour of each kind of mark: the statement running, the one an error stopped the program
 // in, and the one Escape stopped it in, which people press on purpose.
@@ -90,6 +91,20 @@ export class BasicDebugger {
         this.variables = this.panel.querySelector(".debug-variables");
         this.routines = this.panel.querySelector(".debug-routines");
         this.button = document.getElementById("debug");
+        this.overlay = new VduOverlay(
+            document.getElementById("screen"),
+            document.getElementById("vdu-overlay"),
+        );
+        this.overlayToggle = document.getElementById("debug-vdu-overlay");
+        this.legend = this.panel.querySelector(".debug-legend");
+        this.legend.replaceChildren(
+            ...Markers.map(({label, colour}) => {
+                const item = element("span", "debug-legend-item", label);
+                item.style.setProperty("--marker-colour", colour);
+                return item;
+            }),
+        );
+        this.overlayToggle.addEventListener("change", () => this.showOverlay());
         this.on = false;
         this.screenShown = true;
         this.program = null;
@@ -134,6 +149,48 @@ export class BasicDebugger {
     showPanel() {
         this.panel.hidden = !(this.on && this.screenShown);
         this.reserveScreen();
+        this.showOverlay();
+    }
+
+    get overlayShown() {
+        return this.on && this.screenShown && this.overlayToggle.checked;
+    }
+
+    showOverlay() {
+        this.legend.hidden = !this.overlayToggle.checked;
+        // The picture is of the machine as it was when the frame was painted, which the marks match.
+        this.emulator.onPaint = this.overlayShown ? video => this.readOverlay(video) : null;
+        this.painted = null;
+        if (this.overlayShown) this.drawOverlay();
+        else this.overlay.clear();
+    }
+
+    readOverlay(video) {
+        const {cpu, shownArea} = this.emulator;
+        this.painted = {
+            state: readVduState(address => cpu.readmem(address)),
+            area: displayedArea(video),
+            shownArea,
+        };
+    }
+
+    drawOverlay() {
+        const {cpu} = this.emulator;
+        if (!cpu || this.emulator.rebuilding || !this.emulator.shownArea) return;
+        // A paused machine paints nothing, so it is read as it is.
+        if (!this.painted) this.readOverlay(cpu.video);
+        const {state, area, shownArea} = this.painted;
+        this.overlay.draw(state, area, shownArea);
+        this.showLegend(state);
+    }
+
+    showLegend(state) {
+        const values = describeVduState(state);
+        Markers.forEach(({key, label}, i) => {
+            const text = `${label} ${values[key]}`;
+            const item = this.legend.children[i];
+            if (item.textContent !== text) item.textContent = text;
+        });
     }
 
     reserveScreen() {
@@ -160,6 +217,7 @@ export class BasicDebugger {
         this.showStatus(describe(state, range), state.error ? mark : null);
         this.showHandled(state.basic ? state.handled : {total: 0, errors: []});
         this.showVariables(state.basic ? state : {residents: [], variables: [], routines: []});
+        if (this.overlayShown) this.drawOverlay();
     }
 
     /**

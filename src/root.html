@@ -26,6 +26,7 @@
     <div class="code-editor" id="editor"></div>
     <div class="emulator" id="emulator">
         <canvas class="screen" height="512px" id="screen" width="640px" tabindex="1"></canvas>
+        <canvas class="screen-overlay" id="vdu-overlay" hidden></canvas>
         <div id="about" class="text-light">
             <img alt="Owlet logo" src="/assets/images/owlet.png" width="10%"/>
             <h3>Owlet Editor - beta</h3>
@@ -45,6 +46,10 @@
         <div id="reference"></div>
         <div id="debugger" hidden>
             <div class="debug-status"></div>
+            <div class="debug-options">
+                <label title="Mark the graphics and text cursors, the graphics origin and the windows on the screen"><input type="checkbox" id="debug-vdu-overlay"> Show VDU positions</label>
+                <div class="debug-legend" hidden></div>
+            </div>
             <div class="debug-handled" hidden></div>
             <div class="debug-variables"></div>
             <div class="debug-routines"></div>
