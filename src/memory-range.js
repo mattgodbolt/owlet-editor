@@ -115,7 +115,9 @@ export function clipboardText(bytes) {
 
 function evaluateIn(what, text, context) {
     try {
-        return evaluate(text, context);
+        const value = evaluate(text, context);
+        if (!Number.isFinite(value)) throw new ExpressionError("Not a finite number");
+        return value;
     } catch (e) {
         if (e instanceof ExpressionError) throw new ExpressionError(`${what}: ${e.message}`);
         throw e;

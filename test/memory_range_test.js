@@ -109,6 +109,11 @@ describe.each(["B", "Master"])("Memory ranges on the %s", machine => {
             ["&2000", "0", true, "The length is 0"],
             ["Q+1", "1", true, "Start: No such variable: Q"],
             ["PAGE", "TOP-", true, "Length: Missing number"],
+            ["1E999-1E999", "1", true, "Start: Not a finite number"],
+            ["1E999", "1", true, "Start: Not a finite number"],
+            ["0", "1E999-1E999", false, "End: Not a finite number"],
+            ["0", "1E999-1E999", true, "Length: Not a finite number"],
+            ["0", "1E999", true, "Length: Not a finite number"],
         ])
             expect(() => resolveRange({first, second, byLength}, context)).toThrow(
                 new ExpressionError(message),

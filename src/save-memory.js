@@ -34,10 +34,14 @@ function element(tag, className, text) {
 }
 
 /** Puts `text` on the clipboard, by the older way where the page may not use the newer. */
-async function toClipboard(text) {
+export async function toClipboard(text) {
     if (navigator.clipboard) {
-        await navigator.clipboard.writeText(text);
-        return;
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch {
+            // Permission refused or not a secure context; the older way may still be let through.
+        }
     }
     const area = document.createElement("textarea");
     area.value = text;
