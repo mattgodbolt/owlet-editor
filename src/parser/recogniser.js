@@ -4,7 +4,7 @@
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {isFnProc, isStatementKeyword, pseudoVariables} from "../tokens.js";
 import {BasicIIDialect, canStartStatement} from "./dialect.js";
-import {Lexer} from "./lexer.js";
+import {Lexer, lexLine} from "./lexer.js";
 import {BasicVFixCode, basicVFix, basicVOperator} from "./basic-v.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -25,6 +25,8 @@ export const SpacedKeywords = [
     "PROC",
     "ELSE",
 ];
+
+const FnProcNameStart = /[\w`@]/;
 
 const OnErrorLocal =
     "BASIC V accepts ON ERROR LOCAL (not emulated here), but BASIC II and IV take LOCAL as the error handler: the first error fails with Not LOCAL, which runs the handler again, so the program loops forever and Escape does not stop it";
@@ -884,8 +886,26 @@ export class Recogniser {
         return true;
     }
 
-    // Whether "(" after a space is the call's depends on the DEF: FNg (1) is fine if FNg has a parameter.
     call() {
+        if (!this.named()) this.badCall(this.last);
+        this.callArguments();
+    }
+
+    // Whether a name follows the FN or PROC just read. A call takes an @ into the name, though the tokeniser ends a
+    // name before one.
+    named() {
+        return FnProcNameStart.test(this.lexer.text.charAt(this.last.end));
+    }
+
+    badCall(keyword) {
+        const {keyword: word} = keyword.kw;
+        const kind = word === "FN" ? "function" : "procedure";
+        const explanation = `${word} needs a ${kind} name straight after it, with no space`;
+        this.fail("Bad call", keyword, keyword.end === this.lexer.text.length, explanation);
+    }
+
+    // Whether "(" after a space is the call's depends on the DEF: FNg (1) is fine if FNg has a parameter.
+    callArguments() {
         if (this.is("fnname")) this.next();
         if (this.isPunct("(")) this.unworded(() => this.bracket(this.next()));
     }
@@ -979,9 +999,14 @@ export class Recogniser {
         }
         this.expression();
         if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
-        const procedures = this.next().kw.keyword === "PROC";
+        const branch = this.next();
+        const procedures = branch.kw.keyword === "PROC";
+        const named = !procedures || this.named();
         let from = this.peek().start;
         let target = this.onTarget(procedures);
+        // With one target and no ELSE after it on the line, BASIC stops whatever the value: Bad call at 1, ON range
+        // otherwise.
+        if (!named && this.atEnd() && !this.elseFollows()) this.badCall(branch);
         this.waitingForElse = true;
         for (;;) {
             // BASIC II counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
@@ -1005,6 +1030,13 @@ export class Recogniser {
         while (!this.atEnd()) this.next();
     }
 
+    elseFollows() {
+        const from = this.peek().start;
+        return lexLine(this.lexer.source, this.dialect).some(
+            token => token.start >= from && token.kw?.keyword === "ELSE",
+        );
+    }
+
     // Whether a string with a comma in it lies between `from` and the next token, on BASIC II, which splits it there.
     splitsAtStringComma(from) {
         if (this.basicIV) return false;
@@ -1015,7 +1047,7 @@ export class Recogniser {
     // Reads a target of an ON list and returns what it is.
     onTarget(procedures) {
         if (procedures) {
-            this.call();
+            this.callArguments();
             return OnTargets.procedure;
         }
         const target = this.is("linenum") ? OnTargets.lineNumber : OnTargets.expression;

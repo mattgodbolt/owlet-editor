@@ -2351,6 +2351,87 @@ describe("Syntax markers", () => {
             assert.strictEqual(marker.message, worded ? `${plain} (BASIC: ${rom})` : plain);
         });
     });
+    // BASIC stops with Bad call at a FN or PROC with no name straight after it, and the mark is on the keyword; a
+    // warning where a name could still be typed. In text BASIC skips (IF 0 THEN, after END) it is marked all the same.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("a FN or PROC with no name on %s", (_, dialect, table) => {
+        const Fn = "FN needs a function name straight after it, with no space (BASIC: Bad call)";
+        const Proc =
+            "PROC needs a procedure name straight after it, with no space (BASIC: Bad call)";
+        const {Error: Stops, Warning: EndsTooSoon} = MarkerSeverity;
+        it.each([
+            ["IF FN THEN X=1", Stops, "FN THEN X=1", Fn],
+            ["IF FN X=1", Stops, "FN X=1", Fn],
+            ["IF FN X=1 ELSE Y=1", Stops, "FN X=1", Fn],
+            ["IF FN LETX=1", Stops, "FN LETX=1", Fn],
+            ["PROC(1)", Stops, "PROC(1)", Proc],
+            ["PROC (1)", Stops, "PROC (1)", Proc],
+            ["PROC X", Stops, "PROC X", Proc],
+            ["PROC:", Stops, "PROC", Proc],
+            ["PROC ELSE X=1", Stops, "PROC", Proc],
+            ["PROC.5", Stops, "PROC.5", Proc],
+            ["PROC%", Stops, "PROC%", Proc],
+            ["X=FN(1)", Stops, "FN(1)", Fn],
+            ["X=FN+FNf", Stops, "FN+FNf", Fn],
+            ["X=FN:Y=1", Stops, "FN", Fn],
+            ["PRINT FN;", Stops, "FN;", Fn],
+            ["PROC", EndsTooSoon, "PROC", Proc],
+            ["PRO.", EndsTooSoon, "PRO.", Proc],
+            ["X=FN", EndsTooSoon, "FN", Fn],
+            ["X=FNf+FN", EndsTooSoon, "FN", Fn],
+            ["IF FN", EndsTooSoon, "FN", Fn],
+            ["IF 1 THEN PROC", EndsTooSoon, "PROC", Proc],
+            ["IF 0 THEN PROC", EndsTooSoon, "PROC", Proc],
+            ["IF 1 THEN PROCp ELSE PROC", EndsTooSoon, "PROC", Proc],
+            ["END:PROC", EndsTooSoon, "PROC", Proc],
+        ])("%s", (text, severity, marked, message) => {
+            assert.ok(["Bad call", "ok"].includes(table.get(text)), text);
+            const found = getSyntaxMarkers(text, dialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, [[severity, marked, message]]);
+        });
+        it.each([
+            "PROCp",
+            "PROCq(1)",
+            "PROCq (1)",
+            "IF FNf THEN X=1",
+            "X=FNf+1",
+            "DEF PROC",
+            "DEF FN",
+        ])("should leave %s alone", text => {
+            assert.strictEqual(table.get(text), "ok", text);
+            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+        });
+        // A call reads @ as part of the name, though the tokeniser does not (PROC@ is No such FN/PROC).
+        it.each(["PROC@", "X=FN@"])("should not say Bad call for %s", text => {
+            for (const {message} of getSyntaxMarkers(text, dialect))
+                assert.ok(!message.includes("Bad call"), message);
+        });
+    });
+    // An ON PROC list reads its first target only for 1; any other value looks for an ELSE anywhere on the line.
+    it.each([
+        ["ON 1 PROC", MarkerSeverity.Warning, "PROC"],
+        ["ON X PROC", MarkerSeverity.Warning, "PROC"],
+        ['ON 1 PROC:PRINT"ELSE"', MarkerSeverity.Error, "PROC"],
+        ["ON 2 PROC ELSE Y=1", null, null],
+        ["ON 2 PROC:X=1 ELSE Y=1", null, null],
+        ["ON 2 PROC,PROCp", null, null],
+    ])(
+        "should mark the PROC of BASIC IV's %s only where every value stops",
+        (text, severity, marked) => {
+            assert.strictEqual(masterVerdicts.get(text), severity === null ? "ok" : "Bad call");
+            const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+            ]);
+            assert.deepStrictEqual(found, severity === null ? [] : [[severity, marked]]);
+        },
+    );
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
         ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],
