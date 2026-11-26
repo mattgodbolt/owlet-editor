@@ -54,6 +54,29 @@ function defaultLineNumber(line) {
     return line * 10;
 }
 
+/**
+ * The browser does not scroll the page for a cursor the editor has moved off the screen, or, in portrait, behind the
+ * toolbar fixed over the bottom of it, so this does.
+ */
+function keepCursorOnScreen(editor) {
+    const toolbar = document.getElementById("editor_toolbar");
+    editor.onDidChangeCursorPosition(() => {
+        if (!editor.hasTextFocus()) return;
+        // After Monaco has scrolled the cursor into its own view.
+        requestAnimationFrame(() => {
+            const cursor = editor.getScrolledVisiblePosition(editor.getPosition());
+            if (!cursor) return;
+            const top = editor.getDomNode().getBoundingClientRect().top + cursor.top;
+            const bottom =
+                getComputedStyle(toolbar).position === "fixed"
+                    ? toolbar.getBoundingClientRect().top
+                    : window.innerHeight;
+            if (top < 0) window.scrollBy(0, top);
+            else if (top + cursor.height > bottom) window.scrollBy(0, top + cursor.height - bottom);
+        });
+    });
+}
+
 export class OwletEditor {
     constructor(onChangeHandler, onMachineChangeHandler) {
         const editorPane = $("#editor");
@@ -144,6 +167,7 @@ export class OwletEditor {
 
         this.followLineNumbers = followImplicitLineNumbers(this.editor, this.dialect);
         fitMarkerWidgetToWrappedMessage(this.editor);
+        keepCursorOnScreen(this.editor);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
         this.editor.onDidChangeCursorPosition(({position}) => {
@@ -450,19 +474,20 @@ export class OwletEditor {
 
     selectView(selected) {
         const $play = $("#play-pause");
+        const $screenButton = $("#screen-button");
         if (
             selected !== "screen" ||
-            (selected === "screen" &&
-                this.emulator.running &&
-                $("#screen-button").hasClass("selected"))
+            (selected === "screen" && this.emulator.running && $screenButton.hasClass("selected"))
         ) {
             this.emulator.pause();
             $play.addClass("play");
-            $play.html('<i class="fa-solid fa-play" style="pointer-events: none;"></i>');
+            $play.html('<i class="fa-solid fa-play"></i>');
+            $screenButton.attr("aria-label", "Resume the emulator");
         } else {
             this.emulator.start();
             $play.removeClass("play");
             $play.html("&#10074;&#10074;");
+            $screenButton.attr("aria-label", "Pause the emulator");
         }
 
         for (const element of ["screen", "about", "examples", "reference"]) {

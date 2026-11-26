@@ -6,13 +6,11 @@
  */
 export const Machines = {
     B: {
-        name: "BBC Micro Model B",
         label: "Model B",
         startCycles: 725000,
         keyboardWritePointer: 0x2e1,
     },
     Master: {
-        name: "BBC Master 128",
         label: "Master 128",
         startCycles: 1600000,
         keyboardWritePointer: 0x2e0,

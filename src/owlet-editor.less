@@ -9,7 +9,9 @@
   --color-buttons: #595959;
   --color-editor-bg: #171717;
   --font-color: #bbb;
-  --color-highlight: #5e8040;
+  --color-button-text: #fff;
+  --color-highlight: #4a6a30;
+  --color-status: #8cb860;
   --button-highlight: #6f2020;
   --button-blue: #00536f;
 }
@@ -28,8 +30,20 @@ a:active {
   text-decoration: none;
 }
 
-*:focus {
-  outline: 0 !important;
+:focus {
+  outline: 0;
+}
+
+// A ring for keyboard focus only, not after a click or a tap.
+:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+// Monaco draws its own focus, and the emulator's is the accent on its pane.
+.code-editor :focus-visible,
+canvas.screen:focus-visible {
+  outline: 0;
 }
 
 body {
@@ -43,7 +57,7 @@ body {
   height: 90vh;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  grid-template-rows: 80px 24px minmax(320px, 90vh) 24px 32px;
+  grid-template-rows: 80px 32px minmax(320px, 90vh) 32px 32px;
 }
 
 .header {
@@ -92,6 +106,17 @@ h1 {
   grid-template-rows: 80px 24px minmax(320px, 90vh) 24px 32px;
 }
 
+// Which pane the keyboard is in.
+.code-editor,
+.emulator {
+  border-top: 2px solid transparent;
+  box-sizing: border-box;
+
+  &:focus-within {
+    border-top-color: var(--color-status);
+  }
+}
+
 .too_long {
   color: Tomato;
 }
@@ -112,7 +137,7 @@ h1 {
   background-color: var(--color-toolbar);
   border: 1px solid var(--color-background);
   //font-family: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
-  color: var(--color-highlight);
+  color: var(--color-status);
 }
 
 button,
@@ -122,10 +147,29 @@ button:active {
   padding-left: 16px;
   margin-right: 4px;
   text-decoration: none;
-  color: var(--font-color);
+  color: var(--color-button-text);
   border: 0px solid var(--color-toolbar);
   background-color: var(--color-buttons);
   //    background-color: #8064A2 !important;
+}
+
+button[data-action] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  // Clicks should land on the button, whichever part of it was hit.
+  > * {
+    pointer-events: none;
+  }
+}
+
+// The size of a Font Awesome icon, for the one icon that is not from Font Awesome.
+.inline-icon {
+  height: 1em;
+  width: 1.25em;
+  vertical-align: -0.125em;
 }
 
 button:active {
@@ -135,7 +179,7 @@ button:active {
 #machine {
   height: 100%;
   margin-right: 4px;
-  color: var(--font-color);
+  color: var(--color-button-text);
   background-color: var(--color-buttons);
   border: 0;
 }
@@ -146,11 +190,6 @@ canvas.screen {
 
 #sound {
   white-space: nowrap;
-
-  // Clicks should land on the button, whichever part of it was hit.
-  * {
-    pointer-events: none;
-  }
 
   .sound-icon-on {
     display: none;
@@ -174,13 +213,13 @@ canvas.screen {
 #debug {
   white-space: nowrap;
 
-  * {
-    pointer-events: none;
-  }
-
   &[aria-pressed="true"] {
     background-color: var(--color-highlight);
   }
+}
+
+#editor_toolbar button[data-action="run"] {
+  background-color: var(--color-highlight);
 }
 
 // On a phone the icon alone has to do, as the footer has no room for its words.
@@ -188,6 +227,16 @@ canvas.screen {
   #sound-label,
   #debug-label {
     display: none;
+  }
+
+  #emu_toolbar button,
+  #editor_footer button,
+  #emu_footer button {
+    min-width: 44px;
+  }
+
+  .modal-actions button {
+    height: 48px;
   }
 }
 
@@ -208,7 +257,7 @@ canvas.screen {
   }
 
   .debug-status {
-    color: var(--color-highlight);
+    color: var(--color-status);
     margin-bottom: 4px;
 
     &[data-mark="error"] {
@@ -277,7 +326,7 @@ canvas.screen {
 
 .monaco-editor .debug-running-statement {
   background-color: rgba(94, 128, 64, 0.55);
-  outline: 1px solid var(--color-highlight);
+  outline: 1px solid #5e8040;
 }
 
 .monaco-editor .debug-error-line {
@@ -484,6 +533,24 @@ input {
   color: var(--color-background);
 }
 
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    flex: 1 1 9rem;
+    height: 40px;
+    margin: 0;
+  }
+}
+
+// The pop-up is light, so its ring is dark and goes outside the control.
+.modal-content :focus-visible {
+  outline-color: var(--color-background);
+  outline-offset: 2px;
+}
+
 /* The Close Button */
 .close {
   color: var(--color-background);
@@ -508,16 +575,52 @@ input {
     height: 90vh;
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: 80px 32px 32px 80vw 32px 32px minmax(288px, 90vh) 32px 50vh;
+    grid-template-rows: 80px 44px 44px 80vw 32px 44px minmax(288px, 90vh) 50vh;
+  }
+
+  // The bar's height, kept clear at the end of the page and when the browser scrolls something into view.
+  @bar-height: calc(60px + env(safe-area-inset-bottom));
+
+  html {
+    scroll-padding-bottom: @bar-height;
+  }
+
+  // The editor's actions are a bar fixed to the bottom of the screen, so Run, Share and 3D are always in reach.
+  #editor_toolbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    height: 60px;
+    box-sizing: content-box;
+    padding-bottom: env(safe-area-inset-bottom);
+    border: 0;
+    border-top: 1px solid var(--color-background);
+
+    button {
+      flex-direction: column;
+      gap: 2px;
+      margin: 0;
+      padding: 0;
+      font-size: 11px;
+
+      svg {
+        font-size: 18px;
+      }
+    }
+  }
+
+  // Monaco's own layers must stay beneath the fixed bar.
+  .code-editor {
+    isolation: isolate;
   }
 
   .header {
     display: inline;
-  }
-
-  #editor_toolbar {
-    grid-column: 1;
-    grid-row: 8;
   }
 
   #emu_toolbar {
@@ -570,8 +673,8 @@ input {
 
   #mobile {
     grid-column: 1;
-    grid-row: 9;
-    padding: 24px 4px 4px 16px;
+    grid-row: 8;
+    padding: 24px 4px calc(4px + @bar-height) 16px;
     display: block;
     justify-content: center;
     align-content: center;
@@ -603,13 +706,6 @@ input {
     gap: 4px;
     padding: 8px;
     background: var(--color-toolbar);
-  }
-
-  // The global *:focus rule removes outlines, so keyboard focus needs its own, and to win it must be !important.
-  button:focus-visible,
-  .vdu-search:focus-visible {
-    outline: 2px solid #fff !important;
-    outline-offset: -2px;
   }
 
   .vdu-tab.active {
