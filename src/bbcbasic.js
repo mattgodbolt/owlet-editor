@@ -93,12 +93,17 @@ export function setTypingPoint(model, point) {
         return;
     const edited = lineNumber === typing.lineNumber && text !== typing.text;
     const left = typing.endsAtCursor && !edited;
+    // The tokens provider is given no line number, so a line another line repeats cannot be told from it.
+    const repeated =
+        text !== null &&
+        model.getLinesContent().some((line, i) => line === text && i + 1 !== lineNumber);
     const rest = text?.slice(column) ?? "";
     const early =
+        !repeated &&
         rest.trim() !== "" &&
         TypedToEnd.test(rest) &&
         model.tokenization.hasAccurateTokensForLine(lineNumber);
-    Object.assign(typing, {lineNumber, text, column, endsAtCursor: false});
+    Object.assign(typing, {lineNumber, text: repeated ? null : text, column, endsAtCursor: false});
     if (left || early) model.tokenization.resetTokenization();
 }
 

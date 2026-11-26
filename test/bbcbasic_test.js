@@ -2509,6 +2509,31 @@ describe("A line being typed", () => {
             untyped.dispose();
         }
     });
+    it("should not give the allowance to a line another line repeats, and should to a line that is unique", () => {
+        const text = "FOR I=1 TO:PRINT";
+        const column = 10;
+        const red = (model, lineNumber) => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(lineNumber);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const twice = editor.createModel(`${text}\n${text}`, LanguageId);
+        const once = editor.createModel(`${text}\nPRINT`, LanguageId);
+        const left = editor.createModel(text, LanguageId);
+        try {
+            const untouched = red(left, 1);
+            setTypingPoint(twice, {lineNumber: 1, text, column});
+            assert.deepStrictEqual(red(twice, 2), untouched, "the other line keeps its red");
+            assert.deepStrictEqual(red(twice, 1), untouched, "the edited line is red too");
+            setTypingPoint(once, {lineNumber: 1, text, column});
+            assert.notDeepStrictEqual(red(once, 1), untouched, "a unique line is typed");
+        } finally {
+            left.dispose();
+            setTypingPoint(twice, null);
+            twice.dispose();
+            once.dispose();
+        }
+    });
 });
 
 describe("Problem count", () => {
