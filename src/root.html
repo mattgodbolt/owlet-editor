@@ -8,20 +8,19 @@
     <div>
     </div>
     <div class="toolbar" id="editor_toolbar">
-        <button data-action="run" title="Run the program (ctrl-enter)"><i class="fa-solid fa-play" style="pointer-events: none;"></i></button>
-        <button data-action="new" title="Start a new program"><i class="fa-solid fa-file" style="pointer-events: none;"></i></button>
-                <button class="save" data-action="save" title="Save memory from the emulator" data-toggle="tooltip" data-placement="top" title="Save memory from the emulator"><i class="fa-solid fa-memory" style="pointer-events: none;"></i></button>
-        <button data-action="share" title="Share your code as a URL, disc or tape image"><i class="fa-solid fa-share-square" style="pointer-events: none;"></i></button>
-        <button data-action="virtualbeeb" title="Open in the 3D virtual BBC Micro" aria-label="Open in the 3D virtual BBC Micro"><i class="fa-solid fa-cube" style="pointer-events: none;"></i></button>
-
+        <button data-action="run" aria-label="Run the program" title="Run the program (ctrl-enter)"><i class="fa-solid fa-play"></i><span class="label">Run</span></button>
+        <button data-action="new" aria-label="New program" title="Start a new program"><i class="fa-solid fa-file"></i><span class="label">New</span></button>
+        <button class="save" data-action="save" aria-label="Save memory from the emulator" title="Save memory from the emulator"><i class="fa-solid fa-memory"></i><span class="label">Save</span></button>
+        <button data-action="share" aria-label="Share your code" title="Share your code as a URL, disc or tape image"><i class="fa-solid fa-share-square"></i><span class="label">Share</span></button>
+        <button data-action="virtualbeeb" aria-label="Open in the 3D virtual BBC Micro" title="Open in the 3D virtual BBC Micro"><i class="fa-solid fa-vr-cardboard"></i><span class="label">3D</span></button>
     </div>
     <div class="toolbar" id="emu_toolbar">
-        <button data-action="emulator" id="screen-button" title="View emulator (ctrl-enter)">
+        <button data-action="emulator" id="screen-button" aria-label="Pause the emulator" title="View emulator (ctrl-enter)">
             <div data-action="emulator" id="play-pause"></div>
         </button>
-        <button data-action="examples" id="examples-button" title="Load examples">examples</button>
-        <button data-action="about" id="about-button" title="About OwletEditor">about</button>
-        <button data-action="reference" id="reference-button" title="Reference for the VDU, ASCII, MODE 7 and PLOT codes">VDU</button>
+        <button data-action="examples" id="examples-button" title="Load examples">Examples</button>
+        <button data-action="about" id="about-button" title="About OwletEditor">About</button>
+        <button data-action="reference" id="reference-button" title="Reference for the VDU, ASCII, MODE 7 and PLOT codes">Docs</button>
     </div>
     <div class="code-editor" id="editor"></div>
     <div class="emulator" id="emulator">
@@ -69,8 +68,8 @@
         </div>
     </div>
     <div class="footer" id="editor_footer">
-        <button data-action="expand" title="Expand abbreviations, detokenise">Decode</button>
-        <button data-action="tokenise" title="Convert to BBC BASIC byte tokens">Shrink</button>
+        <button data-action="expand" title="Expand abbreviations, detokenise"><i class="fa-solid fa-expand"></i>Decode</button>
+        <button data-action="tokenise" title="Convert to BBC BASIC byte tokens"><i class="fa-solid fa-compress"></i>Shrink</button>
         <div id="edit_status"><span class="count">0</span> characters<button id="problems" type="button" hidden></button></div>
 
     </div>
@@ -84,7 +83,7 @@
             <span id="debug-label">Debug</span>
         </button>
         <select id="machine" aria-label="Machine" title="The machine the program runs on"></select>
-        <button data-action="rocket" id="rocket" title="send to beebjit" style="display:none;"><i class="fa-solid fa-rocket" style="pointer-events: none;"></i></button>
+        <button data-action="rocket" id="rocket" title="send to beebjit" style="display:none;"><i class="fa-solid fa-rocket"></i></button>
         <div id="emu_status"></div>
         <div id="coords"></div>
     </div>
@@ -111,12 +110,14 @@
         <p><b>Share your BBC Micro program</b></p>
         <p id="share-content">The web link below contains a copy of the current program. You can save it or share it.</p>
         <input id="copyText" type="text" value="Hello World">
-        <button data-action="copy">Copy as URL</button>
-        <button data-action="cassette">Tape</button>
-        <button data-action="disc">Disc</button>
-        <button data-action="jsbeeb">jsbeeb</button>
-        <button data-action="virtualbeeb">Virtualbeeb</button>
-        <button data-action="closeModal">Cancel</button>
+        <div class="modal-actions">
+            <button data-action="copy"><i class="fa-solid fa-copy"></i>Copy as URL</button>
+            <button data-action="cassette"><svg class="inline-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h.191l1.862-3.724A.5.5 0 0 1 4 10h8a.5.5 0 0 1 .447.276L14.31 14h.191a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM4 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2m8 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2M6 6a1 1 0 0 1 1-1h2a1 1 0 0 1 0 2H7a1 1 0 0 1-1-1"/><path d="m13.191 14-1.5-3H4.309l-1.5 3z"/></svg>Tape</button>
+            <button data-action="disc"><i class="fa-solid fa-floppy-disk"></i>Disc</button>
+            <button data-action="jsbeeb"><i class="fa-solid fa-desktop"></i>jsbeeb</button>
+            <button data-action="virtualbeeb"><i class="fa-solid fa-vr-cardboard"></i>Virtualbeeb</button>
+            <button data-action="closeModal"><i class="fa-solid fa-circle-xmark"></i>Cancel</button>
+        </div>
     </div>
 
 </div>
@@ -128,8 +129,10 @@
         <p id="save-content">Start address and length (default is BASIC program).</p>
         <input id="saveStartAddr" type="text" value="">
         <input id="saveLen" type="text" value="">
-        <button data-action="copyMem">Copy</button>
-        <button data-action="closeModal">Cancel</button>
+        <div class="modal-actions">
+            <button data-action="copyMem"><i class="fa-solid fa-copy"></i>Copy</button>
+            <button data-action="closeModal"><i class="fa-solid fa-circle-xmark"></i>Cancel</button>
+        </div>
     </div>
 
 </div>

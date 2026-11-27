@@ -143,3 +143,6 @@ and how the highlighter is checked against the real ROM in
 ## License
 
 Owlet is free software, licensed under the GNU General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).
+
+The cassette icon on the Tape button is `cassette-fill` from [Bootstrap Icons](https://icons.getbootstrap.com/),
+copyright the Bootstrap Authors, used under the [MIT License](https://github.com/twbs/icons/blob/main/LICENSE).

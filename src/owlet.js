@@ -54,6 +54,29 @@ function defaultLineNumber(line) {
     return line * 10;
 }
 
+/**
+ * The browser does not scroll the page for a cursor the editor has moved off the screen, or, in portrait, behind the
+ * toolbar fixed over the bottom of it, so this does.
+ */
+function keepCursorOnScreen(editor) {
+    const toolbar = document.getElementById("editor_toolbar");
+    editor.onDidChangeCursorPosition(() => {
+        if (!editor.hasTextFocus()) return;
+        // After Monaco has scrolled the cursor into its own view.
+        requestAnimationFrame(() => {
+            const cursor = editor.getScrolledVisiblePosition(editor.getPosition());
+            if (!cursor) return;
+            const top = editor.getDomNode().getBoundingClientRect().top + cursor.top;
+            const bottom =
+                getComputedStyle(toolbar).position === "fixed"
+                    ? toolbar.getBoundingClientRect().top
+                    : window.innerHeight;
+            if (top < 0) window.scrollBy(0, top);
+            else if (top + cursor.height > bottom) window.scrollBy(0, top + cursor.height - bottom);
+        });
+    });
+}
+
 export class OwletEditor {
     constructor(onChangeHandler, onMachineChangeHandler) {
         const editorPane = $("#editor");
@@ -144,6 +167,7 @@ export class OwletEditor {
 
         this.followLineNumbers = followImplicitLineNumbers(this.editor, this.dialect);
         fitMarkerWidgetToWrappedMessage(this.editor);
+        keepCursorOnScreen(this.editor);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
         this.editor.onDidChangeCursorPosition(({position}) => {
@@ -160,6 +184,7 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
+        this.emulator.onRunningChange = running => this.showRunning(running);
         this.basicDebugger = new BasicDebugger(this.editor, this.emulator, () => this.dialect);
 
         this.examples = {};
@@ -448,21 +473,26 @@ export class OwletEditor {
             .toggleClass("too_long", outputProgram.length > TweetMaximum);
     }
 
-    selectView(selected) {
+    /** Shows the play/pause icon and the screen button's name for whether the emulator is running, however it got so. */
+    showRunning(running) {
         const $play = $("#play-pause");
+        $play.toggleClass("play", !running);
+        $play.html(running ? "&#10074;&#10074;" : '<i class="fa-solid fa-play"></i>');
+        $("#screen-button").attr(
+            "aria-label",
+            running ? "Pause the emulator" : "Resume the emulator",
+        );
+    }
+
+    selectView(selected) {
+        const $screenButton = $("#screen-button");
         if (
             selected !== "screen" ||
-            (selected === "screen" &&
-                this.emulator.running &&
-                $("#screen-button").hasClass("selected"))
+            (selected === "screen" && this.emulator.running && $screenButton.hasClass("selected"))
         ) {
             this.emulator.pause();
-            $play.addClass("play");
-            $play.html('<i class="fa-solid fa-play" style="pointer-events: none;"></i>');
         } else {
             this.emulator.start();
-            $play.removeClass("play");
-            $play.html("&#10074;&#10074;");
         }
 
         for (const element of ["screen", "about", "examples", "reference"]) {

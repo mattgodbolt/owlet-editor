@@ -216,10 +216,7 @@ export class Emulator {
 
     timer() {
         if (this.cpu && !beebjitIncoming && !this.showCoords) {
-            const gxr = this.hasGxr ? " | GXR" : "";
-            this.emuStatus.innerHTML = `${Machines[this.machine].name}${gxr} | ${Math.floor(
-                this.totalCycles / this.cyclesPerSecond,
-            )} s`;
+            this.emuStatus.textContent = `${Math.floor(this.totalCycles / this.cyclesPerSecond)} s`;
         }
     }
 
@@ -228,11 +225,13 @@ export class Emulator {
         this.running = true;
         this.sound.setRunning(true);
         requestAnimationFrame(this.onAnimFrame);
+        this.onRunningChange?.(true);
     }
 
     pause() {
         this.running = false;
         this.sound.setRunning(false);
+        this.onRunningChange?.(false);
     }
 
     async beebjit(tokenised) {
