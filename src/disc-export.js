@@ -11,8 +11,11 @@ const TeletextBaseBelow = 0x3c00;
 const TeletextSize = 0x400;
 const TeletextCellMask = TeletextSize - 1;
 const TeletextPageBit = 0x800;
-const BasicPage = 0x1900;
+const BootFileAddress = 0x1900;
 const IoProcessor = 0xffff0000;
+const BasicPageHighByte = 0x18;
+const BasicIIExec = 0x8023;
+const BasicIVExec = 0x802b;
 
 /**
  * The screen the video is showing, from the first byte it displays: the size of the mode's screen memory in bytes,
@@ -56,13 +59,26 @@ function bitmapAddress(subtract, offset) {
     );
 }
 
+/**
+ * The load and exec addresses BASIC's `SAVE` gives a program on `cpu`'s machine: PAGE as the running BASIC has it, with
+ * the top word set for the I/O processor, and the BASIC ROM's entry (BASIC II on the Model B, BASIC IV on the Master).
+ */
+export function basicSaveAddresses(cpu) {
+    const page = cpu.readmem(BasicPageHighByte) << 8;
+    return {
+        load: IoProcessor + page,
+        exec: IoProcessor + (cpu.model.isMaster ? BasicIVExec : BasicIIExec),
+    };
+}
+
 /** The exported disc: the tokenised `program`, booted with SHIFT+BREAK, and the screen `cpu` shows. */
 export function discImage(program, cpu) {
     const disc = new AcornDFSdisc();
     const {base, bytes} = screenDump(cpu);
     disc.save("README", "Created by Owlet https://bbcmic.ro\r", 0x0000, 0x0000);
-    disc.save("PROGRAM", program, BasicPage, BasicPage);
+    const {load, exec} = basicSaveAddresses(cpu);
+    disc.save("PROGRAM", program, load, exec);
     disc.save("SCREEN", bytes, IoProcessor + base, 0x0000);
-    disc.save("!BOOT", 'CHAIN"PROGRAM"\r', BasicPage, BasicPage);
+    disc.save("!BOOT", '*BASIC\rCHAIN"PROGRAM"\r', BootFileAddress, BootFileAddress);
     return disc.image;
 }

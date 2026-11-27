@@ -3,6 +3,22 @@
 What the Disc button in the Share dialog puts in `owletExport.ssd`. The [README](../README.md#disc-export) has the short
 version. The disc holds `PROGRAM`, a `!BOOT` that runs it on SHIFT+BREAK, and `SCREEN`, described here.
 
+## The `PROGRAM` file
+
+`PROGRAM` is catalogued as a real machine's BASIC `SAVE "PROGRAM"` would catalogue it: the load address is `PAGE` of the
+machine running, read from the emulator when the button is pressed, with the top word set (`FFFF`, the I/O processor),
+and the exec address is the BASIC ROM's entry. Checked with a real `SAVE` on each machine Owlet offers:
+
+| Machine                        | `PAGE` | Load       | Exec       |
+| ------------------------------ | ------ | ---------- | ---------- |
+| Model B with the GXR (default) | &1C00  | `FFFF1C00` | `FFFF8023` |
+| Model B without the GXR        | &1900  | `FFFF1900` | `FFFF8023` |
+| Master 128                     | &E00   | `FFFF0E00` | `FFFF802B` |
+
+`CHAIN` loads at the current `PAGE` whatever the file's addresses say, so `!BOOT` does not depend on them; `!BOOT` itself
+is catalogued at &1900 for both. `!BOOT` is `*BASIC` then `CHAIN"PROGRAM"`, so it selects BASIC first and also works
+when another language ROM is the current language.
+
 ## The `SCREEN` file
 
 `SCREEN` is the screen as the emulator was showing it when the button was pressed. It is the size of the current mode's

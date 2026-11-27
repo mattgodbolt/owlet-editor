@@ -1,9 +1,15 @@
 // @vitest-environment node
-import {describe, expect, it} from "vitest";
+import {existsSync, mkdtempSync, rmSync, writeFileSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
+import {pathToFileURL} from "node:url";
+import {afterAll, describe, expect, it} from "vitest";
 import {MachineSession} from "jsbeeb/machine-session";
+import {toSsdOrDsd} from "jsbeeb/src/disc";
 import {discFor} from "jsbeeb/src/fdc";
 import {MainView, peekViewed, ShadowView} from "jsbeeb/src/paging";
 import {discImage, screenDump} from "../src/disc-export";
+import {blankDisc} from "./blank_disc";
 
 const Drawing = [
     "VDU23,1,0;0;0;0;",
@@ -22,6 +28,7 @@ const IoProcessor = 0xffff0000;
 const BytesPerCell = 8;
 const TeletextCells = 0x400;
 const TeletextStart = 0x2800;
+const RomBankBytes = 0x4000;
 
 // What each mode's screen is on the Model B and the Master, as the MOS lays it out: its size in bytes and the start of
 // its screen memory, which is where the video wraps it to from &8000.
@@ -36,8 +43,13 @@ const Modes = [
     {mode: 7, size: 0x400, base: 0x7c00},
 ];
 
-async function booted(machine) {
-    const session = new MachineSession(machine);
+// Fitted the way Owlet fits it; the ROM is fetched by the Makefile rather than kept in the repository, so a checkout
+// without it tests the other machines.
+const GxrRom = "gxr.rom";
+const HasGxr = existsSync(new URL(`../node_modules/jsbeeb/public/roms/${GxrRom}`, import.meta.url));
+
+async function booted(machine, extraRoms = [], bankRoms = []) {
+    const session = new MachineSession(machine, {extraRoms, bankRoms});
     await session.initialise();
     await session.boot();
     return session;
@@ -88,29 +100,35 @@ async function loadedScreen(machine, image, mode) {
     return session.screenshot();
 }
 
-// The SCREEN file in a DFS image, from its catalogue entry: name in sector 0, addresses, length and start in sector 1.
-function screenFile(image) {
+// A file in a DFS image, from its catalogue entry: name in sector 0, addresses, length and start in sector 1.
+function catalogued(image, wanted) {
     const CatalogueEntry = 8;
     const fileCount = image[0x105] / CatalogueEntry;
     for (let file = 1; file <= fileCount; ++file) {
         const at = file * CatalogueEntry;
         const name = String.fromCharCode(...image.slice(at, at + 7)).trimEnd();
-        if (name !== "SCREEN") continue;
+        if (name !== wanted) continue;
         const info = image.slice(0x100 + at, 0x100 + at + CatalogueEntry);
         const extra = info[6];
         const highBits = shift => (extra >> shift) & 3;
         // DFS keeps two bits of each address's top half, both set for &FFFF, the I/O processor.
-        const loadHigh = highBits(2) === 3 ? 0xffff : highBits(2);
+        const highWord = shift => (highBits(shift) === 3 ? 0xffff : highBits(shift));
         const length = info[4] | (info[5] << 8) | (highBits(4) << 16);
         const start = (info[7] | (highBits(0) << 8)) * 0x100;
         return {
-            load: loadHigh * 0x10000 + (info[0] | (info[1] << 8)),
+            load: highWord(2) * 0x10000 + (info[0] | (info[1] << 8)),
+            exec: highWord(6) * 0x10000 + (info[2] | (info[3] << 8)),
             length,
-            screen: Array.from(image.slice(start, start + length)),
+            data: Array.from(image.slice(start, start + length)),
         };
     }
-    throw new Error("No SCREEN file in the disc image");
+    throw new Error(`No ${wanted} file in the disc image`);
 }
+
+const screenFile = image => {
+    const {load, length, data} = catalogued(image, "SCREEN");
+    return {load, length, screen: data};
+};
 
 describe("The exported disc's SCREEN file", () => {
     for (const machine of ["B", "Master"]) {
@@ -205,4 +223,133 @@ describe("The exported disc's SCREEN file", () => {
             );
         }
     });
+});
+
+describe("The exported disc's PROGRAM file", () => {
+    // What a real SAVE catalogues on each machine Owlet offers, and the PAGE it saves from.
+    const machines = [
+        {
+            name: "Model B with the GXR",
+            machine: "B",
+            extraRoms: [GxrRom],
+            page: 0x1c00,
+            exec: 0x8023,
+            skip: !HasGxr,
+        },
+        {name: "Model B without the GXR", machine: "B", extraRoms: [], page: 0x1900, exec: 0x8023},
+        {name: "Master 128", machine: "Master", extraRoms: [], page: 0x0e00, exec: 0x802b},
+    ];
+    const Hello = 'PRINT "OWLET OK"';
+    const BootText = '*BASIC\rCHAIN"PROGRAM"\r';
+
+    // A language ROM that is not BASIC: it reads a line and hands it to the OS as a command, over and over, which is
+    // all the `!BOOT` needs of a language (it runs `*` commands from the EXEC file).
+    const LanguageRomBank = 8;
+    const NotACommand = /Bad command|Not found/;
+    const romFolder = mkdtempSync(join(tmpdir(), "owlet-lang-"));
+    afterAll(() => rmSync(romFolder, {recursive: true, force: true}));
+    const languageRom = () => {
+        const rom = new Uint8Array(RomBankBytes);
+        rom.set([0x4c, 0x20, 0x80, 0x60, 0xea, 0xea, 0xc2, 0x0e, 0x00], 0);
+        rom.set(
+            [..."XLANG\0(C)"].map(char => char.charCodeAt(0)),
+            9,
+        );
+        rom.set(
+            [
+                // Point BRKV at the error printer at &8060
+                ...[0xa9, 0x60, 0x8d, 0x02, 0x02, 0xa9, 0x80, 0x8d, 0x03, 0x02],
+                // OSWORD 0's parameter block at &80: buffer &0600, 255 long, any character from &20 to &FF
+                ...[0xa9, 0x00, 0x85, 0x80, 0xa9, 0x06, 0x85, 0x81, 0xa9, 0xff, 0x85, 0x82],
+                ...[0xa9, 0x20, 0x85, 0x83, 0xa9, 0xff, 0x85, 0x84],
+                // &803E: read a line (OSWORD 0), try again on Escape, else OSCLI it
+                ...[0xa9, 0x00, 0xa2, 0x80, 0xa0, 0x00, 0x20, 0xf1, 0xff, 0xb0, 0xf5],
+                ...[0xa2, 0x00, 0xa0, 0x06, 0x20, 0xf7, 0xff, 0x4c, 0x3e, 0x80],
+            ],
+            0x20,
+        );
+        rom.set(
+            [
+                // &8060: an error's message is at (&FD)+1: print it and go back to reading lines
+                ...[
+                    0xa2, 0xff, 0x9a, 0x58, 0xa0, 0x01, 0xb1, 0xfd, 0xf0, 0x06, 0x20, 0xee, 0xff,
+                    0xc8, 0xd0, 0xf6,
+                ],
+                ...[0x20, 0xe7, 0xff, 0x4c, 0x3e, 0x80],
+            ],
+            0x60,
+        );
+        const path = join(romFolder, "xlang.rom");
+        writeFileSync(path, rom);
+        return pathToFileURL(path).href;
+    };
+
+    // A real SAVE of Hello on a blank disc: the catalogue entry it makes, and the PAGE it was made at.
+    async function realSave({machine, extraRoms}) {
+        const session = await booted(machine, extraRoms);
+        const cpu = cpuOf(session);
+        const disc = discFor("real.ssd", blankDisc());
+        cpu.fdc.loadDisc(0, disc);
+        await session.loadBasic(`10 ${Hello}`);
+        await session.type('SAVE "PROGRAM"');
+        await session.runUntilPrompt();
+        return {session, entry: catalogued(toSsdOrDsd(disc, {force: true}), "PROGRAM")};
+    }
+
+    for (const {name, machine, extraRoms, page, exec, skip} of machines) {
+        it.skipIf(skip)(
+            `should be catalogued as a real SAVE on the ${name} does, and run when booted`,
+            async () => {
+                const {session, entry: real} = await realSave({machine, extraRoms});
+                expect(real).toMatchObject({load: IoProcessor + page, exec: IoProcessor + exec});
+
+                const image = discImage(real.data, cpuOf(session));
+                expect(catalogued(image, "PROGRAM")).toEqual(real);
+                const boot = catalogued(image, "!BOOT");
+                expect(boot).toMatchObject({load: 0x1900, exec: 0x1900, length: BootText.length});
+                expect(boot.data).toEqual([...BootText].map(char => char.charCodeAt(0)));
+
+                const fresh = await booted(machine, extraRoms);
+                cpuOf(fresh).fdc.loadDisc(0, discFor("owletExport.ssd", image));
+                await fresh.autoboot();
+                const {screenText} = await fresh.runUntilPrompt();
+                expect(screenText).toContain("OWLET OK");
+                await fresh.type("*INFO PROGRAM");
+                const hex = address => address.toString(16).toUpperCase().slice(-6);
+                expect((await fresh.runUntilPrompt()).screenText).toMatch(
+                    new RegExp(
+                        `PROGRAM\\s+${hex(IoProcessor + page)}\\s+${hex(IoProcessor + exec)}`,
+                    ),
+                );
+            },
+            EmulatorTestTimeout,
+        );
+
+        it.skipIf(skip)(
+            `should run from !BOOT on the ${name} when BASIC is not the current language`,
+            async () => {
+                const {session, entry: real} = await realSave({machine, extraRoms});
+                const image = discImage(real.data, cpuOf(session));
+
+                const fresh = await booted(machine, extraRoms, [
+                    {bank: LanguageRomBank, rom: languageRom()},
+                ]);
+                cpuOf(fresh).fdc.loadDisc(0, discFor("owletExport.ssd", image));
+                await fresh.type(`*FX142,${LanguageRomBank}`);
+                await fresh.runUntilPrompt();
+                // Not BASIC: its commands are not OS commands
+                await fresh.type("PRINT 1");
+                expect((await fresh.runUntilPrompt()).screenText).toMatch(NotACommand);
+
+                await fresh.type("*EXEC !BOOT");
+                const {screenText} = await fresh.runUntilPrompt();
+                expect(screenText).toContain("OWLET OK");
+                expect(screenText).not.toMatch(NotACommand);
+                // Now in BASIC
+                await fresh.type("PRINT 1+1");
+                expect((await fresh.runUntilPrompt()).screenText).toMatch(/\b2\b/);
+            },
+            EmulatorTestTimeout,
+        );
+    }
 });
