@@ -133,7 +133,8 @@ function lineBytes(peek, line) {
     return bytes;
 }
 
-const isNameCharacter = code => /[\w`]/.test(String.fromCharCode(code));
+// After PROC or FN the ROM takes @ anywhere in a name.
+const isNameCharacter = code => /[\w`@]/.test(String.fromCharCode(code));
 
 /** The address of the last byte of the name, and any parameters, of a DEF PROC or FN at `at`, or null. */
 function definedNameEnd(peek, at, end) {

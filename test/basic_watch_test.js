@@ -1143,6 +1143,35 @@ describe("BasicWatch handled errors", () => {
                         taken(26, "No such variable", 40, "DEFPROCX(A,B)", 10),
                     ],
                 },
+                // BASIC takes @ anywhere in a name after PROC or FN, so the DEF's name and parameters end at the bracket.
+                ...["@", "@a", "a@", "a@b"].flatMap(name => [
+                    {
+                        name: `the same error in a DEF PROC${name}'s arguments and after its name apart`,
+                        lines: [
+                            "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                            `IF N%=0 THEN PROC${name}(1,Q) ELSE PROC${name}(1,1)`,
+                            "END",
+                            `DEFPROC${name}(A,B)X=Q`,
+                        ],
+                        errors: [
+                            taken(26, "No such variable", 40, "X=Q", 10),
+                            taken(26, "No such variable", 40, `DEFPROC${name}(A,B)`, 10),
+                        ],
+                    },
+                    {
+                        name: `the same error in a DEF FN${name}'s arguments and after its name apart`,
+                        lines: [
+                            "ON ERROR N%=N%+1:IF N%<2 GOTO 20 ELSE END",
+                            `IF N%=0 THEN X=FN${name}(1,Q) ELSE X=FN${name}(1,1)`,
+                            "END",
+                            `DEFFN${name}(A,B)=Q`,
+                        ],
+                        errors: [
+                            taken(26, "No such variable", 40, "=Q", 10),
+                            taken(26, "No such variable", 40, `DEFFN${name}(A,B)`, 10),
+                        ],
+                    },
+                ]),
                 {
                     name: "the same error in two REPEATs with nothing between them apart",
                     lines: [

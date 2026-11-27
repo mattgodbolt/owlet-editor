@@ -42,7 +42,7 @@ export const wordPatternFor = dialect =>
     new RegExp(
         [
             "(?<=&)[0-9A-F]+",
-            "(?<=FN|PROC)[\\w`]+[$%]?",
+            "(?<=FN|PROC)[\\w`@]+[$%]?",
             `(?<keyword>${keywordWordPattern(dialect)})`,
             "@%",
             "-?\\d*\\.\\d+",

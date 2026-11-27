@@ -202,6 +202,43 @@ describe("Tokenisation", () => {
                 "0:keyword 5:variable 7:white 8:keyword 12:variable 16:symbol 17:keyword 21:variable 25:symbol 26:operator 27:keyword 29:variable",
             ]);
         });
+        it("should allow @ anywhere in an FN or PROC name, as the ROM does, but not in a variable's", () => {
+            // #373: every row here is recorded from both ROMs (at-in-names-373).
+            const cases = [
+                ["PROC@", ["@"]],
+                ["PROC@a", ["@a"]],
+                ["PROCa@", ["a@"]],
+                ["PROCa@b(1)", ["a@b"]],
+                ["PROC@:X=1", ["@"]],
+                ["X=FN@", ["@"]],
+                ["X=FN@+1", ["@"]],
+                ["X=FNa@b(1)", ["a@b"]],
+                ["DEF PROC@", ["@"]],
+                ["DEF PROCa@b(A)", ["a@b"]],
+                ["DEF FN@=7", ["@"]],
+                ["DEF FNa@b(A)=A", ["a@b"]],
+            ];
+            for (const [text, names] of cases) {
+                assert.deepStrictEqual(spans(text, "invalid"), [], text);
+                assert.strictEqual(verdicts.get(text), "ok", text);
+                assert.strictEqual(masterVerdicts.get(text), "ok", text);
+                backedByRom(text);
+                const tokenised = highlightLine(text, ModelBDialect, false).tokens;
+                for (const name of names) {
+                    const at = text.indexOf(name);
+                    assert.strictEqual(
+                        tokenised.find(t => t.offset === at)?.type,
+                        "variable",
+                        `${name} in ${text}`,
+                    );
+                }
+            }
+            // The ROM stops at the % here (a Syntax error), so the % is what is marked.
+            for (const text of ["PROC@%", "X=FN@%"]) {
+                assert.strictEqual(verdicts.get(text), "Syntax error", text);
+                assert.deepStrictEqual(spans(text, "invalid"), ["%"], text);
+            }
+        });
         it("should highlight a keyword that cannot start a statement", () => {
             // See #151, checked on the ROM, where each invalid case is a syntax error.
             const cases = [
