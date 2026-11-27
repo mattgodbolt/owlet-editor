@@ -43,7 +43,7 @@ import {
 import {followImplicitLineNumbers} from "./renumber";
 import {fitMarkerWidgetToWrappedMessage} from "./marker-widget";
 import {makeUEF} from "./UEF";
-import {AcornDFSdisc} from "./DFS";
+import {discImage} from "./disc-export";
 import {createVduReference} from "./vdu-reference";
 import {describeBuild} from "./version";
 
@@ -633,20 +633,8 @@ export class OwletEditor {
     }
 
     async downloadDisc() {
-        let disc = new AcornDFSdisc();
         const program = await this.tokeniser.tokenise(this.getBasicText());
-        const screenDump = [];
-
-        for (let i = 0x3000; i <= 0x7fff; i++) {
-            screenDump.push(this.emulator.cpu.readmem(i));
-        }
-
-        disc.save("README", "Created by Owlet https://bbcmic.ro\r", 0x0000, 0x0000);
-        disc.save("PROGRAM", program, 0x1900, 0x1900);
-        disc.save("SCREEN", screenDump, 0xffff3000, 0x0000);
-        disc.save("!BOOT", 'CHAIN"PROGRAM"\r', 0x1900, 0x1900);
-
-        downloadBlob(new Blob([disc.image]), "owletExport.ssd");
+        downloadBlob(new Blob([discImage(program, this.emulator.cpu)]), "owletExport.ssd");
 
         function downloadBlob(blob, name) {
             const blobUrl = window.URL.createObjectURL(blob);

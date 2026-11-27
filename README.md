@@ -60,6 +60,16 @@ on. While Debug is off it costs nothing.
 
 Every status, and how Debug works it all out, is in [docs/debugger.md](docs/debugger.md).
 
+### Disc export
+
+The Disc button in the Share dialog downloads `owletExport.ssd`, a DFS disc with the program as `PROGRAM`, a `!BOOT`
+that runs it on SHIFT+BREAK, and `SCREEN`: the screen as the emulator was showing it when the button was pressed.
+`MODE 5:*LOAD SCREEN` (in the mode the disc was taken in) shows the picture again.
+
+Only the screen's contents are saved, not the mode, the palette (`VDU 19`) or the scroll position. On a Master in a
+shadow mode, load it in the matching non-shadow mode instead (`MODE 1` for `MODE 129`). The details are in
+[docs/disc-export.md](docs/disc-export.md).
+
 ## Share your creations with the BBC Micro Bot Mastodon community
 
 * One button tweet to share code (not yet updated for Mastodon)
@@ -135,6 +145,7 @@ and how the highlighter is checked against the real ROM in
   checked against the ROM.
 - [docs/rom-deviations.md](docs/rom-deviations.md): every place Owlet is stricter or more lenient than the ROM on
   purpose.
+- [docs/disc-export.md](docs/disc-export.md): what the exported disc's `SCREEN` file holds, mode by mode.
 - [docs/development.md](docs/development.md): building, testing, and changing Owlet.
 
 ## Known Issues
