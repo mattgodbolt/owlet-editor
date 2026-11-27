@@ -136,8 +136,8 @@ const AnotherArgument = "a comma or a closing )";
 
 // What may follow the cursor on a line being typed for the line to be read as ending at the cursor: closing brackets,
 // which the editor adds as an opening one is typed, before a colon, ELSE, THEN or the end of the line.
-export const TypedToEnd = /^[ )]*(?::|ELSE\b|THEN\b|$)/i;
-const ThenFollows = /^[ )]*THEN\b/i;
+export const TypedToEnd = /^[ )]*(?::|ELSE|THEN|$)/i;
+const ThenFollows = /^[ )]*THEN/i;
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", "A$", ",1", "1,1", ",1,1"];
@@ -430,13 +430,16 @@ export class Recogniser {
         return unfinished;
     }
 
-    // Whether the statement at `statementStart`, as `typed` read it, is an IF that has not reached its THEN.
+    // Whether the statement at `statementStart`, as `typed` read it, ends in an IF that has not reached its THEN: the
+    // last IF, which in IF X THEN IF Y is the inner one.
     inCondition(typed, statementStart) {
-        const words = typed.tokens.filter(token => token.start >= statementStart.start);
-        const keywords = words.map(token => token.kw?.keyword);
+        const keywords = typed.tokens
+            .filter(token => token.start >= statementStart.start)
+            .map(token => token.kw?.keyword);
+        const lastIf = keywords.lastIndexOf("IF");
         return (
-            keywords[0] === "IF" &&
-            !keywords.includes("THEN") &&
+            lastIf >= 0 &&
+            !keywords.slice(lastIf).includes("THEN") &&
             typed.problems.some(p => p.unfinished)
         );
     }

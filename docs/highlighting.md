@@ -44,8 +44,9 @@ text alone, apart from the statement being typed (below).
   cursor leaves the line (moving along it keeps that reading). So a statement typed in front of a `:` or `ELSE` is not
   red while it is unfinished (`FOR I=1 TO 10` in front of `:PRINT I:NEXT`, from `F` to `FOR I=1 TO `), nor is one typed
   before a `)` the editor closed for you (`IF (X A`, where `A` could become `AND`, though `IF (X A)` is red). A `THEN`
-  does not end a statement, so it counts only in front of the condition of an IF that has no `THEN` before the cursor
-  (`IF X AND ` in front of `THEN 100`); `A=1 ` in front of `THEN 5` is red, as nothing typed there can mend it. Once the
+  does not end a statement, so it counts only in front of the condition of the innermost IF, the last one before the
+  cursor, if it has no `THEN` yet (`IF X AND ` in front of `THEN 100`, or of `THEN100`, which BASIC reads as the same;
+  `IF X THEN IF Y AND ` likewise); `A=1 ` in front of `THEN 5` is red, as nothing typed there can mend it. Once the
   cursor leaves the line it is read as written, and red if it is still wrong. Suggested on #200; `ELSE` and `THEN`
   added in the follow-up to #375.
 - **Markers**: about half a second after the last edit (until then the old markers stay, moving with the text), a
