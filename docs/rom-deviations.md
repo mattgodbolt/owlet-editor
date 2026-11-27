@@ -120,6 +120,21 @@ BASIC does, and shows as an error.
   third), and nothing after it is marked; BASIC IV reads a string as one item. Suggested by Olly Betts on #335; its
   recorded rows include ones that must stay unmarked (`ON 5 GOTO 10ELSE30`, where the `ELSE` is read). As with the
   assembler's, the oracle takes these marks on trust as ignored text and lists them as STRICTER.
+- **`DEF PROC` or `DEF FN` with no name** (`DEF PROC`, `DEF FN(X)=X`, `DEF PROC:X=1`). BASIC skips a `DEF`, so these run
+  without error on BASIC II and IV (recorded on both ROMs), but a call needs its name straight after `PROC` or `FN`
+  (without one it stops with `Bad call`), so nothing can call the definition. The `PROC` or `FN` is red, with a hover
+  that says so. Where the line ends there and the cursor is at its end nothing is red yet, as the name may still be
+  typed. Text that only looks like a `DEF` (in a string, after `REM`, `DATA` or `*`) is left alone. The oracle lists
+  these as STRICTER.
+- **A `PROC` with no name in an `ON ... PROC` list** (BASIC IV; `ON X PROC,PROCb,PROC ELSE END`, `ON 2 PROC ELSE Y=1`).
+  BASIC reads only the target it counts to, so a bare `PROC` stops with `Bad call` only if the value picks it:
+  `ON 1 PROC,PROCp,PROC ELSE END` and `ON 3 PROC,PROCp,PROC ELSE END` stop, `ON 2 PROC,PROCp,PROC ELSE END` and
+  `ON 2 PROC ELSE Y=1` run (recorded on the Master). Every bare `PROC` of the list is red wherever a `PROC` could be
+  valid, as `IF0PROC` is ([red even where it cannot run](highlighting.md#what-red-means)), since it is a latent bug.
+  Where every value stops (one target and no `ELSE` after it on the line) it is the ordinary `Bad call` error; in the
+  other lists it is marked as stricter than the ROM, on the `PROC`, and the text after it is not also marked as
+  ignored. As above, the last `PROC` of a line being typed is not red until the cursor leaves. BASIC II has no
+  `ON ... PROC`. The oracle lists these as STRICTER.
 - **`ON ERROR LOCAL`** (and its abbreviations, `ON ERROR LOC.`). It is BASIC V syntax, which BASIC II and IV accept with
   another meaning: `ON ERROR` takes the rest of the line as the handler, so the handler is the statement `LOCAL`. An
   error unwinds any procedure before the handler runs, so `LOCAL` is outside one even if the `ON ERROR` was inside a

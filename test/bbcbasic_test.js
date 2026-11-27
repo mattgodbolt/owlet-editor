@@ -2455,43 +2455,157 @@ describe("Syntax markers", () => {
             ]);
             assert.deepStrictEqual(found, [[severity, marked, message]]);
         });
-        it.each([
-            "PROCp",
-            "PROCq(1)",
-            "PROCq (1)",
-            "IF FNf THEN X=1",
-            "X=FNf+1",
-            "DEF PROC",
-            "DEF FN",
-        ])("should leave %s alone", text => {
-            assert.strictEqual(table.get(text), "ok", text);
-            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
-        });
+        it.each(["PROCp", "PROCq(1)", "PROCq (1)", "IF FNf THEN X=1", "X=FNf+1"])(
+            "should leave %s alone",
+            text => {
+                assert.strictEqual(table.get(text), "ok", text);
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+            },
+        );
         // A call reads @ as part of the name, though the tokeniser does not (PROC@ is No such FN/PROC).
         it.each(["PROC@", "X=FN@"])("should not say Bad call for %s", text => {
             for (const {message} of getSyntaxMarkers(text, dialect))
                 assert.ok(!message.includes("Bad call"), message);
         });
     });
-    // An ON PROC list reads its first target only for 1; any other value looks for an ELSE anywhere on the line.
-    it.each([
-        ["ON 1 PROC", MarkerSeverity.Warning, "PROC"],
-        ["ON X PROC", MarkerSeverity.Warning, "PROC"],
-        ['ON 1 PROC:PRINT"ELSE"', MarkerSeverity.Error, "PROC"],
-        ["ON 2 PROC ELSE Y=1", null, null],
-        ["ON 2 PROC:X=1 ELSE Y=1", null, null],
-        ["ON 2 PROC,PROCp", null, null],
-    ])(
-        "should mark the PROC of BASIC IV's %s only where every value stops",
-        (text, severity, marked) => {
-            assert.strictEqual(masterVerdicts.get(text), severity === null ? "ok" : "Bad call");
+    // BASIC skips a DEF, so a DEF PROC or DEF FN with no name runs without error on both ROMs but can never be called
+    // (a call with no name is Bad call); it is marked on purpose, as is the same text in a program BASIC never reads.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("a DEF with no name on %s", (_, dialect, table) => {
+        const Def = word =>
+            `DEF ${word} has no name, so nothing can call it (a call needs the name straight after ${word}): BASIC skips a DEF, so this runs without error`;
+        it.each([
+            ["DEF PROC:X=1", "DEF PROC", "PROC"],
+            ["DEF FN:X=1", "DEF FN", "FN"],
+            ["DEF PROC(X)", "DEF PROC(X)", "PROC"],
+            ["DEF FN(X)=X", "DEF FN(X)=X", "FN"],
+            ["DEF FN =1", "DEF FN =1", "FN"],
+            ["X=1:DEF PROC", "DEF PROC", "PROC"],
+            ["X=1:DEF FN", "DEF FN", "FN"],
+            ["DEF PROC", "DEF PROC", "PROC"],
+            ["DEF FN", "DEF FN", "FN"],
+            ["DEF PROC ", "DEF PROC", "PROC"],
+            ["DEF FN ", "DEF FN", "FN"],
+            ["IF 0 THEN DEF PROC", "DEF PROC", "PROC"],
+            ["IF 1 THEN DEF FN", "DEF FN", "FN"],
+        ])("%s should be marked", (text, _row, word) => {
+            assert.strictEqual(table.get(text), "ok", text);
+            const found = getSyntaxMarkers(text, dialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, [[MarkerSeverity.Error, word, Def(word)]]);
+        });
+        it.each([
+            "DEF PROCp",
+            "DEF FNf",
+            "DEF FN@",
+            "DEF PROC@",
+            "REM DEF PROC",
+            "REM DEF FN",
+            'PRINT "DEF PROC"',
+            'PRINT "DEF FN":X=1',
+            "DATA DEF PROC",
+        ])("should leave %s alone", text => {
+            assert.strictEqual(table.get(text), "ok", text);
+            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+        });
+        // A space after the keyword is not a name (BASIC reads PROC X as a call with no name), so it is marked at the end.
+        it.each(["DEF PROC ", "DEF FN "])("should mark %s with the cursor at the end", text => {
+            assert.strictEqual(getSyntaxMarkers(text, dialect, 1, text.length).length, 1);
+        });
+        // The name may still be typed where the line ends, so nothing is red under the cursor there.
+        it.each(["DEF PROC", "DEF FN", "DEF PRO.", "X=1:DEF FN"])(
+            "should not mark %s while it is being typed",
+            text => {
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect, 1, text.length), []);
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect, 2, null).length, 1);
+            },
+        );
+    });
+    // An ON PROC list reads its first target only for 1; any other value looks for an ELSE anywhere on the line. A
+    // PROC with no name is marked wherever it could be valid, as with the branch of an IF whose condition is false.
+    describe("a PROC with no name in BASIC IV's ON list", () => {
+        const {Error: Stops, Warning: EndsTooSoon} = MarkerSeverity;
+        const Target =
+            "PROC has no name (it needs one straight after it, with no space): BASIC stops with Bad call if this target is chosen, but runs the line otherwise";
+        const Call =
+            "PROC needs a procedure name straight after it, with no space (BASIC: Bad call)";
+        // Each mark is [severity, marked text, message]; a Bad call where every value stops, else the deliberate one.
+        const NotExpected = ", is not expected here";
+        const call = (severity, marked) => [severity, marked, Call];
+        const target = marked => [Stops, marked, Target];
+        it.each([
+            ["ON 1 PROC", "Bad call", [call(EndsTooSoon, "PROC")]],
+            ["ON X PROC", "Bad call", [call(EndsTooSoon, "PROC")]],
+            ['ON 1 PROC:PRINT"ELSE"', "Bad call", [call(Stops, "PROC")]],
+            ["ON 2 PROC ELSE Y=1", "ok", [target("PROC")]],
+            ["ON 2 PROC:X=1 ELSE Y=1", "ok", [target("PROC")]],
+            ["ON 2 PROC,PROCp", "ok", [target("PROC")]],
+            ["ON 1 PROC,PROCp", "Bad call", [target("PROC")]],
+            ["ON 1 PROC ELSE PROCp", "Bad call", [target("PROC")]],
+            ["ON 1 PROC ,PROCp", "Bad call", [target("PROC")]],
+            ["ON 1 PRO.,PROCp", "Bad call", [target("PRO.")]],
+            ["ON 1 PROC(1)", "Bad call", [call(Stops, "PROC(1)")]],
+            ["ON 2 PROCp,PROC", "Bad call", [target("PROC")]],
+            ["ON 2 PROCp, PROC", "Bad call", [target("PROC")]],
+            ["ON 1 PROCp,PROC", "ok", [target("PROC")]],
+            ["ON 2 PROCp,PROC(1)", "Bad call", [target("PROC")]],
+            ["ON 3 PROCp,PROCq,PROC", "Bad call", [target("PROC")]],
+            ["ON 3 PROCp,PROCq,PROC ELSE END", "Bad call", [target("PROC")]],
+            ["ON 4 PROC,PROCp,PROC ELSE END", "ok", [target("PROC"), target("PROC")]],
+            ["ON 1 PROC,PROCp,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+            ["ON 3 PROC,PROCp,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+            ["ON 1 PROC JUNK,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+            ["ON 1 PROCp,PROC(", "ok", [target("PROC")]],
+            ["ON 2 PROCp,PROC(", "Bad call", [target("PROC")]],
+            ["ON 1 PROCp,PROC(1)", "ok", [target("PROC")]],
+            ["ON 1 PROC(,PROCp", "Bad call", [target("PROC"), [Stops, ",PROCp", NotExpected]]],
+            ["ON 1 PROC(", "Bad call", [target("PROC"), [EndsTooSoon, "(", "Unfinished after ("]]],
+        ])("%s (the ROM: %s)", (text, verdict, expected) => {
+            assert.strictEqual(masterVerdicts.get(text), verdict, text);
             const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
                 m.severity,
                 text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
             ]);
-            assert.deepStrictEqual(found, severity === null ? [] : [[severity, marked]]);
-        },
-    );
+            assert.deepStrictEqual(found, expected);
+        });
+        // The first PROC of a list that goes on, and one that has a name.
+        it.each(["ON 2 PROCp,PROCq", "ON 1 PROCp ELSE PRINT", "ON 2 PROCp(1),PROCq(2)"])(
+            "should leave %s alone",
+            text => {
+                assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect), []);
+            },
+        );
+        // Nothing typed after the ( can give the PROC a name, so it stays marked with the cursor at the end; the ROM
+        // stops at the first one for 1, and a later value reads it only if it picks it.
+        it.each(["ON 1 PROC(", "ON 2 PROC("])("should mark %s with the cursor at the end", text => {
+            const found = getSyntaxMarkers(text, BasicIVDialect, 1, text.length).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, [target("PROC")]);
+        });
+        it("should not mark the last PROC of a list while it is being typed", () => {
+            const text = "ON 1 PROCp,PROC";
+            assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect, 1, text.length), []);
+        });
+        // A name cannot be typed after a space or after arguments, so the mark stays with the cursor at the end.
+        it.each(["ON 1 PROCp,PROC(1)", "ON 1 PROCp,PROC "])(
+            "should mark %s with the cursor at the end",
+            text => {
+                assert.strictEqual(
+                    getSyntaxMarkers(text, BasicIVDialect, 1, text.length).length,
+                    1,
+                );
+            },
+        );
+    });
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
         ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],
@@ -2597,11 +2711,9 @@ describe("A line being typed", () => {
         unfinished: [false, [MarkerSeverity.Warning]],
         red: [true, [MarkerSeverity.Error]],
     };
-    const shown = (text, typingAt, cursorLine) => [
-        highlightLine(text, ModelBDialect, false, typingAt).tokens.some(t => t.type === "invalid"),
-        getSyntaxMarkers(`${text}\nPRINT`, ModelBDialect, cursorLine, typingAt).map(
-            m => m.severity,
-        ),
+    const shown = (text, typingAt, cursorLine, dialect = ModelBDialect) => [
+        highlightLine(text, dialect, false, typingAt).tokens.some(t => t.type === "invalid"),
+        getSyntaxMarkers(`${text}\nPRINT`, dialect, cursorLine, typingAt).map(m => m.severity),
     ];
     // The text with | at the cursor, as the line shows while the cursor is there and once it has left the line.
     it.each([
@@ -2617,11 +2729,17 @@ describe("A line being typed", () => {
         ["|GOTO:PRINT", "red", "red"],
         ["FOR I=1 TO|", "plain", "unfinished"],
         ["GOTO 20 30|", "red", "red"],
-    ])("%s", (typed, typing, left) => {
+        ["DEF PROC|", "plain", "red"],
+        ["DEF FN|", "plain", "red"],
+        ["X=1:DEF PROC|", "plain", "red"],
+        ["DEF PROC |", "red", "red"],
+        ["ON 1 PROCp,PROC|", "plain", "red", BasicIVDialect],
+        ["ON 1 PROCp,PROC |", "red", "red", BasicIVDialect],
+    ])("%s", (typed, typing, left, dialect) => {
         const at = typed.indexOf("|");
         const text = typed.replace("|", "");
-        assert.deepStrictEqual(shown(text, at, 1), Shown[typing], "typing");
-        assert.deepStrictEqual(shown(text, null, 2), Shown[left], "left");
+        assert.deepStrictEqual(shown(text, at, 1, dialect), Shown[typing], "typing");
+        assert.deepStrictEqual(shown(text, null, 2, dialect), Shown[left], "left");
     });
     it("should colour the line again as the cursor moves after an edit, and once it leaves the line", () => {
         const text = "FOR I=1 TO:PRINT I:NEXT";
@@ -2646,6 +2764,40 @@ describe("A line being typed", () => {
         } finally {
             setTypingPoint(typed, null);
             typed.dispose();
+            untyped.dispose();
+        }
+    });
+    // The cursor mattered to these lines' colours, so they are coloured again when it leaves.
+    it.each([
+        ["DEF PROC", ModelBDialect],
+        ["DEF FN", ModelBDialect],
+        ["ON 1 PROCp,PROC", BasicIVDialect],
+    ])("should note that the cursor matters to %s", (text, dialect) => {
+        assert.strictEqual(highlightLine(text, dialect, false, text.length).endsAtCursor, true);
+        assert.strictEqual(highlightLine(text, dialect, false, null).endsAtCursor, false);
+        assert.strictEqual(
+            highlightLine(`${text} `, dialect, false, text.length + 1).endsAtCursor,
+            false,
+        );
+    });
+    it("should colour a keyword with no name again once the cursor leaves the line", () => {
+        const text = "DEF PROC";
+        const colours = model => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(1);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const model = editor.createModel(`${text}\nPRINT`, LanguageId);
+        const untyped = editor.createModel(`${text}\nPRINT`, LanguageId);
+        try {
+            setTypingPoint(model, {lineNumber: 1, text, column: text.length});
+            const typing = colours(model);
+            setTypingPoint(model, {lineNumber: 2, text: "PRINT", column: 5});
+            assert.notDeepStrictEqual(typing, colours(untyped));
+            assert.deepStrictEqual(colours(model), colours(untyped));
+        } finally {
+            setTypingPoint(model, null);
+            model.dispose();
             untyped.dispose();
         }
     });
