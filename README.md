@@ -63,13 +63,20 @@ Every status, and how Debug works it all out, is in [docs/debugger.md](docs/debu
 ### Disc export
 
 The Disc button in the Share dialog downloads `owletExport.ssd`, a DFS disc with the program as `PROGRAM`, a `!BOOT`
-that runs it on SHIFT+BREAK, and `SCREEN`: the 20K from `&3000` to `&7FFF`, where every mode's screen is, as the
-emulator was showing it when the button was pressed. On the Master in a shadow mode (`MODE 128` to `MODE 135`) that is
-the shadow RAM the picture is in, whatever the program has paged in for the CPU; on the Model B, and on the Master in
-any other mode, it is main RAM. It is screen memory only: the mode and any colours changed with `VDU 19` are not in it.
+that runs it on SHIFT+BREAK, and `SCREEN`: the screen as the emulator was showing it when the button was pressed.
 
-`SCREEN` loads at `&3000` in the I/O processor. To see the picture again, `*LOAD SCREEN` in the mode it was taken in,
-or for a shadow mode in the same mode without the shadow (`MODE 1` for `MODE 129`), as `*LOAD` puts it in main RAM.
+`SCREEN` is the size of the current mode's screen memory (20K for `MODE 0` to `2`, 16K for `MODE 3`, 10K for `MODE 4`
+and `5`, 8K for `MODE 6` and 1K for `MODE 7`), and loads at the start of that memory (`&3000`, `&4000`, `&5800`,
+`&6000` or `&7C00`) in the I/O processor. Its first byte is the one the video shows at the top left, so a screen that
+has been hardware scrolled (the CRTC start address in R12 and R13 moved) is saved unscrolled, wrapped at `&8000` to the
+start of the mode's screen memory as the video wraps it. `MODE 5:*LOAD SCREEN` then shows the picture again, and
+likewise in any mode the disc was taken in. It is screen memory only: the mode, the CRTC start address and any colours
+changed with `VDU 19` are not in it.
+
+On the Master in a shadow mode (`MODE 128` to `MODE 135`) `SCREEN` is the shadow RAM the picture is in, whatever the
+program has paged in for the CPU; on the Model B, and on the Master in any other mode, it is main RAM. `*LOAD` puts a
+file in main RAM, so to see a shadow mode's picture again use the same mode without the shadow (`MODE 1` for
+`MODE 129`).
 
 ## Share your creations with the BBC Micro Bot Mastodon community
 

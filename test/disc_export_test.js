@@ -3,7 +3,7 @@ import {describe, expect, it} from "vitest";
 import {MachineSession} from "jsbeeb/machine-session";
 import {discFor} from "jsbeeb/src/fdc";
 import {MainView, peekViewed, ShadowView} from "jsbeeb/src/paging";
-import {discImage, screenDump, ScreenEnd, ScreenStart} from "../src/disc-export";
+import {discImage, screenDump} from "../src/disc-export";
 
 const Drawing = [
     "VDU23,1,0;0;0;0;",
@@ -17,6 +17,24 @@ const PagesShadowForCpu = `?&FE34=?&FE34 OR ${AccconX}`;
 const CyclesPerLoadCheck = 1000000;
 const MostLoadChecks = 40;
 const EmulatorTestTimeout = 60000;
+const ScreenEnd = 0x8000;
+const IoProcessor = 0xffff0000;
+const BytesPerCell = 8;
+const TeletextCells = 0x400;
+const TeletextStart = 0x2800;
+
+// What each mode's screen is on the Model B and the Master, as the MOS lays it out: its size in bytes and the start of
+// its screen memory, which is where the video wraps it to from &8000.
+const Modes = [
+    {mode: 0, size: 0x5000, base: 0x3000},
+    {mode: 1, size: 0x5000, base: 0x3000},
+    {mode: 2, size: 0x5000, base: 0x3000},
+    {mode: 3, size: 0x4000, base: 0x4000},
+    {mode: 4, size: 0x2800, base: 0x5800},
+    {mode: 5, size: 0x2800, base: 0x5800},
+    {mode: 6, size: 0x2000, base: 0x6000},
+    {mode: 7, size: 0x400, base: 0x7c00},
+];
 
 async function booted(machine) {
     const session = new MachineSession(machine);
@@ -36,18 +54,20 @@ async function ran(machine, lines) {
 
 const cpuOf = session => session._machine.processor;
 
-function bytesIn(view, cpu) {
+function bytesIn(view, cpu, base, size) {
     const bytes = [];
-    for (let address = ScreenStart; address < ScreenEnd; ++address)
+    for (let address = base; address < base + size; ++address)
         bytes.push(peekViewed(cpu, view, address));
     return bytes;
 }
 
-function readmemDump(cpu) {
-    const bytes = [];
-    for (let address = ScreenStart; address < ScreenEnd; ++address)
-        bytes.push(cpu.readmem(address));
-    return bytes;
+// The BASIC that moves the CRTC's start address halfway through the mode's screen, so that the picture is scrolled and
+// the screen memory it shows wraps at &8000 (teletext is a cell per byte and wraps within its 1K).
+function scrollLines({mode, size}) {
+    const half = mode === 7 ? TeletextCells >> 1 : size / BytesPerCell / 2;
+    const defaultStart = mode === 7 ? TeletextStart : (ScreenEnd - size) / BytesPerCell;
+    const start = defaultStart + half;
+    return [`?&FE00=12:?&FE01=${start >> 8}`, `?&FE00=13:?&FE01=${start & 0xff}`];
 }
 
 // The picture a machine shows after `*LOAD SCREEN` from `image` in `mode`, with the cursor off and nothing printed
@@ -57,9 +77,11 @@ async function loadedScreen(machine, image, mode) {
     const cpu = cpuOf(session);
     cpu.fdc.loadDisc(0, discFor("owletExport.ssd", image));
     await session.type(`MODE ${mode}:VDU23,1,0;0;0;0;:OSCLI"LOAD SCREEN":REPEAT UNTIL FALSE`);
-    const {screen} = screenFile(image);
+    const {load, screen} = screenFile(image);
+    const base = load & 0xffff;
     for (let check = 0; check < MostLoadChecks; ++check) {
-        if (bytesIn(MainView, cpu).every((byte, i) => byte === screen[i])) break;
+        if (bytesIn(MainView, cpu, base, screen.length).every((byte, i) => byte === screen[i]))
+            break;
         await session.runFor(CyclesPerLoadCheck);
     }
     await session.runFrames(2);
@@ -91,33 +113,65 @@ function screenFile(image) {
 }
 
 describe("The exported disc's SCREEN file", () => {
-    it(
-        "should hold &3000 to &7FFF as the Model B's CPU reads it, in every mode, as it always has",
-        async () => {
-            const session = await booted("B");
-            const cpu = cpuOf(session);
-            for (let mode = 0; mode <= 7; ++mode) {
-                await session.type(`MODE ${mode}:PRINT"OWLET":MOVE0,0:DRAW1279,1023`);
-                await session.runUntilPrompt();
-                const {load, length, screen} = screenFile(discImage([], cpu));
-                expect({mode, load, length}).toEqual({mode, load: 0xffff3000, length: 0x5000});
-                expect(screen).toEqual(readmemDump(cpu));
-            }
-        },
-        EmulatorTestTimeout,
-    );
-
-    for (const mode of [129, 132, 135]) {
+    for (const machine of ["B", "Master"]) {
         it(
-            `should show in MODE ${mode - ShadowModeBit} what the Master showed in MODE ${mode}`,
+            `should be the mode's screen memory, loading where the Model ${machine} keeps it, in every mode`,
             async () => {
-                const session = await ran("Master", [`MODE ${mode}`, ...Drawing]);
-                const image = discImage([], cpuOf(session));
-                const loaded = await loadedScreen("Master", image, mode - ShadowModeBit);
-                expect(loaded.equals(await session.screenshot())).toBe(true);
+                const session = await booted(machine);
+                const cpu = cpuOf(session);
+                const shadowModes = machine === "Master" ? [0, ShadowModeBit] : [0];
+                for (const shadow of shadowModes) {
+                    for (const {mode, size, base} of Modes) {
+                        await session.type(
+                            `MODE ${mode + shadow}:PRINT"OWLET":MOVE0,0:DRAW1279,1023`,
+                        );
+                        await session.runUntilPrompt();
+                        const {load, length, screen} = screenFile(discImage([], cpu));
+                        const view = shadow ? ShadowView : MainView;
+                        expect({mode: mode + shadow, load, length}).toEqual({
+                            mode: mode + shadow,
+                            load: IoProcessor + base,
+                            length: size,
+                        });
+                        expect(screen).toEqual(bytesIn(view, cpu, base, size));
+                    }
+                }
             },
             EmulatorTestTimeout,
         );
+    }
+
+    const modesOnMachine = {
+        B: Modes.map(({mode}) => mode),
+        Master: [...Modes.map(({mode}) => mode), ...Modes.map(({mode}) => mode + ShadowModeBit)],
+    };
+    for (const machine of ["B", "Master"]) {
+        for (const mode of modesOnMachine[machine]) {
+            for (const scrolled of [false, true]) {
+                it(
+                    `should show in MODE ${mode} what the ${machine} showed${scrolled ? ", hardware scrolled" : ""}`,
+                    async () => {
+                        const geometry = Modes[mode % ShadowModeBit];
+                        const lines = [
+                            `MODE ${mode}`,
+                            ...Drawing,
+                            ...(scrolled ? scrollLines(geometry) : []),
+                        ];
+                        const session = await ran(machine, lines);
+                        const cpu = cpuOf(session);
+                        if (scrolled) {
+                            const {base, bytes} = screenDump(cpu);
+                            const view = mode >= ShadowModeBit ? ShadowView : MainView;
+                            expect(bytes).not.toEqual(bytesIn(view, cpu, base, geometry.size));
+                        }
+                        const image = discImage([], cpu);
+                        const loaded = await loadedScreen(machine, image, mode % ShadowModeBit);
+                        expect(loaded.equals(await session.screenshot())).toBe(true);
+                    },
+                    EmulatorTestTimeout,
+                );
+            }
+        }
     }
 
     describe("should hold what the Master's video reads, whatever its CPU has paged in", () => {
@@ -143,9 +197,9 @@ describe("The exported disc's SCREEN file", () => {
                     expect(cpu.acccon & AccconX).toBe(
                         lines.includes(PagesShadowForCpu) ? AccconX : 0,
                     );
-                    const dump = screenDump(cpu);
-                    expect(dump).toEqual(bytesIn(shows, cpu));
-                    expect(dump).not.toEqual(bytesIn(hidden, cpu));
+                    const {base, bytes} = screenDump(cpu);
+                    expect(bytes).toEqual(bytesIn(shows, cpu, base, bytes.length));
+                    expect(bytes).not.toEqual(bytesIn(hidden, cpu, base, bytes.length));
                 },
                 EmulatorTestTimeout,
             );
