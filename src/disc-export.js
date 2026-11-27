@@ -79,6 +79,6 @@ export function discImage(program, cpu) {
     const {load, exec} = basicSaveAddresses(cpu);
     disc.save("PROGRAM", program, load, exec);
     disc.save("SCREEN", bytes, IoProcessor + base, 0x0000);
-    disc.save("!BOOT", 'CHAIN"PROGRAM"\r', BootFileAddress, BootFileAddress);
+    disc.save("!BOOT", '*BASIC\rCHAIN"PROGRAM"\r', BootFileAddress, BootFileAddress);
     return disc.image;
 }

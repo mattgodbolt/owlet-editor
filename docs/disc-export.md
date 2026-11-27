@@ -16,7 +16,8 @@ and the exec address is the BASIC ROM's entry. Checked with a real `SAVE` on eac
 | Master 128                     | &E00   | `FFFF0E00` | `FFFF802B` |
 
 `CHAIN` loads at the current `PAGE` whatever the file's addresses say, so `!BOOT` does not depend on them; `!BOOT` itself
-is catalogued at &1900 for both.
+is catalogued at &1900 for both. `!BOOT` is `*BASIC` then `CHAIN"PROGRAM"`, so it selects BASIC first and also works
+when another language ROM is the current language.
 
 ## The `SCREEN` file
 
