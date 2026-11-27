@@ -81,7 +81,11 @@ test.describe("A line being typed", () => {
 
         await page.keyboard.press("End");
         await page.keyboard.press("Enter");
-        for (const key of "IF (X A") await page.keyboard.type(key);
+        // A ( typed within a few milliseconds of the Enter is not closed, which no one typing can do.
+        await page.waitForTimeout(200);
+        await page.keyboard.type("IF (");
+        await expect(line(page, "IF ()")).toBeVisible();
+        await page.keyboard.type("X A");
         const opened = line(page, "IF (X A)");
         await expect(opened).toBeVisible();
         await page.waitForTimeout(200);
