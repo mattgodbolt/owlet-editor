@@ -1145,7 +1145,7 @@ describe.each([
     });
 
     it("should read each value with a rule, bare or with its operand", () => {
-        const operands = ["", " 1", "#1", "(1)", "(1,2)", "1,2)", "1,2,3)", " A$"];
+        const operands = ["", " 1", "#1", "(1)", "(1,2)", "1,2)", "1,2,3)", " A$", "f"];
         const unread = values.filter(
             kw =>
                 !Infix.includes(kw.keyword) &&

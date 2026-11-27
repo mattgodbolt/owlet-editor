@@ -89,6 +89,9 @@ const StricterThanRom = [
     ),
     "[OPT0:TSB &70,Y:]",
 ];
+// Lines BASIC IV stops at and nothing marks: which target of an ON PROC list it reads depends on the value, so a PROC
+// with no name is marked only where every value stops (one target and no ELSE).
+const KnownGaps = ["ON 1 PROC ELSE PROCp", "ON 1 PROC,PROCp", "ON 2 PROCp,PROC"];
 // What BASIC II rejects and BASIC IV runs, each a row of both recorded tables.
 const OnlyOnBasicIV = [
     "VDU 23,255,255|",
@@ -205,6 +208,7 @@ describe("BASIC IV", () => {
         assert.deepStrictEqual(
             wrongRows(MasterVerdicts, {
                 stricter: StricterThanRom,
+                gaps: KnownGaps,
                 dialect: BasicIVDialect,
             }),
             [],
