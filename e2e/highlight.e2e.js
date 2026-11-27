@@ -89,4 +89,29 @@ test.describe("A line being typed", () => {
         await page.keyboard.press("ArrowUp");
         await expect.poll(() => redOn(opened)).not.toEqual([]);
     });
+
+    test("is not red in front of a THEN or an ELSE until the cursor leaves it", async ({page}) => {
+        for (const [existing, before, typed] of [
+            ["IF  THEN 100", "IF ", "X AND"],
+            ["IF X THEN  ELSE PRINT 1", "IF X THEN ", "PRINT 1+"],
+        ]) {
+            await page.goto(link(`${existing}\nPRINT`));
+            const edited = line(page, existing.slice(-5));
+            await expect(edited).toBeVisible();
+            await edited.click();
+            await page.keyboard.press("Home");
+            for (let moved = 0; moved < before.length; moved++) {
+                await page.keyboard.press("ArrowRight");
+                await page.waitForTimeout(50);
+            }
+            for (const key of typed) {
+                await page.keyboard.type(key);
+                // Monaco colours an edited line again shortly after showing it.
+                await page.waitForTimeout(200);
+                expect(await redOn(edited)).toEqual([]);
+            }
+            await page.keyboard.press("ArrowDown");
+            await expect.poll(() => redOn(edited)).not.toEqual([]);
+        }
+    });
 });

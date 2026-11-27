@@ -135,8 +135,9 @@ function completions(assembling, dialect) {
 const AnotherArgument = "a comma or a closing )";
 
 // What may follow the cursor on a line being typed for the line to be read as ending at the cursor: closing brackets,
-// which the editor adds as an opening one is typed, before a colon or the end of the line.
-export const TypedToEnd = /^[ )]*(?::|$)/;
+// which the editor adds as an opening one is typed, before a colon, ELSE, THEN or the end of the line.
+export const TypedToEnd = /^[ )]*(?::|ELSE|THEN|$)/i;
+const ThenFollows = /^[ )]*THEN/i;
 
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", "A$", ",1", "1,1", ",1,1"];
@@ -417,12 +418,30 @@ export class Recogniser {
         const typed = new Recogniser(text.slice(0, at), this.startsInAssembler, this.dialect);
         typed.line();
         const inStatement = token => token.start >= statementStart.start;
+        // THEN does not end a statement, so a wrong statement in front of it is not unfinished for lack of typing: it
+        // is only when the typing is an IF's condition, which is what a THEN completes.
+        if (ThenFollows.test(text.slice(at)) && !this.inCondition(typed, statementStart))
+            return false;
         const unfinished =
             !typed.tokens.some(token => inStatement(token) && typed.endsStatement(token)) &&
             typed.problems.every(problem => problem.unfinished || !inStatement(problem.token)) &&
             !typed.tokens.some(token => token.invalid && inStatement(token));
         if (unfinished) this.endsAtCursor = true;
         return unfinished;
+    }
+
+    // Whether the statement at `statementStart`, as `typed` read it, ends in an IF that has not reached its THEN: the
+    // last IF, which in IF X THEN IF Y is the inner one.
+    inCondition(typed, statementStart) {
+        const keywords = typed.tokens
+            .filter(token => token.start >= statementStart.start)
+            .map(token => token.kw?.keyword);
+        const lastIf = keywords.lastIndexOf("IF");
+        return (
+            lastIf >= 0 &&
+            !keywords.slice(lastIf).includes("THEN") &&
+            typed.problems.some(p => p.unfinished)
+        );
     }
 
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
