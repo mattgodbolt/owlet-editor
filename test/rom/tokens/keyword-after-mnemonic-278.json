@@ -1,0 +1,87 @@
+[
+  ["[OPT0:STAPAGE:]", "5b 4f 50 54 30 3a 53 54 41 50 41 47 45 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT3:STAPAGE:]", "5b 4f 50 54 33 3a 53 54 41 50 41 47 45 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDAGET:]", "5b 4f 50 54 30 3a 4c 44 41 47 45 54 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:ASLTOP,X:]",
+    "5b 4f 50 54 30 3a 41 53 4c 54 4f 50 2c 58 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  ["[OPT0:LDATIME:]", "5b 4f 50 54 30 3a 4c 44 41 54 49 4d 45 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:ADCLEN:]", "5b 4f 50 54 30 3a 41 44 43 4c 45 4e 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:STAPAGEX:]",
+    "5b 4f 50 54 30 3a 53 54 41 50 41 47 45 58 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  ["[OPT0:LDAP:]", "5b 4f 50 54 30 3a 4c 44 41 50 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDA PAGE:]", "5b 4f 50 54 30 3a 4c 44 41 20 90 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:LDAPAGE+1:]",
+    "5b 4f 50 54 30 3a 4c 44 41 50 41 47 45 2b 31 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  [
+    "[OPT0:STAPAGE,X:]",
+    "5b 4f 50 54 30 3a 53 54 41 50 41 47 45 2c 58 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  [
+    "[OPT0:LDAPAGE,Y:]",
+    "5b 4f 50 54 30 3a 4c 44 41 50 41 47 45 2c 59 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  [
+    "[OPT0:LDA(PAGE),Y:]",
+    "5b 4f 50 54 30 3a 4c 44 41 28 90 29 2c 59 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  ["[OPT0:LDAGET$:]", "5b 4f 50 54 30 3a 4c 44 41 47 45 54 24 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:LDAHIMEM:]",
+    "5b 4f 50 54 30 3a 4c 44 41 48 49 4d 45 4d 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  ["[OPT0:LDAFNa:]", "5b 4f 50 54 30 3a 4c 44 41 46 4e 61 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:NOPPAGE:]", "5b 4f 50 54 30 3a 4e 4f 50 50 41 47 45 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDAPAGE]", "5b 4f 50 54 30 3a 4c 44 41 50 41 47 45 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDAGETX:]", "5b 4f 50 54 30 3a 4c 44 41 47 45 54 58 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDAPI:]", "5b 4f 50 54 30 3a 4c 44 41 50 49 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDATOPX:]", "5b 4f 50 54 30 3a 4c 44 41 54 4f 50 58 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDATOP%:]", "5b 4f 50 54 30 3a 4c 44 41 54 4f 50 25 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:LDATOP%+1:]",
+    "5b 4f 50 54 30 3a 4c 44 41 54 4f 50 25 2b 31 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  [
+    "[OPT0:LDAPAGE%:]",
+    "5b 4f 50 54 30 3a 4c 44 41 50 41 47 45 25 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  [
+    "[OPT0:LDAPAGE ,X:]",
+    "5b 4f 50 54 30 3a 4c 44 41 50 41 47 45 20 2c 58 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  [
+    "[OPT0:EQUBPAGE:]",
+    "5b 4f 50 54 30 3a 45 51 55 42 50 41 47 45 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  ["[OPT0:LDATOP:]", "5b 4f 50 54 30 3a 4c 44 41 54 4f 50 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDATOP.:]", "5b 4f 50 54 30 3a 4c 44 41 54 4f 50 2e 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDAEND:]", "5b 4f 50 54 30 3a 4c 44 41 45 4e 44 3a 5d", "keyword-after-mnemonic-278"],
+  ["[OPT0:LDAERL:]", "5b 4f 50 54 30 3a 4c 44 41 45 52 4c 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:LDARND(5):]",
+    "5b 4f 50 54 30 3a 4c 44 41 52 4e 44 28 35 29 3a 5d",
+    "keyword-after-mnemonic-278"
+  ],
+  ["[OPT0:LDARND:]", "5b 4f 50 54 30 3a 4c 44 41 52 4e 44 3a 5d", "keyword-after-mnemonic-278"],
+  [
+    "[OPT0:LDAABS(1):]",
+    "5b 4f 50 54 30 3a 4c 44 41 41 42 53 28 31 29 3a 5d",
+    "keyword-after-mnemonic-278"
+  ]
+]

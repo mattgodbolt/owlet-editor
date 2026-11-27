@@ -781,8 +781,9 @@ describe("Tokenisation", () => {
                     "[\nEQUB LENA$",
                     ["0:delimiter.square", "0:keyword.directive 4:white 5:keyword 8:variable"],
                 ],
-                // The tokeniser makes no keyword inside a name, so FN is not one here.
-                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:variable"], "EQUSFNx"],
+                // The tokeniser makes no keyword inside a name, so FN is not one here, but no program can define
+                // a variable called FNx, so it is marked (see docs/rom-deviations.md).
+                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:invalid"], "EQUSFNx"],
                 [
                     "[ROR 80\\comment:ROR80\\comment:]P.",
                     [
@@ -1323,6 +1324,12 @@ describe("Quick fixes and syntax markers", () => {
     it("should offer to replace a ; with a \\, as the ARM assembler of BASIC V takes it as a comment", () => {
         assert.deepStrictEqual(offered("[OPT0:NOP ; hello:]"), ["Replace ; with \\"]);
     });
+    it("should offer both the space and the : for [STAPAGE], which has two things wrong", () => {
+        assert.deepStrictEqual(offered("[STAPAGE]").sort(), [
+            "Insert : before ]",
+            "Insert a space after STA",
+        ]);
+    });
     it("should offer only the space for a keyword straight after a mnemonic", () => {
         assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
     });
@@ -1339,6 +1346,10 @@ describe("Quick fixes and syntax markers", () => {
         ["[OPT0:EQUBH.:]", "Insert a space after EQUB", "[OPT0:EQUB H.:]"],
         ["[OPT0:.lab STAH.,X:]", "Insert a space after STA", "[OPT0:.lab STA H.,X:]"],
         ["[OPT0:NOPPAGE:]", "Insert \\ before the junk", "[OPT0:NOP\\PAGE:]"],
+        ["[OPT0:STAPAGE:]", "Insert a space after STA", "[OPT0:STA PAGE:]"],
+        ["[OPT0:LDAGET:]", "Insert a space after LDA", "[OPT0:LDA GET:]"],
+        ["[OPT0:ASLTOP,X:]", "Insert a space after ASL", "[OPT0:ASL TOP,X:]"],
+        ["[OPT0:.lab ADCLEN:]", "Insert a space after ADC", "[OPT0:.lab ADC LEN:]"],
         ["[OPT0:LDAP.,X:]", "Insert \\ before the junk", "[OPT0:LDAP\\.,X:]"],
     ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
         const [offer] = fixes(text, ModelBDialect).filter(([name]) => name === title);
@@ -2217,13 +2228,24 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Error, message, 1, 10, 15],
         ]);
     });
-    it("should say that a keyword straight after a mnemonic is read as a variable, and a space was meant", () => {
+    it("should say that a keyword straight after a mnemonic is not read as one without a space", () => {
         const message =
-            "H. here is read as the variable H, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows STA with no space, so the rest of the instruction is ignored; probably a space was meant after STA";
+            "BASIC won't read H. as a keyword here without a space after STA, so the rest of the instruction is ignored";
         assert.deepStrictEqual(markers("[OPT0:STAH.,X:]"), [
             [MarkerSeverity.Error, message, 1, 10, 12],
         ]);
     });
+    it.each([
+        ["[OPT0:STAPAGE:]", "PAGE", 10, 14, "STA"],
+        ["[OPT0:ASLTOP,X:]", "TOP", 10, 13, "ASL"],
+        ["[OPT0:LDAGET:]", "GET", 10, 13, "LDA"],
+    ])(
+        "should say that %s is not read as a keyword without a space after the mnemonic, naming %s",
+        (text, name, from, to, mnemonic) => {
+            const message = `BASIC won't read ${name} as a keyword here without a space after ${mnemonic}`;
+            assert.deepStrictEqual(markers(text), [[MarkerSeverity.Error, message, 1, from, to]]);
+        },
+    );
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
             [MarkerSeverity.Warning, "Expected a comma before ) (BASIC: Missing ,)", 1, 12, 13],

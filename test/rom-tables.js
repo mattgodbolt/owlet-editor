@@ -64,7 +64,16 @@ export function wrongRows(rows, {stricter = [], gaps = [], lenient = [], dialect
             const unfinished = problems.filter(problem => problem.unfinished);
             const ends = unfinished.map(({start, end}) => [start, end]);
             // What is red on purpose says so, with a message.
-            const onPurpose = problems.filter(problem => problem.stricter);
+            // Marks that touch are one red span.
+            const onPurpose = problems
+                .filter(problem => problem.stricter)
+                .sort((a, b) => a.start - b.start)
+                .reduce((merged, {start, end}) => {
+                    const last = merged.at(-1);
+                    if (last && start <= last.end) last.end = Math.max(last.end, end);
+                    else merged.push({start, end});
+                    return merged;
+                }, []);
             const unexplained = marked.filter(
                 ([start, end]) => !onPurpose.some(p => p.start <= start && end <= p.end),
             );

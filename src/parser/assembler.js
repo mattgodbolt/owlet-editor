@@ -175,26 +175,53 @@ export class Assembler {
         const mnemonic = this.mnemonic();
         const operand = r.peek();
         this.operand(mnemonic);
+        const operandEnd = r.last.end;
         if (this.comment()) return;
         let junk = null;
+        let spaceAdvised = false;
         while (!r.is("end") && !r.isPunct(":") && !this.isBranchElse()) {
             const token = r.next();
             if (junk) continue;
             junk = token;
             const space = this.keywordAfterMnemonic(first, mnemonic, operand);
-            if (space) r.stricter(token, space, SpaceAfterMnemonicCode, operand);
-            else
+            if (space) {
+                spaceAdvised = true;
+                r.stricter(token, space, SpaceAfterMnemonicCode, operand);
+            } else
                 r.stricter(
                     token,
                     JunkMessages.get(token.text) ?? JunkMessage,
                     JunkAfterInstructionCode,
                 );
         }
+        if (!spaceAdvised) this.keywordNamedOperand(first, mnemonic, operand, operandEnd);
+    }
+
+    // Marks an operand that begins with a keyword spelled in full, straight after a mnemonic that takes one (STAPAGE,
+    // ASLTOP,X); a space after the mnemonic reads the keyword.
+    keywordNamedOperand(first, mnemonic, operand, operandEnd) {
+        const r = this.recogniser;
+        const {text} = r.lexer;
+        const keyword =
+            operand.kind === "name" &&
+            !operand.spaced &&
+            matchKeyword(text, operand.start, r.dialect);
+        if (!keyword || r.probing || this.rules.implied.has(mnemonic)) return;
+        const spelling = text.slice(operand.start, keyword.end);
+        if (spelling.endsWith(".") || spelling.length > operand.end - operand.start) return;
+        const spaced = `${text.slice(0, operand.start)} ${text.slice(operand.start, operandEnd)}`;
+        if (!r.valid(spaced, first, operand.start)) return;
+        const written = text.slice(first.start, operand.start);
+        r.stricter(
+            operand,
+            `BASIC won't read ${operand.text} as a keyword here without a space after ${written}`,
+            SpaceAfterMnemonicCode,
+        );
     }
 
     // The message for junk after an instruction whose operand begins with a name that spells a keyword, straight after
-    // a mnemonic that takes an operand, where a space before it would leave no junk; otherwise null. BASIC tokenises a
-    // keyword only at the start of a word, so STAH.,X is STA, the variable H, and junk.
+    // a mnemonic that takes an operand, where a space before it would leave no junk; otherwise null. STAH.,X is STA, the
+    // variable H, and junk.
     keywordAfterMnemonic(first, mnemonic, operand) {
         const r = this.recogniser;
         const {text} = r.lexer;
@@ -207,7 +234,7 @@ export class Assembler {
         if (!r.valid(spaced, first, operand.start)) return null;
         const written = text.slice(first.start, operand.start);
         const spelling = text.slice(operand.start, keyword.end);
-        return `${spelling} here is read as the variable ${operand.text}, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows ${written} with no space, so the rest of the instruction is ignored; probably a space was meant after ${written}`;
+        return `BASIC won't read ${spelling} as a keyword here without a space after ${written}, so the rest of the instruction is ignored`;
     }
 
     // A comment runs to the next colon, whatever the tokeniser made of it.

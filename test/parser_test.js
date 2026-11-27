@@ -172,6 +172,27 @@ const StricterThanRom = [
     "[OPT0:EQƀB 9:]",
     "[OPT0:EQƂB 9:]",
     "[OPT0:STAH.,X:]",
+    "[OPT0:STAPAGE:]",
+    "[OPT0:LDAPAGE]",
+    "[OPT0:LDATOP.:]",
+    "[OPT0:CMPLOMEM:]",
+    "[OPT0:LDAERL:]",
+    "[OPT0:LDAHIMEM:]",
+    "[OPT0:LDAPAGE ,X:]",
+    "[OPT0:LDAPAGE+1:]",
+    "[OPT0:LDAPAGE,Y:]",
+    "[OPT0:LDAPI:]",
+    "[OPT0:LDARND:]",
+    "[OPT0:LDATOP:]",
+    "[OPT0:INCTOP:]",
+    "[OPT0:LDAGET:]",
+    "[OPT0:ASLTOP,X:]",
+    "[OPT0:LDATIME:]",
+    "[OPT0:ADCLEN:]",
+    "[OPT0:STAPAGE,X:]",
+    "[OPT0:LDAGET$:]",
+    "[OPT0:LDAFNa:]",
+    "[OPT0:EQUBPAGE:]",
     "[OPT0:LDAUSR@%+GET:]",
     "[OPT0:LDAH.:]",
     "[OPT0:EQUBH.:]",
@@ -1063,11 +1084,11 @@ describe("Junk after a complete instruction", () => {
         assert.ok(problem.message.startsWith(begins), problem.message);
         assert.match(problem.message, junk === "]" ? /a : is missing/ : /a \\ is missing/);
     });
-    // BASIC tokenises a keyword only at the start of a word, so one straight after a mnemonic is a variable's name.
+    // A keyword straight after a mnemonic is not tokenised, so it is read as a variable's name.
     it.each([
-        ["[OPT0:STAH.,X:]", "H.", ".", "H. here is read as the variable H, not the keyword"],
-        ["[OPT0:LDAUSR@%+GET:]", "USR@%", "@%", "USR here is read as the variable USR"],
-        ["[OPT0:EQUBH.:]", "H.", ".", "H. here is read as the variable H"],
+        ["[OPT0:STAH.,X:]", "H.", ".", "BASIC won't read H. as a keyword here"],
+        ["[OPT0:LDAUSR@%+GET:]", "USR@%", "@%", "BASIC won't read USR as a keyword here"],
+        ["[OPT0:EQUBH.:]", "H.", ".", "BASIC won't read H. as a keyword here"],
     ])(
         "%s should show %j as one problem, red on %j, that says a space was probably meant",
         (text, shown, junk, begins) => {
@@ -1076,8 +1097,11 @@ describe("Junk after a complete instruction", () => {
             assert.strictEqual(text.slice(problem.start, problem.end), shown);
             assert.strictEqual(problem.code, "space-after-mnemonic");
             assert.ok(problem.message.startsWith(begins), problem.message);
-            assert.match(problem.message, /follows (?:STA|LDA|EQUB) with no space/);
-            assert.match(problem.message, /probably a space was meant after (?:STA|LDA|EQUB)$/);
+            assert.match(problem.message, /without a space after (?:STA|LDA|EQUB)/);
+            assert.match(
+                problem.message,
+                /(?:STA|LDA|EQUB), so the rest of the instruction is ignored$/,
+            );
         },
     );
     it.each([
@@ -1094,6 +1118,42 @@ describe("Junk after a complete instruction", () => {
             assert.strictEqual(problem.code, "junk-after-instruction");
         },
     );
+    // A keyword spelled in full is a name no program can define, so a space is the fix; a name a program can define
+    // (STAPAGEX has the keyword PAGE then an X, but LDAP is just P) is left alone.
+    it.each([
+        ["[OPT0:STAPAGE:]", "PAGE"],
+        ["[OPT0:LDAGET:]", "GET"],
+        ["[OPT0:ASLTOP,X:]", "TOP"],
+        ["[OPT0:LDATIME:]", "TIME"],
+        ["[OPT0:ADCLEN:]", "LEN"],
+        ["[OPT0:.lab STAPAGE,X:]", "PAGE"],
+        ["[OPT0:LDAPAGE]", "PAGE"],
+        ["[OPT0:LDAPI:]", "PI"],
+    ])("%s should mark %j as a keyword's name, with a space as the fix", (text, name) => {
+        const problem = stricter(text).find(p => p.code === "space-after-mnemonic");
+        assert.strictEqual(text.slice(problem.start, problem.end), name);
+        assert.match(
+            problem.message,
+            /^BASIC won't read \w+ as a keyword here without a space after /,
+        );
+        assert.match(problem.message, /without a space after (?:STA|LDA|ASL|ADC|EQUB|\.lab)$/);
+    });
+    it.each([
+        "[OPT0:LDA PAGE:]",
+        "[OPT0:LDA#PAGE:]",
+        "[OPT0:LDAP:]",
+        "[OPT0:STAPAGEX:]",
+        "[OPT0:LDATOPX:]",
+        "[OPT0:LDATOP%:]",
+        "[OPT0:LDAPAGE%:]",
+        "[OPT0:LDAHIMEMORY:]",
+        "[OPT0:NOP:]",
+    ])("%s should not be marked as a keyword straight after a mnemonic", text => {
+        assert.deepStrictEqual(
+            stricter(text).filter(p => p.code === "space-after-mnemonic"),
+            [],
+        );
+    });
     it("should leave the block open after a ] that is ignored, so the next line is assembled", () => {
         const [first, second] = programProblems(
             readLines("[LDA #1]\ntax=1\n]", ModelBDialect),
