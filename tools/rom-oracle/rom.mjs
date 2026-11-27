@@ -12,6 +12,12 @@ const SupportProgram = [
     "40 DEF FNf=1",
     "50 DEF FNg(A)=A",
     "60 DATA 1,2,3",
+    "70 DEF PROC@:ENDPROC",
+    "71 DEF PROC@a:ENDPROC",
+    "72 DEF PROCa@:ENDPROC",
+    "73 DEF PROCa@b(A):ENDPROC",
+    "74 DEF FN@=7",
+    "75 DEF FNa@b(A)=A",
 ].join("\n");
 const Prelude = 'X=1:Y=2:Z=3:A=1:I=1:X%=1:A%=1:X$="a":A$="a":DIM X(3),X%(3),X$(3),D 20';
 

@@ -43,6 +43,8 @@ const Pattern = {
     // BASIC takes ` (a pound sign on the BBC) as a letter.
     nameRun: /[\w`]+/y,
     name: /[\w`]+[%$]?|@%/y,
+    // After PROC or FN the ROM also takes @ anywhere in the name, which it does not in a variable's.
+    fnName: /[\w`@]+/y,
     hex: /&[0-9A-F]*/y,
     // "" in a string is a quote.
     string: /"(?:[^"]|"")*"?/y,
@@ -194,7 +196,7 @@ export class Lexer {
             raw,
         });
         if (kw.flags & Flags.REM) this.restOfLine = kw.keyword === "REM" ? "comment" : "data";
-        const name = kw.flags & Flags.FnProc && this.match(Pattern.nameRun);
+        const name = kw.flags & Flags.FnProc && this.match(Pattern.fnName);
         if (name) this.push("fnname", name);
         if (kw.flags & Flags.Middle) this.middle();
         if (kw.flags & Flags.Start) {
