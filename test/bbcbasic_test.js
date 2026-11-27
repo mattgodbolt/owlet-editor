@@ -2617,6 +2617,23 @@ describe("A line being typed", () => {
         ["|GOTO:PRINT", "red", "red"],
         ["FOR I=1 TO|", "plain", "unfinished"],
         ["GOTO 20 30|", "red", "red"],
+        ["IF X THEN PRINT +|ELSE PRINT 1", "plain", "red"],
+        ["FOR I=1 TO |ELSE PRINT 1", "plain", "red"],
+        ["IF X THEN A=|ELSE PRINT 1", "plain", "red"],
+        ["GOTO |ELSE PRINT 1", "plain", "red"],
+        ["IF X AND |THEN 100", "plain", "red"],
+        ["IF X A|THEN PRINT 1", "plain", "red"],
+        ["IF (X A|) THEN 100", "plain", "red"],
+        ["IF X A|", "plain", "unfinished"],
+        ["IF X THEN A=|ELSEX 1", "red", "red"],
+        ["GOTO 20 30 |ELSE PRINT 1", "red", "red"],
+        ["GOTO:PRINT |ELSE 1", "red", "red"],
+        ["A=1 |THEN 5", "red", "red"],
+        ["PRINT |THEN 1", "red", "red"],
+        ["FOR I=1 TO |THEN 1", "red", "red"],
+        ["IF X THEN Y AND |THEN 5", "red", "red"],
+        ["ON X+|GOTO 10", "red", "red"],
+        ["IF X |100", "red", "red"],
     ])("%s", (typed, typing, left) => {
         const at = typed.indexOf("|");
         const text = typed.replace("|", "");
