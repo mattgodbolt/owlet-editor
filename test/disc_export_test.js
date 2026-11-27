@@ -1,15 +1,15 @@
 // @vitest-environment node
-import {existsSync, mkdtempSync, rmSync, writeFileSync} from "node:fs";
+import {mkdtempSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {pathToFileURL} from "node:url";
 import {afterAll, describe, expect, it} from "vitest";
-import {MachineSession} from "jsbeeb/machine-session";
 import {toSsdOrDsd} from "jsbeeb/src/disc";
 import {discFor} from "jsbeeb/src/fdc";
 import {MainView, peekViewed, ShadowView} from "jsbeeb/src/paging";
 import {discImage, screenDump} from "../src/disc-export";
 import {blankDisc} from "./blank_disc";
+import {booted, cpuOf, SavingMachines} from "./machine_helpers";
 
 const Drawing = [
     "VDU23,1,0;0;0;0;",
@@ -43,18 +43,6 @@ const Modes = [
     {mode: 7, size: 0x400, base: 0x7c00},
 ];
 
-// Fitted the way Owlet fits it; the ROM is fetched by the Makefile rather than kept in the repository, so a checkout
-// without it tests the other machines.
-const GxrRom = "gxr.rom";
-const HasGxr = existsSync(new URL(`../node_modules/jsbeeb/public/roms/${GxrRom}`, import.meta.url));
-
-async function booted(machine, extraRoms = [], bankRoms = []) {
-    const session = new MachineSession(machine, {extraRoms, bankRoms});
-    await session.initialise();
-    await session.boot();
-    return session;
-}
-
 async function ran(machine, lines) {
     const session = await booted(machine);
     await session.loadBasic(lines.join("\n"));
@@ -63,8 +51,6 @@ async function ran(machine, lines) {
     await session.runFrames(2);
     return session;
 }
-
-const cpuOf = session => session._machine.processor;
 
 function bytesIn(view, cpu, base, size) {
     const bytes = [];
@@ -226,19 +212,6 @@ describe("The exported disc's SCREEN file", () => {
 });
 
 describe("The exported disc's PROGRAM file", () => {
-    // What a real SAVE catalogues on each machine Owlet offers, and the PAGE it saves from.
-    const machines = [
-        {
-            name: "Model B with the GXR",
-            machine: "B",
-            extraRoms: [GxrRom],
-            page: 0x1c00,
-            exec: 0x8023,
-            skip: !HasGxr,
-        },
-        {name: "Model B without the GXR", machine: "B", extraRoms: [], page: 0x1900, exec: 0x8023},
-        {name: "Master 128", machine: "Master", extraRoms: [], page: 0x0e00, exec: 0x802b},
-    ];
     const Hello = 'PRINT "OWLET OK"';
     const BootText = '*BASIC\rCHAIN"PROGRAM"\r';
 
@@ -296,7 +269,7 @@ describe("The exported disc's PROGRAM file", () => {
         return {session, entry: catalogued(toSsdOrDsd(disc, {force: true}), "PROGRAM")};
     }
 
-    for (const {name, machine, extraRoms, page, exec, skip} of machines) {
+    for (const {name, machine, extraRoms, page, exec, skip} of SavingMachines) {
         it.skipIf(skip)(
             `should be catalogued as a real SAVE on the ${name} does, and run when booted`,
             async () => {
