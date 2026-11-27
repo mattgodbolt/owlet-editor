@@ -126,11 +126,23 @@
 <div class="modal" id="save">
     <div class="modal-content">
         <p><b>Save memory from the emulator (to clipboard)</b></p>
-        <p id="save-content">Start address and length (default is BASIC program).</p>
-        <input id="saveStartAddr" type="text" value="">
-        <input id="saveLen" type="text" value="">
+        <p id="save-content">Give the range as BASIC expressions: <code>D%</code> to <code>P%-1</code>, or <code>PAGE</code> length <code>TOP-PAGE</code>. Hex is <code>&amp;1900</code>, <code>$1900</code> or <code>0x1900</code>, and <code>?</code> and <code>!</code> read memory. The emulator is paused while this is open.</p>
+        <div class="save-range">
+            <input id="saveStartAddr" type="text" aria-label="Start address" spellcheck="false" autocomplete="off" autocapitalize="off">
+            <select id="saveMode" aria-label="Whether the second box is the end address or the length">
+                <option value="end">to</option>
+                <option value="length">length</option>
+            </select>
+            <input id="saveLen" type="text" aria-label="End address, or length" spellcheck="false" autocomplete="off" autocapitalize="off">
+        </div>
+        <select id="saveView" aria-label="Which memory to read"></select>
+        <p id="saveSummary" role="status"></p>
+        <p id="saveShadow" hidden>The screen is in shadow RAM, which the program does not read at these addresses: choose Shadow RAM to copy what is on the screen.</p>
+        <div id="saveProblems"></div>
+        <div id="savePreview" role="region" aria-label="The bytes that will be copied" tabindex="0"></div>
+        <pre id="saveText" role="region" aria-label="The text that will be copied"></pre>
         <div class="modal-actions">
-            <button data-action="copyMem"><i class="fa-solid fa-copy"></i>Copy</button>
+            <button id="saveCopy" data-action="copyMem"><i class="fa-solid fa-copy"></i>Copy</button>
             <button data-action="closeModal"><i class="fa-solid fa-circle-xmark"></i>Cancel</button>
         </div>
     </div>

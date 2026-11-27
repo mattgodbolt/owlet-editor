@@ -1,9 +1,9 @@
 # Debug: watching BASIC run
 
 Owlet's Debug panel in full: what each status means, how the errors that `ON ERROR` handlers took are listed, and how
-Debug works them out from the emulated machine. The [README](../README.md#debug-watching-basic-run) has the short
-version; for red in the editor's highlighting, as opposed to the Debug panel's red mark, see
-[highlighting](highlighting.md).
+Debug works them out from the emulated machine; and the Save memory dialog, which copies bytes from the machine.
+The [README](../README.md#debug-watching-basic-run) has the short version; for red in the editor's highlighting, as
+opposed to the Debug panel's red mark, see [highlighting](highlighting.md).
 
 The Debug button under the emulator opens a panel under the screen with BASIC's variables (the resident integers
 `@%` and `A%` to `Z%` that the program has written to, then every other variable, then the names of the procedures
@@ -111,3 +111,51 @@ While Debug is off nothing is read from the machine and nothing is hooked, so it
 emulator notes, through jsbeeb's write hook, writes to the resident integers, where BASIC was and which handler was set
 when the OS takes an error, and when a statement of the program starts or BASIC moves on; that adds a little work to
 each write the program makes. Debug is not remembered between visits.
+
+## Save memory: copying bytes into a program
+
+The Save memory button (the memory chip in the editor's toolbar) copies a range of the emulated machine's memory to the
+clipboard as text that can go in a program line, such as machine code or a data table to keep in a `REM` or a string.
+Each byte is the character BBC BASIC shows it as, with a control code (0 to 31) and 127 to 160 as the character 256
+higher (&0A is U+010A), which is how Owlet takes such bytes in program text. It works whether or not Debug is on, and
+the emulator is paused while the dialog is open, so the bytes it shows are the bytes it copies; it carries on when the
+dialog closes, if it was running before.
+
+![The Save memory dialog showing 23 bytes a program assembled, with two &0A and two &0D picked out](images/save-memory.png)
+
+The range is a start and either an end (`to`, the last byte copied) or a length, each a BASIC numeric expression
+worked out as BBC BASIC would, from the machine's memory as the program left it:
+
+- numbers, in decimal or hex: `&1900`, and also `$1900` and `0x1900`;
+- the program's numeric variables, including labels set by the assembler (`D%`, `buf`, `msg`), the resident integers
+  `A%` to `Z%` (0 until set, as in BASIC), and `PAGE`, `TOP`, `HIMEM` and `LOMEM`;
+- `+`, `-`, `*`, `/`, `DIV`, `MOD`, `AND`, `OR` and `EOR` at BASIC's precedences, brackets and unary minus;
+- indirection: `?A` is the byte at `A`, `!A` the four bytes there, and `A?3` and `A!3` those at `A+3`, so
+  `!&70 AND &FFFF` follows a pointer in zero page.
+
+So after `DIM D% 99:P%=D%:[...]`, `D%` to `P%-1`, or `D%` length `P%-D%`, is what was assembled. The result is
+truncated to a whole number, and the range must lie in &0000 to &FFFF: one that runs past &FFFF is refused rather
+than wrapped round to &0000. A mistake is shown in place of the bytes, as BASIC would say it (`Start: No such
+variable: Q`), and Copy waits until there is none. It opens on the BASIC program (`PAGE` length `TOP-PAGE`) and then
+keeps the range last given, so after changing and running the program again, the same range is a click away. Return
+in either box copies and Escape closes.
+
+Under the range the dialog says how many bytes it covers and how many of them are &0A or &0D, which can break a program
+line, with a button for each of the first twelve that brings it into view. The bytes, up to the first 4096, are shown
+in hex, 16 to a row (8 on a phone held upright), with &0A in orange and &0D in red, and under them the start of the
+text that will be copied.
+
+### Which memory
+
+The menu under the range chooses what is read. **As the program sees it** is the memory a BASIC program reads with `?`
+and `!`, and what the dialog has always copied. The other choices show what is not paged in:
+
+- **Bank N (...)**: a sideways bank at &8000 to &BFFF, named by the ROM in it, such as BASIC or the DFS; banks with
+  nothing in them are left out.
+- On the Master 128 only, as the Model B has no shadow RAM: **ANDY** (&8000 to &8FFF), **Main RAM** and **Shadow
+  RAM** (both &3000 to &7FFF). In a shadow screen mode such as `MODE 135` the screen is in shadow RAM, while the
+  program reads and writes main RAM at the same addresses, so the dialog says so when the range covers the screen and
+  Shadow RAM is not chosen.
+
+Outside the addresses a choice covers, it reads as the program sees memory. Nothing is read with side effects: a
+hardware register that cannot be read without changing it (in &FC00 to &FEFF) reads as &FF.

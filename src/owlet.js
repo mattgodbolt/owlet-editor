@@ -10,6 +10,7 @@ import "monaco-editor/editor/contrib/codeAction/browser/codeActionContributions"
 
 import {Emulator} from "./emulator";
 import {BasicDebugger} from "./basic-debugger";
+import {SaveMemory} from "./save-memory";
 import Examples from "./examples.yaml";
 import {expandCode} from "./expand-code";
 import {partialDetokenise} from "./detokenise";
@@ -191,6 +192,7 @@ export class OwletEditor {
         });
 
         this.emulator = new Emulator($("#emulator"));
+        this.saveMemory = new SaveMemory(this.emulator);
         this.emulator.onRunningChange = running => this.showRunning(running);
         this.basicDebugger = new BasicDebugger(this.editor, this.emulator, () => this.dialect);
 
@@ -535,14 +537,7 @@ export class OwletEditor {
     }
 
     save() {
-        const saveModal = document.getElementById("save");
-        const saveStartAddr = document.getElementById("saveStartAddr");
-        const saveLen = document.getElementById("saveLen");
-        saveModal.style.display = "block";
-        const PAGE = this.emulator.readmem(0x18) << 8;
-        const TOP = (this.emulator.readmem(0x13) << 8) | this.emulator.readmem(0x12);
-        saveStartAddr.value = PAGE;
-        saveLen.value = TOP - PAGE;
+        this.saveMemory.open();
     }
 
     expandCode() {
@@ -576,10 +571,8 @@ export class OwletEditor {
     }
 
     closeModal() {
-        const modal = document.getElementById("share");
-        const modal2 = document.getElementById("save");
-        modal.style.display = "none";
-        modal2.style.display = "none";
+        document.getElementById("share").style.display = "none";
+        this.saveMemory.close();
     }
 
     codeToTweet() {
@@ -750,39 +743,7 @@ export class OwletEditor {
                 */
                 this.closeModal();
             },
-            copyMem: () => {
-                let data = "";
-                const saveStartAddr = document.getElementById("saveStartAddr");
-                const saveLen = document.getElementById("saveLen");
-                let addr = saveStartAddr.value;
-                let len = saveLen.value;
-                let byte10Count = 0;
-                let byte13Count = 0;
-                while (len--) {
-                    let b = this.emulator.readmem(addr++);
-                    if (b < 32 || (b >= 127 && b < 161)) {
-                        if (b === 10) ++byte10Count;
-                        if (b === 13) ++byte13Count;
-                        b += 0x100;
-                    }
-                    data += String.fromCodePoint(b);
-                }
-                saveLen.value = data;
-                saveLen.select();
-                saveLen.setSelectionRange(0, 99999); // For mobile devices
-                document.execCommand("copy");
-                if (byte10Count || byte13Count) {
-                    let message = "problematic byte values:";
-                    if (byte10Count) {
-                        message += " 10 (x" + byte10Count.toString() + ")";
-                    }
-                    if (byte13Count) {
-                        message += " 13 (x" + byte13Count.toString() + ")";
-                    }
-                    alert(message);
-                }
-                this.closeModal();
-            },
+            copyMem: () => this.saveMemory.copy(),
             closeModal: () => this.closeModal(),
         };
         $("button[data-action]").click(e => actions[e.target.dataset.action]());

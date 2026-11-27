@@ -509,8 +509,4 @@ export class Emulator {
         if (this.keyboard)
             this.keyboard.keyUp(this.cpu.model.isMaster ? event : keypadEnterAsReturn(event));
     }
-
-    readmem(address) {
-        return this.cpu.readmem(address);
-    }
 }
