@@ -1048,7 +1048,8 @@ export class Recogniser {
             // BASIC II counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
             // which target it is reading and mark nothing more. BASIC IV reads a string as one item.
             if (this.splitsAtStringComma(from)) break;
-            if (!nameless) this.ignoredAfter(target);
+            if (nameless) this.skipToComma();
+            else this.ignoredAfter(target);
             if (this.splitsAtStringComma(from)) break;
             if (!this.isPunct(",")) return;
             this.next();
@@ -1058,8 +1059,8 @@ export class Recogniser {
             try {
                 const keyword = procedures ? this.next() : null;
                 nameless = procedures && !this.named();
-                target = this.onTarget(procedures);
                 if (nameless) this.namelessTarget(keyword);
+                target = this.onTarget(procedures);
             } catch (e) {
                 if (!(e instanceof Failure)) throw e;
                 break;
@@ -1070,14 +1071,14 @@ export class Recogniser {
 
     // A PROC in an ON list with no name, which BASIC reads only if the value picks it.
     namelessTarget(keyword) {
-        if (!this.nameMayFollow()) this.stricter(keyword, NamelessOnTarget);
+        if (!this.nameMayFollow(keyword)) this.stricter(keyword, NamelessOnTarget);
     }
 
-    // Whether the text ends here with the cursor at the end, or is a probe of what could be typed, so that a name may
-    // still be typed.
-    nameMayFollow() {
+    // Whether the keyword ends the text, with nothing after it, not even a space, and the cursor is at the end or the
+    // text is a probe of what could be typed, so that a name may still be typed straight after it.
+    nameMayFollow(keyword) {
         return (
-            this.is("end") &&
+            keyword.end === this.lexer.text.length &&
             (this.probing || (this.typingAt !== null && this.typingAt >= this.lexer.text.length))
         );
     }
@@ -1118,6 +1119,10 @@ export class Recogniser {
             ? `${token.text} is read as a name, not the keyword ${keyword}: BASIC recognises a keyword only at the start of a word, and there is no space before this one. ${target}; probably a space was meant before ${keyword}`
             : `${target}; probably a space or comma is missing`;
         this.stricter(this.next(), message, code ?? IgnoredInOnListCode);
+        this.skipToComma();
+    }
+
+    skipToComma() {
         while (!this.atEnd() && !this.isPunct(",")) this.next();
     }
 
@@ -1189,7 +1194,7 @@ export class Recogniser {
         const token = this.peek();
         if (token.kind !== "keyword" || !isFnProc(token.kw)) return void this.skipLine();
         this.next();
-        if (!this.named() && !this.nameMayFollow())
+        if (!this.named() && !this.nameMayFollow(token))
             this.stricter(token, namelessDefinition(token.kw.keyword));
         if (this.is("fnname")) this.next();
         if (this.isPunct("(")) {

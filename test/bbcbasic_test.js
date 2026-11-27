@@ -2486,6 +2486,8 @@ describe("Syntax markers", () => {
             ["X=1:DEF FN", "DEF FN", "FN"],
             ["DEF PROC", "DEF PROC", "PROC"],
             ["DEF FN", "DEF FN", "FN"],
+            ["DEF PROC ", "DEF PROC", "PROC"],
+            ["DEF FN ", "DEF FN", "FN"],
             ["IF 0 THEN DEF PROC", "DEF PROC", "PROC"],
             ["IF 1 THEN DEF FN", "DEF FN", "FN"],
         ])("%s should be marked", (text, _row, word) => {
@@ -2510,6 +2512,10 @@ describe("Syntax markers", () => {
         ])("should leave %s alone", text => {
             assert.strictEqual(table.get(text), "ok", text);
             assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+        });
+        // A space after the keyword is not a name (BASIC reads PROC X as a call with no name), so it is marked at the end.
+        it.each(["DEF PROC ", "DEF FN "])("should mark %s with the cursor at the end", text => {
+            assert.strictEqual(getSyntaxMarkers(text, dialect, 1, text.length).length, 1);
         });
         // The name may still be typed where the line ends, so nothing is red under the cursor there.
         it.each(["DEF PROC", "DEF FN", "DEF PRO.", "X=1:DEF FN"])(
@@ -2552,6 +2558,10 @@ describe("Syntax markers", () => {
             ["ON 4 PROC,PROCp,PROC ELSE END", "ok", [target("PROC"), target("PROC")]],
             ["ON 1 PROC,PROCp,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
             ["ON 3 PROC,PROCp,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+            ["ON 1 PROC JUNK,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+            ["ON 1 PROCp,PROC(", "ok", [target("PROC")]],
+            ["ON 2 PROCp,PROC(", "Bad call", [target("PROC")]],
+            ["ON 1 PROCp,PROC(1)", "ok", [target("PROC")]],
         ])("%s (the ROM: %s)", (text, verdict, expected) => {
             assert.strictEqual(masterVerdicts.get(text), verdict, text);
             const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
@@ -2572,6 +2582,16 @@ describe("Syntax markers", () => {
             const text = "ON 1 PROCp,PROC";
             assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect, 1, text.length), []);
         });
+        // A name cannot be typed after a space or after arguments, so the mark stays with the cursor at the end.
+        it.each(["ON 1 PROCp,PROC(1)", "ON 1 PROCp,PROC "])(
+            "should mark %s with the cursor at the end",
+            text => {
+                assert.strictEqual(
+                    getSyntaxMarkers(text, BasicIVDialect, 1, text.length).length,
+                    1,
+                );
+            },
+        );
     });
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],

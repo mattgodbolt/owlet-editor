@@ -50,6 +50,8 @@ const StricterThanRom = [
     "ON 4 PROC,PROCp,PROC ELSE END",
     "ON 2 PROC,PROCp ELSE PROC",
     "ON 1 PROCp,PROC",
+    "ON 1 PROCp,PROC(",
+    "ON 1 PROCp,PROC(1)",
     "X%=6ELSE7",
     "PRINT 1 ELSE PRINT 2",
     "A=1:B=2 ELSE C=3",

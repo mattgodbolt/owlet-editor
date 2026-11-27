@@ -23,5 +23,12 @@
   ["DEF PROC%", "ok", "nameless-proc-372"],
   ["ON 1 PROC,PROCp,PROC ELSE END", "ON syntax", "nameless-proc-372"],
   ["IF 0 PROC", "ok", "nameless-proc-372"],
-  ["ON ERROR PROC", "ok", "nameless-proc-372"]
+  ["ON ERROR PROC", "ok", "nameless-proc-372"],
+  ["DEF PROC ", "ok", "nameless-proc-372"],
+  ["ON 1 PROC JUNK,PROC ELSE END", "ON syntax", "nameless-proc-372"],
+  ["ON 1 PROCp,PROC(", "ON syntax", "nameless-proc-372"],
+  ["ON 1 PROCp,PROC(1)", "ON syntax", "nameless-proc-372"],
+  ["ON 2 PROCp,PROC(", "ON syntax", "nameless-proc-372"],
+  ["DEF FN ", "ok", "nameless-proc-372"],
+  ["PROC ", "Bad call", "nameless-proc-372"]
 ]
