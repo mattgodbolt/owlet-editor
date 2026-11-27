@@ -12,12 +12,19 @@ const SupportProgram = [
     "40 DEF FNf=1",
     "50 DEF FNg(A)=A",
     "60 DATA 1,2,3",
+    "70 DEF PROC@:ENDPROC",
+    "71 DEF PROC@a:ENDPROC",
+    "72 DEF PROCa@:ENDPROC",
+    "73 DEF PROCa@b(A):ENDPROC",
+    "74 DEF FN@=7",
+    "75 DEF FNa@b(A)=A",
 ].join("\n");
 const Prelude = 'X=1:Y=2:Z=3:A=1:I=1:X%=1:A%=1:X$="a":A$="a":DIM X(3),X%(3),X$(3),D 20';
 
 // Syntax errors from BBC BASIC II; any other error is raised while running a statement and stops BASIC reading it.
 // No such variable is here because the prelude defines every name the generator uses: BASIC reports it when what
-// should be a value is not one, as in PRINT STR$~~1, or for a name with nothing after it, as in CALL.
+// should be a value is not one, as in PRINT STR$~~1, or for a name with nothing after it, as in CALL. Bad call is
+// here because BASIC raises it for a FN or PROC with no name after it, whatever the program defines.
 export const SyntaxErrors = new Map([
     [3, "Index"],
     [4, "Mistake"],
@@ -27,6 +34,7 @@ export const SyntaxErrors = new Map([
     [26, "No such variable"],
     [27, "Missing )"],
     [28, "Bad HEX"],
+    [30, "Bad call"],
     [36, "No TO"],
     [39, "ON syntax"],
     [45, "Missing #"],

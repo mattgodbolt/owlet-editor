@@ -73,6 +73,7 @@ describe("The word pattern", () => {
         // A name that BASIC reads in full after FN or PROC, or a keyword that is a name when a name character follows.
         ["PROCPRINTSCORE(1)", ["PROC", "PRINTSCORE", "1"]],
         ["X=FNEND+1", ["X", "FN", "END", "1"]],
+        ["PROCa@b(1)", ["PROC", "a@b", "1"]],
         ["TIMER=ENDING", ["TIMER", "ENDING"]],
         // A "$" ends a name, and what follows "&" is hex digits.
         ["IFA$THEN", ["IF", "A$", "THEN"]],

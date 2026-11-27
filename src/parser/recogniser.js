@@ -4,7 +4,7 @@
 import {Assembler, mnemonicsFor} from "./assembler.js";
 import {isFnProc, isStatementKeyword, pseudoVariables} from "../tokens.js";
 import {BasicIIDialect, canStartStatement} from "./dialect.js";
-import {Lexer} from "./lexer.js";
+import {Lexer, lexLine} from "./lexer.js";
 import {BasicVFixCode, basicVFix, basicVOperator} from "./basic-v.js";
 
 // Recursion deeper than this is an error: the 6502's stack gives out long before it.
@@ -25,6 +25,8 @@ export const SpacedKeywords = [
     "PROC",
     "ELSE",
 ];
+
+const FnProcNameStart = /[\w`@]/;
 
 const OnErrorLocal =
     "BASIC V accepts ON ERROR LOCAL (not emulated here), but BASIC II and IV take LOCAL as the error handler: the first error fails with Not LOCAL, which runs the handler again, so the program loops forever and Escape does not stop it";
@@ -132,6 +134,10 @@ function completions(assembling, dialect) {
 
 const AnotherArgument = "a comma or a closing )";
 
+// What may follow the cursor on a line being typed for the line to be read as ending at the cursor: closing brackets,
+// which the editor adds as an opening one is typed, before a colon or the end of the line.
+export const TypedToEnd = /^[ )]*(?::|$)/;
+
 // What might be typed before a ) to supply what is missing: an operand, or more arguments.
 const Fillers = ["1", "A", "A$", ",1", "1,1", ",1,1"];
 
@@ -164,7 +170,7 @@ function readsStatement(text, dialect) {
 }
 
 export class Recogniser {
-    constructor(text, inAssembler, dialect, probing = false) {
+    constructor(text, inAssembler, dialect, probing = false, typingAt = null) {
         this.dialect = dialect;
         this.lexer = new Lexer(text, dialect);
         this.basicIV = dialect.basicIV;
@@ -174,6 +180,10 @@ export class Recogniser {
         this.assembling = false;
         this.startsInAssembler = inAssembler;
         this.probing = probing;
+        // Where the cursor is on a line being typed, as an offset, or null.
+        this.typingAt = typingAt;
+        // Whether a statement is unfinished only because it is read as ending at `typingAt`.
+        this.endsAtCursor = false;
         this.depth = 0;
         this.last = null;
         // The "[" that opened the assembler block this line leaves open, if it did.
@@ -313,7 +323,10 @@ export class Recogniser {
     mark(failure, statementStart, assembling) {
         let {token} = failure;
         const {message, explanation, code, fix} = failure;
-        const ended = failure.unfinished || this.completable(token, statementStart, assembling);
+        const ended =
+            failure.unfinished ||
+            this.completable(token, statementStart, assembling) ||
+            this.typedUpTo(statementStart);
         const hole = !ended && this.repairable(failure, statementStart);
         const unfinished = ended || hole;
         const atEnd = token.kind === "end" || token.text === ":" || token.kw?.keyword === "ELSE";
@@ -392,6 +405,24 @@ export class Recogniser {
                 return this.valid(text.slice(0, start) + word, statementStart, text.length);
             });
         });
+    }
+
+    // Whether the statement is the one being typed, with only `TypedToEnd` after the cursor, and is unfinished read as
+    // if the line ended at the cursor.
+    typedUpTo(statementStart) {
+        const at = this.typingAt;
+        const {text} = this.lexer;
+        if (this.probing || at === null || at <= statementStart.start) return false;
+        if (!TypedToEnd.test(text.slice(at))) return false;
+        const typed = new Recogniser(text.slice(0, at), this.startsInAssembler, this.dialect);
+        typed.line();
+        const inStatement = token => token.start >= statementStart.start;
+        const unfinished =
+            !typed.tokens.some(token => inStatement(token) && typed.endsStatement(token)) &&
+            typed.problems.every(problem => problem.unfinished || !inStatement(problem.token)) &&
+            !typed.tokens.some(token => token.invalid && inStatement(token));
+        if (unfinished) this.endsAtCursor = true;
+        return unfinished;
     }
 
     // Whether the text, a probe of the line with something added, has no error from the statement at `statementStart`
@@ -884,8 +915,26 @@ export class Recogniser {
         return true;
     }
 
-    // Whether "(" after a space is the call's depends on the DEF: FNg (1) is fine if FNg has a parameter.
     call() {
+        if (!this.named()) this.badCall(this.last);
+        this.callArguments();
+    }
+
+    // Whether a name follows the FN or PROC just read. A call takes an @ into the name, though the tokeniser ends a
+    // name before one.
+    named() {
+        return FnProcNameStart.test(this.lexer.text.charAt(this.last.end));
+    }
+
+    badCall(keyword) {
+        const {keyword: word} = keyword.kw;
+        const kind = word === "FN" ? "function" : "procedure";
+        const explanation = `${word} needs a ${kind} name straight after it, with no space`;
+        this.fail("Bad call", keyword, keyword.end === this.lexer.text.length, explanation);
+    }
+
+    // Whether "(" after a space is the call's depends on the DEF: FNg (1) is fine if FNg has a parameter.
+    callArguments() {
         if (this.is("fnname")) this.next();
         if (this.isPunct("(")) this.unworded(() => this.bracket(this.next()));
     }
@@ -979,9 +1028,14 @@ export class Recogniser {
         }
         this.expression();
         if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
-        const procedures = this.next().kw.keyword === "PROC";
+        const branch = this.next();
+        const procedures = branch.kw.keyword === "PROC";
+        const named = !procedures || this.named();
         let from = this.peek().start;
         let target = this.onTarget(procedures);
+        // With one target and no ELSE after it on the line, BASIC stops whatever the value: Bad call at 1, ON range
+        // otherwise.
+        if (!named && this.atEnd() && !this.elseFollows()) this.badCall(branch);
         this.waitingForElse = true;
         for (;;) {
             // BASIC II counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
@@ -1005,6 +1059,13 @@ export class Recogniser {
         while (!this.atEnd()) this.next();
     }
 
+    elseFollows() {
+        const from = this.peek().start;
+        return lexLine(this.lexer.source, this.dialect).some(
+            token => token.start >= from && token.kw?.keyword === "ELSE",
+        );
+    }
+
     // Whether a string with a comma in it lies between `from` and the next token, on BASIC II, which splits it there.
     splitsAtStringComma(from) {
         if (this.basicIV) return false;
@@ -1015,7 +1076,7 @@ export class Recogniser {
     // Reads a target of an ON list and returns what it is.
     onTarget(procedures) {
         if (procedures) {
-            this.call();
+            this.callArguments();
             return OnTargets.procedure;
         }
         const target = this.is("linenum") ? OnTargets.lineNumber : OnTargets.expression;

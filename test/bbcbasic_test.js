@@ -6,6 +6,7 @@ import {
     LanguageId,
     rebuildBracketPairs,
     registerBbcBasicLanguage,
+    setTypingPoint,
 } from "../src/bbcbasic";
 import {
     BasicIIDialect,
@@ -201,6 +202,43 @@ describe("Tokenisation", () => {
             assert.deepStrictEqual(tokens("DEFFN3D PROC1to1:PRO.2too:=FN42"), [
                 "0:keyword 5:variable 7:white 8:keyword 12:variable 16:symbol 17:keyword 21:variable 25:symbol 26:operator 27:keyword 29:variable",
             ]);
+        });
+        it("should allow @ anywhere in an FN or PROC name, as the ROM does, but not in a variable's", () => {
+            // #373: every row here is recorded from both ROMs (at-in-names-373).
+            const cases = [
+                ["PROC@", ["@"]],
+                ["PROC@a", ["@a"]],
+                ["PROCa@", ["a@"]],
+                ["PROCa@b(1)", ["a@b"]],
+                ["PROC@:X=1", ["@"]],
+                ["X=FN@", ["@"]],
+                ["X=FN@+1", ["@"]],
+                ["X=FNa@b(1)", ["a@b"]],
+                ["DEF PROC@", ["@"]],
+                ["DEF PROCa@b(A)", ["a@b"]],
+                ["DEF FN@=7", ["@"]],
+                ["DEF FNa@b(A)=A", ["a@b"]],
+            ];
+            for (const [text, names] of cases) {
+                assert.deepStrictEqual(spans(text, "invalid"), [], text);
+                assert.strictEqual(verdicts.get(text), "ok", text);
+                assert.strictEqual(masterVerdicts.get(text), "ok", text);
+                backedByRom(text);
+                const tokenised = highlightLine(text, ModelBDialect, false).tokens;
+                for (const name of names) {
+                    const at = text.indexOf(name);
+                    assert.strictEqual(
+                        tokenised.find(t => t.offset === at)?.type,
+                        "variable",
+                        `${name} in ${text}`,
+                    );
+                }
+            }
+            // The ROM stops at the % here (a Syntax error), so the % is what is marked.
+            for (const text of ["PROC@%", "X=FN@%"]) {
+                assert.strictEqual(verdicts.get(text), "Syntax error", text);
+                assert.deepStrictEqual(spans(text, "invalid"), ["%"], text);
+            }
         });
         it("should highlight a keyword that cannot start a statement", () => {
             // See #151, checked on the ROM, where each invalid case is a syntax error.
@@ -743,8 +781,9 @@ describe("Tokenisation", () => {
                     "[\nEQUB LENA$",
                     ["0:delimiter.square", "0:keyword.directive 4:white 5:keyword 8:variable"],
                 ],
-                // The tokeniser makes no keyword inside a name, so FN is not one here.
-                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:variable"], "EQUSFNx"],
+                // The tokeniser makes no keyword inside a name, so FN is not one here, but no program can define
+                // a variable called FNx, so it is marked (see docs/rom-deviations.md).
+                ["[\nEQUSFNx", ["0:delimiter.square", "0:keyword.directive 4:invalid"], "EQUSFNx"],
                 [
                     "[ROR 80\\comment:ROR80\\comment:]P.",
                     [
@@ -1285,6 +1324,12 @@ describe("Quick fixes and syntax markers", () => {
     it("should offer to replace a ; with a \\, as the ARM assembler of BASIC V takes it as a comment", () => {
         assert.deepStrictEqual(offered("[OPT0:NOP ; hello:]"), ["Replace ; with \\"]);
     });
+    it("should offer both the space and the : for [STAPAGE], which has two things wrong", () => {
+        assert.deepStrictEqual(offered("[STAPAGE]").sort(), [
+            "Insert : before ]",
+            "Insert a space after STA",
+        ]);
+    });
     it("should offer only the space for a keyword straight after a mnemonic", () => {
         assert.deepStrictEqual(offered("[OPT0:STAH.,X:]"), ["Insert a space after STA"]);
     });
@@ -1301,6 +1346,10 @@ describe("Quick fixes and syntax markers", () => {
         ["[OPT0:EQUBH.:]", "Insert a space after EQUB", "[OPT0:EQUB H.:]"],
         ["[OPT0:.lab STAH.,X:]", "Insert a space after STA", "[OPT0:.lab STA H.,X:]"],
         ["[OPT0:NOPPAGE:]", "Insert \\ before the junk", "[OPT0:NOP\\PAGE:]"],
+        ["[OPT0:STAPAGE:]", "Insert a space after STA", "[OPT0:STA PAGE:]"],
+        ["[OPT0:LDAGET:]", "Insert a space after LDA", "[OPT0:LDA GET:]"],
+        ["[OPT0:ASLTOP,X:]", "Insert a space after ASL", "[OPT0:ASL TOP,X:]"],
+        ["[OPT0:.lab ADCLEN:]", "Insert a space after ADC", "[OPT0:.lab ADC LEN:]"],
         ["[OPT0:LDAP.,X:]", "Insert \\ before the junk", "[OPT0:LDAP\\.,X:]"],
     ])("%s should offer %s, leaving %j with no junk marker", (text, title, result) => {
         const [offer] = fixes(text, ModelBDialect).filter(([name]) => name === title);
@@ -2179,13 +2228,24 @@ describe("Syntax markers", () => {
             [MarkerSeverity.Error, message, 1, 10, 15],
         ]);
     });
-    it("should say that a keyword straight after a mnemonic is read as a variable, and a space was meant", () => {
+    it("should say that a keyword straight after a mnemonic is not read as one without a space", () => {
         const message =
-            "H. here is read as the variable H, not the keyword: BASIC recognises a keyword only at the start of a word, and this follows STA with no space, so the rest of the instruction is ignored; probably a space was meant after STA";
+            "BASIC won't read H. as a keyword here without a space after STA, so the rest of the instruction is ignored";
         assert.deepStrictEqual(markers("[OPT0:STAH.,X:]"), [
             [MarkerSeverity.Error, message, 1, 10, 12],
         ]);
     });
+    it.each([
+        ["[OPT0:STAPAGE:]", "PAGE", 10, 14, "STA"],
+        ["[OPT0:ASLTOP,X:]", "TOP", 10, 13, "ASL"],
+        ["[OPT0:LDAGET:]", "GET", 10, 13, "LDA"],
+    ])(
+        "should say that %s is not read as a keyword without a space after the mnemonic, naming %s",
+        (text, name, from, to, mnemonic) => {
+            const message = `BASIC won't read ${name} as a keyword here without a space after ${mnemonic}`;
+            assert.deepStrictEqual(markers(text), [[MarkerSeverity.Error, message, 1, from, to]]);
+        },
+    );
     it("should show something missing from the middle of a statement at the token where it stops", () => {
         assert.deepStrictEqual(markers("A$=LEFT$(X$)"), [
             [MarkerSeverity.Warning, "Expected a comma before ) (BASIC: Missing ,)", 1, 12, 13],
@@ -2351,6 +2411,87 @@ describe("Syntax markers", () => {
             assert.strictEqual(marker.message, worded ? `${plain} (BASIC: ${rom})` : plain);
         });
     });
+    // BASIC stops with Bad call at a FN or PROC with no name straight after it, and the mark is on the keyword; a
+    // warning where a name could still be typed. In text BASIC skips (IF 0 THEN, after END) it is marked all the same.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("a FN or PROC with no name on %s", (_, dialect, table) => {
+        const Fn = "FN needs a function name straight after it, with no space (BASIC: Bad call)";
+        const Proc =
+            "PROC needs a procedure name straight after it, with no space (BASIC: Bad call)";
+        const {Error: Stops, Warning: EndsTooSoon} = MarkerSeverity;
+        it.each([
+            ["IF FN THEN X=1", Stops, "FN THEN X=1", Fn],
+            ["IF FN X=1", Stops, "FN X=1", Fn],
+            ["IF FN X=1 ELSE Y=1", Stops, "FN X=1", Fn],
+            ["IF FN LETX=1", Stops, "FN LETX=1", Fn],
+            ["PROC(1)", Stops, "PROC(1)", Proc],
+            ["PROC (1)", Stops, "PROC (1)", Proc],
+            ["PROC X", Stops, "PROC X", Proc],
+            ["PROC:", Stops, "PROC", Proc],
+            ["PROC ELSE X=1", Stops, "PROC", Proc],
+            ["PROC.5", Stops, "PROC.5", Proc],
+            ["PROC%", Stops, "PROC%", Proc],
+            ["X=FN(1)", Stops, "FN(1)", Fn],
+            ["X=FN+FNf", Stops, "FN+FNf", Fn],
+            ["X=FN:Y=1", Stops, "FN", Fn],
+            ["PRINT FN;", Stops, "FN;", Fn],
+            ["PROC", EndsTooSoon, "PROC", Proc],
+            ["PRO.", EndsTooSoon, "PRO.", Proc],
+            ["X=FN", EndsTooSoon, "FN", Fn],
+            ["X=FNf+FN", EndsTooSoon, "FN", Fn],
+            ["IF FN", EndsTooSoon, "FN", Fn],
+            ["IF 1 THEN PROC", EndsTooSoon, "PROC", Proc],
+            ["IF 0 THEN PROC", EndsTooSoon, "PROC", Proc],
+            ["IF 1 THEN PROCp ELSE PROC", EndsTooSoon, "PROC", Proc],
+            ["END:PROC", EndsTooSoon, "PROC", Proc],
+        ])("%s", (text, severity, marked, message) => {
+            assert.ok(["Bad call", "ok"].includes(table.get(text)), text);
+            const found = getSyntaxMarkers(text, dialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, [[severity, marked, message]]);
+        });
+        it.each([
+            "PROCp",
+            "PROCq(1)",
+            "PROCq (1)",
+            "IF FNf THEN X=1",
+            "X=FNf+1",
+            "DEF PROC",
+            "DEF FN",
+        ])("should leave %s alone", text => {
+            assert.strictEqual(table.get(text), "ok", text);
+            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+        });
+        // A call reads @ as part of the name, though the tokeniser does not (PROC@ is No such FN/PROC).
+        it.each(["PROC@", "X=FN@"])("should not say Bad call for %s", text => {
+            for (const {message} of getSyntaxMarkers(text, dialect))
+                assert.ok(!message.includes("Bad call"), message);
+        });
+    });
+    // An ON PROC list reads its first target only for 1; any other value looks for an ELSE anywhere on the line.
+    it.each([
+        ["ON 1 PROC", MarkerSeverity.Warning, "PROC"],
+        ["ON X PROC", MarkerSeverity.Warning, "PROC"],
+        ['ON 1 PROC:PRINT"ELSE"', MarkerSeverity.Error, "PROC"],
+        ["ON 2 PROC ELSE Y=1", null, null],
+        ["ON 2 PROC:X=1 ELSE Y=1", null, null],
+        ["ON 2 PROC,PROCp", null, null],
+    ])(
+        "should mark the PROC of BASIC IV's %s only where every value stops",
+        (text, severity, marked) => {
+            assert.strictEqual(masterVerdicts.get(text), severity === null ? "ok" : "Bad call");
+            const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+            ]);
+            assert.deepStrictEqual(found, severity === null ? [] : [[severity, marked]]);
+        },
+    );
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
         ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],
@@ -2446,6 +2587,92 @@ describe("Syntax markers", () => {
         assert.deepStrictEqual(markers("[\nLDA #\n]"), [
             [MarkerSeverity.Warning, Unfinished("a value", "#", "No such variable"), 2, 5, 6],
         ]);
+    });
+});
+
+describe("A line being typed", () => {
+    // What the line shows: its colour, and its markers' severities.
+    const Shown = {
+        plain: [false, []],
+        unfinished: [false, [MarkerSeverity.Warning]],
+        red: [true, [MarkerSeverity.Error]],
+    };
+    const shown = (text, typingAt, cursorLine) => [
+        highlightLine(text, ModelBDialect, false, typingAt).tokens.some(t => t.type === "invalid"),
+        getSyntaxMarkers(`${text}\nPRINT`, ModelBDialect, cursorLine, typingAt).map(
+            m => m.severity,
+        ),
+    ];
+    // The text with | at the cursor, as the line shows while the cursor is there and once it has left the line.
+    it.each([
+        ["FOR I=1 TO|:PRINT I:NEXT", "plain", "red"],
+        ["GOTO |:REM x", "plain", "red"],
+        ["A=1:B=|:C=2", "plain", "red"],
+        ["X=1+| :PRINT X", "plain", "red"],
+        ["IF (X A|)", "plain", "red"],
+        ["IF (X A|):PRINT", "plain", "red"],
+        ["IF (X A|+1)", "red", "red"],
+        ["IF A=1 T|PRINT 2", "red", "red"],
+        ["GOTO:PRINT |:END", "red", "red"],
+        ["|GOTO:PRINT", "red", "red"],
+        ["FOR I=1 TO|", "plain", "unfinished"],
+        ["GOTO 20 30|", "red", "red"],
+    ])("%s", (typed, typing, left) => {
+        const at = typed.indexOf("|");
+        const text = typed.replace("|", "");
+        assert.deepStrictEqual(shown(text, at, 1), Shown[typing], "typing");
+        assert.deepStrictEqual(shown(text, null, 2), Shown[left], "left");
+    });
+    it("should colour the line again as the cursor moves after an edit, and once it leaves the line", () => {
+        const text = "FOR I=1 TO:PRINT I:NEXT";
+        const colours = model => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(1);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const typed = editor.createModel("FOR I=1 T:PRINT I:NEXT\nPRINT", LanguageId);
+        const untyped = editor.createModel(text, LanguageId);
+        try {
+            colours(typed);
+            // The O typed before the colon, coloured before the cursor moves past it, as Monaco does with suggestions
+            // showing.
+            typed.pushEditOperations([], [{range: new Range(1, 10, 1, 10), text: "O"}], () => null);
+            assert.deepStrictEqual(colours(typed), colours(untyped));
+            setTypingPoint(typed, {lineNumber: 1, text, column: 10});
+            const typing = colours(typed);
+            setTypingPoint(typed, {lineNumber: 2, text: "PRINT", column: 5});
+            assert.notDeepStrictEqual(typing, colours(untyped));
+            assert.deepStrictEqual(colours(typed), colours(untyped));
+        } finally {
+            setTypingPoint(typed, null);
+            typed.dispose();
+            untyped.dispose();
+        }
+    });
+    it("should not give the allowance to a line another line repeats, and should to a line that is unique", () => {
+        const text = "FOR I=1 TO:PRINT";
+        const column = 10;
+        const red = (model, lineNumber) => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(lineNumber);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const twice = editor.createModel(`${text}\n${text}`, LanguageId);
+        const once = editor.createModel(`${text}\nPRINT`, LanguageId);
+        const left = editor.createModel(text, LanguageId);
+        try {
+            const untouched = red(left, 1);
+            setTypingPoint(twice, {lineNumber: 1, text, column});
+            assert.deepStrictEqual(red(twice, 2), untouched, "the other line keeps its red");
+            assert.deepStrictEqual(red(twice, 1), untouched, "the edited line is red too");
+            setTypingPoint(once, {lineNumber: 1, text, column});
+            assert.notDeepStrictEqual(red(once, 1), untouched, "a unique line is typed");
+        } finally {
+            left.dispose();
+            setTypingPoint(twice, null);
+            twice.dispose();
+            once.dispose();
+        }
     });
 });
 

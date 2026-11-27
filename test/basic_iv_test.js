@@ -23,6 +23,26 @@ const stops = (text, dialect) =>
 // Lines BASIC IV runs that are marked on purpose (see docs/rom-deviations.md): what follows a complete instruction is
 // ignored, and an ELSE that no IF is waiting for.
 const StricterThanRom = [
+    "[OPT0:STAPAGE:]",
+    "[OPT0:LDAGET:]",
+    "[OPT0:ASLTOP,X:]",
+    "[OPT0:LDATIME:]",
+    "[OPT0:ADCLEN:]",
+    "[OPT0:LDAPAGE+1:]",
+    "[OPT0:STAPAGE,X:]",
+    "[OPT0:LDAPAGE,Y:]",
+    "[OPT0:LDAGET$:]",
+    "[OPT0:LDAHIMEM:]",
+    "[OPT0:LDAFNa:]",
+    "[OPT0:NOPPAGE:]",
+    "[OPT0:LDAPAGE]",
+    "[OPT0:LDAPI:]",
+    "[OPT0:LDAPAGE ,X:]",
+    "[OPT0:EQUBPAGE:]",
+    "[OPT0:LDATOP:]",
+    "[OPT0:LDATOP.:]",
+    "[OPT0:LDAERL:]",
+    "[OPT0:LDARND:]",
     "X%=6ELSE7",
     "PRINT 1 ELSE PRINT 2",
     "A=1:B=2 ELSE C=3",
@@ -89,6 +109,9 @@ const StricterThanRom = [
     ),
     "[OPT0:TSB &70,Y:]",
 ];
+// Lines BASIC IV stops at and nothing marks: which target of an ON PROC list it reads depends on the value, so a PROC
+// with no name is marked only where every value stops (one target and no ELSE).
+const KnownGaps = ["ON 1 PROC ELSE PROCp", "ON 1 PROC,PROCp", "ON 2 PROCp,PROC"];
 // What BASIC II rejects and BASIC IV runs, each a row of both recorded tables.
 const OnlyOnBasicIV = [
     "VDU 23,255,255|",
@@ -205,6 +228,7 @@ describe("BASIC IV", () => {
         assert.deepStrictEqual(
             wrongRows(MasterVerdicts, {
                 stricter: StricterThanRom,
+                gaps: KnownGaps,
                 dialect: BasicIVDialect,
             }),
             [],

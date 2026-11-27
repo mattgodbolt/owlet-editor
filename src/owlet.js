@@ -23,6 +23,7 @@ import {
     LanguageId,
     rebuildBracketPairs,
     registerBbcBasicLanguage,
+    setTypingPoint,
     withoutCodes,
 } from "./bbcbasic";
 import {registerCompletions} from "./completions";
@@ -53,6 +54,29 @@ const SyntaxMarkerDelayMs = 500;
 
 function defaultLineNumber(line) {
     return line * 10;
+}
+
+/**
+ * The browser does not scroll the page for a cursor the editor has moved off the screen, or, in portrait, behind the
+ * toolbar fixed over the bottom of it, so this does.
+ */
+function keepCursorOnScreen(editor) {
+    const toolbar = document.getElementById("editor_toolbar");
+    editor.onDidChangeCursorPosition(() => {
+        if (!editor.hasTextFocus()) return;
+        // After Monaco has scrolled the cursor into its own view.
+        requestAnimationFrame(() => {
+            const cursor = editor.getScrolledVisiblePosition(editor.getPosition());
+            if (!cursor) return;
+            const top = editor.getDomNode().getBoundingClientRect().top + cursor.top;
+            const bottom =
+                getComputedStyle(toolbar).position === "fixed"
+                    ? toolbar.getBoundingClientRect().top
+                    : window.innerHeight;
+            if (top < 0) window.scrollBy(0, top);
+            else if (top + cursor.height > bottom) window.scrollBy(0, top + cursor.height - bottom);
+        });
+    });
 }
 
 export class OwletEditor {
@@ -145,13 +169,20 @@ export class OwletEditor {
 
         this.followLineNumbers = followImplicitLineNumbers(this.editor, this.dialect);
         fitMarkerWidgetToWrappedMessage(this.editor);
+        keepCursorOnScreen(this.editor);
         // An unfinished line is not marked while the cursor is on it, so moving off it marks it, unless an edit has the
         // markers about to be made anyway.
         this.editor.onDidChangeCursorPosition(({position}) => {
+            if (this.typingEdited || position.lineNumber !== this.typingPoint?.lineNumber)
+                this.followTyping();
             if (!this.syntaxTimer && position.lineNumber !== this.syntaxCursorLine)
                 this.showSyntaxMarkers();
         });
         this.editor.getModel().onDidChangeContent(() => {
+            this.typingEdited = true;
+            queueMicrotask(() => {
+                if (this.typingEdited) this.followTyping();
+            });
             const basicText = this.getBasicText();
             this.onChangeHandler(basicText);
             this.lineNumberDetect(basicText);
@@ -162,6 +193,7 @@ export class OwletEditor {
 
         this.emulator = new Emulator($("#emulator"));
         this.saveMemory = new SaveMemory(this.emulator);
+        this.emulator.onRunningChange = running => this.showRunning(running);
         this.basicDebugger = new BasicDebugger(this.editor, this.emulator, () => this.dialect);
 
         this.examples = {};
@@ -208,6 +240,20 @@ export class OwletEditor {
         );
     }
 
+    // The line being typed is the one the cursor is on after an edit, until the cursor leaves it. Monaco reports the
+    // cursor's move after the edit, and before its own listeners colour the line again (suggestions do, as you type);
+    // an edit that leaves the cursor where it was (Delete) reports no move, and is followed once it is done.
+    followTyping() {
+        const edited = this.typingEdited;
+        this.typingEdited = false;
+        const model = this.editor.getModel();
+        const {lineNumber, column} = this.editor.getPosition();
+        if (!edited && lineNumber === this.typingPoint?.lineNumber) return;
+        const text = edited ? model.getLineContent(lineNumber) : null;
+        this.typingPoint = edited ? {lineNumber, text, column: column - 1} : null;
+        setTypingPoint(model, this.typingPoint);
+    }
+
     // The markers for lines that end too soon, and for lines that are not there yet, would be wrong while the line is
     // still being typed, so they come only after the typing stops. The old ones stay until then; Monaco moves them
     // along with the text.
@@ -222,7 +268,9 @@ export class OwletEditor {
         const model = this.editor.getModel();
         this.syntaxCursorLine = this.editor.getPosition().lineNumber;
         const text = model.getValue();
-        const syntax = getSyntaxMarkers(text, this.dialect, this.syntaxCursorLine);
+        const {lineNumber, column} = this.typingPoint ?? {};
+        const typingAt = lineNumber === this.syntaxCursorLine ? column : null;
+        const syntax = getSyntaxMarkers(text, this.dialect, this.syntaxCursorLine, typingAt);
         const lineNumbers = getLineNumberMarkers(text, this.dialect, this.syntaxCursorLine);
         monacoEditor.setModelMarkers(model, "syntax", withoutCodes(syntax));
         monacoEditor.setModelMarkers(model, "lineNumbers", lineNumbers);
@@ -450,21 +498,26 @@ export class OwletEditor {
             .toggleClass("too_long", outputProgram.length > TweetMaximum);
     }
 
-    selectView(selected) {
+    /** Shows the play/pause icon and the screen button's name for whether the emulator is running, however it got so. */
+    showRunning(running) {
         const $play = $("#play-pause");
+        $play.toggleClass("play", !running);
+        $play.html(running ? "&#10074;&#10074;" : '<i class="fa-solid fa-play"></i>');
+        $("#screen-button").attr(
+            "aria-label",
+            running ? "Pause the emulator" : "Resume the emulator",
+        );
+    }
+
+    selectView(selected) {
+        const $screenButton = $("#screen-button");
         if (
             selected !== "screen" ||
-            (selected === "screen" &&
-                this.emulator.running &&
-                $("#screen-button").hasClass("selected"))
+            (selected === "screen" && this.emulator.running && $screenButton.hasClass("selected"))
         ) {
             this.emulator.pause();
-            $play.addClass("play");
-            $play.html('<i class="fa-solid fa-play" style="pointer-events: none;"></i>');
         } else {
             this.emulator.start();
-            $play.removeClass("play");
-            $play.html("&#10074;&#10074;");
         }
 
         for (const element of ["screen", "about", "examples", "reference"]) {
@@ -668,6 +721,7 @@ export class OwletEditor {
             rocket: () => this.rocket(),
             sound: () => this.toggleSound(),
             debug: () => this.basicDebugger.toggle(),
+            beam: () => this.basicDebugger.toggleBeam(),
             copy: () => {
                 this.copy();
                 this.closeModal();

@@ -91,11 +91,12 @@ function parts(token) {
     }
 }
 
-// The line's tokens as {offset, type, bracket}, and whether an assembler block is open at its end. `bracket` is set on
-// a "(" and the ")" that closes it on the same line, where neither is invalid, and on a valid "[" or "]": those are
-// the only text Monaco is to match brackets in. Neighbours of the same type and `bracket` are joined.
-export function highlightLine(text, dialect, inAssembler = false) {
-    const recogniser = new Recogniser(text, inAssembler, dialect);
+// The line's tokens as {offset, type, bracket}, whether an assembler block is open at its end, and whether the cursor
+// at `typingAt` (an offset, on a line being typed) kept any of it from being red. `bracket` is set on a "(" and the ")"
+// that closes it on the same line, where neither is invalid, and on a valid "[" or "]": those are the only text Monaco
+// is to match brackets in. Neighbours of the same type and `bracket` are joined.
+export function highlightLine(text, dialect, inAssembler = false, typingAt = null) {
+    const recogniser = new Recogniser(text, inAssembler, dialect, false, typingAt);
     const open = recogniser.line();
     const tokens = [];
     const unclosed = [];
@@ -115,20 +116,23 @@ export function highlightLine(text, dialect, inAssembler = false) {
         (part, i) =>
             i === 0 || part.type !== tokens[i - 1].type || part.bracket !== tokens[i - 1].bracket,
     );
-    return {tokens: joined, inAssembler: open};
+    return {tokens: joined, inAssembler: open, endsAtCursor: recogniser.endsAtCursor};
 }
 
-// The recogniser's reading of each line of a program, an assembler block open at the end of one carrying into the next.
-export function readEach(lines, dialect) {
+// The recogniser's reading of each line of a program, an assembler block open at the end of one carrying into the next,
+// and the line being typed ({lineNumber, column}, the column counted from 0) read with its cursor.
+export function readEach(lines, dialect, typing = null) {
     let inAssembler = false;
-    return lines.map(lineText => {
-        const recogniser = new Recogniser(lineText, inAssembler, dialect);
+    return lines.map((lineText, i) => {
+        const typingAt = i + 1 === typing?.lineNumber ? typing.column : null;
+        const recogniser = new Recogniser(lineText, inAssembler, dialect, false, typingAt);
         inAssembler = recogniser.line();
         return recogniser;
     });
 }
 
-export const readLines = (text, dialect) => readEach(text.split(/\r?\n/), dialect);
+export const readLines = (text, dialect, typing = null) =>
+    readEach(text.split(/\r?\n/), dialect, typing);
 
 // Each line's tokens as the dialect's tokeniser makes them: the lexer's, with each COLOR that is COLOUR as such, which
 // is decided as the highlighter does, with the assembler block a line may be in.
@@ -213,12 +217,20 @@ class State {
 const States = [new State(false), new State(true)];
 
 // `metadata(scopes, bracket)` is Monaco's encoding of a token: the theme's colours for the scopes, and whether Monaco
-// looks for brackets in its text.
-export function tokensProvider(languageId, metadata, dialect) {
+// looks for brackets in its text. Monaco gives a line's text but not its number, so the line being typed is the one
+// with the text of `typing` ({text, column, endsAtCursor}), whose `endsAtCursor` is set once its cursor has mattered.
+export function tokensProvider(languageId, metadata, dialect, typing) {
     return {
         getInitialState: () => States[0],
         tokenizeEncoded(line, state) {
-            const {tokens, inAssembler} = highlightLine(line, dialect, state.inAssembler);
+            const typingAt = line === typing.text ? typing.column : null;
+            const {tokens, inAssembler, endsAtCursor} = highlightLine(
+                line,
+                dialect,
+                state.inAssembler,
+                typingAt,
+            );
+            if (endsAtCursor) typing.endsAtCursor = true;
             return {
                 tokens: Uint32Array.from(
                     tokens.flatMap(({offset, type, bracket}) => [

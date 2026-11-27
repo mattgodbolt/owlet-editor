@@ -1,0 +1,19 @@
+[
+  ["PROC@", "ok", "at-in-names-373"],
+  ["PROC@a", "ok", "at-in-names-373"],
+  ["PROCa@", "ok", "at-in-names-373"],
+  ["PROCa@b(1)", "ok", "at-in-names-373"],
+  ["PROC@:X=1", "ok", "at-in-names-373"],
+  ["X=FN@", "ok", "at-in-names-373"],
+  ["X=FN@+1", "ok", "at-in-names-373"],
+  ["X=FNa@b(1)", "ok", "at-in-names-373"],
+  ["DEF PROC@", "ok", "at-in-names-373"],
+  ["DEF PROC@a", "ok", "at-in-names-373"],
+  ["DEF PROCa@", "ok", "at-in-names-373"],
+  ["DEF PROCa@b(A)", "ok", "at-in-names-373"],
+  ["DEF FN@=7", "ok", "at-in-names-373"],
+  ["DEF FNa@b(A)=A", "ok", "at-in-names-373"],
+  ["DEF FN@a=4", "ok", "at-in-names-373"],
+  ["PROC@%", "Syntax error", "at-in-names-373"],
+  ["X=FN@%", "Syntax error", "at-in-names-373"]
+]

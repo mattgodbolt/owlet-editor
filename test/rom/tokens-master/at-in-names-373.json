@@ -1,0 +1,21 @@
+[
+  ["PROC@", "f2 40", "at-in-names-373"],
+  ["PROC@a", "f2 40 61", "at-in-names-373"],
+  ["PROCa@", "f2 61 40", "at-in-names-373"],
+  ["PROCa@b(1)", "f2 61 40 62 28 31 29", "at-in-names-373"],
+  ["PROC@:X=1", "f2 40 3a 58 3d 31", "at-in-names-373"],
+  ["X=FN@", "58 3d a4 40", "at-in-names-373"],
+  ["X=FN@+1", "58 3d a4 40 2b 31", "at-in-names-373"],
+  ["X=FNa@b(1)", "58 3d a4 61 40 62 28 31 29", "at-in-names-373"],
+  ["DEF PROC@", "dd 20 f2 40", "at-in-names-373"],
+  ["DEF PROC@a", "dd 20 f2 40 61", "at-in-names-373"],
+  ["DEF PROCa@", "dd 20 f2 61 40", "at-in-names-373"],
+  ["DEF PROCa@b(A)", "dd 20 f2 61 40 62 28 41 29", "at-in-names-373"],
+  ["DEF FN@=7", "dd 20 a4 40 3d 37", "at-in-names-373"],
+  ["DEF FNa@b(A)=A", "dd 20 a4 61 40 62 28 41 29 3d 41", "at-in-names-373"],
+  ["DEF FN@a=4", "dd 20 a4 40 61 3d 34", "at-in-names-373"],
+  ["PROC@%", "f2 40 25", "at-in-names-373"],
+  ["X=FN@%", "58 3d a4 40 25", "at-in-names-373"],
+  ["PROCa@b", "f2 61 40 62", "at-in-names-373"],
+  ["X=FNa@b", "58 3d a4 61 40 62", "at-in-names-373"]
+]

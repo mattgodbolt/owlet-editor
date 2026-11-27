@@ -40,3 +40,53 @@ test.describe("Syntax colouring", () => {
         });
     }
 });
+
+// vs-dark's colour for the "invalid" token type.
+const Red = "rgb(244, 71, 71)";
+
+/** The text of each part of the line that Monaco shows in red. */
+const redOn = locator =>
+    locator.evaluate(
+        (element, red) =>
+            [...element.querySelectorAll("span span")]
+                .filter(span => getComputedStyle(span).color === red)
+                .map(span => span.textContent),
+        Red,
+    );
+
+test.describe("A line being typed", () => {
+    test.beforeEach(async ({page, baseURL}) => {
+        await page.route(
+            url => url.origin !== new URL(baseURL).origin,
+            route => route.fulfill({status: 204, body: ""}),
+        );
+        await page.goto(link(":PRINT I:NEXT\nPRINT"));
+        await expect(line(page, "NEXT")).toBeVisible();
+    });
+
+    test("is not red in front of a colon, or before a closing bracket the editor added, until the cursor leaves it", async ({
+        page,
+    }) => {
+        const typed = line(page, "NEXT");
+        await typed.click();
+        await page.keyboard.press("Home");
+        for (const key of "FOR I=1 TO") {
+            await page.keyboard.type(key);
+            // Monaco colours an edited line again shortly after showing it.
+            await page.waitForTimeout(200);
+            expect(await redOn(typed)).toEqual([]);
+        }
+        await page.keyboard.press("ArrowDown");
+        await expect.poll(() => redOn(typed)).toEqual(["TO"]);
+
+        await page.keyboard.press("End");
+        await page.keyboard.press("Enter");
+        for (const key of "IF (X A") await page.keyboard.type(key);
+        const opened = line(page, "IF (X A)");
+        await expect(opened).toBeVisible();
+        await page.waitForTimeout(200);
+        expect(await redOn(opened)).toEqual([]);
+        await page.keyboard.press("ArrowUp");
+        await expect.poll(() => redOn(opened)).not.toEqual([]);
+    });
+});

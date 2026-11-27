@@ -9,7 +9,7 @@ ROM disagrees is in [deliberate deviations from the ROM](rom-deviations.md).
 
 Red means that BBC BASIC II (BASIC IV on a Master 128, [below](#basic-iv-the-master)) would stop with an error at that
 statement if it ran it, and that no more typing at the end of the line could change that. The colours depend on the
-text alone, not on where the cursor is.
+text alone, apart from the statement being typed (below).
 
 - **Red runs to the end of the statement**: BASIC stops at the first token that cannot continue a statement and never
   reads the rest, so that token and the rest of the statement are red. `I am a badger` is `I` as a variable and
@@ -32,21 +32,28 @@ text alone, not on where the cursor is.
   `A$=LEFT$(B$,)`, `PRINT (1+)`, `PRINT TAB(1,)` and `DIM a()`. Monaco closes only `(` and `"`, and an open `"` is
   unfinished already. The recogniser tries a short list of fillers (a value, `,1`, `1,1`...) at the `)` and asks
   whether the statement is then valid. `A$=LEFT$(X$)` is unfinished too, though one argument short, because the editor
-  shows it at `LEFT$(X$|)` and the two cannot be told apart. The colour cannot know the cursor, so a line left like
+  shows it at `LEFT$(X$|)` and the two cannot be told apart. This does not depend on the cursor, so a line left like
   that in a finished program gets a marker instead (below). Everything else that stops short is red: no typing at the
   end mends it, and the ROM rejects it as written. `GOTO:PRINT`, `FOR I=1 TO:NEXT`, `IF PRINT 2` and `X=1+:PRINT X` are
   red, and so are `GOTO 20 30`, `PRINT )`, `A=1'`, `X=1+*` and `PRINT (1+2))`. Text typed in front of existing text
-  gets no allowance, so it is red until its statement is finished (`FOR I=1 TO 10` in front of `:PRINT I:NEXT` is red
-  from `F` to `FOR I=1 TO `, and not once the `10` is there). Words typed against the next word with no space
-  (`IF A=1 TPRINT 2`, which is a name, `TPRINT`, and a number) are red until the space is typed.
+  other than a `:` (next) gets no allowance, so it is red until its statement is finished (`IF A=1 THEN ` in front of
+  `PRINT 2`). Words typed against the next word with no space (`IF A=1 TPRINT 2`, which is a name, `TPRINT`, and a
+  number) are red until the space is typed.
+- **The statement being typed**: after an edit, the line the cursor is on is read as if it ended at the cursor, where
+  nothing but closing brackets comes between the cursor and a `:` or the end of the line, until the cursor leaves the
+  line (moving along it keeps that reading). So a statement typed in front of a `:` is not red while it is unfinished
+  (`FOR I=1 TO 10` in front of `:PRINT I:NEXT`, from `F` to `FOR I=1 TO `), nor is one typed before a `)` the editor
+  closed for you (`IF (X A`, where `A` could become `AND`, though `IF (X A)` is red). Once the cursor leaves the line
+  it is read as written, and red if it is still wrong. Suggested by Olly Betts on #200.
 - **Markers**: about half a second after the last edit (until then the old markers stay, moving with the text), a
   statement BASIC would stop at gets an error squiggle on its red text, and an unfinished line gets a warning squiggle:
   at its end, or at the token where the statement stopped when something is missing from the middle. Both come from the
   recogniser that colours the text. The message is the ROM's own error text (`Mistake`, `Syntax error`, `No TO`,
   `Missing ,`, `Missing "` and so on) where the recogniser knows it; the recorded rows in `test/rom/verdicts` are
   checked against it, and where the ROM's wording depends on context (a call's arguments) there is no text rather than
-  a guess. Unlike the colours, markers may depend on the cursor: the line the cursor is on is not marked as unfinished
-  (it would blink with every key) until the cursor leaves it. An assembler block that is never closed is one error on
+  a guess. Markers depend on the cursor more than the colours do: the line the cursor is on is not marked as
+  unfinished (it would blink with every key) until the cursor leaves it, and the statement being typed is read as the
+  colours read it. An assembler block that is never closed is one error on
   its `[`, not one per later line (the later lines are coloured as before). A syntax marker is left out where a warning
   already covers the same text (`x == 3` has the warning about `==`). Quick fixes are offered only for warnings, never
   for a syntax marker, apart from an index register that BASIC II reads only in capitals (`LDA 42,x`, `STA (42),y`):
