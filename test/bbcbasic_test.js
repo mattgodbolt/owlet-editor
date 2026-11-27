@@ -2535,6 +2535,7 @@ describe("Syntax markers", () => {
         const Call =
             "PROC needs a procedure name straight after it, with no space (BASIC: Bad call)";
         // Each mark is [severity, marked text, message]; a Bad call where every value stops, else the deliberate one.
+        const NotExpected = ", is not expected here";
         const call = (severity, marked) => [severity, marked, Call];
         const target = marked => [Stops, marked, Target];
         it.each([
@@ -2562,6 +2563,8 @@ describe("Syntax markers", () => {
             ["ON 1 PROCp,PROC(", "ok", [target("PROC")]],
             ["ON 2 PROCp,PROC(", "Bad call", [target("PROC")]],
             ["ON 1 PROCp,PROC(1)", "ok", [target("PROC")]],
+            ["ON 1 PROC(,PROCp", "Bad call", [target("PROC"), [Stops, ",PROCp", NotExpected]]],
+            ["ON 1 PROC(", "Bad call", [target("PROC"), [EndsTooSoon, "(", "Unfinished after ("]]],
         ])("%s (the ROM: %s)", (text, verdict, expected) => {
             assert.strictEqual(masterVerdicts.get(text), verdict, text);
             const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
@@ -2578,6 +2581,16 @@ describe("Syntax markers", () => {
                 assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect), []);
             },
         );
+        // Nothing typed after the ( can give the PROC a name, so it stays marked with the cursor at the end; the ROM
+        // stops at the first one for 1, and a later value reads it only if it picks it.
+        it.each(["ON 1 PROC(", "ON 2 PROC("])("should mark %s with the cursor at the end", text => {
+            const found = getSyntaxMarkers(text, BasicIVDialect, 1, text.length).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, [target("PROC")]);
+        });
         it("should not mark the last PROC of a list while it is being typed", () => {
             const text = "ON 1 PROCp,PROC";
             assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect, 1, text.length), []);
@@ -2698,11 +2711,9 @@ describe("A line being typed", () => {
         unfinished: [false, [MarkerSeverity.Warning]],
         red: [true, [MarkerSeverity.Error]],
     };
-    const shown = (text, typingAt, cursorLine) => [
-        highlightLine(text, ModelBDialect, false, typingAt).tokens.some(t => t.type === "invalid"),
-        getSyntaxMarkers(`${text}\nPRINT`, ModelBDialect, cursorLine, typingAt).map(
-            m => m.severity,
-        ),
+    const shown = (text, typingAt, cursorLine, dialect = ModelBDialect) => [
+        highlightLine(text, dialect, false, typingAt).tokens.some(t => t.type === "invalid"),
+        getSyntaxMarkers(`${text}\nPRINT`, dialect, cursorLine, typingAt).map(m => m.severity),
     ];
     // The text with | at the cursor, as the line shows while the cursor is there and once it has left the line.
     it.each([
@@ -2718,11 +2729,17 @@ describe("A line being typed", () => {
         ["|GOTO:PRINT", "red", "red"],
         ["FOR I=1 TO|", "plain", "unfinished"],
         ["GOTO 20 30|", "red", "red"],
-    ])("%s", (typed, typing, left) => {
+        ["DEF PROC|", "plain", "red"],
+        ["DEF FN|", "plain", "red"],
+        ["X=1:DEF PROC|", "plain", "red"],
+        ["DEF PROC |", "red", "red"],
+        ["ON 1 PROCp,PROC|", "plain", "red", BasicIVDialect],
+        ["ON 1 PROCp,PROC |", "red", "red", BasicIVDialect],
+    ])("%s", (typed, typing, left, dialect) => {
         const at = typed.indexOf("|");
         const text = typed.replace("|", "");
-        assert.deepStrictEqual(shown(text, at, 1), Shown[typing], "typing");
-        assert.deepStrictEqual(shown(text, null, 2), Shown[left], "left");
+        assert.deepStrictEqual(shown(text, at, 1, dialect), Shown[typing], "typing");
+        assert.deepStrictEqual(shown(text, null, 2, dialect), Shown[left], "left");
     });
     it("should colour the line again as the cursor moves after an edit, and once it leaves the line", () => {
         const text = "FOR I=1 TO:PRINT I:NEXT";
@@ -2747,6 +2764,40 @@ describe("A line being typed", () => {
         } finally {
             setTypingPoint(typed, null);
             typed.dispose();
+            untyped.dispose();
+        }
+    });
+    // The cursor mattered to these lines' colours, so they are coloured again when it leaves.
+    it.each([
+        ["DEF PROC", ModelBDialect],
+        ["DEF FN", ModelBDialect],
+        ["ON 1 PROCp,PROC", BasicIVDialect],
+    ])("should note that the cursor matters to %s", (text, dialect) => {
+        assert.strictEqual(highlightLine(text, dialect, false, text.length).endsAtCursor, true);
+        assert.strictEqual(highlightLine(text, dialect, false, null).endsAtCursor, false);
+        assert.strictEqual(
+            highlightLine(`${text} `, dialect, false, text.length + 1).endsAtCursor,
+            false,
+        );
+    });
+    it("should colour a keyword with no name again once the cursor leaves the line", () => {
+        const text = "DEF PROC";
+        const colours = model => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(1);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const model = editor.createModel(`${text}\nPRINT`, LanguageId);
+        const untyped = editor.createModel(`${text}\nPRINT`, LanguageId);
+        try {
+            setTypingPoint(model, {lineNumber: 1, text, column: text.length});
+            const typing = colours(model);
+            setTypingPoint(model, {lineNumber: 2, text: "PRINT", column: 5});
+            assert.notDeepStrictEqual(typing, colours(untyped));
+            assert.deepStrictEqual(colours(model), colours(untyped));
+        } finally {
+            setTypingPoint(model, null);
+            model.dispose();
             untyped.dispose();
         }
     });

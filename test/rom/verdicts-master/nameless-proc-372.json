@@ -48,5 +48,8 @@
   ["ON 1 PROCp,PROC(1)", "ok", "nameless-proc-372"],
   ["ON 2 PROCp,PROC(", "Bad call", "nameless-proc-372"],
   ["DEF FN ", "ok", "nameless-proc-372"],
-  ["PROC ", "Bad call", "nameless-proc-372"]
+  ["PROC ", "Bad call", "nameless-proc-372"],
+  ["ON 1 PROC(", "Bad call", "nameless-proc-372"],
+  ["ON 1 PROC(,PROCp", "Bad call", "nameless-proc-372"],
+  ["ON 1 PROC(1,PROCp", "Bad call", "nameless-proc-372"]
 ]

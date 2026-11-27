@@ -1038,7 +1038,14 @@ export class Recogniser {
         const procedures = branch.kw.keyword === "PROC";
         let nameless = procedures && !this.named();
         let from = this.peek().start;
-        let target = this.onTarget(procedures);
+        let target;
+        try {
+            target = this.onTarget(procedures);
+        } catch (e) {
+            // Whatever is typed after a PROC with no name cannot give it one, so the mark stays with the failure.
+            if (nameless && e instanceof Failure) this.namelessTarget(branch);
+            throw e;
+        }
         // With one target and no ELSE after it on the line, BASIC stops whatever the value: Bad call at 1, ON range
         // otherwise.
         if (nameless && this.atEnd() && !this.elseFollows()) this.badCall(branch);
@@ -1077,10 +1084,11 @@ export class Recogniser {
     // Whether the keyword ends the text, with nothing after it, not even a space, and the cursor is at the end or the
     // text is a probe of what could be typed, so that a name may still be typed straight after it.
     nameMayFollow(keyword) {
-        return (
-            keyword.end === this.lexer.text.length &&
-            (this.probing || (this.typingAt !== null && this.typingAt >= this.lexer.text.length))
-        );
+        if (keyword.end !== this.lexer.text.length) return false;
+        if (this.probing) return true;
+        const typed = this.typingAt !== null && this.typingAt >= this.lexer.text.length;
+        if (typed) this.endsAtCursor = true;
+        return typed;
     }
 
     elseFollows() {
