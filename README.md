@@ -21,8 +21,9 @@ and it runs on an emulated BBC Micro beside it.
 * Export to external emulator for interactive use
 
 The Share dialog also opens the program in [Archimedes Live](https://archi.medes.live/), which runs BBC BASIC V on
-emulated Acorn Archimedes machines. It numbers lines that have no number and renumbers the program (as 10, 20, 30 and so
-on, with `GOTO` targets updated), so the line numbers there can differ from the editor's.
+emulated Acorn Archimedes machines. A program whose lines all have numbers is used as it is. One that mixes numbered
+and unnumbered lines is renumbered (as 10, 20, 30 and so on, with `GOTO` targets updated), so its line numbers there can
+differ from the editor's.
 
 ### Links that ask for sound
 
