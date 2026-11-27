@@ -17,6 +17,8 @@ const BlockSync = 0x2a;
 const ProgramStartsAfterLine = 2;
 const NewMarker = 0xff;
 
+const hex = (value, digits) => value.toString(16).toUpperCase().padStart(digits, "0");
+
 const readLe = (bytes, at, size) =>
     bytes.slice(at, at + size).reduce((sum, byte, i) => sum + byte * 2 ** (8 * i), 0);
 
@@ -88,6 +90,21 @@ describe("The exported tape", () => {
                     expect(await afterRunning(session, TapeSearchCycles)).toContain(
                         `${TapeFileName}      00 ${length}`,
                     );
+                },
+                EmulatorTestTimeout,
+            );
+
+            it.skipIf(skip)(
+                "should show the machine's own load and exec addresses for the file, with *OPT1,2",
+                async () => {
+                    const {program, image} = await withProgram(machine, extraRoms);
+                    const session = await withTape({machine, extraRoms}, image, "*OPT1,2");
+                    await session.runUntilPrompt();
+                    await session.type('LOAD""');
+                    // The name, block number, length, load address and exec address the tape filing system read
+                    // from the file's header and printed itself
+                    const header = `${TapeFileName}      00 ${hex(program.length, 4)}    FFFF${hex(page, 4)} FFFF${hex(exec, 4)}`;
+                    expect(await afterRunning(session, TapeSearchCycles)).toContain(header);
                 },
                 EmulatorTestTimeout,
             );
