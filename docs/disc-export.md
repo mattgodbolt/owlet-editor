@@ -35,4 +35,5 @@ part of the screen is not captured.
 
 In a shadow mode (`MODE 128` to `135`) `SCREEN` is the shadow RAM the picture is in, whatever the program has paged in
 for the CPU; on the Model B, and on the Master in any other mode, it is main RAM. `*LOAD` puts a file in main RAM, so to
-see a shadow mode's picture again use the same mode without the shadow (`MODE 1` for `MODE 129`).
+see a shadow mode's picture again use the same mode without the shadow (`MODE 1` for `MODE 129`). That was checked on
+jsbeeb's Master (MOS 3.20, DFS), not on a real one.
