@@ -42,7 +42,7 @@ import {
 } from "./machines";
 import {followImplicitLineNumbers} from "./renumber";
 import {fitMarkerWidgetToWrappedMessage} from "./marker-widget";
-import {makeUEF} from "./UEF";
+import {tapeImage} from "./tape-export";
 import {discImage} from "./disc-export";
 import {createVduReference} from "./vdu-reference";
 import {describeBuild} from "./version";
@@ -657,9 +657,7 @@ export class OwletEditor {
     async openCassette() {
         let tokenized = await this.tokeniser.tokenise(this.getBasicText());
 
-        let uef = btoa(
-            String.fromCharCode.apply(null, makeUEF("TWEET", 0x1900, 0x1900, tokenized)),
-        );
+        let uef = btoa(String.fromCharCode.apply(null, tapeImage(tokenized, this.emulator.cpu)));
         console.log(uef);
         uef = uef.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // make URL safe base64
 

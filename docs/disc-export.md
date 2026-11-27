@@ -15,6 +15,12 @@ and the exec address is the BASIC ROM's entry. Checked with a real `SAVE` on eac
 | Model B without the GXR        | &1900  | `FFFF1900` | `FFFF8023` |
 | Master 128                     | &E00   | `FFFF0E00` | `FFFF802B` |
 
+The Tape button's UEF file is headed with the same load and exec addresses (`tapeImage` in `src/tape-export.js` takes them
+from `basicSaveAddresses` too), so that `*LOAD` and `*RUN` of the tape file place and enter the program as the disc's do.
+The tape filing system displays them too: after `*TAPE` and `*OPT1,2`, `LOAD""` prints the file's name, block number, length,
+load address and exec address as it read them from the header. The test checks that display on each machine. A real tape
+`SAVE` has not been compared, as jsbeeb cannot record to tape.
+
 `CHAIN` loads at the current `PAGE` whatever the file's addresses say, so `!BOOT` does not depend on them; `!BOOT` itself
 is catalogued at &1900 for both. `!BOOT` is `*BASIC` then `CHAIN"PROGRAM"`, so it selects BASIC first and also works
 when another language ROM is the current language.
