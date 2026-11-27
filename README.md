@@ -75,7 +75,9 @@ is red.
 
 - **A line you are still typing is not red.** `FOR I=1 TO`, `PRINT "HI` and `A$=LEFT$()` (the editor closes the
   bracket for you) keep their ordinary colours. A line left unfinished gets a warning squiggle once the cursor leaves
-  it.
+  it. A statement you type in front of a `:` (`FOR I=1 TO` in front of `:PRINT I:NEXT`) or of a `)` the editor closed
+  for you (`IF (X A`) is not red either while the cursor is on its line; once the cursor leaves, it is red if it is
+  still wrong.
 - **Hover over red text for the reason.** About half a second after you stop typing, red text gets an error squiggle,
   with BASIC's own message where Owlet knows it (`Mistake`, `Syntax error`, `No TO`, `Missing ,`...). F8 goes to the
   next one.

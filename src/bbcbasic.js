@@ -11,6 +11,7 @@ import {
     ForeignOperators,
     SpaceBeforeKeywordCode,
     SpacedKeywords,
+    TypedToEnd,
     ZeroBeforeGcolArgumentCode,
 } from "./parser/recogniser";
 import {
@@ -78,6 +79,33 @@ export function rebuildBracketPairs(model) {
 // BASIC IV adds no keyword that ends in "(", so BASIC II's table gives the same list for both dialects.
 const openParenKeywords = keywords.filter(kw => kw.keyword.endsWith("("));
 let registrations = [];
+const typing = {lineNumber: 0, text: null, column: 0, endsAtCursor: false};
+
+/**
+ * Has the tokenizer read the line being typed, {lineNumber, text, column} with the column counted from 0, with its
+ * cursor, or no line so if it is null. Monaco colours a line again only when its text changes, so the model is coloured
+ * again where the old line's colours depended on its cursor and it has not been edited since, and where Monaco has
+ * coloured the line since the edit but before the cursor moved (it does as you type with suggestions showing).
+ */
+export function setTypingPoint(model, point) {
+    const {lineNumber = 0, text = null, column = 0} = point ?? {};
+    if (lineNumber === typing.lineNumber && text === typing.text && column === typing.column)
+        return;
+    const edited = lineNumber === typing.lineNumber && text !== typing.text;
+    const left = typing.endsAtCursor && !edited;
+    // The tokens provider is given no line number, so a line another line repeats cannot be told from it.
+    const repeated =
+        text !== null &&
+        model.getLinesContent().some((line, i) => line === text && i + 1 !== lineNumber);
+    const rest = text?.slice(column) ?? "";
+    const early =
+        !repeated &&
+        rest.trim() !== "" &&
+        TypedToEnd.test(rest) &&
+        model.tokenization.hasAccurateTokensForLine(lineNumber);
+    Object.assign(typing, {lineNumber, text: repeated ? null : text, column, endsAtCursor: false});
+    if (left || early) model.tokenization.resetTokenization();
+}
 
 /** Has the editor read its BBC BASIC by the dialect, in place of the one it was reading by. */
 export function registerBbcBasicLanguage(dialect) {
@@ -107,7 +135,10 @@ export function registerBbcBasicLanguage(dialect) {
     });
 
     registrations = [
-        languages.setTokensProvider(LanguageId, tokensProvider(LanguageId, tokenMetadata, dialect)),
+        languages.setTokensProvider(
+            LanguageId,
+            tokensProvider(LanguageId, tokenMetadata, dialect, typing),
+        ),
         configuration,
         languages.registerCodeActionProvider(LanguageId, codeActionProviderFor(dialect)),
     ];
@@ -279,9 +310,11 @@ export function getWarnings(text, dialect) {
 }
 
 // The markers for the lines BASIC would stop at, and for those that end too soon or have something missing. A line is unfinished while the cursor is on it (`cursorLine`) and so is not marked then,
-// and a warning that covers the same text says enough.
-export function getSyntaxMarkers(text, dialect, cursorLine = 0) {
-    const recognisers = readLines(text, dialect);
+// and a warning that covers the same text says enough. `typingAt` is the cursor's offset on that line if it is being
+// typed, which is read as the tokenizer reads it.
+export function getSyntaxMarkers(text, dialect, cursorLine = 0, typingAt = null) {
+    const typingPoint = typingAt === null ? null : {lineNumber: cursorLine, column: typingAt};
+    const recognisers = readLines(text, dialect, typingPoint);
     const warnings = recognisers.map(({lexer, tokens}) =>
         lineWarnings(lexer.text, tokens, dialect),
     );

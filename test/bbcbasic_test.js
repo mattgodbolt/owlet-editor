@@ -6,6 +6,7 @@ import {
     LanguageId,
     rebuildBracketPairs,
     registerBbcBasicLanguage,
+    setTypingPoint,
 } from "../src/bbcbasic";
 import {
     BasicIIDialect,
@@ -2564,6 +2565,92 @@ describe("Syntax markers", () => {
         assert.deepStrictEqual(markers("[\nLDA #\n]"), [
             [MarkerSeverity.Warning, Unfinished("a value", "#", "No such variable"), 2, 5, 6],
         ]);
+    });
+});
+
+describe("A line being typed", () => {
+    // What the line shows: its colour, and its markers' severities.
+    const Shown = {
+        plain: [false, []],
+        unfinished: [false, [MarkerSeverity.Warning]],
+        red: [true, [MarkerSeverity.Error]],
+    };
+    const shown = (text, typingAt, cursorLine) => [
+        highlightLine(text, ModelBDialect, false, typingAt).tokens.some(t => t.type === "invalid"),
+        getSyntaxMarkers(`${text}\nPRINT`, ModelBDialect, cursorLine, typingAt).map(
+            m => m.severity,
+        ),
+    ];
+    // The text with | at the cursor, as the line shows while the cursor is there and once it has left the line.
+    it.each([
+        ["FOR I=1 TO|:PRINT I:NEXT", "plain", "red"],
+        ["GOTO |:REM x", "plain", "red"],
+        ["A=1:B=|:C=2", "plain", "red"],
+        ["X=1+| :PRINT X", "plain", "red"],
+        ["IF (X A|)", "plain", "red"],
+        ["IF (X A|):PRINT", "plain", "red"],
+        ["IF (X A|+1)", "red", "red"],
+        ["IF A=1 T|PRINT 2", "red", "red"],
+        ["GOTO:PRINT |:END", "red", "red"],
+        ["|GOTO:PRINT", "red", "red"],
+        ["FOR I=1 TO|", "plain", "unfinished"],
+        ["GOTO 20 30|", "red", "red"],
+    ])("%s", (typed, typing, left) => {
+        const at = typed.indexOf("|");
+        const text = typed.replace("|", "");
+        assert.deepStrictEqual(shown(text, at, 1), Shown[typing], "typing");
+        assert.deepStrictEqual(shown(text, null, 2), Shown[left], "left");
+    });
+    it("should colour the line again as the cursor moves after an edit, and once it leaves the line", () => {
+        const text = "FOR I=1 TO:PRINT I:NEXT";
+        const colours = model => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(1);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const typed = editor.createModel("FOR I=1 T:PRINT I:NEXT\nPRINT", LanguageId);
+        const untyped = editor.createModel(text, LanguageId);
+        try {
+            colours(typed);
+            // The O typed before the colon, coloured before the cursor moves past it, as Monaco does with suggestions
+            // showing.
+            typed.pushEditOperations([], [{range: new Range(1, 10, 1, 10), text: "O"}], () => null);
+            assert.deepStrictEqual(colours(typed), colours(untyped));
+            setTypingPoint(typed, {lineNumber: 1, text, column: 10});
+            const typing = colours(typed);
+            setTypingPoint(typed, {lineNumber: 2, text: "PRINT", column: 5});
+            assert.notDeepStrictEqual(typing, colours(untyped));
+            assert.deepStrictEqual(colours(typed), colours(untyped));
+        } finally {
+            setTypingPoint(typed, null);
+            typed.dispose();
+            untyped.dispose();
+        }
+    });
+    it("should not give the allowance to a line another line repeats, and should to a line that is unique", () => {
+        const text = "FOR I=1 TO:PRINT";
+        const column = 10;
+        const red = (model, lineNumber) => {
+            model.tokenization.forceTokenization(model.getLineCount());
+            const tokens = model.tokenization.getLineTokens(lineNumber);
+            return Array.from({length: tokens.getCount()}, (_, i) => tokens.getForeground(i));
+        };
+        const twice = editor.createModel(`${text}\n${text}`, LanguageId);
+        const once = editor.createModel(`${text}\nPRINT`, LanguageId);
+        const left = editor.createModel(text, LanguageId);
+        try {
+            const untouched = red(left, 1);
+            setTypingPoint(twice, {lineNumber: 1, text, column});
+            assert.deepStrictEqual(red(twice, 2), untouched, "the other line keeps its red");
+            assert.deepStrictEqual(red(twice, 1), untouched, "the edited line is red too");
+            setTypingPoint(once, {lineNumber: 1, text, column});
+            assert.notDeepStrictEqual(red(once, 1), untouched, "a unique line is typed");
+        } finally {
+            left.dispose();
+            setTypingPoint(twice, null);
+            twice.dispose();
+            once.dispose();
+        }
     });
 });
 
