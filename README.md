@@ -115,6 +115,8 @@ Each has a hover saying what BASIC actually does. They include:
 - an `ELSE` that no `IF` is waiting for, as in `PRINT 1 ELSE PRINT 2`, where BASIC skips the rest of the line;
 - text after a target in an `ON X GOTO` list, as in `ON X GOTO 20E1,30`, where the first target is line 20 and BASIC
   never reads the `E1`;
+- a `DEF PROC` or `DEF FN` with no name, which BASIC skips but nothing can call, and a `PROC` with no name in an
+  `ON ... PROC` list, which BASIC stops at only if the value picks it;
 - a string where BASIC wants a number, or the other way round, as in `X=1+"A"`, which BASIC only rejects
   (`Type mismatch`) when it runs the line.
 

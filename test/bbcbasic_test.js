@@ -2455,43 +2455,124 @@ describe("Syntax markers", () => {
             ]);
             assert.deepStrictEqual(found, [[severity, marked, message]]);
         });
-        it.each([
-            "PROCp",
-            "PROCq(1)",
-            "PROCq (1)",
-            "IF FNf THEN X=1",
-            "X=FNf+1",
-            "DEF PROC",
-            "DEF FN",
-        ])("should leave %s alone", text => {
-            assert.strictEqual(table.get(text), "ok", text);
-            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
-        });
+        it.each(["PROCp", "PROCq(1)", "PROCq (1)", "IF FNf THEN X=1", "X=FNf+1"])(
+            "should leave %s alone",
+            text => {
+                assert.strictEqual(table.get(text), "ok", text);
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+            },
+        );
         // A call reads @ as part of the name, though the tokeniser does not (PROC@ is No such FN/PROC).
         it.each(["PROC@", "X=FN@"])("should not say Bad call for %s", text => {
             for (const {message} of getSyntaxMarkers(text, dialect))
                 assert.ok(!message.includes("Bad call"), message);
         });
     });
-    // An ON PROC list reads its first target only for 1; any other value looks for an ELSE anywhere on the line.
-    it.each([
-        ["ON 1 PROC", MarkerSeverity.Warning, "PROC"],
-        ["ON X PROC", MarkerSeverity.Warning, "PROC"],
-        ['ON 1 PROC:PRINT"ELSE"', MarkerSeverity.Error, "PROC"],
-        ["ON 2 PROC ELSE Y=1", null, null],
-        ["ON 2 PROC:X=1 ELSE Y=1", null, null],
-        ["ON 2 PROC,PROCp", null, null],
-    ])(
-        "should mark the PROC of BASIC IV's %s only where every value stops",
-        (text, severity, marked) => {
-            assert.strictEqual(masterVerdicts.get(text), severity === null ? "ok" : "Bad call");
+    // BASIC skips a DEF, so a DEF PROC or DEF FN with no name runs without error on both ROMs but can never be called
+    // (a call with no name is Bad call); it is marked on purpose, as is the same text in a program BASIC never reads.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("a DEF with no name on %s", (_, dialect, table) => {
+        const Def = word =>
+            `DEF ${word} has no name, so nothing can call it (a call needs the name straight after ${word}): BASIC skips a DEF, so this runs without error`;
+        it.each([
+            ["DEF PROC:X=1", "DEF PROC", "PROC"],
+            ["DEF FN:X=1", "DEF FN", "FN"],
+            ["DEF PROC(X)", "DEF PROC(X)", "PROC"],
+            ["DEF FN(X)=X", "DEF FN(X)=X", "FN"],
+            ["DEF FN =1", "DEF FN =1", "FN"],
+            ["X=1:DEF PROC", "DEF PROC", "PROC"],
+            ["X=1:DEF FN", "DEF FN", "FN"],
+            ["DEF PROC", "DEF PROC", "PROC"],
+            ["DEF FN", "DEF FN", "FN"],
+            ["IF 0 THEN DEF PROC", "DEF PROC", "PROC"],
+            ["IF 1 THEN DEF FN", "DEF FN", "FN"],
+        ])("%s should be marked", (text, _row, word) => {
+            assert.strictEqual(table.get(text), "ok", text);
+            const found = getSyntaxMarkers(text, dialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, [[MarkerSeverity.Error, word, Def(word)]]);
+        });
+        it.each([
+            "DEF PROCp",
+            "DEF FNf",
+            "DEF FN@",
+            "DEF PROC@",
+            "REM DEF PROC",
+            "REM DEF FN",
+            'PRINT "DEF PROC"',
+            'PRINT "DEF FN":X=1',
+            "DATA DEF PROC",
+        ])("should leave %s alone", text => {
+            assert.strictEqual(table.get(text), "ok", text);
+            assert.deepStrictEqual(getSyntaxMarkers(text, dialect), []);
+        });
+        // The name may still be typed where the line ends, so nothing is red under the cursor there.
+        it.each(["DEF PROC", "DEF FN", "DEF PRO.", "X=1:DEF FN"])(
+            "should not mark %s while it is being typed",
+            text => {
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect, 1, text.length), []);
+                assert.deepStrictEqual(getSyntaxMarkers(text, dialect, 2, null).length, 1);
+            },
+        );
+    });
+    // An ON PROC list reads its first target only for 1; any other value looks for an ELSE anywhere on the line. A
+    // PROC with no name is marked wherever it could be valid, as with the branch of an IF whose condition is false.
+    describe("a PROC with no name in BASIC IV's ON list", () => {
+        const {Error: Stops, Warning: EndsTooSoon} = MarkerSeverity;
+        const Target =
+            "PROC has no name (it needs one straight after it, with no space): BASIC stops with Bad call if this target is chosen, but runs the line otherwise";
+        const Call =
+            "PROC needs a procedure name straight after it, with no space (BASIC: Bad call)";
+        // Each mark is [severity, marked text, message]; a Bad call where every value stops, else the deliberate one.
+        const call = (severity, marked) => [severity, marked, Call];
+        const target = marked => [Stops, marked, Target];
+        it.each([
+            ["ON 1 PROC", "Bad call", [call(EndsTooSoon, "PROC")]],
+            ["ON X PROC", "Bad call", [call(EndsTooSoon, "PROC")]],
+            ['ON 1 PROC:PRINT"ELSE"', "Bad call", [call(Stops, "PROC")]],
+            ["ON 2 PROC ELSE Y=1", "ok", [target("PROC")]],
+            ["ON 2 PROC:X=1 ELSE Y=1", "ok", [target("PROC")]],
+            ["ON 2 PROC,PROCp", "ok", [target("PROC")]],
+            ["ON 1 PROC,PROCp", "Bad call", [target("PROC")]],
+            ["ON 1 PROC ELSE PROCp", "Bad call", [target("PROC")]],
+            ["ON 1 PROC ,PROCp", "Bad call", [target("PROC")]],
+            ["ON 1 PRO.,PROCp", "Bad call", [target("PRO.")]],
+            ["ON 1 PROC(1)", "Bad call", [call(Stops, "PROC(1)")]],
+            ["ON 2 PROCp,PROC", "Bad call", [target("PROC")]],
+            ["ON 2 PROCp, PROC", "Bad call", [target("PROC")]],
+            ["ON 1 PROCp,PROC", "ok", [target("PROC")]],
+            ["ON 2 PROCp,PROC(1)", "Bad call", [target("PROC")]],
+            ["ON 3 PROCp,PROCq,PROC", "Bad call", [target("PROC")]],
+            ["ON 3 PROCp,PROCq,PROC ELSE END", "Bad call", [target("PROC")]],
+            ["ON 4 PROC,PROCp,PROC ELSE END", "ok", [target("PROC"), target("PROC")]],
+            ["ON 1 PROC,PROCp,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+            ["ON 3 PROC,PROCp,PROC ELSE END", "Bad call", [target("PROC"), target("PROC")]],
+        ])("%s (the ROM: %s)", (text, verdict, expected) => {
+            assert.strictEqual(masterVerdicts.get(text), verdict, text);
             const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
                 m.severity,
                 text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
             ]);
-            assert.deepStrictEqual(found, severity === null ? [] : [[severity, marked]]);
-        },
-    );
+            assert.deepStrictEqual(found, expected);
+        });
+        // The first PROC of a list that goes on, and one that has a name.
+        it.each(["ON 2 PROCp,PROCq", "ON 1 PROCp ELSE PRINT", "ON 2 PROCp(1),PROCq(2)"])(
+            "should leave %s alone",
+            text => {
+                assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect), []);
+            },
+        );
+        it("should not mark the last PROC of a list while it is being typed", () => {
+            const text = "ON 1 PROCp,PROC";
+            assert.deepStrictEqual(getSyntaxMarkers(text, BasicIVDialect, 1, text.length), []);
+        });
+    });
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
         ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],

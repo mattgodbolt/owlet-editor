@@ -34,6 +34,12 @@ const OnErrorLocal =
 const StrayElse =
     "ELSE is not after an IF or ON that has no ELSE yet: BASIC accepts it and ignores the rest of the line";
 
+const namelessDefinition = word =>
+    `DEF ${word} has no name, so nothing can call it (a call needs the name straight after ${word}): BASIC skips a DEF, so this runs without error`;
+
+const NamelessOnTarget =
+    "PROC has no name (it needs one straight after it, with no space): BASIC stops with Bad call if this target is chosen, but runs the line otherwise";
+
 const OnTargets = {
     lineNumber:
         "BASIC ignores everything after the line number here, up to the next comma (20E1 is line 20, not 200)",
@@ -1030,18 +1036,19 @@ export class Recogniser {
         if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
         const branch = this.next();
         const procedures = branch.kw.keyword === "PROC";
-        const named = !procedures || this.named();
+        let nameless = procedures && !this.named();
         let from = this.peek().start;
         let target = this.onTarget(procedures);
         // With one target and no ELSE after it on the line, BASIC stops whatever the value: Bad call at 1, ON range
         // otherwise.
-        if (!named && this.atEnd() && !this.elseFollows()) this.badCall(branch);
+        if (nameless && this.atEnd() && !this.elseFollows()) this.badCall(branch);
+        if (nameless) this.namelessTarget(branch);
         this.waitingForElse = true;
         for (;;) {
             // BASIC II counts the commas of the list in the raw text, so past a comma inside a string we cannot tell
             // which target it is reading and mark nothing more. BASIC IV reads a string as one item.
             if (this.splitsAtStringComma(from)) break;
-            this.ignoredAfter(target);
+            if (!nameless) this.ignoredAfter(target);
             if (this.splitsAtStringComma(from)) break;
             if (!this.isPunct(",")) return;
             this.next();
@@ -1049,14 +1056,30 @@ export class Recogniser {
             if (procedures && !this.isKeyword("PROC")) break;
             // BASIC reads only the target it counts to, so a later one that does not parse is not an error.
             try {
-                if (procedures) this.next();
+                const keyword = procedures ? this.next() : null;
+                nameless = procedures && !this.named();
                 target = this.onTarget(procedures);
+                if (nameless) this.namelessTarget(keyword);
             } catch (e) {
                 if (!(e instanceof Failure)) throw e;
                 break;
             }
         }
         while (!this.atEnd()) this.next();
+    }
+
+    // A PROC in an ON list with no name, which BASIC reads only if the value picks it.
+    namelessTarget(keyword) {
+        if (!this.nameMayFollow()) this.stricter(keyword, NamelessOnTarget);
+    }
+
+    // Whether the text ends here with the cursor at the end, or is a probe of what could be typed, so that a name may
+    // still be typed.
+    nameMayFollow() {
+        return (
+            this.is("end") &&
+            (this.probing || (this.typingAt !== null && this.typingAt >= this.lexer.text.length))
+        );
     }
 
     elseFollows() {
@@ -1166,6 +1189,8 @@ export class Recogniser {
         const token = this.peek();
         if (token.kind !== "keyword" || !isFnProc(token.kw)) return void this.skipLine();
         this.next();
+        if (!this.named() && !this.nameMayFollow())
+            this.stricter(token, namelessDefinition(token.kw.keyword));
         if (this.is("fnname")) this.next();
         if (this.isPunct("(")) {
             const opener = this.next();

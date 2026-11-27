@@ -43,6 +43,13 @@ const StricterThanRom = [
     "[OPT0:LDATOP.:]",
     "[OPT0:LDAERL:]",
     "[OPT0:LDARND:]",
+    "ON 2 PROC ELSE Y=1",
+    "ON 2 PROC:X=1 ELSE Y=1",
+    "ON 2 PROC,PROCp",
+    "ON 2 PROC,PROCp,PROC ELSE END",
+    "ON 4 PROC,PROCp,PROC ELSE END",
+    "ON 2 PROC,PROCp ELSE PROC",
+    "ON 1 PROCp,PROC",
     "X%=6ELSE7",
     "PRINT 1 ELSE PRINT 2",
     "A=1:B=2 ELSE C=3",
@@ -109,9 +116,8 @@ const StricterThanRom = [
     ),
     "[OPT0:TSB &70,Y:]",
 ];
-// Lines BASIC IV stops at and nothing marks: which target of an ON PROC list it reads depends on the value, so a PROC
-// with no name is marked only where every value stops (one target and no ELSE).
-const KnownGaps = ["ON 1 PROC ELSE PROCp", "ON 1 PROC,PROCp", "ON 2 PROCp,PROC"];
+// Lines BASIC IV stops at and nothing marks: an empty target in a PROC list.
+const KnownGaps = ["ON 2 PROCp,,PROC"];
 // What BASIC II rejects and BASIC IV runs, each a row of both recorded tables.
 const OnlyOnBasicIV = [
     "VDU 23,255,255|",

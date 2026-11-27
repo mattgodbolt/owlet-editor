@@ -401,7 +401,8 @@ const Typed = [
     ["A$=LEFT$(B$,3)", []],
     ["REPEAT UNTIL X=1", []],
     ["10 GOSUB 100", []],
-    ["DEF PROCfoo", []],
+    // A DEF with no name runs, so it is red on purpose until a name is typed (the editor holds that back at the cursor).
+    ["DEF PROCfoo", ["DEF PROC"]],
     ['PRINT "HI"', []],
     ["X=1+2*3", []],
     ["X=1 AND 2", []],
