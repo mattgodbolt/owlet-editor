@@ -20,6 +20,10 @@ and it runs on an emulated BBC Micro beside it.
 * Share your entire program as a URL
 * Export to external emulator for interactive use
 
+The Share dialog also opens the program in [Archimedes Live](https://archi.medes.live/), which runs BBC BASIC V on
+emulated Acorn Archimedes machines. It numbers lines that have no number and renumbers the program (as 10, 20, 30 and so
+on, with `GOTO` targets updated), so the line numbers there can differ from the editor's.
+
 ### Links that ask for sound
 
 Browsers allow sound only after a click or key press, so a link can't turn it on by itself. With `?sound` in the
