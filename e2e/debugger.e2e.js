@@ -78,11 +78,15 @@ async function open(page, baseURL, program, state) {
         route => route.fulfill({status: 204, body: ""}),
     );
     await page.goto(link(program, state));
-    await expect(debugButton(page)).toBeVisible();
+    await ready(page);
     return problems;
 }
 
+// The buttons are shown before the page binds them, which it does just before it fills the machine menu.
+const ready = page => expect(page.locator("#machine option")).not.toHaveCount(0);
+
 const debugButton = page => page.getByRole("button", {name: "Debug BASIC"});
+const beamButton = page => page.getByRole("button", {name: "Show beam"});
 const panel = page => page.locator("#debugger");
 const status = page => panel(page).locator(".debug-status");
 const screenHeight = page =>
@@ -212,6 +216,10 @@ const pause = async page => {
     await settle(page);
 };
 
+const screenShot = page => page.locator("#screen").screenshot();
+// The beam is off the picture in the borders and flyback, so pausing may take a few goes to catch it on it.
+const PausesToFindTheBeam = 10;
+
 for (const {name, state} of Machines) {
     test.describe(name, () => {
         test("the Debug button is named, and opens the panel and shrinks the screen", async ({
@@ -288,6 +296,37 @@ for (const {name, state} of Machines) {
                 variables: await variables(page),
                 marked: await markedText(page),
             }).toEqual(frozen);
+            expect(problems).toEqual([]);
+        });
+
+        test("Show beam is off at first, marks the beam while paused, puts the picture back, and is remembered", async ({
+            page,
+            baseURL,
+        }) => {
+            const problems = await open(page, baseURL, Program, state);
+            await debugButton(page).click();
+            await expect(beamButton(page)).toHaveAttribute("aria-pressed", "false");
+            let marked = false;
+            for (let pauses = 0; !marked && pauses < PausesToFindTheBeam; ++pauses) {
+                await pause(page);
+                const picture = await screenShot(page);
+                await beamButton(page).click();
+                await expect(beamButton(page)).toHaveAttribute("aria-pressed", "true");
+                await settle(page);
+                marked = !picture.equals(await screenShot(page));
+                await beamButton(page).click();
+                await settle(page);
+                expect((await screenShot(page)).equals(picture)).toBe(true);
+                await page.locator("#play-pause").click();
+                await settle(page);
+            }
+            expect(marked).toBe(true);
+
+            await beamButton(page).click();
+            await page.reload();
+            await ready(page);
+            await debugButton(page).click();
+            await expect(beamButton(page)).toHaveAttribute("aria-pressed", "true");
             expect(problems).toEqual([]);
         });
 
