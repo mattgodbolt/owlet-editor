@@ -120,6 +120,14 @@ BASIC does, and shows as an error.
   third), and nothing after it is marked; BASIC IV reads a string as one item. Suggested by Olly Betts on #335; its
   recorded rows include ones that must stay unmarked (`ON 5 GOTO 10ELSE30`, where the `ELSE` is read). As with the
   assembler's, the oracle takes these marks on trust as ignored text and lists them as STRICTER.
+- **An empty target in an `ON ... GOTO`, `GOSUB` or (BASIC IV) `PROC` list** (`ON X GOTO 10,,30`, `ON X GOTO ,20`,
+  `ON X PROCp,,PROCq`). BASIC counts commas to the target the value picks and reads only that one, so an empty target
+  stops it (`No such variable`, or `ON syntax` in a `PROC` list) only if the value picks it, and is otherwise never
+  read (`ON 1 GOTO 10,,30` runs; recorded on both ROMs in `on-empty-target-387`). It is an error, as BASIC's, where the
+  value is a plain number that picks it (`ON 2 GOTO 10,,30`) or where it is the only target and no `ELSE` follows, so
+  every value stops. Anywhere else it is red as a probable mistake, on the token that ends the empty target (a comma,
+  the `ELSE` or the `:`), with a hover that says BASIC stops there if the value picks it. At the end of the line it is
+  not marked, since the target may still be typed.
 - **`ON ERROR LOCAL`** (and its abbreviations, `ON ERROR LOC.`). It is BASIC V syntax, which BASIC II and IV accept with
   another meaning: `ON ERROR` takes the rest of the line as the handler, so the handler is the statement `LOCAL`. An
   error unwinds any procedure before the handler runs, so `LOCAL` is outside one even if the `ON ERROR` was inside a

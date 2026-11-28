@@ -41,6 +41,10 @@ const OnTargets = {
     procedure: "BASIC ignores everything after the procedure call here, up to the next comma",
 };
 
+const EmptyTargetPicked = "This target of the list is empty, and the value picks it";
+const emptyTargetUnpicked = error =>
+    `This target of the list is empty: BASIC never reads it unless the value picks it, and then stops (BASIC: ${error})`;
+
 const names = text => new Set(text.split(" "));
 export const NoArgument = names(
     "PI TRUE FALSE POS VPOS COUNT ERL ERR TIME PAGE LOMEM HIMEM GET GET$",
@@ -1026,13 +1030,22 @@ export class Recogniser {
             }
             return this.statement();
         }
+        const valueStart = this.peek();
         this.expression();
+        // The value is known only where it is a plain number.
+        const picked =
+            this.last === valueStart && /^\d+$/.test(valueStart.text) ? Number(valueStart.text) : 0;
         if (!this.isKeyword(...this.dialect.onBranches)) this.failBeforeKeyword("ON syntax");
         const branch = this.next();
         const procedures = branch.kw.keyword === "PROC";
         const named = !procedures || this.named();
         let from = this.peek().start;
-        let target = this.onTarget(procedures);
+        let position = 1;
+        // A sole empty target with no ELSE stops whatever the value, and is the error the expression gives.
+        const soleEmpty = this.atEnd() && !this.elseFollows();
+        const emptyFirst = !procedures && !soleEmpty && this.emptyTarget();
+        let target = emptyFirst ? null : this.onTarget(procedures);
+        if (emptyFirst) this.markEmptyTarget(procedures, position, picked);
         // With one target and no ELSE after it on the line, BASIC stops whatever the value: Bad call at 1, ON range
         // otherwise.
         if (!named && this.atEnd() && !this.elseFollows()) this.badCall(branch);
@@ -1046,6 +1059,11 @@ export class Recogniser {
             if (!this.isPunct(",")) return;
             this.next();
             from = this.peek().start;
+            position++;
+            if (this.emptyTarget()) {
+                this.markEmptyTarget(procedures, position, picked);
+                continue;
+            }
             if (procedures && !this.isKeyword("PROC")) break;
             // BASIC reads only the target it counts to, so a later one that does not parse is not an error.
             try {
@@ -1057,6 +1075,19 @@ export class Recogniser {
             }
         }
         while (!this.atEnd()) this.next();
+    }
+
+    emptyTarget() {
+        return this.isPunct(",") || this.atEnd();
+    }
+
+    // The empty target ends at the token here: an error if the value picks it, else marked as stricter than BASIC,
+    // except at the end of the line, where the target may still be typed.
+    markEmptyTarget(procedures, position, picked) {
+        const error = procedures ? "ON syntax" : "No such variable";
+        const token = this.peek();
+        if (picked === position) this.fail(error, token, undefined, EmptyTargetPicked);
+        if (token.kind !== "end") this.stricter(token, emptyTargetUnpicked(error));
     }
 
     elseFollows() {
