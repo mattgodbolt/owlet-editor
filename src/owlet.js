@@ -713,6 +713,13 @@ export class OwletEditor {
                 );
                 this.closeModal();
             },
+            archimedes: () => {
+                window.open(
+                    `https://archi.medes.live/#basic=${encodeURIComponent(this.getBasicText())}`,
+                    "_blank",
+                );
+                this.closeModal();
+            },
             rocket: () => this.rocket(),
             sound: () => this.toggleSound(),
             debug: () => this.basicDebugger.toggle(),
