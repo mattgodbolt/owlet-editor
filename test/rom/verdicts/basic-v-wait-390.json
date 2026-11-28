@@ -19,5 +19,9 @@
   ["IF 1 THEN OSCLI\"FX19\" ELSE PRINT", "ok", "basic-v-wait-390"],
   ["IF 0 THEN PRINT ELSE OSCLI\"FX19\"", "ok", "basic-v-wait-390"],
   ["REPEAT:OSCLI\"FX19\":UNTIL 1", "ok", "basic-v-wait-390"],
-  ["REPEAT OSCLI\"FX19\" UNTIL 1", "Syntax error", "basic-v-wait-390"]
+  ["REPEAT OSCLI\"FX19\" UNTIL 1", "Syntax error", "basic-v-wait-390"],
+  ["REPEATWAIT:UNTIL 1", "Mistake", "basic-v-wait-390"],
+  ["REPEAT WAIT:UNTIL 1", "Mistake", "basic-v-wait-390"],
+  ["REPEATOSCLI\"FX19\":UNTIL 1", "ok", "basic-v-wait-390"],
+  ["REPEAT OSCLI\"FX19\":UNTIL 1", "ok", "basic-v-wait-390"]
 ]
