@@ -347,7 +347,6 @@
   ["ON ERROR GOTO 10", "ok"],
   ["ON ERROR OFF 1", "Syntax error"],
   ["ON X", "ON syntax"],
-  ["ON X GOTO", "No such variable"],
   ["ON X GOSUB 10,20", "ok"],
   ["ON X GOTO 10,", "ok"],
   ["ON X GOTO 10 ELSE", "ok"],

@@ -2492,6 +2492,101 @@ describe("Syntax markers", () => {
             assert.deepStrictEqual(found, severity === null ? [] : [[severity, marked]]);
         },
     );
+    // BASIC counts commas to the target the value picks and reads only that one, so an empty target stops it (No such
+    // variable, or ON syntax for PROC) only if the value picks it. The mark is an error where a number picks it, and
+    // otherwise stricter than the ROM, on the token that ends the empty target; nothing at the end of the line, where
+    // the target may still be typed. Where the only target is empty and no ELSE follows, every value stops.
+    describe.each([
+        ["BASIC II", ModelBDialect, verdicts],
+        ["BASIC IV", BasicIVDialect, masterVerdicts],
+    ])("an empty target in an ON GOTO or GOSUB list on %s", (_, dialect, table) => {
+        const Picked =
+            "This target of the list is empty, and the value picks it (BASIC: No such variable)";
+        const Unpicked =
+            "This target of the list is empty: BASIC never reads it unless the value picks it, and then stops (BASIC: No such variable)";
+        const {Error: Stops, Warning: EndsTooSoon} = MarkerSeverity;
+        const Nothing = "ok";
+        const Stop = "No such variable";
+        describe.each(["GOTO", "GOSUB"])("%s", keyword => {
+            it.each([
+                ["ON 2 K10,,20", Stop, [[Stops, ",20", Picked]]],
+                ["ON 2 K10, ,20", Stop, [[Stops, ",20", Picked]]],
+                ["ON 1 K ,10", Stop, [[Stops, ",10", Picked]]],
+                ["ON 3 K10,20,,", Stop, [[Stops, ",", Picked]]],
+                ["ON 2 K10, ELSE PRINT", Stop, [[Stops, ",", Picked]]],
+                ["ON 1 K ELSE PRINT", Stop, [[Stops, "K", Picked]]],
+                ["ON 2 K10,", Stop, [[EndsTooSoon, ",", Picked]]],
+                ["ON 1 K10,,20", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON 3 K10,,20", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON 1 K10,,20 ELSE PRINT", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON 3 K10, ,20", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON X K10,,20", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON 2 K ,10", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON 3 K,10,20", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON X K ,10", Stop, [[Stops, ",", Unpicked]]],
+                ["ON 1 K10, ELSE PRINT", Nothing, [[Stops, "ELSE", Unpicked]]],
+                ["ON 2 K ELSE PRINT", Nothing, [[Stops, "ELSE", Unpicked]]],
+                ["ON 2 K10,20,,", Nothing, [[Stops, ",", Unpicked]]],
+                ["ON 1 K10,", Nothing, []],
+                ["ON X K10,", Nothing, []],
+                ["ON 2 K10,,20 ELSE PRINT", Stop, [[Stops, ",20", Picked]]],
+            ])("%s", (template, verdict, expected) => {
+                const text = template.replace("K", keyword);
+                assert.strictEqual(table.get(text), verdict, text);
+                const found = getSyntaxMarkers(text, dialect).map(m => [
+                    m.severity,
+                    text.slice(m.startColumn - 1, m.endColumn - 1),
+                    m.message,
+                ]);
+                assert.deepStrictEqual(
+                    found,
+                    expected.map(([severity, marked, message]) => [
+                        severity,
+                        marked.replace("K", keyword),
+                        message,
+                    ]),
+                );
+            });
+        });
+    });
+    // The same on BASIC IV's ON PROC list, which says ON syntax; BASIC II has no ON PROC.
+    describe("an empty target in an ON PROC list on BASIC IV", () => {
+        const Picked =
+            "This target of the list is empty, and the value picks it (BASIC: ON syntax)";
+        const Unpicked =
+            "This target of the list is empty: BASIC never reads it unless the value picks it, and then stops (BASIC: ON syntax)";
+        const {Error: Stops, Warning: EndsTooSoon} = MarkerSeverity;
+        it.each([
+            ["ON 2 PROCp,,PROCq", "ON syntax", [[Stops, ",PROCq", Picked]]],
+            ["ON 2 PROCp, ,PROCq", "ON syntax", [[Stops, ",PROCq", Picked]]],
+            ["ON 2 PROCp, ELSE PRINT", "ON syntax", [[Stops, ",", Picked]]],
+            ["ON 3 PROCp,PROCq,,", "ON syntax", [[Stops, ",", Picked]]],
+            ["ON 2 PROCp,", "ON syntax", [[EndsTooSoon, ",", Picked]]],
+            ["ON 1 PROCp,,PROCq", "ok", [[Stops, ",", Unpicked]]],
+            ["ON 1 PROCp,,PROCq ELSE PRINT", "ok", [[Stops, ",", Unpicked]]],
+            ["ON X PROCp,,PROCq", "ok", [[Stops, ",", Unpicked]]],
+            ["ON 1 PROCp, ELSE PRINT", "ok", [[Stops, "ELSE", Unpicked]]],
+            ["ON 1 PROCp,PROCq,,", "ok", [[Stops, ",", Unpicked]]],
+            ["ON 1 PROCp,", "ok", []],
+            ["ON X PROCp,", "ok", []],
+            ["ON 1 PROCp,PROCq,", "ok", []],
+        ])("%s", (text, verdict, expected) => {
+            assert.strictEqual(masterVerdicts.get(text), verdict, text);
+            const found = getSyntaxMarkers(text, BasicIVDialect).map(m => [
+                m.severity,
+                text.slice(m.startColumn - 1, m.endColumn - 1),
+                m.message,
+            ]);
+            assert.deepStrictEqual(found, expected);
+        });
+        it("should say ON syntax at the whole statement on BASIC II, as it has no ON PROC", () => {
+            assert.strictEqual(verdicts.get("ON 2 PROCp,,PROCq"), "ON syntax");
+            assert.deepStrictEqual(
+                getSyntaxMarkers("ON 2 PROCp,,PROCq", ModelBDialect).map(m => m.message),
+                ["Expected GOTO or GOSUB here, not PROC (BASIC: ON syntax)"],
+            );
+        });
+    });
     it.each([
         ["[ASL42,Y:]", BasicIIDialect, "ASL cannot be indexed by Y, only by X"],
         ["[ASL42,Y:]", BasicIVDialect, "ASL cannot be indexed by Y, only by X"],
