@@ -1,0 +1,23 @@
+[
+  ["WAIT", "Mistake", "basic-v-wait-390"],
+  ["WAIT:P.\"HELLO\"", "Mistake", "basic-v-wait-390"],
+  ["IF X% WAIT", "Mistake", "basic-v-wait-390"],
+  ["X=1:WAIT", "Mistake", "basic-v-wait-390"],
+  ["IF 1 THEN WAIT ELSE PRINT", "Mistake", "basic-v-wait-390"],
+  ["IF 0 THEN PRINT ELSE WAIT", "Mistake", "basic-v-wait-390"],
+  ["REPEAT:WAIT:UNTIL 1", "Mistake", "basic-v-wait-390"],
+  ["REPEAT WAIT UNTIL 1", "Mistake", "basic-v-wait-390"],
+  ["WAIT 5", "Mistake", "basic-v-wait-390"],
+  ["WAITING", "Mistake", "basic-v-wait-390"],
+  ["WAIT%", "Mistake", "basic-v-wait-390"],
+  ["WAIT=1:PRINT WAIT", "ok", "basic-v-wait-390"],
+  ["OSCLI\"FX19\"", "ok", "basic-v-wait-390"],
+  ["OSCLI\"FX19\":P.\"HELLO\"", "ok", "basic-v-wait-390"],
+  ["IF X% OSCLI\"FX19\"", "ok", "basic-v-wait-390"],
+  ["IF X% THEN OSCLI\"FX19\"", "ok", "basic-v-wait-390"],
+  ["X=1:OSCLI\"FX19\"", "ok", "basic-v-wait-390"],
+  ["IF 1 THEN OSCLI\"FX19\" ELSE PRINT", "ok", "basic-v-wait-390"],
+  ["IF 0 THEN PRINT ELSE OSCLI\"FX19\"", "ok", "basic-v-wait-390"],
+  ["REPEAT:OSCLI\"FX19\":UNTIL 1", "ok", "basic-v-wait-390"],
+  ["REPEAT OSCLI\"FX19\" UNTIL 1", "Syntax error", "basic-v-wait-390"]
+]

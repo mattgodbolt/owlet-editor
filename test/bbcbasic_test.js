@@ -1846,6 +1846,13 @@ describe("Quick fix for a BASIC V statement", () => {
     it.each([
         ["OFF", "VDU 23,1,0;0;0;0;"],
         ["ON", "VDU 23,1,1;0;0;0;"],
+        ["WAIT", 'OSCLI"FX19"'],
+        ['WAIT:P."HELLO"', 'OSCLI"FX19":P."HELLO"'],
+        ["IF X% WAIT", 'IF X% OSCLI"FX19"'],
+        ["X=1:WAIT", 'X=1:OSCLI"FX19"'],
+        ["IF 1 THEN WAIT ELSE PRINT", 'IF 1 THEN OSCLI"FX19" ELSE PRINT'],
+        ["IF 0 THEN PRINT ELSE WAIT", 'IF 0 THEN PRINT ELSE OSCLI"FX19"'],
+        ["REPEAT:WAIT:UNTIL 1", 'REPEAT:OSCLI"FX19":UNTIL 1'],
         ["OFF:PRINT", "VDU 23,1,0;0;0;0;:PRINT"],
         ["IF 1 THEN OFF ELSE PRINT", "IF 1 THEN VDU 23,1,0;0;0;0; ELSE PRINT"],
         ["BY=1:MOVE BY 1,2", "BY=1:PLOT0,1,2"],
@@ -2013,6 +2020,12 @@ describe("Quick fix for a BASIC V statement", () => {
         "ON ERROR OFF",
         "ON ERROR LINE 1,2",
         "TRACE OFF",
+        "WAIT 5",
+        "WAITING",
+        "WAIT%",
+        "WAIT$",
+        "REPEAT WAIT UNTIL 1",
+        'REM WAIT:PRINT "WAIT"',
     ])("%s should offer no fix", text => {
         for (const dialect of [BasicIIDialect, BasicIVDialect])
             assert.deepStrictEqual(fixes(text, dialect), []);
