@@ -50,7 +50,7 @@ BASIC does, and shows as an error.
   (recorded on both ROMs); the hover says that BASIC V, which is not emulated here, accepts one argument, with
   `GCOL C` meaning `GCOL 0,C` (from #340). The fix, "Insert 0, before the argument", is offered only where the
   statement then has no error (so not for `GCOL 1 2`). `GCOL 1,2,3` is a different error and has no fix.
-- **BASIC V statements** (`OFF`, `ON`, `MOVE BY`, `DRAW BY`, `POINT`, `POINT BY`, `ORIGIN`, `LINE`, `CIRCLE`,
+- **BASIC V statements** (`OFF`, `ON`, `WAIT`, `MOVE BY`, `DRAW BY`, `POINT`, `POINT BY`, `ORIGIN`, `LINE`, `CIRCLE`,
   `CIRCLE FILL`). BASIC II and IV stop at each with the error it has always had (`Syntax error`, `No such variable`,
   `Missing ,` or `Mistake`; recorded on both ROMs). The hover says that BASIC V accepts it (BASIC V is not emulated here)
   and the quick fix replaces the statement with the one that does the same, as listed in #348: `OFF` and `ON` become
@@ -61,6 +61,15 @@ BASIC does, and shows as an error.
   has and a Model B has with the GXR ROM fitted (checked by drawing on both, as on the Master), so they have a fix on
   BASIC IV and on a Model B with the GXR (the machine menu's default), and none on a Model B without it, where nothing
   is drawn. `ModelBDialect` is the Model B with the GXR and `ModelBNoGxrDialect` is without it; `dialectFor` picks one.
+  - `WAIT` waits for the next vertical sync in BASIC V. BASIC II and IV read it as a variable, so a `WAIT` that starts a
+    statement stops with `Mistake` (`WAIT:P."HELLO"`, `IF X% WAIT`, `X=1:WAIT`, `ELSE WAIT`; recorded on both ROMs in
+    `basic-v-wait-390`, as is `WAIT=1:PRINT WAIT`, which runs). The fix is `OSCLI"FX19"`, which both ROMs run and which
+    waits for the sync (five of them in a loop took 8 to 12 centiseconds), not the shorter `*FX19`: a `*` command runs
+    to the end of the line, so `WAIT:P."HELLO"` would lose the `PRINT`, and `IF X% WAIT` would become the product of
+    `X%` and a variable `FX19` (#390). It is offered only where the line with it has no error, so not for
+    `REPEAT WAIT UNTIL 1` (BASIC needs a `:` before `UNTIL` after `OSCLI"FX19"`), and not where `WAIT` has something
+    after it (`WAIT 5`) or is part of a longer name (`WAITING`, `WAIT%`). A program that assigns `WAIT` gets the fix
+    on a bare `WAIT` statement all the same, which stops whatever the variable holds.
   - `BY` is the BASIC V word only where the ROM stops. In BASIC II and IV it is a variable, so `MOVE BY -1,2`,
     `MOVE BY+1,2`, `MOVE BY!1,2`, `MOVE BY?1,2`, `MOVE BY(1),2` (an array element) and the same with `*`, `/`, `^`, `<`,
     `>`, `=`, `AND`, `OR`, `EOR`, `DIV` or `MOD` run on both ROMs, as does `DRAW BY`; they have no error and so no fix (but see the warning for `-` below).

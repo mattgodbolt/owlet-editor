@@ -9,6 +9,7 @@ export const BasicVFixCode = "basic-v-fix";
 const Statements = [
     ["OFF", "VDU 23,1,0;0;0;0;", "turns the cursor off"],
     ["ON", "VDU 23,1,1;0;0;0;", "turns the cursor on"],
+    ["WAIT", 'OSCLI"FX19"', "waits for the next vertical sync"],
     ["MOVE BY X,Y", "PLOT0,X,Y", "moves the graphics cursor relative to where it is"],
     ["DRAW BY X,Y", "PLOT1,X,Y", "draws a line relative to the graphics cursor"],
     ["POINT BY X,Y", "PLOT&61,X,Y", "plots a point relative to the graphics cursor"],
